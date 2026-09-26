@@ -1,5 +1,20 @@
 import { ChevronDown, Loader2, Play, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+/** Segundos transcurridos mientras `active` es true (SFC/DISM tardan minutos). */
+function useElapsed(active: boolean) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    setSecs(0);
+    const start = Date.now();
+    const t = window.setInterval(() => setSecs(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => window.clearInterval(t);
+  }, [active]);
+  return secs;
+}
+
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 import type { Risk, TweakStatus, TweakView } from "../lib/api";
 
 const RISK: Record<Risk, { label: string; cls: string }> = {
@@ -54,6 +69,7 @@ export function TweakCard({
   onRun: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const elapsed = useElapsed(busy);
   const blocked = (t.needsAdmin && !isAdmin) || !t.supported || t.status === "unavailable";
   // "Parcial" se muestra apagado: al pulsarlo se completa el ajuste.
   const on = t.status === "applied";
@@ -90,6 +106,7 @@ export function TweakCard({
             {busy ? (
               <span className="flex items-center gap-1.5 text-neon">
                 <Loader2 size={12} className="animate-spin" /> {busyLabel ?? "Trabajando…"}
+                {elapsed >= 3 && <span className="font-mono text-mute">{mmss(elapsed)}</span>}
               </span>
             ) : (
               <>

@@ -4,6 +4,8 @@ import { ToastProvider } from "./components/feedback";
 import { NAV, Sidebar, type PageId } from "./components/Sidebar";
 import { api, systemApi, type TargetUser } from "./lib/api";
 import { Bloatware } from "./pages/Bloatware";
+import { Diagnostics } from "./pages/Diagnostics";
+import { Report } from "./pages/Report";
 import { Dashboard } from "./pages/Dashboard";
 import { History } from "./pages/History";
 import { Placeholder } from "./pages/Placeholder";
@@ -14,6 +16,7 @@ import { TweaksPage } from "./pages/TweaksPage";
 const TWEAK_PAGES: Partial<Record<PageId, string>> = {
   privacy: "privacy",
   performance: "performance",
+  repair: "repair",
   services: "services",
   cleanup: "cleanup",
 };
@@ -36,6 +39,8 @@ export default function App() {
   else if (page === "history") content = <History isAdmin={!!isAdmin} />;
   else if (page === "bloatware") content = <Bloatware isAdmin={!!isAdmin} />;
   else if (page === "startup") content = <Startup isAdmin={!!isAdmin} />;
+  else if (page === "diagnostics") content = <Diagnostics />;
+  else if (page === "report") content = <Report />;
   else if (category) content = <TweaksPage key={category} category={category} isAdmin={!!isAdmin} />;
   else content = <Placeholder label={nav.label} icon={nav.icon} phase={nav.phase} />;
 

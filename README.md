@@ -16,6 +16,16 @@ El ejecutable de **release** lleva un manifiesto `requireAdministrator` y pide U
 En **debug** usa `asInvoker` para que `tauri dev` funcione sin una terminal elevada
 (ver `src-tauri/build.rs` y `src-tauri/manifests/`).
 
+## Ícono
+
+Fuente única: `src/assets/logo.svg` (también se usa en la barra lateral y en el informe PDF).
+Para regenerar todos los tamaños (ventana, barra de tareas, .exe, instalador):
+
+```bash
+# exportar el SVG a PNG de 1024 px como src-tauri/icons/icon-source.png, luego:
+npx tauri icon src-tauri/icons/icon-source.png
+```
+
 ## Estructura
 
 ```
@@ -76,6 +86,20 @@ Tareas puntuales: `kind = "action"` con `[tweak.script] run = '''...'''`.
 Si AdminOps se eleva con otra cuenta de administrador, los ajustes de HKCU se aplican al usuario con
 la sesión abierta (dueño de `explorer.exe`, vía `HKEY_USERS\<SID>`), no a la cuenta del técnico.
 
+## Diagnóstico e informe
+
+- `src-tauri/src/diagnostics/collect.rs`: recolectores en PowerShell (discos físicos y SMART,
+  pantallazos azules y apagados inesperados, apps que fallan, drivers con error, batería,
+  Defender/actualizaciones/activación/TPM). Corren en paralelo; si uno falla, el resto sigue.
+- `diagnostics/mod.rs` convierte los datos en hallazgos priorizados y guarda cada análisis en
+  `%APPDATA%\com.adminops.app\snapshots\` para comparar antes/después.
+- `diagnostics/report.rs` arma el informe y `diagnostics/pdf.rs` lo convierte a PDF (A4) con Microsoft
+  Edge en modo headless (incluido en Windows 10/11). Se guarda en `Documentos\AdminOps\Informes` y se
+  abre vía `explorer.exe` para que el visor no herede los permisos de administrador. Si Edge no está,
+  se guarda como HTML.
+- Reparaciones (`tweaks/repair.toml`): SFC, DISM, red, Windows Update, cola de impresión,
+  Explorador, hora, caché de iconos y prueba de RAM.
+
 ## Deshacer
 
 Cada aplicación guarda el valor exacto anterior (tipo + bytes del registro, tipo de inicio y
@@ -93,5 +117,5 @@ concreto (y, desde la Fase 2, un `id` de tweak del catálogo embebido en el bina
 1. **Base** ✅: proyecto, tema, UAC, panel en vivo.
 2. **Motor de tweaks** ✅: formato declarativo (detect/apply/revert), journal de cambios, puntos de restauración.
 3. **Catálogo** ✅: limpieza, privacidad/telemetría, bloatware, servicios, programas de inicio.
-4. **Diagnóstico e informes**: SMART, eventos/BSOD, drivers, batería, informe exportable.
+4. **Diagnóstico e informes** ✅: SMART, eventos/BSOD, drivers, batería, informe exportable.
 5. **Pulido**: perfiles, modo portable, firma de código.

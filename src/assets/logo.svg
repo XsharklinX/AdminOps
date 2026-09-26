@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- AdminOps: una "A" neón cuyo travesaño es un pulso de diagnóstico. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141d2b"/>
+      <stop offset="1" stop-color="#07090d"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#22e1ff"/>
+      <stop offset="1" stop-color="#b56cff"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.55" r="0.5">
+      <stop offset="0" stop-color="#22e1ff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#22e1ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="40" y="40" width="944" height="944" rx="216" fill="url(#bg)"/>
+  <rect x="40" y="40" width="944" height="944" rx="216" fill="url(#halo)"/>
+  <rect x="44" y="44" width="936" height="936" rx="212" fill="none" stroke="#22e1ff" stroke-opacity="0.35" stroke-width="8"/>
+
+  <g filter="url(#glow)" fill="none" stroke="url(#neon)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Patas de la A -->
+    <path d="M268 800 L512 228 L756 800" stroke-width="92"/>
+    <!-- Travesaño: pulso -->
+    <path d="M352 612 H438 L478 530 L534 700 L574 612 H672" stroke-width="52"/>
+  </g>
+</svg>

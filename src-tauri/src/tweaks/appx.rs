@@ -190,6 +190,15 @@ pub fn list_apps() -> Result<Vec<AppView>, String> {
     Ok(out)
 }
 
+/// Apps instaladas marcadas como "recomendado quitar" (para el informe).
+pub fn recommended_installed() -> Result<Vec<String>, String> {
+    Ok(list_apps()?
+        .into_iter()
+        .filter(|a| a.installed && a.advice == Some(Advice::Remove))
+        .map(|a| a.name)
+        .collect())
+}
+
 fn remove(name: &str) -> Result<(), String> {
     let n = name.replace('\'', "''");
     ps::powershell(&format!(

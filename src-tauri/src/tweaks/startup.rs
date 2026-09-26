@@ -237,6 +237,11 @@ fn list() -> Result<Vec<StartupItem>, String> {
     Ok(items)
 }
 
+/// Nombres visibles de lo que arranca con Windows (para el informe).
+pub fn enabled_names() -> Result<Vec<String>, String> {
+    Ok(list()?.into_iter().filter(|i| i.enabled).map(|i| i.description.unwrap_or(i.name)).collect())
+}
+
 #[tauri::command(async)]
 pub fn list_startup() -> Result<Vec<StartupItem>, String> {
     list()

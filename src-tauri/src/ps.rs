@@ -6,7 +6,8 @@ use std::process::{Command, Output};
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-fn hidden(program: &str) -> Command {
+/// `Command` que no abre ventana de consola.
+pub fn hidden(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut cmd = Command::new(program);
     #[cfg(windows)]
     {

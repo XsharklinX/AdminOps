@@ -4,9 +4,9 @@
 pub mod appx;
 mod catalog;
 mod engine;
-mod journal;
+pub(crate) mod journal;
 pub mod model;
-mod registry;
+pub(crate) mod registry;
 mod restore;
 mod service;
 pub mod startup;
@@ -63,6 +63,22 @@ impl TweakState {
 
     fn log(&self, e: Entry) -> u64 {
         self.journal.lock().unwrap().push(e)
+    }
+
+    /// Cuántos ajustes (toggle) del catálogo están aplicados ahora mismo.
+    pub fn applied_count(&self) -> usize {
+        let toggles: Vec<&Tweak> = self.catalog.iter().filter(|t| t.kind == Kind::Toggle).collect();
+        std::thread::scope(|s| {
+            let handles: Vec<_> = toggles.iter().map(|t| s.spawn(|| engine::detect(t))).collect();
+            handles.into_iter().filter_map(|h| h.join().ok()).filter(|st| *st == Status::Applied).count()
+        })
+    }
+
+    /// Entradas del diario desde `since` (segundos epoch), de más antigua a más reciente.
+    pub fn journal_since(&self, since: u64) -> Vec<Entry> {
+        let mut v: Vec<Entry> = self.journal.lock().unwrap().newest_first().into_iter().filter(|e| e.timestamp >= since).collect();
+        v.reverse();
+        v
     }
 }
 

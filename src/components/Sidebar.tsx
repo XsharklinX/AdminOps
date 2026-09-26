@@ -1,14 +1,17 @@
+import logo from "../assets/logo.svg";
 import type { TargetUser } from "../lib/api";
 import {
   Activity,
   Brush,
   Cog,
+  FileText,
   Gauge,
   History,
   Package,
   Power,
   ShieldHalf,
   Stethoscope,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +24,8 @@ export type PageId =
   | "services"
   | "startup"
   | "diagnostics"
+  | "repair"
+  | "report"
   | "history";
 
 export const NAV: { id: PageId; label: string; icon: LucideIcon; phase?: number }[] = [
@@ -31,7 +36,9 @@ export const NAV: { id: PageId; label: string; icon: LucideIcon; phase?: number 
   { id: "bloatware", label: "Bloatware", icon: Package },
   { id: "services", label: "Servicios", icon: Cog },
   { id: "startup", label: "Inicio", icon: Power },
-  { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope, phase: 4 },
+  { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope },
+  { id: "repair", label: "Reparaciones", icon: Wrench },
+  { id: "report", label: "Informe", icon: FileText },
   { id: "history", label: "Historial", icon: History },
 ];
 
@@ -49,12 +56,10 @@ export function Sidebar({
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-panel/60">
       <div className="flex items-center gap-2.5 px-5 pt-5 pb-6">
-        <div className="grid size-8 place-items-center rounded-lg bg-neon/10 glow-neon">
-          <span className="font-mono text-sm font-bold text-neon">A/</span>
-        </div>
+        <img src={logo} alt="" className="size-9 drop-shadow-[0_0_10px_rgba(34,225,255,0.35)]" draggable={false} />
         <div>
           <div className="text-[15px] font-semibold tracking-tight">AdminOps</div>
-          <div className="text-[10px] tracking-widest text-mute uppercase">v0.3 · Fase 3</div>
+          <div className="text-[10px] tracking-widest text-mute uppercase">v0.4 · Fase 4</div>
         </div>
       </div>
 

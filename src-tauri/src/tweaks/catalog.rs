@@ -8,6 +8,7 @@ const FILES: &[(&str, &str)] = &[
     ("services.toml", include_str!("../../tweaks/services.toml")),
     ("cleanup.toml", include_str!("../../tweaks/cleanup.toml")),
     ("performance.toml", include_str!("../../tweaks/performance.toml")),
+    ("repair.toml", include_str!("../../tweaks/repair.toml")),
 ];
 
 pub fn load() -> Vec<Tweak> {

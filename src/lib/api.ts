@@ -163,3 +163,107 @@ export const systemApi = {
   setStartupEnabled: (id: string, enabled: boolean) => invoke<void>("set_startup_enabled", { id, enabled }),
   targetUser: () => invoke<TargetUser | null>("get_target_user"),
 };
+
+// ---------- Diagnóstico e informes (Fase 4) ----------
+
+export type Severity = "info" | "warn" | "bad";
+
+export interface Finding {
+  severity: Severity;
+  area: string;
+  title: string;
+  detail: string | null;
+}
+
+export interface Section<T> {
+  data: T | null;
+  error: string | null;
+}
+
+export interface PhysicalDisk {
+  name: string;
+  mediaType: string;
+  busType: string;
+  health: string;
+  operational: string;
+  size: number;
+  temperature: number | null;
+  wear: number | null;
+  powerOnHours: number | null;
+  readErrors: number | null;
+  writeErrors: number | null;
+}
+
+export interface Stability {
+  days: number;
+  bugchecks: { time: string; code: string; name: string | null; hint: string | null }[];
+  unexpectedShutdowns: string[];
+  crashes: { app: string; count: number; last: string }[];
+  minidumps: { name: string; time: string; size: number }[] | null;
+  bootTimes: { time: string; ms: number }[] | null;
+}
+
+export interface DeviceProblem {
+  name: string;
+  class: string | null;
+  code: number;
+  deviceId: string;
+  problem: string;
+}
+
+export interface Battery {
+  name: string;
+  manufacturer: string;
+  chemistry: string;
+  design: number;
+  full: number;
+  cycles: number | null;
+}
+
+export interface SystemHealth {
+  lastBoot: string;
+  installDate: string;
+  pendingReboot: boolean;
+  lastUpdate: string | null;
+  lastUpdateId: string | null;
+  defenderRealtime: boolean | null;
+  signatureAgeDays: number | null;
+  antivirus: string[];
+  activated: boolean | null;
+  secureBoot: boolean | null;
+  tpmReady: boolean | null;
+}
+
+export interface Diagnostics {
+  timestamp: number;
+  host: string;
+  os: string;
+  cpu: string;
+  ramTotal: number;
+  admin: boolean;
+  volumes: { mount: string; total: number; free: number }[];
+  disks: Section<PhysicalDisk[]>;
+  stability: Section<Stability>;
+  drivers: Section<DeviceProblem[]>;
+  battery: Section<Battery | null>;
+  system: Section<SystemHealth>;
+  startupEnabled: Section<string[]>;
+  bloatInstalled: Section<string[]>;
+  tweaksApplied: number;
+  findings: Finding[];
+}
+
+export interface SnapshotInfo {
+  timestamp: number;
+  bad: number;
+  warn: number;
+}
+
+export const diagApi = {
+  run: () => invoke<Diagnostics>("run_diagnostics"),
+  snapshots: () => invoke<SnapshotInfo[]>("list_snapshots"),
+  generateReport: (baseline: number | null, technician: string, client: string, notes: string) =>
+    invoke<string>("generate_report", { baseline, technician, client, notes }),
+  openReport: (path: string) => invoke<void>("open_report", { path }),
+  revealReport: (path: string) => invoke<void>("reveal_report", { path }),
+};

@@ -1,0 +1,179 @@
+# Reparaciones: tareas puntuales para problemas concretos (kind = "action").
+
+[[tweak]]
+id = "repair.sfc"
+name = "Comprobar archivos del sistema (SFC)"
+description = "Busca y repara archivos de Windows dañados o modificados. Primer paso ante pantallazos azules o fallos raros."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+note = "Tarda de 5 a 15 minutos. Si no puede reparar algo, ejecuta DISM y después SFC de nuevo."
+
+[tweak.script]
+run = '''
+# sfc escribe en UTF-16 aunque se redirija: quitamos los nulos para poder leerlo.
+$out = ((sfc.exe /scannow) -join "`n") -replace "`0", ''
+$code = $LASTEXITCODE
+if ($out -match 'did not find any integrity violations|no encontr\S* ninguna infracci') { 'Sin archivos dañados.' }
+elseif ($out -match 'successfully repaired|repar\S* correctamente') { 'Se encontraron y repararon archivos dañados. Reinicia el equipo.' }
+elseif ($out -match 'unable to fix|no pudo reparar') { 'Hay archivos dañados que SFC no pudo reparar: ejecuta DISM y vuelve a pasar SFC.' }
+elseif ($out -match 'pending|pendiente') { 'Hay una reparación pendiente: reinicia y vuelve a ejecutarlo.' }
+else { "SFC terminó (código $code). Detalle en C:\Windows\Logs\CBS\CBS.log" }
+'''
+
+[[tweak]]
+id = "repair.dism"
+name = "Reparar imagen de Windows (DISM)"
+description = "Repara el almacén de componentes desde Windows Update. Necesario cuando SFC no puede reparar."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+note = "Tarda de 10 a 30 minutos y necesita conexión a Internet."
+
+[tweak.script]
+run = '''
+Dism.exe /Online /Cleanup-Image /RestoreHealth /NoRestart | Out-Null
+switch ($LASTEXITCODE) {
+  0 { 'Imagen de Windows correcta o reparada. Ejecuta SFC a continuación.' }
+  3010 { 'Reparada. Reinicia el equipo y ejecuta SFC.' }
+  default { throw "DISM devolvió $LASTEXITCODE. Detalle en C:\Windows\Logs\DISM\dism.log" }
+}
+'''
+
+[[tweak]]
+id = "repair.network-reset"
+name = "Restablecer red"
+description = "Reinicia Winsock y la pila TCP/IP y renueva la IP. Soluciona 'conectado sin Internet', DNS que no resuelven y restos de VPN o malware."
+category = "repair"
+risk = "medium"
+kind = "action"
+admin = true
+note = "Se pierde la configuración de IP fija, si la hay. Requiere reiniciar."
+
+[tweak.script]
+run = '''
+netsh.exe winsock reset | Out-Null
+netsh.exe int ip reset | Out-Null
+ipconfig.exe /release | Out-Null
+ipconfig.exe /renew | Out-Null
+ipconfig.exe /flushdns | Out-Null
+'Red restablecida. Reinicia el equipo para completar.'
+'''
+
+[[tweak]]
+id = "repair.windows-update"
+name = "Reparar Windows Update"
+description = "Detiene los servicios de actualización y renombra SoftwareDistribution y catroot2 para que se regeneren."
+category = "repair"
+risk = "medium"
+kind = "action"
+admin = true
+note = "Se pierde el historial de actualizaciones que muestra Configuración (no las actualizaciones instaladas)."
+
+[tweak.script]
+run = '''
+$svcs = 'wuauserv', 'bits', 'cryptsvc', 'msiserver'
+Stop-Service $svcs -Force -ErrorAction SilentlyContinue
+$stamp = Get-Date -Format 'yyyyMMddHHmmss'
+$sd = Join-Path $env:SystemRoot 'SoftwareDistribution'
+$cr = Join-Path $env:SystemRoot 'System32\catroot2'
+if (Test-Path $sd) { Rename-Item $sd "SoftwareDistribution.old-$stamp" }
+if (Test-Path $cr) { Rename-Item $cr "catroot2.old-$stamp" }
+Start-Service 'cryptsvc', 'bits', 'wuauserv' -ErrorAction SilentlyContinue
+'Componentes de Windows Update restablecidos. Busca actualizaciones de nuevo.'
+'''
+
+[[tweak]]
+id = "repair.print-queue"
+name = "Desatascar cola de impresión"
+description = "Vacía los trabajos de impresión bloqueados y reinicia la cola."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+Stop-Service Spooler -Force
+$n = @(Get-ChildItem (Join-Path $env:SystemRoot 'System32\spool\PRINTERS') -Force -ErrorAction SilentlyContinue).Count
+Get-ChildItem (Join-Path $env:SystemRoot 'System32\spool\PRINTERS') -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+Start-Service Spooler
+"Cola reiniciada ($n archivos eliminados)."
+'''
+
+[[tweak]]
+id = "repair.explorer"
+name = "Reiniciar Explorador de Windows"
+description = "Reinicia la barra de tareas, el escritorio y el menú Inicio cuando se congelan o no responden."
+category = "repair"
+risk = "low"
+kind = "action"
+note = "Las ventanas del Explorador de archivos abiertas se cerrarán."
+
+[tweak.script]
+run = '''
+# Windows (winlogon) relanza el shell solo y sin privilegios. Lanzarlo desde aquí lo
+# dejaría elevado si AdminOps corre como administrador, así que solo es el último recurso.
+Stop-Process -Name explorer -Force
+foreach ($i in 1..10) { Start-Sleep -Milliseconds 500; if (Get-Process explorer -ErrorAction SilentlyContinue) { break } }
+if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }
+'Explorador reiniciado.'
+'''
+
+[[tweak]]
+id = "repair.time-sync"
+name = "Sincronizar hora"
+description = "Fuerza la sincronización del reloj con el servidor de hora. Una hora incorrecta rompe HTTPS, Office y las activaciones."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+Set-Service w32time -StartupType Manual
+Start-Service w32time -ErrorAction SilentlyContinue
+w32tm.exe /resync /force | Out-Null
+if ($LASTEXITCODE) { w32tm.exe /config /update | Out-Null; w32tm.exe /resync /force | Out-Null }
+if ($LASTEXITCODE) { throw 'No se pudo sincronizar (¿sin conexión o puerto 123 bloqueado?).' }
+"Hora sincronizada: $(Get-Date -Format 'HH:mm:ss')"
+'''
+
+[[tweak]]
+id = "repair.icon-cache"
+name = "Reconstruir caché de iconos"
+description = "Arregla iconos en blanco, incorrectos o que no se actualizan."
+category = "repair"
+risk = "low"
+kind = "action"
+note = "Reinicia el Explorador; las ventanas de carpetas abiertas se cerrarán."
+
+[tweak.script]
+run = '''
+Stop-Process -Name explorer -Force
+Start-Sleep -Milliseconds 300
+Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Explorer') -Filter 'iconcache*' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $env:LOCALAPPDATA 'IconCache.db') -Force -ErrorAction SilentlyContinue
+# Ver 'Reiniciar Explorador': dejamos que winlogon lo relance sin privilegios.
+foreach ($i in 1..10) { Start-Sleep -Milliseconds 500; if (Get-Process explorer -ErrorAction SilentlyContinue) { break } }
+if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }
+'Caché de iconos reconstruida.'
+'''
+
+[[tweak]]
+id = "repair.memory-test"
+name = "Programar prueba de memoria RAM"
+description = "Abre el Diagnóstico de memoria de Windows para comprobar la RAM en el próximo reinicio. Indicado con pantallazos MEMORY_MANAGEMENT o reinicios aleatorios."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+note = "Muestra una ventana de Windows para elegir cuándo reiniciar."
+
+[tweak.script]
+run = '''
+Start-Process mdsched.exe
+'Elige "Reiniciar ahora y comprobar si existen problemas".'
+'''
