@@ -152,17 +152,23 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
             </div>
           </div>
         </div>
-        <div className="mt-4 space-y-1 font-mono text-[11px] text-mute">
-          <p className="truncate" title={appInfo?.dataDir}>
-            Datos: {appInfo?.dataDir}
-          </p>
-          <p className="truncate" title={appInfo?.reportsDir}>
-            Informes: {appInfo?.reportsDir}
-          </p>
+        <div className="mt-4 flex flex-wrap gap-2 text-xs">
+          {(
+            [
+              ["data", "Carpeta de datos"],
+              ["reports", "Carpeta de informes"],
+              ["logs", "Registros"],
+            ] as const
+          ).map(([kind, label]) => (
+            <button
+              key={kind}
+              onClick={() => appApi.openFolder(kind).catch((e) => toast("error", String(e)))}
+              className="rounded-md border border-line-2 px-2.5 py-1 text-dim hover:border-neon/40 hover:text-neon"
+            >
+              {label} →
+            </button>
+          ))}
         </div>
-        <button onClick={() => appApi.openLogsFolder()} className="mt-3 text-xs text-dim hover:text-ink">
-          Abrir carpeta de registros →
-        </button>
       </Card>
 
       {dirty && (

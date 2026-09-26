@@ -3,6 +3,7 @@ import type { AppInfo, TargetUser } from "../lib/api";
 import {
   Activity,
   Brush,
+  CircuitBoard,
   ClipboardCheck,
   Cog,
   Cpu,
@@ -27,6 +28,7 @@ export type PageId =
   | "dashboard"
   | "processes"
   | "diagnostics"
+  | "hardware"
   | "network"
   | "space"
   | "profiles"
@@ -57,6 +59,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "dashboard", label: "Panel", icon: Activity },
       { id: "processes", label: "Procesos", icon: Cpu },
       { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope },
+      { id: "hardware", label: "Hardware", icon: CircuitBoard },
       { id: "network", label: "Red y velocidad", icon: Wifi },
       { id: "space", label: "Espacio en disco", icon: HardDrive },
     ],
@@ -117,7 +120,7 @@ export function Sidebar({
             {appInfo?.portable && (
               <span
                 className="rounded border border-neon/40 px-1 tracking-normal text-neon normal-case"
-                title={`Datos en ${appInfo.dataDir}`}
+                title="Modo portable: los datos se guardan junto a AdminOps.exe, no en este equipo"
               >
                 portable
               </span>
@@ -136,7 +139,7 @@ export function Sidebar({
                 <button
                   key={id}
                   onClick={() => onSelect(id)}
-                  className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-[5px] text-left text-[13px] transition-colors ${
+                  className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-[3px] text-left text-[13px] transition-colors ${
                     on ? "bg-neon/10 text-neon" : "text-dim hover:bg-panel-2 hover:text-ink"
                   }`}
                 >

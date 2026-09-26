@@ -299,6 +299,81 @@ fn build(c: &Ctx) -> String {
     }
     h.push_str("</table>");
 
+    // Hardware
+    if let Some(hw) = &d.hardware.data {
+        h.push_str("<h2>Hardware</h2><table>");
+        let row = |h: &mut String, k: &str, v: String| {
+            if !v.trim().is_empty() {
+                let _ = write!(h, "<tr><th>{k}</th><td>{}</td></tr>", esc(&v));
+            }
+        };
+        row(&mut h, "Equipo", format!("{} {}", hw.manufacturer, hw.model));
+        row(&mut h, "Placa base", format!("{} {}", hw.board_manufacturer, hw.board_product));
+        row(
+            &mut h,
+            "BIOS",
+            format!("{} {}{} · {}", hw.bios_vendor, hw.bios_version, hw.bios_date.as_deref().map(|d| format!(" ({})", fmt_iso(d).split(' ').next().unwrap_or(""))).unwrap_or_default(), hw.firmware),
+        );
+        row(&mut h, "Procesador", format!("{} · {} núcleos / {} hilos · {} MHz", hw.cpu, hw.cores, hw.threads, hw.max_mhz));
+        row(&mut h, "Memoria", format!("{} en {} de {} ranuras", gb(hw.ram_total), hw.modules.len(), hw.ram_slots));
+        for g in &hw.gpus {
+            row(
+                &mut h,
+                "Gráfica",
+                format!(
+                    "{}{} · driver {}{}",
+                    g.name,
+                    g.vram.map(|v| format!(" ({})", gb(v))).unwrap_or_default(),
+                    g.driver_version,
+                    g.driver_date.as_deref().map(|d| format!(" del {}", fmt_iso(d).split(' ').next().unwrap_or(""))).unwrap_or_default()
+                ),
+            );
+        }
+        for m in &hw.monitors {
+            row(&mut h, "Monitor", format!("{} {}", m.manufacturer, m.name));
+        }
+        row(&mut h, "Windows", format!("{} {} (compilación {}) · {}", hw.os, hw.os_version, hw.os_build, hw.architecture));
+        h.push_str("</table>");
+        if !hw.modules.is_empty() {
+            h.push_str("<table style=margin-top:12px><tr><th>Ranura</th><th>Módulo</th><th>Capacidad</th><th>Velocidad</th></tr>");
+            for m in &hw.modules {
+                let _ = write!(
+                    h,
+                    "<tr><td>{}</td><td>{} {} {}</td><td class=num>{}</td><td class=num>{}</td></tr>",
+                    esc(&m.slot),
+                    esc(&m.manufacturer),
+                    esc(&m.part_number),
+                    esc(&m.kind),
+                    gb(m.capacity),
+                    m.configured_speed.or(m.speed).map(|s| format!("{s} MT/s")).unwrap_or("—".into())
+                );
+            }
+            h.push_str("</table>");
+        }
+    }
+    if let Some(t) = &d.temperatures.data {
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(c) = t.cpu {
+            parts.push(format!("CPU {c:.0} °C"));
+        }
+        for (name, temp, hot) in &t.gpus {
+            if let Some(g) = temp {
+                parts.push(format!("{name} {g:.0} °C{}", hot.map(|x| format!(" (punto caliente {x:.0} °C)")).unwrap_or_default()));
+            }
+        }
+        if !parts.is_empty() {
+            let _ = write!(h, "<p><b>Temperaturas en el análisis:</b> {}</p>", esc(&parts.join(" · ")));
+        }
+    }
+    if let Some(Some(m)) = &d.memory_test.data {
+        let _ = write!(
+            h,
+            "<p><b>Prueba de memoria:</b> {} ({})</p>",
+            if m.passed { "sin errores" } else { "<span class=worse>errores detectados</span>" },
+            fmt_iso(&m.time).split(' ').next().unwrap_or("")
+        );
+    }
+
     // Discos
     if let Some(disks) = &d.disks.data {
         h.push_str("<h2>Salud de discos</h2><table><tr><th>Disco</th><th>Tipo</th><th>Estado</th><th>Temp.</th><th>Desgaste</th><th>Horas</th></tr>");
@@ -314,6 +389,26 @@ fn build(c: &Ctx) -> String {
                 k.temperature.map(|t| format!("{t} °C")).unwrap_or("—".into()),
                 k.wear.map(|w| format!("{w}%")).unwrap_or("—".into()),
                 k.power_on_hours.map(|p| p.to_string()).unwrap_or("—".into())
+            );
+        }
+        h.push_str("</table>");
+    }
+
+    // SMART
+    if let Some(smart) = d.smart.data.as_ref().filter(|s| !s.is_empty()) {
+        h.push_str("<table style=margin-top:12px><tr><th>Disco (SMART)</th><th>Reasignados</th><th>Pendientes</th><th>No corregibles</th><th>Errores CRC</th><th>Horas</th></tr>");
+        let n = |v: Option<u64>| v.map(|x| x.to_string()).unwrap_or("—".into());
+        for k in smart {
+            let _ = write!(
+                h,
+                "<tr><td>{}{}</td><td class=num>{}</td><td class=num>{}</td><td class=num>{}</td><td class=num>{}</td><td class=num>{}</td></tr>",
+                esc(&k.model),
+                if k.predict_failure { " <span class=worse>· fallo previsto</span>" } else { "" },
+                n(k.reallocated),
+                n(k.pending),
+                n(k.uncorrectable),
+                n(k.crc_errors),
+                n(k.power_on_hours)
             );
         }
         h.push_str("</table>");

@@ -1,0 +1,65 @@
+AdminOps incluye los siguientes componentes de terceros, sin modificar, para leer
+sensores de hardware (temperaturas, ventiladores, SMART). Se distribuyen bajo sus
+propias licencias:
+
+- LibreHardwareMonitorLib 0.9.6 — LibreHardwareMonitorLib
+  Licencia: MPL-2.0
+  Proyecto: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+
+- DiskInfoToolkit 1.1.2 — DiskInfoToolkit
+  Licencia: MPL-2.0
+  Proyecto: https://github.com/Blacktempel/DiskInfoToolkit
+
+- BlackSharp.Core 1.0.7 — BlackSharp.Core
+  Licencia: MPL-2.0
+  Proyecto: https://github.com/Blacktempel/BlackSharp
+
+- HidSharp 2.6.4 — James F. Bellinger
+  Licencia: Apache-2.0
+  Proyecto: https://software.seekye.com/hidsharp
+
+- RAMSPDToolkit-NDD 1.4.2 — RAMSPDToolkit-NDD
+  Licencia: MPL-2.0
+  Proyecto: https://github.com/Blacktempel/RAMSPDToolkit
+
+- System.Management 10.0.0 — Microsoft
+  Licencia: MIT
+  Proyecto: https://dot.net/
+
+- System.CodeDom 10.0.0 — Microsoft
+  Licencia: MIT
+  Proyecto: https://dot.net/
+
+- System.Memory 4.6.3 — Microsoft
+  Licencia: MIT
+  Proyecto: https://github.com/dotnet/maintenance-packages
+
+- System.Buffers 4.6.1 — Microsoft
+  Licencia: MIT
+  Proyecto: https://github.com/dotnet/maintenance-packages
+
+- System.Numerics.Vectors 4.6.1 — Microsoft
+  Licencia: MIT
+  Proyecto: https://github.com/dotnet/maintenance-packages
+
+- System.Runtime.CompilerServices.Unsafe 6.1.2 — Microsoft
+  Licencia: MIT
+  Proyecto: https://github.com/dotnet/maintenance-packages
+
+- System.Threading.AccessControl 10.0.3 — Microsoft
+  Licencia: MIT
+  Proyecto: https://dot.net/
+
+- System.Security.AccessControl 6.0.0 — Microsoft
+  Licencia: MIT
+  Proyecto: https://dot.net/
+
+- System.Security.Principal.Windows 5.0.0 — Microsoft
+  Licencia: MIT
+  Proyecto: https://github.com/dotnet/runtime
+
+- System.Security.Claims 4.3.0 — Microsoft
+  Licencia: Microsoft .NET Library License (redistribuible)
+  Proyecto: https://dot.net/
+
+El texto completo de cada licencia está disponible en la página de cada proyecto.

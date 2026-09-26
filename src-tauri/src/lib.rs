@@ -1,6 +1,7 @@
 mod diagnostics;
 mod drivers;
 mod elevation;
+mod hardware;
 mod metrics;
 mod network;
 mod paths;
@@ -83,8 +84,15 @@ pub fn run() {
             paths::get_app_info,
             paths::read_log,
             paths::open_logs_folder,
+            paths::open_app_folder,
             task::cancel_task,
             drivers::backup_drivers,
+            hardware::hardware_inventory,
+            hardware::memory_test_result,
+            hardware::smart::smart_status,
+            hardware::sensors::read_sensors,
+            hardware::sensors::install_pawnio,
+            hardware::sensors::open_third_party_notices,
             workflow::get_settings,
             workflow::save_settings,
             workflow::list_clients,

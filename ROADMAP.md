@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.9.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.10.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.9)
+## Hecho (v0.1 – v0.10)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -19,6 +19,7 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 7. Rendimiento | 0.7 | PowerShell persistente, Inicio por COM, carga diferida de páginas, pintado más barato, WebView2 con GPU en proceso |
 | 8. Herramientas | 0.9 | Procesos (finalizar proceso/árbol), red y speedtest, actualizar software (winget), analizador de espacio, copia de drivers, análisis de Defender |
 | 9. Flujo del técnico | 0.9 | Sesión de servicio, clientes, perfiles propios (importar/exportar), marca en el informe, checklist, "by David Bonilla" |
+| 10. Hardware | 0.10 | Inventario (placa, BIOS, RAM por ranura, GPU, monitores, clave OEM), temperaturas (LibreHardwareMonitor), SMART, prueba de RAM, speedtest con medidor animado e IP/proveedor |
 
 ### Fase 6 en detalle
 
@@ -75,6 +76,7 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
 - **La prueba de ida y vuelta aún no se ha ejecutado** en un Windows 11 cliente limpio: la CI usa
   Windows Server. Ejecutarla en Sandbox al menos una vez por versión.
 - **Dependencia de Edge para el PDF.** Si falta, el informe cae a HTML.
+- **Sin firma de código** (decisión: no se contempla por coste). SmartScreen avisará al instalar.
 - **Solo español.**
 
 ---
@@ -101,26 +103,89 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
 
 ---
 
-## Fase 10 — Diagnóstico avanzado
+## Plan siguiente (v0.10 – v1.0)
 
-**Prioridad: media.** Lo que quedó fuera de la Fase 8 por requerir componentes externos.
+Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo**, sin costes
+(nada de certificados de pago ni servicios de suscripción). Cada fase es una versión.
 
-- **SMART completo** con `smartctl` opcional (sectores reasignados/pendientes, CRC), con alertas.
-- **Temperaturas** de CPU y GPU (LibreHardwareMonitor) en el panel y en el informe.
-- **Benchmark de disco** antes/después (lectura/escritura secuencial y aleatoria).
-- **Enviar el informe por correo** o compartir enlace desde la sesión.
+### Fase 10 — Hardware (v0.10) ✅
 
----
+- Inventario completo en la página **Hardware**, en el informe y en la ficha del cliente, que avisa si el
+  hardware cambió entre visitas.
+- **Temperaturas** con LibreHardwareMonitor (MPL-2.0, incluido): GPU sin administrador; CPU y placa con
+  administrador y el driver PawnIO, instalable desde la app.
+- **SMART** de discos SATA por WMI (reasignados, pendientes, no corregibles, CRC), sin programas externos.
+- Resultado de la **prueba de RAM**; hallazgos de doble canal, BIOS y drivers antiguos.
+- **Speedtest** con medidor animado, fases, gráfica en vivo, "apto para", IPv4/IPv6, proveedor y ubicación.
+- Pendiente de esta área: identificar el **driver culpable** de cada pantallazo azul (análisis de minidumps).
 
-## Fase 11 — Distribución
+### Fase 11 — Base sólida antes de crecer (v0.11)
 
-**Prioridad: media-baja** (pasa a alta al empezar a repartir la app a otros).
+**Prioridad: alta.** Cerrar lo que quedó sin comprobar y los detalles que se notan en el uso diario.
 
-- **Firma de código real**: Azure Trusted Signing o certificado OV. El script `scripts/sign.ps1`
-  ya está conectado: basta con definir las variables de entorno.
-- **Actualización automática** con `tauri-plugin-updater` y GitHub Releases.
-- **Releases automáticas** desde la CI al crear una etiqueta `vX.Y.Z`.
-- Publicación en **winget** (`winget install AdminOps`).
-- **Inglés** como segundo idioma (i18n de la interfaz, el catálogo y el informe).
+- **Verificación en limpio**: ejecutar la prueba de ida y vuelta en una VM de Windows 11
+  (VirtualBox ya está instalado en el equipo de desarrollo) y una sesión de servicio completa con
+  administrador: finalizar procesos, actualizar software, copia de drivers, perfiles.
+- **Primer arranque guiado**: asistente de 3 pasos (tu nombre y logo, modo instalado/portable,
+  diagnóstico inicial) para que la app no empiece "vacía".
+- **Portable sin rastro**: llevar también la caché de WebView2 a `AdminOps-data` (hoy queda en
+  `%LOCALAPPDATA%` del cliente).
+- **Paquete de soporte**: un botón que junta registro, último diagnóstico y versión en un .zip para
+  cuando algo falle.
+- **Medición de CPU en reposo** con el equipo sin carga y fijar la cifra definitiva.
 
-**Terminado cuando:** instalar y actualizar AdminOps no muestra avisos de SmartScreen y no requiere pasos manuales.
+**Terminado cuando:** todo lo marcado como "pendiente de verificar" esté probado y un usuario nuevo
+llegue a su primer informe sin instrucciones.
+
+### Fase 12 — Más mantenimiento y reparación (v0.12)
+
+**Prioridad: media.**
+
+- **Desinstalador de programas** (Win32 y Store) con desinstalación silenciosa y limpieza de restos
+  (carpetas y claves huérfanas), mostrando el tamaño que libera cada uno.
+- **Limpieza de navegadores** (Chrome, Edge, Firefox, Opera) por perfil del usuario destino: caché,
+  sin tocar contraseñas ni historial salvo que se elija.
+- **Restaurar drivers** desde una copia hecha con AdminOps (`pnputil /add-driver`).
+- **Más reparaciones**: restablecer Microsoft Store (`wsreset`), reparar la búsqueda de Windows,
+  reiniciar el audio, reparar asociaciones de archivos.
+- **Mantenimiento programado**: limpieza semanal o mensual como tarea programada del sistema,
+  opcional y reversible desde la app.
+- **Gestión de puntos de restauración**: ver el espacio que ocupan y borrar los antiguos.
+
+**Terminado cuando:** las tareas habituales de "PC lento" se resuelven sin salir de AdminOps.
+
+### Fase 13 — Experiencia profesional (v0.13)
+
+**Prioridad: media.** Que se sienta como un producto terminado.
+
+- **Búsqueda global (Ctrl+K)**: saltar a cualquier página, ajuste, reparación o proceso escribiendo.
+- **Notificaciones de Windows** al terminar tareas largas (SFC, DISM, speedtest, sesión).
+- **Tema claro** opcional y tamaño de texto ajustable; la ventana recuerda tamaño y posición.
+- **Atajos de teclado** y navegación completa sin ratón.
+- **Panel más útil**: tendencia de temperaturas y alertas en vivo (RAM llena, disco al 100 %).
+- **Comparar visitas** en la ficha del cliente: cómo evolucionó el equipo entre sesiones.
+
+### Fase 14 — Informe y relación con el cliente (v0.14)
+
+**Prioridad: media.**
+
+- **Dos plantillas de informe**: resumido para el cliente (lenguaje sencillo) y técnico detallado.
+- **Presupuesto o recibo** opcional en la sesión: líneas de servicio, precios y total en el PDF.
+- **Conformidad del cliente**: firma a mano en pantalla al cerrar la sesión.
+- **Enviar el informe**: abrir el correo con el PDF adjunto y los datos del cliente ya puestos.
+- **Recordatorios**: "próximo mantenimiento" por cliente, visibles en Clientes.
+
+### Fase 15 — Distribución gratuita (v1.0)
+
+**Prioridad: media.**
+
+- **Actualización automática** con `tauri-plugin-updater` y GitHub Releases. Usa una clave propia
+  gratuita (no un certificado): la app solo instala actualizaciones firmadas por ti.
+- **Releases automáticas** desde la CI al crear una etiqueta `vX.Y.Z` (instalador + portable).
+- **Inglés** como segundo idioma (interfaz, catálogo e informe).
+- **Página de descarga** en GitHub Pages con capturas y novedades.
+- **Nota sobre SmartScreen**: sin certificado, Windows avisará al abrir el instalador las primeras
+  veces; el aviso se reduce solo a medida que el archivo acumula descargas. Documentarlo en la página.
+
+**v1.0 cuando:** actualizaciones automáticas funcionando, inglés completo y dos semanas de uso real
+en clientes sin fallos graves.

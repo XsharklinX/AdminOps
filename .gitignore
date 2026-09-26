@@ -23,8 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Paquetes portables generados
-dist-portable/
+# Instalador y portable de cada versión (npm run build:release)
+release/
 
 # Salida de la prueba en Windows Sandbox
 tests/sandbox/work/

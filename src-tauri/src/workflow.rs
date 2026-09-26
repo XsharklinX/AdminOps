@@ -93,6 +93,8 @@ pub struct Machine {
     pub os: String,
     pub first_seen: u64,
     pub last_seen: u64,
+    /// Resumen del hardware en la última visita (CPU, RAM, GPU, placa).
+    pub hardware: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -110,6 +112,8 @@ pub struct SessionRecord {
     pub warn_after: usize,
     pub work_items: usize,
     pub notes: String,
+    /// Si el hardware cambió respecto a la visita anterior: "antes → ahora".
+    pub hardware_change: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -278,7 +282,8 @@ pub fn finish_session(app: tauri::AppHandle, state: State<'_, TweakState>) -> Re
     )?;
 
     let count = |d: &diagnostics::Diagnostics, sev| d.findings.iter().filter(|f| f.severity == sev).count();
-    let record = SessionRecord {
+    let hardware = after.hardware.data.as_ref().map(|h| h.summary()).unwrap_or_default();
+    let mut record = SessionRecord {
         id: s.id.clone(),
         host: s.host.clone(),
         started: s.started,
@@ -290,15 +295,22 @@ pub fn finish_session(app: tauri::AppHandle, state: State<'_, TweakState>) -> Re
         warn_after: count(&after, diagnostics::Severity::Warn),
         work_items: state.journal_since(s.started).iter().filter(|e| e.ok).count(),
         notes: s.notes.clone(),
+        hardware_change: None,
     };
     let mut all = load_clients(&app);
     if let Some(c) = all.iter_mut().find(|c| c.id == s.client_id) {
         match c.machines.iter_mut().find(|m| m.host.eq_ignore_ascii_case(&s.host)) {
             Some(m) => {
+                if !m.hardware.is_empty() && !hardware.is_empty() && m.hardware != hardware {
+                    record.hardware_change = Some(format!("{} → {}", m.hardware, hardware));
+                }
                 m.last_seen = now();
                 m.os = after.os.clone();
+                if !hardware.is_empty() {
+                    m.hardware = hardware.clone();
+                }
             }
-            None => c.machines.push(Machine { host: s.host.clone(), os: after.os.clone(), first_seen: s.started, last_seen: now() }),
+            None => c.machines.push(Machine { host: s.host.clone(), os: after.os.clone(), first_seen: s.started, last_seen: now(), hardware: hardware.clone() }),
         }
         c.sessions.insert(0, record);
     }

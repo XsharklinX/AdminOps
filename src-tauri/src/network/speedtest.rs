@@ -39,7 +39,15 @@ pub struct SpeedResult {
     /// Centro de datos de Cloudflare que atendió el test (p. ej. "MIA · Miami").
     pub server: String,
     pub isp: Option<String>,
+    /// IP pública con la que se hizo el test (IPv6 si la conexión la usa).
     pub ip: Option<String>,
+    #[serde(default)]
+    pub ipv4: Option<String>,
+    #[serde(default)]
+    pub ipv6: Option<String>,
+    /// Ubicación aproximada según la IP (ciudad, país).
+    #[serde(default)]
+    pub location: Option<String>,
     pub latency_ms: f64,
     pub jitter_ms: f64,
     pub download_mbps: f64,
@@ -63,6 +71,7 @@ struct Progress {
 }
 
 /// Receptor del progreso: (fase, Mbps instantáneos, avance 0..1, latencia).
+/// Al terminar cada fase se emite con avance 1.0 y el valor final.
 type OnProgress<'a> = &'a (dyn Fn(&'static str, f64, f64, Option<f64>) + Sync);
 
 fn client() -> Result<reqwest::Client, String> {
@@ -93,16 +102,51 @@ fn server_time(headers: &reqwest::header::HeaderMap) -> f64 {
         .sum()
 }
 
-/// Centro de datos, país e IP pública (`/cdn-cgi/trace`: líneas `clave=valor`).
+async fn trace(client: &reqwest::Client, base: &str) -> Vec<(String, String)> {
+    let Ok(resp) = client.get(format!("{base}/cdn-cgi/trace")).timeout(Duration::from_secs(6)).send().await else {
+        return vec![];
+    };
+    resp.text()
+        .await
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+        .collect()
+}
+
+#[derive(Deserialize, Default)]
+struct IpInfo {
+    city: Option<String>,
+    region: Option<String>,
+    country: Option<String>,
+    org: Option<String>,
+}
+
+/// Datos de la conexión: IP pública (v4 y v6), proveedor, ubicación y centro de datos.
 async fn meta(client: &reqwest::Client) -> Meta {
-    let Ok(resp) = client.get(format!("{BASE}/cdn-cgi/trace")).timeout(Duration::from_secs(8)).send().await else {
-        return Meta::default();
+    let info = async {
+        match client.get("https://ipinfo.io/json").timeout(Duration::from_secs(6)).send().await {
+            Ok(r) => r.json::<IpInfo>().await.unwrap_or_default(),
+            Err(_) => IpInfo::default(),
+        }
     };
-    let text = resp.text().await.unwrap_or_default();
-    let get = |k: &str| {
-        text.lines().find_map(|l| l.strip_prefix(k).and_then(|v| v.strip_prefix('='))).map(str::to_string).filter(|v| !v.is_empty())
-    };
-    Meta { client_ip: get("ip"), colo: get("colo"), country: get("loc") }
+    let (cf, v4, info) = tokio::join!(trace(client, BASE), trace(client, "https://1.1.1.1"), info);
+    let get = |t: &[(String, String)], k: &str| t.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone()).filter(|v| !v.is_empty());
+    let used = get(&cf, "ip");
+    let ipv4 = get(&v4, "ip").or_else(|| used.clone().filter(|ip| !ip.contains(':')));
+    let ipv6 = used.clone().filter(|ip| ip.contains(':'));
+    // "AS6400 Compañía Dominicana de Teléfonos S. A." → proveedor sin el número de AS
+    let isp = info.org.map(|o| o.split_once(' ').map_or(o.clone(), |(asn, name)| if asn.starts_with("AS") { name.to_string() } else { o.clone() }));
+    let location = [info.city, info.region, info.country].into_iter().flatten().collect::<Vec<_>>();
+    Meta {
+        client_ip: used,
+        ipv4,
+        ipv6,
+        isp,
+        location: (!location.is_empty()).then(|| location.join(", ")),
+        colo: get(&cf, "colo"),
+        country: get(&cf, "loc"),
+    }
 }
 
 /// Latencia de red de una petición vacía, sin el tiempo de proceso del servidor.
@@ -136,11 +180,17 @@ fn jitter(samples: &[f64]) -> f64 {
     samples.windows(2).map(|w| (w[1] - w[0]).abs()).sum::<f64>() / (samples.len() - 1) as f64
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct Meta {
     client_ip: Option<String>,
+    ipv4: Option<String>,
+    ipv6: Option<String>,
+    isp: Option<String>,
+    location: Option<String>,
     /// Código IATA del centro de datos (p. ej. "MIA").
     colo: Option<String>,
+    /// País del cliente según Cloudflare (respaldo si ipinfo.io no responde).
     country: Option<String>,
 }
 
@@ -205,7 +255,7 @@ async fn throughput(
         let back = samples.iter().rev().find(|s| now.0 - s.0 >= Duration::from_secs(1)).copied().unwrap_or(samples[0]);
         let secs = (now.0 - back.0).as_secs_f64().max(0.001);
         let mbps = (now.1 - back.1) as f64 * 8.0 / secs / 1e6;
-        on(phase, mbps, (now.0.as_secs_f64() / PHASE.as_secs_f64()).min(1.0), None);
+        on(phase, mbps, (now.0.as_secs_f64() / PHASE.as_secs_f64()).min(0.99), None);
     }
     let end = (start.elapsed(), bytes.load(Ordering::Relaxed));
     for w in workers {
@@ -295,10 +345,11 @@ fn save(app: &tauri::AppHandle, r: &SpeedResult) {
     }
 }
 
-async fn run(on: OnProgress<'_>) -> Result<SpeedResult, String> {
+async fn run(on: OnProgress<'_>, on_meta: &(dyn Fn(&Meta) + Sync)) -> Result<SpeedResult, String> {
     let client = client()?;
     on("meta", 0.0, 0.0, None);
     let meta = meta(&client).await;
+    on_meta(&meta);
     // La primera petición abre la conexión y no cuenta para la latencia.
     if let Err(e) = ping(&client).await {
         return Err(format!("Sin conexión con el servidor de pruebas: {e}"));
@@ -317,20 +368,22 @@ async fn run(on: OnProgress<'_>) -> Result<SpeedResult, String> {
     }
     let jitter_ms = jitter(&lat);
     let latency_ms = median(&mut lat.clone());
+    on("latency", 0.0, 1.0, Some(latency_ms));
 
     let (download_mbps, down_bytes, mut down_lat) = throughput(on, &client, "download", DOWN_STREAMS).await?;
+    on("download", download_mbps, 1.0, None);
     let (upload_mbps, up_bytes, mut up_lat) = throughput(on, &client, "upload", UP_STREAMS).await?;
+    on("upload", upload_mbps, 1.0, None);
 
-    let server = match (&meta.colo, &meta.country) {
-        (Some(c), Some(cc)) => format!("Cloudflare {c} ({cc})"),
-        (Some(c), None) => format!("Cloudflare {c}"),
-        _ => "Cloudflare".into(),
-    };
+    let server = meta.colo.as_ref().map_or_else(|| "Cloudflare".to_string(), |c| format!("Cloudflare {c}"));
     let result = SpeedResult {
         timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         server,
-        isp: None,
+        isp: meta.isp,
         ip: meta.client_ip,
+        ipv4: meta.ipv4,
+        ipv6: meta.ipv6,
+        location: meta.location.or(meta.country),
         latency_ms,
         jitter_ms,
         download_mbps,
@@ -354,7 +407,11 @@ pub async fn run_speedtest(app: tauri::AppHandle) -> Result<SpeedResult, String>
     let on = move |phase: &'static str, mbps: f64, progress: f64, latency_ms: Option<f64>| {
         let _ = emitter.emit("speedtest-progress", Progress { phase, mbps, progress, latency_ms });
     };
-    let result = run(&on).await;
+    let meta_emitter = app.clone();
+    let on_meta = move |m: &Meta| {
+        let _ = meta_emitter.emit("speedtest-meta", m.clone());
+    };
+    let result = run(&on, &on_meta).await;
     RUNNING.store(false, Ordering::SeqCst);
     match &result {
         Ok(r) => {
@@ -411,7 +468,7 @@ mod tests {
             }
             let _ = mbps;
         };
-        let r = tauri::async_runtime::block_on(run(&on)).unwrap();
+        let r = tauri::async_runtime::block_on(run(&on, &|_m: &Meta| {})).unwrap();
         println!("{r:#?}");
         assert!(r.download_mbps > 0.0 && r.upload_mbps > 0.0);
     }

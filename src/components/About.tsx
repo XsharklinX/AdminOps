@@ -22,11 +22,6 @@ export function About({ open, onClose, appInfo }: { open: boolean; onClose: () =
           <div className="mt-0.5 text-lg font-semibold text-neon">David Bonilla</div>
         </div>
         <p className="mt-5 text-[11px] text-mute">© {new Date().getFullYear()} David Bonilla. Todos los derechos reservados.</p>
-        {appInfo && (
-          <p className="mt-3 truncate font-mono text-[10px] text-mute" title={appInfo.dataDir}>
-            Datos: {appInfo.dataDir}
-          </p>
-        )}
       </div>
     </div>
   );

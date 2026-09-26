@@ -17,6 +17,7 @@ const Profiles = lazyPage("Profiles", () => import("./pages/Profiles"));
 const Startup = lazyPage("Startup", () => import("./pages/Startup"));
 const TweaksPage = lazyPage("TweaksPage", () => import("./pages/TweaksPage"));
 const Processes = lazyPage("Processes", () => import("./pages/Processes"));
+const Hardware = lazyPage("Hardware", () => import("./pages/Hardware"));
 const Network = lazyPage("Network", () => import("./pages/Network"));
 const Software = lazyPage("Software", () => import("./pages/Software"));
 const Space = lazyPage("Space", () => import("./pages/Space"));
@@ -66,6 +67,7 @@ export default function App() {
   else if (page === "report") content = <Report />;
   else if (page === "profiles") content = <Profiles isAdmin={!!isAdmin} />;
   else if (page === "processes") content = <Processes isAdmin={!!isAdmin} />;
+  else if (page === "hardware") content = <Hardware isAdmin={!!isAdmin} focus={focus} onNavigate={navigate} />;
   else if (page === "network") content = <Network />;
   else if (page === "software") content = <Software isAdmin={!!isAdmin} />;
   else if (page === "space") content = <Space />;

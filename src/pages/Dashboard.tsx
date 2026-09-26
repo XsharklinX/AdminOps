@@ -2,11 +2,14 @@ import { ArrowDown, ArrowUp, Cpu, HardDrive, ListTree, MemoryStick, Monitor, Net
 import { useEffect, useState } from "react";
 import { Bar, Card, Ring, Sparkline, Stat } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
+import { tempColor, useSensors } from "../hooks/useSensors";
 import { api, type SystemInfo } from "../lib/api";
 import { bytes, duration, loadColor, pct, rate } from "../lib/format";
 
 export function Dashboard() {
   const { metrics: m, history, error } = useLiveMetrics(2000);
+  const { sensors, error: sensorsError } = useSensors(5000);
+  const gpu = sensors?.gpus.find((g) => g.temperature != null);
   const [info, setInfo] = useState<SystemInfo | null>(null);
 
   useEffect(() => {
@@ -24,7 +27,7 @@ export function Dashboard() {
     <div className="grid grid-cols-12 gap-4 p-6">
       {/* Equipo */}
       <Card title="Equipo" icon={<Monitor size={14} />} className="col-span-12">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-6">
           <Stat label="Host" value={info?.hostName ?? "—"} />
           <Stat label="Sistema" value={info?.osName ?? "—"} sub={info && `Build ${info.kernelVersion}`} />
           <Stat
@@ -34,6 +37,16 @@ export function Dashboard() {
           />
           <Stat label="Memoria" value={bytes(m.memoryTotal)} sub={m.swapTotal ? `+ ${bytes(m.swapTotal)} de paginación` : undefined} />
           <Stat label="Encendido" value={duration(m.uptime)} sub={`${m.processCount} procesos`} />
+          <Stat
+            label="Temperatura"
+            value={
+              <span>
+                <span style={{ color: tempColor(sensors?.cpuTemp) }}>CPU {sensors?.cpuTemp != null ? `${sensors.cpuTemp.toFixed(0)}°` : "—"}</span>
+                {gpu && <span style={{ color: tempColor(gpu.temperature) }}> · GPU {gpu.temperature!.toFixed(0)}°</span>}
+              </span>
+            }
+            sub={sensors?.cpuNeedsDriver ? "CPU: requiere admin / PawnIO" : sensors ? "en vivo" : sensorsError ? "no disponible" : "cargando…"}
+          />
         </div>
       </Card>
 

@@ -40,7 +40,7 @@ jobs:
         run: cargo test --lib
 
       - name: Instalador y portable
-        run: npm run build:portable
+        run: npm run build:release
 
       # Aplica y deshace cada ajuste del catálogo en el runner (desechable) y
       # falla si alguno no vuelve EXACTAMENTE a su estado original.
@@ -59,7 +59,6 @@ jobs:
         with:
           name: adminops-${{ github.sha }}
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            dist-portable/*.zip
+            release/
             roundtrip.json
           if-no-files-found: ignore

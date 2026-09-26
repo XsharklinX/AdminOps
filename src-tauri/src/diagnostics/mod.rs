@@ -116,8 +116,39 @@ pub struct Diagnostics {
     /// Programas con actualización disponible (winget). Ausente en análisis antiguos.
     #[serde(default)]
     pub software_updates: Section<Vec<crate::software::SoftwareUpdate>>,
+    /// Inventario de hardware (placa, BIOS, RAM, GPU…).
+    #[serde(default)]
+    pub hardware: Section<crate::hardware::Inventory>,
+    /// Atributos SMART de discos SATA (requiere administrador).
+    #[serde(default)]
+    pub smart: Section<Vec<crate::hardware::smart::SmartDisk>>,
+    #[serde(default)]
+    pub memory_test: Section<Option<crate::hardware::MemoryTest>>,
+    /// Temperaturas en el momento del análisis.
+    #[serde(default)]
+    pub temperatures: Section<Temperatures>,
     pub tweaks_applied: usize,
     pub findings: Vec<Finding>,
+}
+
+/// Temperaturas resumidas (lo que se guarda en el snapshot).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Temperatures {
+    pub cpu: Option<f64>,
+    /// (nombre, núcleo °C, punto caliente °C)
+    pub gpus: Vec<(String, Option<f64>, Option<f64>)>,
+    pub cpu_needs_driver: bool,
+}
+
+impl From<crate::hardware::sensors::Sensors> for Temperatures {
+    fn from(s: crate::hardware::sensors::Sensors) -> Self {
+        Temperatures {
+            cpu: s.cpu_temp,
+            gpus: s.gpus.into_iter().map(|g| (g.name, g.temperature, g.hotspot)).collect(),
+            cpu_needs_driver: s.cpu_needs_driver,
+        }
+    }
 }
 
 fn now() -> u64 {
@@ -346,6 +377,75 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
             );
         }
     }
+    // ---- Hardware ----
+    let hw_detail = |focus: &str| page("Ver hardware", "hardware", Some(focus));
+    if let Some(disks) = &d.smart.data {
+        for k in disks {
+            if k.predict_failure {
+                f.push(finding(Bad, "Discos", format!("{}: el disco anuncia un fallo inminente (SMART)", k.model), Some("Copia de seguridad YA y reemplazo del disco.".into())).with(vec![hw_detail("smart")]));
+            }
+            let bad_sectors = k.reallocated.unwrap_or(0) + k.pending.unwrap_or(0) + k.uncorrectable.unwrap_or(0);
+            if bad_sectors > 0 {
+                f.push(
+                    finding(
+                        if bad_sectors >= 10 || k.pending.unwrap_or(0) > 0 { Bad } else { Warn },
+                        "Discos",
+                        format!("{}: {bad_sectors} sectores dañados o pendientes", k.model),
+                        Some(format!(
+                            "Reasignados {} · pendientes {} · no corregibles {}. El disco se está degradando: planificar el reemplazo.",
+                            k.reallocated.unwrap_or(0), k.pending.unwrap_or(0), k.uncorrectable.unwrap_or(0)
+                        )),
+                    )
+                    .with(vec![hw_detail("smart")]),
+                );
+            }
+            if let Some(crc) = k.crc_errors.filter(|c| *c > 0) {
+                f.push(finding(Warn, "Discos", format!("{}: {crc} errores de transmisión (CRC)", k.model), Some("Casi siempre es el cable SATA o el conector: cambiarlo.".into())).with(vec![hw_detail("smart")]));
+            }
+        }
+    }
+    if let Some(Some(m)) = &d.memory_test.data {
+        if !m.passed {
+            f.push(finding(Bad, "Memoria", "La prueba de memoria de Windows encontró errores".into(), Some("Probar los módulos de RAM uno a uno y reemplazar el defectuoso.".into())).with(vec![hw_detail("memory")]));
+        }
+    }
+    if let Some(t) = &d.temperatures.data {
+        if let Some(c) = t.cpu.filter(|c| *c >= 80.0) {
+            f.push(
+                finding(if c >= 90.0 { Bad } else { Warn }, "Temperatura", format!("CPU a {c:.0} °C en reposo"), Some("Limpiar el disipador y cambiar la pasta térmica.".into()))
+                    .with(vec![hw_detail("sensors")]),
+            );
+        }
+        for (name, temp, _) in &t.gpus {
+            if let Some(g) = temp.filter(|g| *g >= 85.0) {
+                f.push(finding(Warn, "Temperatura", format!("{name} a {g:.0} °C"), Some("Revisar ventiladores y polvo de la tarjeta gráfica.".into())).with(vec![hw_detail("sensors")]));
+            }
+        }
+    }
+    if let Some(hw) = &d.hardware.data {
+        let sizes: std::collections::BTreeSet<u64> = hw.modules.iter().map(|m| m.capacity).collect();
+        if hw.modules.len() == 1 && hw.ram_slots >= 2 {
+            f.push(finding(Info, "Memoria", "La RAM funciona en un solo canal".into(), Some("Añadir un módulo igual al instalado duplicaría el ancho de banda de memoria.".into())).with(vec![hw_detail("memory")]));
+        } else if sizes.len() > 1 {
+            let list: Vec<String> = hw.modules.iter().map(|m| format!("{} GB", m.capacity / 1024u64.pow(3))).collect();
+            f.push(
+                finding(Info, "Memoria", "Módulos de RAM de distinto tamaño".into(), Some(format!("{} — parte de la memoria puede funcionar sin doble canal.", list.join(" + "))))
+                    .with(vec![hw_detail("memory")]),
+            );
+        }
+        if let Some(years) = hw.bios_date.as_deref().and_then(days_since).map(|d| d / 365).filter(|y| *y >= 3) {
+            f.push(
+                finding(Info, "Hardware", format!("BIOS de hace {years} años ({})", hw.bios_version), Some("Consultar en la web del fabricante si hay una versión más reciente (mejoras de estabilidad y seguridad).".into()))
+                    .with(vec![hw_detail("board")]),
+            );
+        }
+        for g in &hw.gpus {
+            if let Some(days) = g.driver_date.as_deref().and_then(days_since).filter(|d| *d >= 365) {
+                f.push(finding(Info, "Hardware", format!("Driver de {} de hace {} meses", g.name, days / 30), Some("Actualizar el driver gráfico desde la web del fabricante.".into())).with(vec![hw_detail("gpu")]));
+            }
+        }
+    }
+
     if let Some(u) = d.software_updates.data.as_ref().filter(|u| !u.is_empty()) {
         let names: Vec<&str> = u.iter().take(6).map(|x| x.name.as_str()).collect();
         f.push(
@@ -438,10 +538,14 @@ pub fn latest_snapshot(app: &tauri::AppHandle) -> Option<Diagnostics> {
 }
 
 fn join<T>(r: std::thread::Result<Result<T, String>>) -> Result<T, String> {
-    r.unwrap_or_else(|_| Err("El recolector falló".to_string()))
+    r.unwrap_or_else(|_| failed())
 }
 
-fn collect(state: &TweakState) -> Diagnostics {
+fn failed<T>() -> Result<T, String> {
+    Err("El recolector falló".to_string())
+}
+
+fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
     let mut sys = sysinfo::System::new();
     sys.refresh_memory();
     sys.refresh_cpu_all();
@@ -453,7 +557,7 @@ fn collect(state: &TweakState) -> Diagnostics {
     volumes.sort_by(|a, b| a.mount.cmp(&b.mount));
 
     // Todos los recolectores en paralelo: el total es el del más lento, no la suma.
-    let (disks, stability, drivers, battery, system, startup, bloat, updates, tweaks_applied) = std::thread::scope(|s| {
+    let (disks, stability, drivers, battery, system, startup, bloat, updates, hw, tweaks_applied) = std::thread::scope(|s| {
         let disks = s.spawn(collect::disks);
         let stability = s.spawn(collect::stability);
         let drivers = s.spawn(collect::drivers);
@@ -462,6 +566,14 @@ fn collect(state: &TweakState) -> Diagnostics {
         let startup = s.spawn(crate::tweaks::startup::enabled_names);
         let bloat = s.spawn(crate::tweaks::appx::recommended_installed);
         let updates = s.spawn(crate::software::list);
+        let hw = s.spawn(|| {
+            (
+                crate::hardware::inventory(),
+                crate::hardware::smart::read(),
+                crate::hardware::memory_test(),
+                crate::hardware::sensors::read(app).map(Temperatures::from),
+            )
+        });
         let tweaks = s.spawn(|| state.applied_count());
         (
             join(disks.join()),
@@ -472,6 +584,7 @@ fn collect(state: &TweakState) -> Diagnostics {
             join(startup.join()),
             join(bloat.join()),
             join(updates.join()),
+            hw.join().unwrap_or_else(|_| (failed(), failed(), failed(), failed())),
             tweaks.join().unwrap_or(0),
         )
     });
@@ -492,6 +605,10 @@ fn collect(state: &TweakState) -> Diagnostics {
         startup_enabled: startup.into(),
         bloat_installed: bloat.into(),
         software_updates: updates.into(),
+        hardware: hw.0.into(),
+        smart: hw.1.into(),
+        memory_test: hw.2.into(),
+        temperatures: hw.3.into(),
         tweaks_applied,
         findings: vec![],
     };
@@ -501,7 +618,7 @@ fn collect(state: &TweakState) -> Diagnostics {
 
 /// Analiza el equipo y guarda la foto (snapshot) para comparaciones.
 pub fn run_and_save(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
-    let d = collect(state);
+    let d = collect(app, state);
     save_snapshot(app, &d);
     d
 }

@@ -122,6 +122,20 @@ pub fn read_log(app: tauri::AppHandle, lines: usize) -> String {
     all[all.len().saturating_sub(lines.clamp(1, 5000))..].join("\n")
 }
 
+/// Abre una carpeta de AdminOps sin mostrar su ruta en la interfaz (contiene
+/// el nombre de usuario de Windows del equipo).
+#[tauri::command]
+pub fn open_app_folder(app: tauri::AppHandle, kind: String) -> Result<(), String> {
+    let dir = match kind.as_str() {
+        "data" => machine_data_dir(&app),
+        "reports" => reports_dir(&app),
+        "logs" => logs_dir(&app),
+        _ => return Err("Carpeta desconocida".into()),
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::process::Command::new("explorer.exe").arg(&dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn open_logs_folder(app: tauri::AppHandle) -> Result<(), String> {
     let dir = logs_dir(&app);

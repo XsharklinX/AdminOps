@@ -156,7 +156,10 @@ export function Clients() {
                       {form.machines.map((m) => (
                         <li key={m.host} className="flex items-center gap-3">
                           <span className="font-mono text-ink">{m.host}</span>
-                          <span className="truncate text-xs text-dim">{m.os}</span>
+                          <span className="min-w-0 flex-1 truncate text-xs text-dim" title={m.hardware}>
+                            {m.os}
+                            {m.hardware && <span className="block truncate text-[11px] text-mute">{m.hardware}</span>}
+                          </span>
                           <span className="ml-auto text-xs text-mute">última visita {date(m.lastSeen)}</span>
                         </li>
                       ))}
@@ -187,6 +190,7 @@ export function Clients() {
                               </button>
                             )}
                           </div>
+                          {s.hardwareChange && <p className="mt-1 text-xs text-warn">Hardware cambiado: {s.hardwareChange}</p>}
                           {s.notes && <p className="mt-1 line-clamp-2 text-xs text-dim">{s.notes}</p>}
                         </li>
                       ))}
