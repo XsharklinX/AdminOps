@@ -1,0 +1,128 @@
+# Servicios de Windows. `default` es el tipo de inicio de fábrica.
+
+[[tweak]]
+id = "services.sysmain"
+name = "Deshabilitar SysMain (Superfetch)"
+description = "Detiene la precarga en RAM de las apps que más usas."
+category = "services"
+risk = "medium"
+note = "Solo ayuda en equipos con poca RAM o disco al 100% constante. En discos HDD puede hacer que las apps abran más lento."
+
+[[tweak.service]]
+name = "SysMain"
+startup = "disabled"
+default = "automatic"
+stop = true
+
+[[tweak]]
+id = "services.search-indexer"
+name = "Deshabilitar indexación de búsqueda"
+description = "Detiene Windows Search, que indexa archivos en segundo plano."
+category = "services"
+risk = "high"
+note = "La búsqueda del menú Inicio, del Explorador y de Outlook se vuelve muy lenta o deja de encontrar resultados."
+
+[[tweak.service]]
+name = "WSearch"
+startup = "disabled"
+default = "delayed"
+stop = true
+
+[[tweak]]
+id = "services.print-spooler"
+name = "Deshabilitar cola de impresión"
+description = "Detiene el servicio de impresión. Reduce superficie de ataque en equipos sin impresora."
+category = "services"
+risk = "medium"
+note = "No se podrá imprimir ni usar 'Imprimir a PDF' hasta revertirlo."
+
+[[tweak.service]]
+name = "Spooler"
+startup = "disabled"
+default = "automatic"
+stop = true
+
+[[tweak]]
+id = "services.fax"
+name = "Deshabilitar servicio de Fax"
+description = "Servicio heredado que casi ningún equipo necesita."
+category = "services"
+risk = "low"
+
+[[tweak.service]]
+name = "Fax"
+startup = "disabled"
+default = "manual"
+stop = true
+
+[[tweak]]
+id = "services.xbox"
+name = "Deshabilitar servicios de Xbox"
+description = "Autenticación, partidas guardadas en la nube, red y mandos de Xbox."
+category = "services"
+risk = "medium"
+note = "Los juegos de Game Pass / Microsoft Store y los mandos Xbox inalámbricos dejan de funcionar correctamente."
+
+[[tweak.service]]
+name = "XblAuthManager"
+startup = "disabled"
+default = "manual"
+stop = true
+
+[[tweak.service]]
+name = "XblGameSave"
+startup = "disabled"
+default = "manual"
+stop = true
+
+[[tweak.service]]
+name = "XboxNetApiSvc"
+startup = "disabled"
+default = "manual"
+stop = true
+
+[[tweak.service]]
+name = "XboxGipSvc"
+startup = "disabled"
+default = "manual"
+stop = true
+
+[[tweak]]
+id = "services.maps-broker"
+name = "Deshabilitar administrador de mapas descargados"
+description = "Servicio que actualiza mapas sin conexión, que casi nadie usa."
+category = "services"
+risk = "low"
+
+[[tweak.service]]
+name = "MapsBroker"
+startup = "disabled"
+default = "delayed"
+stop = true
+
+[[tweak]]
+id = "services.retail-demo"
+name = "Deshabilitar modo demostración"
+description = "Servicio para equipos de exposición en tiendas."
+category = "services"
+risk = "low"
+
+[[tweak.service]]
+name = "RetailDemo"
+startup = "disabled"
+default = "manual"
+stop = true
+
+[[tweak]]
+id = "services.error-reporting"
+name = "Deshabilitar informe de errores de Windows"
+description = "Deja de recopilar y enviar a Microsoft los informes de cuelgues de apps."
+category = "services"
+risk = "low"
+note = "El Historial de confiabilidad seguirá registrando los fallos, pero sin informe detallado."
+
+[[tweak.service]]
+name = "WerSvc"
+startup = "disabled"
+default = "manual"
+stop = true

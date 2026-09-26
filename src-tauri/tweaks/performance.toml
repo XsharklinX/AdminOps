@@ -1,0 +1,181 @@
+# Rendimiento y experiencia de uso.
+
+[[tweak]]
+id = "performance.edge-background"
+name = "Evitar que Edge corra en segundo plano"
+description = "Edge deja de quedarse abierto al cerrarlo y de precargarse al iniciar Windows."
+category = "performance"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "BackgroundModeEnabled"
+type = "dword"
+value = 0
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "StartupBoostEnabled"
+type = "dword"
+value = 0
+
+[[tweak]]
+id = "performance.widgets"
+name = "Desactivar Widgets"
+description = "Quita el panel de Widgets (noticias, tiempo, MSN) y su proceso en segundo plano."
+category = "performance"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Dsh'
+name = "AllowNewsAndInterests"
+type = "dword"
+value = 0
+
+[[tweak]]
+id = "performance.game-dvr"
+name = "Desactivar grabación en segundo plano de juegos"
+description = "Game DVR graba continuamente mientras juegas para poder guardar clips; consume GPU y disco."
+category = "performance"
+risk = "low"
+note = "Dejará de funcionar 'Grabar lo que ha pasado' (Win+Alt+G)."
+
+[[tweak.registry]]
+path = 'HKCU\System\GameConfigStore'
+name = "GameDVR_Enabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR'
+name = "AllowGameDVR"
+type = "dword"
+value = 0
+
+[[tweak]]
+id = "performance.transparency"
+name = "Desactivar transparencias"
+description = "Quita el efecto de vidrio de la barra de tareas, Inicio y ventanas. Alivia GPUs integradas."
+category = "performance"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+name = "EnableTransparency"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak]]
+id = "performance.animations"
+name = "Reducir animaciones"
+description = "Quita las animaciones al minimizar/maximizar ventanas y de la barra de tareas."
+category = "performance"
+risk = "low"
+reboot = true
+
+[[tweak.registry]]
+path = 'HKCU\Control Panel\Desktop\WindowMetrics'
+name = "MinAnimate"
+type = "string"
+value = "0"
+default = "1"
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "TaskbarAnimations"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak]]
+id = "performance.menu-delay"
+name = "Menús más rápidos"
+description = "Reduce la espera al desplegar submenús de 400 ms a 100 ms."
+category = "performance"
+risk = "low"
+reboot = true
+
+[[tweak.registry]]
+path = 'HKCU\Control Panel\Desktop'
+name = "MenuShowDelay"
+type = "string"
+value = "100"
+default = "400"
+
+[[tweak]]
+id = "performance.background-apps"
+name = "Impedir apps de la Store en segundo plano"
+description = "Las apps de Microsoft Store dejan de ejecutarse cuando están cerradas."
+category = "performance"
+risk = "medium"
+note = "Apps como WhatsApp, Teams o Vincular teléfono no mostrarán notificaciones mientras estén cerradas."
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy'
+name = "LetAppsRunInBackground"
+type = "dword"
+value = 2
+
+[[tweak]]
+id = "performance.fast-startup"
+name = "Desactivar inicio rápido"
+description = "Cada apagado pasa a ser completo. Evita problemas con drivers, actualizaciones pendientes y arranque dual."
+category = "performance"
+risk = "low"
+note = "El arranque desde apagado tarda unos segundos más. Reiniciar no cambia."
+
+[[tweak.registry]]
+path = 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power'
+name = "HiberbootEnabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak]]
+id = "performance.hibernation"
+name = "Desactivar hibernación"
+description = "Borra hiberfil.sys, que ocupa en disco alrededor del 40% de la RAM."
+category = "performance"
+risk = "medium"
+admin = true
+note = "También desactiva el inicio rápido. En portátiles se pierde la opción de hibernar."
+
+[tweak.script]
+detect = '''
+"$((Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power').HibernateEnabled -eq 0)"
+'''
+apply = '''
+powercfg.exe /hibernate off
+if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
+'''
+revert = '''
+powercfg.exe /hibernate on
+if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
+'''
+
+[[tweak]]
+id = "performance.power-plan"
+name = "Plan de energía Alto rendimiento"
+description = "La CPU no baja de frecuencia ni aparca núcleos. Al deshacer vuelve al plan que estaba activo."
+category = "performance"
+risk = "low"
+note = "En portátiles reduce la duración de la batería y aumenta la temperatura."
+
+[tweak.script]
+detect = '''
+"$(powercfg.exe /getactivescheme)" -match '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
+'''
+apply = '''
+$prev = [regex]::Match("$(powercfg.exe /getactivescheme)", '[0-9a-fA-F-]{36}').Value
+powercfg.exe /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+if ($LASTEXITCODE) { throw 'Este equipo no tiene el plan Alto rendimiento (habitual con Modern Standby).' }
+$prev
+'''
+revert = '''
+# Sin historial vuelve a Equilibrado.
+$plan = if ($Previous) { $Previous } else { '381b4222-f694-41f0-9685-ff5bb260df2e' }
+powercfg.exe /setactive $plan
+if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
+'''

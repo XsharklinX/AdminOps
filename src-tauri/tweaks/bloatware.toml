@@ -1,0 +1,322 @@
+# Apps preinstaladas conocidas. `package` es el Name exacto del paquete Appx.
+# advice: remove (se puede quitar sin problema) | optional (depende del usuario) | keep (útil, quitar con cuidado)
+# store_id: ID de Microsoft Store verificado con `winget show --id <id> --source msstore`.
+#           Si falta, la app no se puede reinstalar automáticamente.
+
+# ---------- Promocional / sin uso habitual ----------
+
+[[app]]
+package = "Microsoft.BingNews"
+name = "Noticias (Microsoft News)"
+description = "Agregador de noticias de MSN."
+advice = "remove"
+store_id = "9WZDNCRFHVFW"
+
+[[app]]
+package = "Microsoft.BingWeather"
+name = "El Tiempo (MSN)"
+description = "App del tiempo de MSN."
+advice = "remove"
+store_id = "9WZDNCRFJ3Q2"
+
+[[app]]
+package = "Microsoft.BingSearch"
+name = "Búsqueda de Bing"
+description = "Integración de Bing en la búsqueda de Windows."
+advice = "remove"
+
+[[app]]
+package = "Microsoft.MicrosoftSolitaireCollection"
+name = "Solitaire Collection"
+description = "Juegos de cartas con anuncios y suscripción."
+advice = "remove"
+
+[[app]]
+package = "Microsoft.Getstarted"
+name = "Consejos"
+description = "Tutoriales y sugerencias de Windows."
+advice = "remove"
+
+[[app]]
+package = "Microsoft.WindowsFeedbackHub"
+name = "Centro de opiniones"
+description = "Enviar comentarios a Microsoft."
+advice = "remove"
+store_id = "9NBLGGH4R32N"
+
+[[app]]
+package = "Microsoft.MicrosoftOfficeHub"
+name = "Microsoft 365 Copilot (Office Hub)"
+description = "Lanzador de Office que promociona la suscripción. No es Office."
+advice = "remove"
+store_id = "9WZDNCRD29V9"
+
+[[app]]
+package = "Microsoft.Copilot"
+name = "Copilot"
+description = "Asistente de IA de Microsoft."
+advice = "remove"
+store_id = "9NHT9RB2F4HD"
+
+[[app]]
+package = "Microsoft.549981C3F5F10"
+name = "Cortana"
+description = "Asistente retirado por Microsoft. Ya no funciona."
+advice = "remove"
+
+[[app]]
+package = "Clipchamp.Clipchamp"
+name = "Clipchamp"
+description = "Editor de vídeo en la nube."
+advice = "remove"
+store_id = "9P1J8S7CCWWT"
+
+[[app]]
+package = "Microsoft.MSPaint"
+name = "Paint 3D"
+description = "Retirado por Microsoft. No confundir con Paint."
+advice = "remove"
+
+[[app]]
+package = "Microsoft.People"
+name = "Contactos"
+description = "App retirada; los contactos ahora viven en Outlook."
+advice = "remove"
+
+[[app]]
+package = "microsoft.windowscommunicationsapps"
+name = "Correo y Calendario (clásico)"
+description = "Retirada por Microsoft, sustituida por el nuevo Outlook."
+advice = "remove"
+note = "Si el usuario aún la usa, migrar antes sus cuentas al nuevo Outlook."
+
+[[app]]
+package = "Microsoft.Windows.DevHome"
+name = "Dev Home"
+description = "Panel para desarrolladores, retirado por Microsoft."
+advice = "remove"
+
+[[app]]
+package = "Microsoft.PowerAutomateDesktop"
+name = "Power Automate"
+description = "Automatización de tareas. Rara vez usada en equipos domésticos."
+advice = "remove"
+store_id = "9NFTCH6J7FHV"
+
+[[app]]
+package = "Microsoft.GetHelp"
+name = "Obtener ayuda"
+description = "Asistente de soporte de Microsoft."
+advice = "optional"
+store_id = "9PKDZBMV1H3T"
+note = "Algunos solucionadores de problemas de Windows 11 dependen de esta app."
+
+[[app]]
+package = "Microsoft.Todos"
+name = "Microsoft To Do"
+description = "Listas de tareas."
+advice = "optional"
+store_id = "9NBLGGH5R558"
+
+[[app]]
+package = "Microsoft.WindowsMaps"
+name = "Mapas"
+description = "Mapas sin conexión. Microsoft la está retirando."
+advice = "remove"
+
+[[app]]
+package = "Microsoft.ZuneVideo"
+name = "Películas y TV"
+description = "Reproductor de vídeo y tienda de alquiler."
+advice = "optional"
+store_id = "9WZDNCRFJ3P2"
+
+[[app]]
+package = "MSTeams"
+name = "Microsoft Teams"
+description = "Chat y reuniones."
+advice = "optional"
+store_id = "XP8BT8DW290MPQ"
+note = "Imprescindible si el usuario lo usa para trabajar o estudiar."
+
+# ---------- Terceros promocionados ----------
+
+[[app]]
+package = "SpotifyAB.SpotifyMusic"
+name = "Spotify"
+description = "Preinstalada como promoción."
+advice = "optional"
+store_id = "9NCBCSZSJRSB"
+
+[[app]]
+package = "Disney.37853FC22B2CE"
+name = "Disney+"
+description = "Preinstalada como promoción."
+advice = "remove"
+store_id = "9NXQXXLFST89"
+
+[[app]]
+package = "AmazonVideo.PrimeVideo"
+name = "Prime Video"
+description = "Preinstalada como promoción."
+advice = "remove"
+store_id = "9P6RC76MSMMJ"
+
+[[app]]
+package = "BytedancePte.Ltd.TikTok"
+name = "TikTok"
+description = "Preinstalada como promoción."
+advice = "remove"
+store_id = "9NH2GPH4JZS4"
+
+[[app]]
+package = "king.com.CandyCrushSaga"
+name = "Candy Crush Saga"
+description = "Juego preinstalado como promoción."
+advice = "remove"
+
+[[app]]
+package = "king.com.CandyCrushSodaSaga"
+name = "Candy Crush Soda Saga"
+description = "Juego preinstalado como promoción."
+advice = "remove"
+
+# ---------- Xbox ----------
+
+[[app]]
+package = "Microsoft.GamingApp"
+name = "Xbox"
+description = "Tienda y biblioteca de Game Pass."
+advice = "optional"
+store_id = "9MV0B5HZVK9Z"
+note = "Necesaria para jugar con Game Pass en PC."
+
+[[app]]
+package = "Microsoft.XboxGamingOverlay"
+name = "Xbox Game Bar"
+description = "Superposición Win+G: grabación, rendimiento, chat."
+advice = "optional"
+store_id = "9NZKPSTSNW4P"
+note = "Sin ella no funciona la grabación de pantalla con Win+G ni Win+Alt+R."
+
+[[app]]
+package = "Microsoft.XboxGameOverlay"
+name = "Xbox Game Overlay (antigua)"
+description = "Componente heredado de Game Bar."
+advice = "optional"
+
+[[app]]
+package = "Microsoft.XboxSpeechToTextOverlay"
+name = "Xbox Voz a texto"
+description = "Transcripción de chat de voz en juegos."
+advice = "remove"
+
+[[app]]
+package = "Microsoft.Xbox.TCUI"
+name = "Xbox TCUI"
+description = "Interfaz de amigos y perfil que usan algunos juegos."
+advice = "keep"
+note = "Algunos juegos de Microsoft Store fallan al iniciar sesión sin este componente."
+
+[[app]]
+package = "Microsoft.XboxIdentityProvider"
+name = "Xbox Identity Provider"
+description = "Inicio de sesión de Xbox Live en juegos."
+advice = "keep"
+note = "Los juegos con cuenta Xbox (Minecraft, Forza…) no pueden iniciar sesión sin él."
+
+# ---------- Utilidades (útiles: quitar solo si se sabe que no se usan) ----------
+
+[[app]]
+package = "Microsoft.YourPhone"
+name = "Vincular teléfono"
+description = "Notificaciones, SMS y fotos del móvil en el PC."
+advice = "optional"
+store_id = "9NMPJ99VJBWV"
+
+[[app]]
+package = "MicrosoftCorporationII.QuickAssist"
+name = "Asistencia rápida"
+description = "Soporte remoto integrado de Windows."
+advice = "keep"
+store_id = "9P7BP5VNWKX5"
+note = "Muy útil para soporte técnico remoto. Recomendado mantenerla."
+
+[[app]]
+package = "Microsoft.OutlookForWindows"
+name = "Outlook (nuevo)"
+description = "Cliente de correo que reemplaza a Correo y Calendario."
+advice = "optional"
+store_id = "9NRX63209R7B"
+
+[[app]]
+package = "Microsoft.MicrosoftStickyNotes"
+name = "Notas rápidas"
+description = "Notas adhesivas sincronizadas con OneNote."
+advice = "optional"
+store_id = "9NBLGGH4QGHW"
+
+[[app]]
+package = "Microsoft.WindowsAlarms"
+name = "Reloj"
+description = "Alarmas, temporizador y sesiones de concentración."
+advice = "optional"
+store_id = "9WZDNCRFJ3PR"
+
+[[app]]
+package = "Microsoft.WindowsSoundRecorder"
+name = "Grabadora de sonido"
+description = "Grabación de audio simple."
+advice = "optional"
+store_id = "9WZDNCRFHWKN"
+
+[[app]]
+package = "Microsoft.ZuneMusic"
+name = "Reproductor multimedia"
+description = "Reproductor de música y vídeo predeterminado."
+advice = "keep"
+store_id = "9WZDNCRFJ3PT"
+note = "Es el reproductor predeterminado de Windows 11."
+
+[[app]]
+package = "Microsoft.WindowsCamera"
+name = "Cámara"
+description = "App de cámara del sistema."
+advice = "keep"
+store_id = "9WZDNCRFJBBG"
+
+[[app]]
+package = "Microsoft.Paint"
+name = "Paint"
+description = "Editor de imágenes básico."
+advice = "keep"
+store_id = "9PCFS5B6T72H"
+
+[[app]]
+package = "Microsoft.ScreenSketch"
+name = "Recortes"
+description = "Capturas de pantalla (Win+Shift+S)."
+advice = "keep"
+store_id = "9MZ95KL8MR0L"
+note = "Sin ella deja de funcionar Win+Shift+S."
+
+[[app]]
+package = "Microsoft.WindowsNotepad"
+name = "Bloc de notas"
+description = "Editor de texto del sistema."
+advice = "keep"
+store_id = "9MSMLRH6LZF3"
+
+[[app]]
+package = "Microsoft.Windows.Photos"
+name = "Fotos"
+description = "Visor de imágenes predeterminado."
+advice = "keep"
+store_id = "9WZDNCRFJBH4"
+
+[[app]]
+package = "Microsoft.WindowsCalculator"
+name = "Calculadora"
+description = "Calculadora del sistema."
+advice = "keep"
+store_id = "9WZDNCRFHVN5"

@@ -1,7 +1,9 @@
+import type { TargetUser } from "../lib/api";
 import {
   Activity,
   Brush,
   Cog,
+  Gauge,
   History,
   Package,
   Power,
@@ -14,6 +16,7 @@ export type PageId =
   | "dashboard"
   | "cleanup"
   | "privacy"
+  | "performance"
   | "bloatware"
   | "services"
   | "startup"
@@ -22,23 +25,26 @@ export type PageId =
 
 export const NAV: { id: PageId; label: string; icon: LucideIcon; phase?: number }[] = [
   { id: "dashboard", label: "Panel", icon: Activity },
-  { id: "cleanup", label: "Limpieza", icon: Brush, phase: 3 },
-  { id: "privacy", label: "Privacidad", icon: ShieldHalf, phase: 3 },
-  { id: "bloatware", label: "Bloatware", icon: Package, phase: 3 },
-  { id: "services", label: "Servicios", icon: Cog, phase: 3 },
-  { id: "startup", label: "Inicio", icon: Power, phase: 3 },
+  { id: "cleanup", label: "Limpieza", icon: Brush },
+  { id: "performance", label: "Rendimiento", icon: Gauge },
+  { id: "privacy", label: "Privacidad", icon: ShieldHalf },
+  { id: "bloatware", label: "Bloatware", icon: Package },
+  { id: "services", label: "Servicios", icon: Cog },
+  { id: "startup", label: "Inicio", icon: Power },
   { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope, phase: 4 },
-  { id: "history", label: "Historial", icon: History, phase: 2 },
+  { id: "history", label: "Historial", icon: History },
 ];
 
 export function Sidebar({
   active,
   onSelect,
   isAdmin,
+  targetUser,
 }: {
   active: PageId;
   onSelect: (id: PageId) => void;
   isAdmin: boolean | null;
+  targetUser: TargetUser | null;
 }) {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-panel/60">
@@ -48,7 +54,7 @@ export function Sidebar({
         </div>
         <div>
           <div className="text-[15px] font-semibold tracking-tight">AdminOps</div>
-          <div className="text-[10px] tracking-widest text-mute uppercase">v0.1 · Fase 1</div>
+          <div className="text-[10px] tracking-widest text-mute uppercase">v0.3 · Fase 3</div>
         </div>
       </div>
 
@@ -81,6 +87,15 @@ export function Sidebar({
             {isAdmin === null ? "Comprobando…" : isAdmin ? "Administrador" : "Usuario estándar"}
           </span>
         </div>
+        {targetUser && (
+          <div
+            className="mt-1.5 truncate text-[11px] text-mute"
+            title={`Los ajustes de usuario (HKCU) se aplican a ${targetUser.name} (${targetUser.sid})`}
+          >
+            Usuario: <span className={targetUser.redirected ? "text-neon" : "text-dim"}>{targetUser.name}</span>
+            {targetUser.redirected && <span className="text-neon"> · sesión activa</span>}
+          </div>
+        )}
       </div>
     </aside>
   );

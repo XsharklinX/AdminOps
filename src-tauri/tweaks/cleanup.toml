@@ -1,0 +1,155 @@
+# Tareas puntuales de limpieza (kind = "action"): no tienen estado ni se deshacen.
+# La última línea que imprime el script se muestra al usuario.
+
+[[tweak]]
+id = "cleanup.dns-cache"
+name = "Vaciar caché DNS"
+description = "Borra las resoluciones de nombres guardadas. Útil si una web no carga tras cambiar de red o de DNS."
+category = "cleanup"
+risk = "low"
+kind = "action"
+
+[tweak.script]
+run = '''
+Clear-DnsClientCache
+'Caché DNS vaciada'
+'''
+
+[[tweak]]
+id = "cleanup.user-temp"
+name = "Limpiar temporales del usuario"
+description = "Vacía %TEMP%. Los archivos en uso se omiten automáticamente."
+category = "cleanup"
+risk = "low"
+kind = "action"
+
+[tweak.script]
+run = '''
+$p = $env:TEMP
+$size = { (Get-ChildItem $p -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum }
+$before = & $size
+Get-ChildItem $p -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+$freed = [math]::Max(0, $before - (& $size))
+'Liberados {0:N1} MB' -f ($freed / 1MB)
+'''
+
+[[tweak]]
+id = "cleanup.windows-temp"
+name = "Limpiar temporales de Windows"
+description = 'Vacía C:\Windows\Temp. Los archivos en uso se omiten automáticamente.'
+category = "cleanup"
+risk = "low"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+$p = Join-Path $env:SystemRoot 'Temp'
+$size = { (Get-ChildItem $p -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum }
+$before = & $size
+Get-ChildItem $p -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+$freed = [math]::Max(0, $before - (& $size))
+'Liberados {0:N1} MB' -f ($freed / 1MB)
+'''
+
+[[tweak]]
+id = "cleanup.recycle-bin"
+name = "Vaciar papelera de reciclaje"
+description = "Elimina definitivamente el contenido de la papelera de todas las unidades."
+category = "cleanup"
+risk = "medium"
+kind = "action"
+note = "No se puede deshacer."
+
+[tweak.script]
+run = '''
+Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+'Papelera vaciada'
+'''
+
+[[tweak]]
+id = "cleanup.delivery-optimization"
+name = "Limpiar caché de Optimización de distribución"
+description = "Borra las actualizaciones que Windows guarda para compartir con otros equipos de la red."
+category = "cleanup"
+risk = "low"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+$drive = $env:SystemDrive.TrimEnd(':')
+$before = (Get-PSDrive $drive).Free
+Delete-DeliveryOptimizationCache -Force
+$freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
+'Liberados {0:N1} MB' -f ($freed / 1MB)
+'''
+
+[[tweak]]
+id = "cleanup.disk-cleanup"
+name = "Liberador de espacio (silencioso)"
+description = "Ejecuta cleanmgr con temporales, caché de miniaturas y de shaders, restos de actualizaciones y registros de instalación."
+category = "cleanup"
+risk = "low"
+kind = "action"
+admin = true
+note = "Puede tardar varios minutos. Conserva los volcados de memoria para poder diagnosticar pantallazos azules."
+
+[tweak.script]
+run = '''
+$root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
+$handlers = 'Active Setup Temp Folders', 'D3D Shader Cache', 'Delivery Optimization Files', 'Downloaded Program Files',
+  'Internet Cache Files', 'Old ChkDsk Files', 'Setup Log Files', 'Temporary Files', 'Temporary Setup Files',
+  'Thumbnail Cache', 'Update Cleanup', 'Upgrade Discarded Files', 'Windows Error Reporting Files', 'Windows Upgrade Log Files'
+foreach ($h in $handlers) {
+  $k = Join-Path $root $h
+  if (Test-Path $k) { Set-ItemProperty $k -Name StateFlags0777 -Value 2 -Type DWord }
+}
+$drive = $env:SystemDrive.TrimEnd(':')
+$before = (Get-PSDrive $drive).Free
+Start-Process cleanmgr.exe -ArgumentList '/sagerun:777' -Wait -WindowStyle Hidden
+$freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
+'Liberados {0:N1} MB' -f ($freed / 1MB)
+'''
+
+[[tweak]]
+id = "cleanup.component-store"
+name = "Limpiar almacén de componentes (WinSxS)"
+description = "Elimina versiones antiguas de componentes de Windows reemplazadas por actualizaciones."
+category = "cleanup"
+risk = "low"
+kind = "action"
+admin = true
+note = "Puede tardar de 5 a 20 minutos."
+
+[tweak.script]
+run = '''
+$drive = $env:SystemDrive.TrimEnd(':')
+$before = (Get-PSDrive $drive).Free
+Dism.exe /Online /Cleanup-Image /StartComponentCleanup /NoRestart | Out-Null
+if ($LASTEXITCODE) { throw "DISM devolvió $LASTEXITCODE" }
+$freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
+'Liberados {0:N1} MB' -f ($freed / 1MB)
+'''
+
+[[tweak]]
+id = "cleanup.windows-update-cache"
+name = "Vaciar descargas de Windows Update"
+description = 'Borra SoftwareDistribution\Download. Soluciona actualizaciones atascadas o corruptas.'
+category = "cleanup"
+risk = "medium"
+kind = "action"
+admin = true
+note = "Detiene Windows Update un momento. Las actualizaciones pendientes se volverán a descargar."
+
+[tweak.script]
+run = '''
+$d = Join-Path $env:SystemRoot 'SoftwareDistribution\Download'
+$size = { (Get-ChildItem $d -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum }
+$before = & $size
+Stop-Service wuauserv, bits -Force -ErrorAction SilentlyContinue
+Get-ChildItem $d -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+Start-Service bits -ErrorAction SilentlyContinue
+$freed = [math]::Max(0, $before - (& $size))
+'Liberados {0:N1} MB' -f ($freed / 1MB)
+'''

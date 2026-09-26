@@ -1,0 +1,219 @@
+# Privacidad y telemetría.
+# Formato: ver src-tauri/src/tweaks/model.rs
+
+[[tweak]]
+id = "privacy.advertising-id"
+name = "Desactivar ID de publicidad"
+description = "Impide que las apps usen un identificador único para mostrarte anuncios personalizados."
+category = "privacy"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo'
+name = "Enabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak]]
+id = "privacy.tailored-experiences"
+name = "Desactivar experiencias personalizadas"
+description = "Microsoft deja de usar tus datos de diagnóstico para sugerencias, anuncios y recomendaciones."
+category = "privacy"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy'
+name = "TailoredExperiencesWithDiagnosticDataEnabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak]]
+id = "privacy.start-suggestions"
+name = "Quitar sugerencias y anuncios del sistema"
+description = "Oculta apps sugeridas en Inicio, consejos de Windows y contenido sugerido en Configuración."
+category = "privacy"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SystemPaneSuggestionsEnabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-338388Enabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-338389Enabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-353694Enabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-353696Enabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak]]
+id = "privacy.activity-history"
+name = "Desactivar historial de actividad"
+description = "Windows deja de registrar y subir las apps, archivos y webs que usas."
+category = "privacy"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System'
+name = "PublishUserActivities"
+type = "dword"
+value = 0
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System'
+name = "UploadUserActivities"
+type = "dword"
+value = 0
+
+[[tweak]]
+id = "privacy.telemetry"
+name = "Reducir telemetría al mínimo"
+description = "Fija la directiva de datos de diagnóstico al mínimo y deshabilita los servicios que los envían."
+category = "privacy"
+risk = "medium"
+note = "En Windows Home y Pro el mínimo real es 'Obligatorio': Windows trata el 0 como 1. El Programa Insider deja de funcionar."
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+name = "AllowTelemetry"
+type = "dword"
+value = 0
+
+[[tweak.service]]
+name = "DiagTrack"
+startup = "disabled"
+default = "automatic"
+stop = true
+
+[[tweak.service]]
+name = "dmwappushservice"
+startup = "disabled"
+default = "manual"
+stop = true
+
+[[tweak]]
+id = "privacy.copilot"
+name = "Quitar Copilot de la barra de tareas"
+description = "Oculta el botón de Copilot y desactiva la barra lateral de Copilot de Windows."
+category = "privacy"
+risk = "low"
+note = "La app Copilot, si está instalada, se quita desde Bloatware."
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "ShowCopilotButton"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak.registry]]
+path = 'HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot'
+name = "TurnOffWindowsCopilot"
+type = "dword"
+value = 1
+
+[[tweak]]
+id = "privacy.recall"
+name = "Desactivar Recall"
+description = "Impide que Windows guarde capturas periódicas de la pantalla para búsqueda con IA."
+category = "privacy"
+risk = "low"
+min_build = 26100
+note = "Solo tiene efecto en equipos Copilot+ PC; en el resto no cambia nada visible."
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+name = "DisableAIDataAnalysis"
+type = "dword"
+value = 1
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+name = "AllowRecallEnablement"
+type = "dword"
+value = 0
+
+[[tweak]]
+id = "privacy.bing-search"
+name = "Quitar resultados de Bing del menú Inicio"
+description = "La búsqueda de Windows solo muestra apps, archivos y configuración locales."
+category = "privacy"
+risk = "low"
+reboot = true
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Search'
+name = "BingSearchEnabled"
+type = "dword"
+value = 0
+
+[[tweak.registry]]
+path = 'HKCU\Software\Policies\Microsoft\Windows\Explorer'
+name = "DisableSearchBoxSuggestions"
+type = "dword"
+value = 1
+
+[[tweak]]
+id = "privacy.lockscreen-ads"
+name = "Quitar anuncios de la pantalla de bloqueo"
+description = "Elimina los 'datos curiosos', consejos y promociones sobre la imagen de bloqueo."
+category = "privacy"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "RotatingLockScreenOverlayEnabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-338387Enabled"
+type = "dword"
+value = 0
+default = 1
+
+[[tweak]]
+id = "privacy.feedback"
+name = "Desactivar solicitudes de opinión"
+description = "Windows deja de mostrar encuestas y peticiones de comentarios."
+category = "privacy"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKCU\Software\Microsoft\Siuf\Rules'
+name = "NumberOfSIUFInPeriod"
+type = "dword"
+value = 0
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+name = "DoNotShowFeedbackNotifications"
+type = "dword"
+value = 1
