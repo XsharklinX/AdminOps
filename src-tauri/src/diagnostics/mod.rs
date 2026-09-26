@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use sysinfo::Disks;
-use tauri::{Manager, State};
+use tauri::State;
 
 const MAX_SNAPSHOTS: usize = 40;
 
@@ -235,7 +235,7 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
 }
 
 fn snapshots_dir(app: &tauri::AppHandle) -> PathBuf {
-    app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("AdminOps")).join("snapshots")
+    crate::paths::machine_data_dir(app).join("snapshots")
 }
 
 fn save_snapshot(app: &tauri::AppHandle, d: &Diagnostics) {

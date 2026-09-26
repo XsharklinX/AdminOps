@@ -1,5 +1,5 @@
 import logo from "../assets/logo.svg";
-import type { TargetUser } from "../lib/api";
+import type { AppInfo, TargetUser } from "../lib/api";
 import {
   Activity,
   Brush,
@@ -7,6 +7,7 @@ import {
   FileText,
   Gauge,
   History,
+  Layers,
   Package,
   Power,
   ShieldHalf,
@@ -17,6 +18,7 @@ import {
 
 export type PageId =
   | "dashboard"
+  | "profiles"
   | "cleanup"
   | "privacy"
   | "performance"
@@ -28,8 +30,9 @@ export type PageId =
   | "report"
   | "history";
 
-export const NAV: { id: PageId; label: string; icon: LucideIcon; phase?: number }[] = [
+export const NAV: { id: PageId; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "Panel", icon: Activity },
+  { id: "profiles", label: "Perfiles", icon: Layers },
   { id: "cleanup", label: "Limpieza", icon: Brush },
   { id: "performance", label: "Rendimiento", icon: Gauge },
   { id: "privacy", label: "Privacidad", icon: ShieldHalf },
@@ -47,11 +50,13 @@ export function Sidebar({
   onSelect,
   isAdmin,
   targetUser,
+  appInfo,
 }: {
   active: PageId;
   onSelect: (id: PageId) => void;
   isAdmin: boolean | null;
   targetUser: TargetUser | null;
+  appInfo: AppInfo | null;
 }) {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-panel/60">
@@ -59,12 +64,22 @@ export function Sidebar({
         <img src={logo} alt="" className="size-9 drop-shadow-[0_0_10px_rgba(34,225,255,0.35)]" draggable={false} />
         <div>
           <div className="text-[15px] font-semibold tracking-tight">AdminOps</div>
-          <div className="text-[10px] tracking-widest text-mute uppercase">v0.4 · Fase 4</div>
+          <div className="flex items-center gap-1.5 text-[10px] tracking-widest text-mute uppercase">
+            {appInfo ? `v${appInfo.version}` : "…"}
+            {appInfo?.portable && (
+              <span
+                className="rounded border border-neon/40 px-1 tracking-normal text-neon normal-case"
+                title={`Datos en ${appInfo.dataDir}`}
+              >
+                portable
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 px-3">
-        {NAV.map(({ id, label, icon: Icon, phase }) => {
+        {NAV.map(({ id, label, icon: Icon }) => {
           const on = id === active;
           return (
             <button
@@ -77,7 +92,6 @@ export function Sidebar({
               {on && <span className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-neon shadow-[0_0_8px_var(--color-neon)]" />}
               <Icon size={16} strokeWidth={1.8} />
               <span className="flex-1">{label}</span>
-              {phase && <span className="rounded bg-line px-1.5 py-px font-mono text-[9px] text-mute">F{phase}</span>}
             </button>
           );
         })}

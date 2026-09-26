@@ -3,6 +3,7 @@
 
 pub mod appx;
 mod catalog;
+pub mod profiles;
 mod engine;
 pub(crate) mod journal;
 pub mod model;
@@ -17,7 +18,7 @@ use model::{Kind, Risk, Tweak};
 use serde::Serialize;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::{Manager, State};
+use tauri::State;
 
 /// No crear más de un punto de restauración automático cada 30 min: aplicar
 /// cinco ajustes seguidos no debe generar cinco puntos.
@@ -35,7 +36,7 @@ pub struct TweakState {
 
 impl TweakState {
     pub fn new(app: &tauri::AppHandle) -> Self {
-        let dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("AdminOps"));
+        let dir = crate::paths::machine_data_dir(app);
         let build = registry::read_string(r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber")
             .and_then(|b| b.parse().ok())
             .unwrap_or(0);
@@ -177,14 +178,19 @@ pub fn apply_tweak(id: String, skip_restore_point: bool, state: State<'_, TweakS
     let restore_point_created =
         t.risk >= Risk::Medium && !skip_restore_point && ensure_restore_point(&state, &t.name, Some(&t.id))?;
 
+    apply_logged(&state, t)?;
+    let message = if t.reboot { "Aplicado. Reinicia para que surta efecto." } else { "Aplicado." };
+    Ok(OpResult { status: engine::detect(t), message: message.into(), restore_point_created })
+}
+
+/// Aplica un ajuste y lo registra en el diario (sin punto de restauración).
+fn apply_logged(state: &TweakState, t: &Tweak) -> Result<(), String> {
     let mut e = entry(Op::Apply, Some(&t.id), &t.name);
     match engine::apply(t) {
         Ok(backups) => {
             e.backups = backups;
             state.log(e);
-            let status = engine::detect(t);
-            let message = if t.reboot { "Aplicado. Reinicia para que surta efecto." } else { "Aplicado." };
-            Ok(OpResult { status, message: message.into(), restore_point_created })
+            Ok(())
         }
         Err(err) => {
             e.ok = false;
@@ -193,6 +199,30 @@ pub fn apply_tweak(id: String, skip_restore_point: bool, state: State<'_, TweakS
             Err(err)
         }
     }
+}
+
+/// Deshace la última aplicación hecha por AdminOps usando su copia del diario.
+/// `Ok(false)` si no había nada que deshacer.
+fn revert_logged(state: &TweakState, t: &Tweak) -> Result<bool, String> {
+    let pending = state.journal.lock().unwrap().pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
+    let Some((entry_id, backups)) = pending else { return Ok(false) };
+    let result = engine::restore(Some(t), &backups);
+    finish_revert(state, Some(t), &t.name, Some(entry_id), result).map(|_| true)
+}
+
+/// Ejecuta una tarea puntual y la registra en el diario.
+fn run_logged(state: &TweakState, t: &Tweak) -> Result<String, String> {
+    let mut e = entry(Op::Run, Some(&t.id), &t.name);
+    let result = engine::run_action(t);
+    match &result {
+        Ok(msg) => e.message = Some(msg.clone()),
+        Err(err) => {
+            e.ok = false;
+            e.message = Some(err.clone());
+        }
+    }
+    state.log(e);
+    result
 }
 
 /// Deshace un ajuste: con la copia exacta del diario si AdminOps lo aplicó,
@@ -275,17 +305,7 @@ pub fn run_action(id: String, state: State<'_, TweakState>) -> Result<OpResult, 
         return Err("Esto es un ajuste, no una tarea.".into());
     }
     state.check_can_modify(t)?;
-    let mut e = entry(Op::Run, Some(&t.id), &t.name);
-    let result = engine::run_action(t);
-    match &result {
-        Ok(msg) => e.message = Some(msg.clone()),
-        Err(err) => {
-            e.ok = false;
-            e.message = Some(err.clone());
-        }
-    }
-    state.log(e);
-    result.map(|message| OpResult { status: Status::Action, message, restore_point_created: false })
+    run_logged(&state, t).map(|message| OpResult { status: Status::Action, message, restore_point_created: false })
 }
 
 #[tauri::command]

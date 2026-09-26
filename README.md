@@ -10,7 +10,27 @@ Herramienta de escritorio para técnicos de soporte: diagnóstico y optimizació
 npm install
 npm run tauri dev      # corre como usuario normal; la UI ofrece "Reiniciar como admin"
 npm run tauri build    # instalador NSIS en src-tauri/target/release/bundle/
+npm run build:portable # instalador + zip portable en dist-portable/
 ```
+
+## Modo portable
+
+Si junto a `AdminOps.exe` hay un archivo `AdminOps.portable`, todos los datos van a
+`AdminOps-data\` al lado del ejecutable: `equipos\<NOMBRE-PC>\` (diario y análisis de cada equipo)
+e `Informes\` (los PDF de todos). `npm run build:portable` genera el zip listo para un USB.
+
+## Perfiles
+
+`src-tauri/tweaks/profiles.toml`: Oficina, Gaming, Equipo viejo y Privacidad máxima. Un perfil
+aplica sus ajustes con un único punto de restauración; cada ajuste queda en el diario, así que
+se puede deshacer el perfil entero o ajuste por ajuste. `cargo test` verifica que los perfiles
+solo usen ids existentes del catálogo.
+
+## Firma de código
+
+`tauri build` llama a `scripts/sign.ps1` para cada binario. Sin certificado solo avisa y sigue.
+Para firmar, define `ADMINOPS_CERT_THUMBPRINT` (certificado instalado) o `ADMINOPS_CERT_PFX`
+(+ `ADMINOPS_CERT_PASSWORD`) y opcionalmente `ADMINOPS_TIMESTAMP_URL`. Requiere el Windows SDK (signtool).
 
 El ejecutable de **release** lleva un manifiesto `requireAdministrator` y pide UAC al abrirse.
 En **debug** usa `asInvoker` para que `tauri dev` funcione sin una terminal elevada
@@ -114,8 +134,5 @@ concreto (y, desde la Fase 2, un `id` de tweak del catálogo embebido en el bina
 
 ## Roadmap
 
-1. **Base** ✅: proyecto, tema, UAC, panel en vivo.
-2. **Motor de tweaks** ✅: formato declarativo (detect/apply/revert), journal de cambios, puntos de restauración.
-3. **Catálogo** ✅: limpieza, privacidad/telemetría, bloatware, servicios, programas de inicio.
-4. **Diagnóstico e informes** ✅: SMART, eventos/BSOD, drivers, batería, informe exportable.
-5. **Pulido**: perfiles, modo portable, firma de código.
+Fases 1–5 completadas (v0.5.0). Lo siguiente, la deuda técnica conocida y los criterios de cada
+fase están en [ROADMAP.md](ROADMAP.md).

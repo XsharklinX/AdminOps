@@ -267,3 +267,52 @@ export const diagApi = {
   openReport: (path: string) => invoke<void>("open_report", { path }),
   revealReport: (path: string) => invoke<void>("reveal_report", { path }),
 };
+
+// ---------- Perfiles y datos de la app (Fase 5) ----------
+
+export interface ProfileItem {
+  id: string;
+  name: string;
+  kind: "toggle" | "action";
+  risk: Risk;
+  status: TweakStatus;
+  supported: boolean;
+  hasBackup: boolean;
+}
+
+export interface ProfileView {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  items: ProfileItem[];
+  needsAdmin: boolean;
+}
+
+export interface ProfileResult {
+  results: {
+    id: string;
+    name: string;
+    outcome: "applied" | "reverted" | "ran" | "skipped" | "failed";
+    message: string | null;
+  }[];
+  restorePointCreated: boolean;
+  reboot: boolean;
+}
+
+export interface AppInfo {
+  version: string;
+  portable: boolean;
+  dataDir: string;
+  reportsDir: string;
+}
+
+export const profilesApi = {
+  list: () => invoke<ProfileView[]>("list_profiles"),
+  apply: (id: string, skipRestorePoint = false) => invoke<ProfileResult>("apply_profile", { id, skipRestorePoint }),
+  revert: (id: string) => invoke<ProfileResult>("revert_profile", { id }),
+};
+
+export const appApi = {
+  info: () => invoke<AppInfo>("get_app_info"),
+};

@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { AdminBanner } from "./components/AdminBanner";
 import { ToastProvider } from "./components/feedback";
 import { NAV, Sidebar, type PageId } from "./components/Sidebar";
-import { api, systemApi, type TargetUser } from "./lib/api";
+import { api, appApi, systemApi, type AppInfo, type TargetUser } from "./lib/api";
 import { Bloatware } from "./pages/Bloatware";
 import { Diagnostics } from "./pages/Diagnostics";
 import { Report } from "./pages/Report";
 import { Dashboard } from "./pages/Dashboard";
 import { History } from "./pages/History";
-import { Placeholder } from "./pages/Placeholder";
+import { Profiles } from "./pages/Profiles";
 import { Startup } from "./pages/Startup";
 import { TweaksPage } from "./pages/TweaksPage";
 
@@ -25,10 +25,12 @@ export default function App() {
   const [page, setPage] = useState<PageId>("dashboard");
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [targetUser, setTargetUser] = useState<TargetUser | null>(null);
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 
   useEffect(() => {
     api.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
     systemApi.targetUser().then(setTargetUser).catch(() => {});
+    appApi.info().then(setAppInfo).catch(() => {});
   }, []);
 
   const nav = NAV.find((n) => n.id === page)!;
@@ -41,13 +43,14 @@ export default function App() {
   else if (page === "startup") content = <Startup isAdmin={!!isAdmin} />;
   else if (page === "diagnostics") content = <Diagnostics />;
   else if (page === "report") content = <Report />;
+  else if (page === "profiles") content = <Profiles isAdmin={!!isAdmin} />;
   else if (category) content = <TweaksPage key={category} category={category} isAdmin={!!isAdmin} />;
-  else content = <Placeholder label={nav.label} icon={nav.icon} phase={nav.phase} />;
+  else content = null;
 
   return (
     <ToastProvider>
       <div className="flex h-full">
-        <Sidebar active={page} onSelect={setPage} isAdmin={isAdmin} targetUser={targetUser} />
+        <Sidebar active={page} onSelect={setPage} isAdmin={isAdmin} targetUser={targetUser} appInfo={appInfo} />
         <main className="flex min-w-0 flex-1 flex-col">
           {isAdmin === false && <AdminBanner />}
           <header className="flex items-center justify-between border-b border-line px-6 py-4">

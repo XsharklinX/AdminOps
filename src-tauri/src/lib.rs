@@ -1,6 +1,7 @@
 mod diagnostics;
 mod elevation;
 mod metrics;
+mod paths;
 mod ps;
 mod target_user;
 mod tweaks;
@@ -40,6 +41,10 @@ pub fn run() {
             diagnostics::report::generate_report,
             diagnostics::report::open_report,
             diagnostics::report::reveal_report,
+            paths::get_app_info,
+            tweaks::profiles::list_profiles,
+            tweaks::profiles::apply_profile,
+            tweaks::profiles::revert_profile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

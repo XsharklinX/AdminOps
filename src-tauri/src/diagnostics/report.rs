@@ -7,7 +7,7 @@ use crate::tweaks::TweakState;
 use chrono::{DateTime, Local, TimeZone};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
-use tauri::{Manager, State};
+use tauri::State;
 
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
@@ -37,13 +37,7 @@ fn yes_no(b: Option<bool>, yes: &str, no: &str) -> String {
     }
 }
 
-pub fn reports_dir(app: &tauri::AppHandle) -> PathBuf {
-    app.path()
-        .document_dir()
-        .unwrap_or_else(|_| std::env::temp_dir())
-        .join("AdminOps")
-        .join("Informes")
-}
+use crate::paths::reports_dir;
 
 const CSS: &str = r#"
 *{box-sizing:border-box}body{margin:0;background:#f4f6f9;color:#1b2330;font:14px/1.5 "Segoe UI",system-ui,sans-serif}

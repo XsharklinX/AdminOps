@@ -1,0 +1,79 @@
+# Perfiles: conjuntos de ajustes y tareas que se aplican de una vez, con un
+# único punto de restauración. Cada elemento queda en el diario por separado,
+# así que el perfil se puede deshacer entero o ajuste por ajuste.
+# icon: nombre de un icono de lucide (ver src/pages/Profiles.tsx).
+
+[[profile]]
+id = "office"
+name = "Oficina"
+icon = "briefcase"
+description = "Equipo de trabajo: sin anuncios ni distracciones, Edge y Widgets fuera del segundo plano y apagados completos para evitar problemas de drivers y actualizaciones. No toca impresión ni búsqueda."
+items = [
+  "privacy.advertising-id",
+  "privacy.tailored-experiences",
+  "privacy.start-suggestions",
+  "privacy.lockscreen-ads",
+  "privacy.feedback",
+  "privacy.bing-search",
+  "performance.edge-background",
+  "performance.widgets",
+  "performance.fast-startup",
+  "cleanup.user-temp",
+]
+
+[[profile]]
+id = "gaming"
+name = "Gaming"
+icon = "gamepad"
+description = "Máximo rendimiento en juegos: plan Alto rendimiento, sin grabación en segundo plano ni procesos de Edge y Widgets. Mantiene Xbox, Game Pass y Game Bar funcionando."
+items = [
+  "performance.power-plan",
+  "performance.game-dvr",
+  "performance.edge-background",
+  "performance.widgets",
+  "performance.menu-delay",
+  "privacy.start-suggestions",
+  "privacy.copilot",
+  "cleanup.user-temp",
+]
+
+[[profile]]
+id = "legacy"
+name = "Equipo viejo"
+icon = "turtle"
+description = "Para poca RAM o disco lento: quita efectos visuales, apps en segundo plano, telemetría y servicios innecesarios, y limpia temporales."
+items = [
+  "performance.transparency",
+  "performance.animations",
+  "performance.menu-delay",
+  "performance.widgets",
+  "performance.edge-background",
+  "performance.background-apps",
+  "privacy.telemetry",
+  "privacy.start-suggestions",
+  "services.maps-broker",
+  "services.retail-demo",
+  "services.fax",
+  "services.error-reporting",
+  "cleanup.user-temp",
+  "cleanup.windows-temp",
+]
+
+[[profile]]
+id = "privacy"
+name = "Privacidad máxima"
+icon = "eye-off"
+description = "Reduce al mínimo los datos que Windows envía a Microsoft y quita Copilot, Recall, Bing y la publicidad personalizada."
+items = [
+  "privacy.telemetry",
+  "privacy.advertising-id",
+  "privacy.tailored-experiences",
+  "privacy.activity-history",
+  "privacy.start-suggestions",
+  "privacy.lockscreen-ads",
+  "privacy.feedback",
+  "privacy.bing-search",
+  "privacy.copilot",
+  "privacy.recall",
+  "services.error-reporting",
+]
