@@ -1,20 +1,6 @@
 import { ChevronDown, Loader2, Play, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
-
-/** Segundos transcurridos mientras `active` es true (SFC/DISM tardan minutos). */
-function useElapsed(active: boolean) {
-  const [secs, setSecs] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    setSecs(0);
-    const start = Date.now();
-    const t = window.setInterval(() => setSecs(Math.floor((Date.now() - start) / 1000)), 1000);
-    return () => window.clearInterval(t);
-  }, [active]);
-  return secs;
-}
-
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+import { useState } from "react";
+import { TaskStatus } from "./TaskStatus";
 import type { Risk, TweakStatus, TweakView } from "../lib/api";
 
 const RISK: Record<Risk, { label: string; cls: string }> = {
@@ -59,6 +45,7 @@ export function TweakCard({
   isAdmin,
   onToggle,
   onRun,
+  highlighted = false,
 }: {
   tweak: TweakView;
   busy: boolean;
@@ -67,9 +54,10 @@ export function TweakCard({
   isAdmin: boolean;
   onToggle: () => void;
   onRun: () => void;
+  /** Resaltado al llegar desde un hallazgo del diagnóstico. */
+  highlighted?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const elapsed = useElapsed(busy);
   const blocked = (t.needsAdmin && !isAdmin) || !t.supported || t.status === "unavailable";
   // "Parcial" se muestra apagado: al pulsarlo se completa el ajuste.
   const on = t.status === "applied";
@@ -77,9 +65,10 @@ export function TweakCard({
 
   return (
     <article
-      className={`rounded-xl border bg-panel transition-colors ${
+      id={`focus-${t.id}`}
+      className={`scroll-mt-6 rounded-xl border bg-panel transition-all duration-500 ${
         t.status === "applied" ? "border-neon/25" : "border-line"
-      } ${blocked ? "opacity-70" : ""}`}
+      } ${blocked ? "opacity-70" : ""} ${highlighted ? "border-neon! glow-neon" : ""}`}
     >
       <div className="flex items-start gap-4 p-4">
         <div className="min-w-0 flex-1">
@@ -104,10 +93,7 @@ export function TweakCard({
           )}
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             {busy ? (
-              <span className="flex items-center gap-1.5 text-neon">
-                <Loader2 size={12} className="animate-spin" /> {busyLabel ?? "Trabajando…"}
-                {elapsed >= 3 && <span className="font-mono text-mute">{mmss(elapsed)}</span>}
-              </span>
+              <TaskStatus task={`tweak:${t.id}`} active={busy} fallback={busyLabel} />
             ) : (
               <>
                 {st && <span className={`font-medium ${st.cls}`}>● {st.label}</span>}

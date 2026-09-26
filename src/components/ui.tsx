@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 import { loadColor } from "../lib/format";
 
 export function Card({
+  id,
   title,
   icon,
   right,
   children,
   className = "",
 }: {
+  id?: string;
   title?: string;
   icon?: ReactNode;
   right?: ReactNode;
@@ -15,7 +17,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-line bg-panel p-4 ${className}`}>
+    <section id={id} className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 [contain:layout_paint] ${className}`}>
       {title && (
         <header className="mb-3 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-xs font-semibold tracking-[0.14em] text-dim uppercase">
@@ -39,6 +41,12 @@ export function Ring({ value, size = 112, label }: { value: number; size?: numbe
   const color = loadColor(v);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
+      {/* Halo con degradado: sin filtros de desenfoque, que son caros de repintar. */}
+      <div
+        className="absolute -inset-2 rounded-full opacity-30"
+        style={{ background: `radial-gradient(circle, transparent 52%, ${color} 58%, transparent 72%)` }}
+        aria-hidden
+      />
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-line)" strokeWidth={stroke} />
         <circle
@@ -51,11 +59,13 @@ export function Ring({ value, size = 112, label }: { value: number; size?: numbe
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c - (v / 100) * c}
-          style={{ transition: "stroke-dashoffset .6s ease, stroke .3s", filter: `drop-shadow(0 0 6px ${color})` }}
+          // Sin transición ni filtro: el arco cambia en cada actualización y un
+          // drop-shadow obliga a recalcular el desenfoque (medido en la Fase 7).
+          // El brillo lo da el halo estático de abajo.
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-2xl font-semibold tabular text-glow" style={{ color }}>
+        <span className="font-mono text-2xl font-semibold tabular" style={{ color }}>
           {Math.round(v)}
           <span className="text-sm">%</span>
         </span>
@@ -100,14 +110,14 @@ export function Sparkline({
   );
 }
 
-export function Bar({ value, color }: { value: number; color?: string }) {
+export function Bar({ value, color, glow = true }: { value: number; color?: string; glow?: boolean }) {
   const v = Math.min(100, Math.max(0, value));
   const c = color ?? loadColor(v);
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
       <div
         className="h-full rounded-full"
-        style={{ width: `${v}%`, background: c, boxShadow: `0 0 8px ${c}`, transition: "width .6s ease" }}
+        style={{ width: `${v}%`, background: c, boxShadow: glow ? `0 0 8px ${c}` : undefined }}
       />
     </div>
   );

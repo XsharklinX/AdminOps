@@ -2,8 +2,10 @@
 //! abrirse en el navegador e imprimirse o guardarse como PDF.
 
 use super::{latest_snapshot, load_snapshot, parse_time, Diagnostics, Severity};
+use crate::network::speedtest::SpeedResult;
 use crate::tweaks::journal::{Entry, Op};
 use crate::tweaks::TweakState;
+use crate::workflow::{ChecklistItem, Settings};
 use chrono::{DateTime, Local, TimeZone};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -56,7 +58,11 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .better{color:#12784a;font-weight:600}.worse{color:#c0223f;font-weight:600}.muted{color:#8a95a5}
 .notes{white-space:pre-wrap;background:#f7f9fb;border-left:3px solid #0bb5d6;padding:12px 14px;border-radius:4px}
 footer{margin-top:40px;color:#8a95a5;font-size:12px;text-align:center}
-header .brand{display:flex;align-items:center;gap:14px}header .brand svg{width:52px;height:52px;flex:none}
+header .brand{display:flex;align-items:center;gap:14px}header .brand svg,header .brand img{width:52px;height:52px;flex:none;object-fit:contain}
+.company{font-size:12px;color:#5b6778;margin-top:2px}.check{list-style:none;padding:0;margin:0;columns:2}.check li{padding:3px 0}
+.check .y{color:#12784a;font-weight:700}.check .n{color:#c0223f;font-weight:700}
+.speed{display:flex;gap:10px}.speed div{flex:1;background:#f7f9fb;border-radius:8px;padding:10px 12px}.speed b{display:block;font-size:20px;color:#0a7f97}
+.conditions{font-size:11px;color:#5b6778;white-space:pre-wrap;border-top:1px solid #e3e8ef;margin-top:28px;padding-top:10px}
 @page{size:A4;margin:14mm 12mm}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff}main{padding:0;max-width:none;min-height:0}h2{break-after:avoid}tr,.f{break-inside:avoid}}
 "#;
@@ -70,6 +76,9 @@ struct Ctx<'a> {
     technician: &'a str,
     client: &'a str,
     notes: &'a str,
+    settings: &'a Settings,
+    checklist: &'a [ChecklistItem],
+    speed: Option<&'a SpeedResult>,
 }
 
 fn sev_class(s: Severity) -> &'static str {
@@ -80,49 +89,89 @@ fn sev_class(s: Severity) -> &'static str {
     }
 }
 
+/// Fila de la tabla antes/después.
+struct Row {
+    label: String,
+    before: String,
+    after: String,
+    /// (diferencia numérica, ¿es mejor que suba?)
+    delta: (f64, bool),
+    text: String,
+}
+
+/// Métrica contable de un análisis: (etiqueta, cómo obtenerla, ¿mejor si sube?).
+type Metric = (&'static str, fn(&Diagnostics) -> Option<usize>, bool);
+
 fn comparison(h: &mut String, cur: &Diagnostics, base: &Diagnostics) {
-    // (métrica, antes, después, delta legible, mejor si sube)
-    let mut rows: Vec<(String, String, String, Option<(f64, bool)>, String)> = Vec::new();
+    let mut rows: Vec<Row> = Vec::new();
     for v in &cur.volumes {
         if let Some(b) = base.volumes.iter().find(|b| b.mount == v.mount) {
             let delta = v.free as f64 - b.free as f64;
             // Menos de 100 MB es el ir y venir normal de temporales: no es un cambio.
             let delta = if delta.abs() < 100.0 * 1024.0 * 1024.0 { 0.0 } else { delta };
-            rows.push((format!("Espacio libre en {}", v.mount), gb(b.free), gb(v.free), Some((delta, true)), format!("{:+.1} GB", delta / 1024f64.powi(3))));
+            rows.push(Row {
+                label: format!("Espacio libre en {}", v.mount),
+                before: gb(b.free),
+                after: gb(v.free),
+                delta: (delta, true),
+                text: format!("{:+.1} GB", delta / 1024f64.powi(3)),
+            });
         }
     }
     let count = |d: &Diagnostics, f: fn(&Diagnostics) -> Option<usize>| f(d);
-    let metrics: [(&str, fn(&Diagnostics) -> Option<usize>, bool); 5] = [
+    let metrics: [Metric; 6] = [
         ("Programas que arrancan con Windows", |d| d.startup_enabled.data.as_ref().map(Vec::len), false),
         ("Apps promocionales instaladas", |d| d.bloat_installed.data.as_ref().map(Vec::len), false),
         ("Ajustes de optimización aplicados", |d| Some(d.tweaks_applied), true),
+        ("Programas con actualizaciones pendientes", |d| d.software_updates.data.as_ref().map(Vec::len), false),
         ("Problemas críticos", |d| Some(d.findings.iter().filter(|f| f.severity == Severity::Bad).count()), false),
         ("Advertencias", |d| Some(d.findings.iter().filter(|f| f.severity == Severity::Warn).count()), false),
     ];
     for (label, get, up_is_better) in metrics {
         if let (Some(b), Some(c)) = (count(base, get), count(cur, get)) {
             let delta = c as f64 - b as f64;
-            rows.push((label.into(), b.to_string(), c.to_string(), Some((delta, up_is_better)), format!("{:+}", c as i64 - b as i64)));
+            rows.push(Row {
+                label: label.into(),
+                before: b.to_string(),
+                after: c.to_string(),
+                delta: (delta, up_is_better),
+                text: format!("{:+}", c as i64 - b as i64),
+            });
         }
     }
     let boot = |d: &Diagnostics| d.stability.data.as_ref()?.boot_times.as_ref()?.first().map(|b| b.ms);
     if let (Some(b), Some(c)) = (boot(base), boot(cur)) {
         if b != c {
             let delta = c as f64 - b as f64;
-            rows.push(("Tiempo del último arranque".into(), format!("{:.1} s", b as f64 / 1000.0), format!("{:.1} s", c as f64 / 1000.0), Some((delta, false)), format!("{:+.1} s", delta / 1000.0)));
+            rows.push(Row {
+                label: "Tiempo del último arranque".into(),
+                before: format!("{:.1} s", b as f64 / 1000.0),
+                after: format!("{:.1} s", c as f64 / 1000.0),
+                delta: (delta, false),
+                text: format!("{:+.1} s", delta / 1000.0),
+            });
         }
     }
 
     let _ = write!(h, "<h2>Antes y después</h2><p class=muted>Comparado con el análisis del {}.</p><table><tr><th>Métrica</th><th>Antes</th><th>Después</th><th>Cambio</th></tr>", fmt_ts(base.timestamp));
-    for (label, before, after, delta, text) in rows {
-        let cls = match delta {
-            Some((d, _)) if d.abs() < f64::EPSILON => "muted",
-            Some((d, up)) if (d > 0.0) == up => "better",
-            Some(_) => "worse",
-            None => "muted",
+    for r in rows {
+        let (d, up) = r.delta;
+        let cls = if d.abs() < f64::EPSILON {
+            "muted"
+        } else if (d > 0.0) == up {
+            "better"
+        } else {
+            "worse"
         };
-        let text = if cls == "muted" { "Sin cambios".to_string() } else { text };
-        let _ = write!(h, "<tr><td>{}</td><td class=num>{}</td><td class=num>{}</td><td class=\"num {cls}\">{}</td></tr>", esc(&label), esc(&before), esc(&after), esc(&text));
+        let text = if cls == "muted" { "Sin cambios".to_string() } else { r.text };
+        let _ = write!(
+            h,
+            "<tr><td>{}</td><td class=num>{}</td><td class=num>{}</td><td class=\"num {cls}\">{}</td></tr>",
+            esc(&r.label),
+            esc(&r.before),
+            esc(&r.after),
+            esc(&text)
+        );
     }
     h.push_str("</table>");
 }
@@ -145,9 +194,21 @@ fn build(c: &Ctx) -> String {
         esc(&d.host),
         local(d.timestamp).format("%d/%m/%Y")
     );
+    let st = c.settings;
+    // El logo del técnico (data URL validada al guardar) sustituye al de AdminOps.
+    let logo = match &st.logo {
+        Some(url) => format!("<img src=\"{}\" alt=\"\">", esc(url)),
+        None => LOGO.to_string(),
+    };
+    let contact: Vec<String> = [&st.phone, &st.email, &st.website].into_iter().filter(|x| !x.trim().is_empty()).map(|x| esc(x.trim())).collect();
+    let company = if st.company.trim().is_empty() {
+        String::new()
+    } else {
+        format!("<div class=company><b>{}</b>{}</div>", esc(st.company.trim()), if contact.is_empty() { String::new() } else { format!(" · {}", contact.join(" · ")) })
+    };
     let _ = write!(
         h,
-        "<header><div class=brand>{LOGO}<h1><small>Informe técnico · AdminOps</small>{}</h1></div><div class=meta>{}{}<div>Fecha: <b>{}</b></div></div></header>",
+        "<header><div class=brand>{logo}<div><h1><small>Informe técnico</small>{}</h1>{company}</div></div><div class=meta>{}{}<div>Fecha: <b>{}</b></div></div></header>",
         esc(&d.host),
         if c.client.is_empty() { String::new() } else { format!("<div>Cliente: <b>{}</b></div>", esc(c.client)) },
         if c.technician.is_empty() { String::new() } else { format!("<div>Técnico: <b>{}</b></div>", esc(c.technician)) },
@@ -192,6 +253,37 @@ fn build(c: &Ctx) -> String {
             );
         }
         h.push_str("</table>");
+    }
+
+    // Checklist de servicio
+    if !c.checklist.is_empty() {
+        h.push_str("<h2>Checklist de servicio</h2><ul class=check>");
+        for item in c.checklist {
+            let _ = write!(
+                h,
+                "<li><span class={}>{}</span> {}</li>",
+                if item.done { "y" } else { "n" },
+                if item.done { "✓" } else { "✗" },
+                esc(&item.text)
+            );
+        }
+        h.push_str("</ul>");
+    }
+
+    // Velocidad de Internet
+    if let Some(sp) = c.speed {
+        let _ = write!(
+            h,
+            "<h2>Velocidad de Internet</h2><div class=speed><div>Bajada<b>{:.1} Mbps</b></div><div>Subida<b>{:.1} Mbps</b></div>\
+             <div>Latencia<b>{:.0} ms</b></div><div>Jitter<b>{:.1} ms</b></div></div><p class=muted>{} · {}{}</p>",
+            sp.download_mbps,
+            sp.upload_mbps,
+            sp.latency_ms,
+            sp.jitter_ms,
+            esc(&sp.server),
+            fmt_ts(sp.timestamp),
+            sp.download_latency_ms.map(|l| format!(" · latencia con carga {l:.0} ms")).unwrap_or_default()
+        );
     }
 
     // Equipo
@@ -276,12 +368,24 @@ fn build(c: &Ctx) -> String {
         );
     }
 
+    // Software con actualizaciones
+    if let Some(updates) = d.software_updates.data.as_ref().filter(|u| !u.is_empty()) {
+        let _ = write!(h, "<h2>Software con actualizaciones pendientes ({})</h2><table><tr><th>Programa</th><th>Instalada</th><th>Disponible</th></tr>", updates.len());
+        for u in updates.iter().take(40) {
+            let _ = write!(h, "<tr><td>{}</td><td class=num>{}</td><td class=num>{}</td></tr>", esc(&u.name), esc(&u.version), esc(&u.available));
+        }
+        h.push_str("</table>");
+    }
+
     // Seguridad
     if let Some(s) = &d.system.data {
         h.push_str("<h2>Seguridad y mantenimiento</h2><table>");
         let av = if s.antivirus.is_empty() { "No detectado".to_string() } else { s.antivirus.join(", ") };
         let _ = write!(h, "<tr><th>Antivirus</th><td>{}</td></tr>", esc(&av));
         let _ = write!(h, "<tr><th>Protección en tiempo real (Defender)</th><td>{}</td></tr>", yes_no(s.defender_realtime, "Activa", "Desactivada"));
+        if let Some(days) = s.quick_scan_age_days {
+            let _ = write!(h, "<tr><th>Último análisis antivirus</th><td>{}</td></tr>", if days == 0 { "Hoy".to_string() } else { format!("Hace {days} días") });
+        }
         let _ = write!(
             h,
             "<tr><th>Última actualización</th><td>{}</td></tr>",
@@ -297,7 +401,14 @@ fn build(c: &Ctx) -> String {
         let _ = write!(h, "<h2>Observaciones del técnico</h2><div class=notes>{}</div>", esc(c.notes.trim()));
     }
 
-    let _ = write!(h, "<footer>Generado con AdminOps el {}</footer></main></body></html>", Local::now().format("%d/%m/%Y %H:%M"));
+    if !st.conditions.trim().is_empty() {
+        let _ = write!(h, "<div class=conditions>{}</div>", esc(st.conditions.trim()));
+    }
+    let _ = write!(
+        h,
+        "<footer>Generado el {} con AdminOps · por David Bonilla</footer></main></body></html>",
+        Local::now().format("%d/%m/%Y %H:%M")
+    );
     h
 }
 
@@ -317,26 +428,43 @@ fn inside_reports(app: &tauri::AppHandle, path: &str) -> Result<PathBuf, String>
     Ok(PathBuf::from(s.strip_prefix(r"\\?\").unwrap_or(&s)))
 }
 
-#[tauri::command(async)]
-pub fn generate_report(
-    app: tauri::AppHandle,
-    state: State<'_, TweakState>,
-    baseline: Option<u64>,
-    technician: String,
-    client: String,
-    notes: String,
-) -> Result<String, String> {
-    let cur = latest_snapshot(&app).ok_or("Ejecuta un diagnóstico antes de generar el informe.")?;
-    let base = baseline.filter(|b| *b != cur.timestamp).and_then(|b| load_snapshot(&app, b));
-    // Sin base, el trabajo realizado es el de hoy.
-    let since = base.as_ref().map_or_else(
-        || Local::now().date_naive().and_hms_opt(0, 0, 0).and_then(|d| d.and_local_timezone(Local).single()).map_or(0, |d| d.timestamp() as u64),
-        |b| b.timestamp,
-    );
-    let journal = state.journal_since(since);
-    let html = build(&Ctx { cur: &cur, base: base.as_ref(), journal: &journal, technician: &technician, client: &client, notes: &notes });
+/// Datos del informe además del diagnóstico.
+pub struct ReportInput {
+    /// Snapshot "antes" para comparar.
+    pub baseline: Option<u64>,
+    pub client: String,
+    /// `None`: el técnico de los ajustes.
+    pub technician: Option<String>,
+    pub notes: String,
+    pub checklist: Vec<ChecklistItem>,
+    /// Desde cuándo contar el trabajo realizado (por defecto, la base o hoy).
+    pub since: Option<u64>,
+}
 
-    let dir = reports_dir(&app);
+/// Genera el informe PDF (o HTML si falta Edge), lo abre y devuelve su ruta.
+pub fn create_report(app: &tauri::AppHandle, state: &TweakState, input: ReportInput) -> Result<String, String> {
+    let cur = latest_snapshot(app).ok_or("Ejecuta un diagnóstico antes de generar el informe.")?;
+    let base = input.baseline.filter(|b| *b != cur.timestamp).and_then(|b| load_snapshot(app, b));
+    let today = || Local::now().date_naive().and_hms_opt(0, 0, 0).and_then(|d| d.and_local_timezone(Local).single()).map_or(0, |d| d.timestamp() as u64);
+    let since = input.since.or(base.as_ref().map(|b| b.timestamp)).unwrap_or_else(today);
+    let journal = state.journal_since(since);
+    let settings = crate::workflow::settings(app);
+    let technician = input.technician.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| settings.technician.clone());
+    // Último test de velocidad del periodo del informe.
+    let speed = crate::network::speedtest::history(app).into_iter().find(|r| r.timestamp >= since);
+    let html = build(&Ctx {
+        cur: &cur,
+        base: base.as_ref(),
+        journal: &journal,
+        technician: &technician,
+        client: &input.client,
+        notes: &input.notes,
+        settings: &settings,
+        checklist: &input.checklist,
+        speed: speed.as_ref(),
+    });
+
+    let dir = reports_dir(app);
     std::fs::create_dir_all(&dir).map_err(|e| format!("No se pudo crear {}: {e}", dir.display()))?;
     let safe_host: String = cur.host.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).collect();
     let base_name = format!("AdminOps_{}_{}", safe_host, Local::now().format("%Y-%m-%d_%H%M"));
@@ -352,6 +480,22 @@ pub fn generate_report(
     };
     shell_open(&[path.as_os_str()])?;
     Ok(path.display().to_string())
+}
+
+#[tauri::command(async)]
+pub fn generate_report(
+    app: tauri::AppHandle,
+    state: State<'_, TweakState>,
+    baseline: Option<u64>,
+    technician: String,
+    client: String,
+    notes: String,
+) -> Result<String, String> {
+    create_report(
+        &app,
+        &state,
+        ReportInput { baseline, client, technician: Some(technician), notes, checklist: vec![], since: None },
+    )
 }
 
 #[tauri::command]

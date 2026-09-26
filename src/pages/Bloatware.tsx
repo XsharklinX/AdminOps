@@ -1,6 +1,7 @@
 import { Download, Loader2, PackageX, RefreshCw, Search, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
+import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, systemApi, type Advice, type AppView } from "../lib/api";
 
 const ADVICE: Record<Advice, { title: string; hint: string; cls: string }> = {
@@ -259,12 +260,16 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
       {selected.size > 0 && (
         <div className="fixed right-0 bottom-0 left-56 z-30 border-t border-line bg-panel/95 px-6 py-3 backdrop-blur">
           <div className="mx-auto flex max-w-4xl items-center justify-between">
+            {removing ? (
+              <TaskStatus task="apps" active={removing} fallback="Quitando apps…" />
+            ) : (
             <span className="text-sm text-dim">
               <span className="font-mono text-neon">{selected.size}</span> seleccionadas
               <button onClick={() => setSelected(new Set())} className="ml-3 text-xs text-mute hover:text-ink">
                 Limpiar
               </button>
             </span>
+            )}
             <button
               onClick={() => remove()}
               disabled={removing}

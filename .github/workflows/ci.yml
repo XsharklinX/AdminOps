@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Compilar, probar y empaquetar
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Tipos y bundle del frontend
+        run: npm run build
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --lib --tests -- -D warnings
+
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Instalador y portable
+        run: npm run build:portable
+
+      # Aplica y deshace cada ajuste del catálogo en el runner (desechable) y
+      # falla si alguno no vuelve EXACTAMENTE a su estado original.
+      - name: Prueba de ida y vuelta del catálogo
+        shell: pwsh
+        run: |
+          $p = Start-Process src-tauri/target/release/adminops.exe -ArgumentList '--roundtrip', "$PWD/roundtrip.json" -Wait -PassThru
+          $r = Get-Content roundtrip.json -Raw | ConvertFrom-Json
+          "Total $($r.total) · OK $($r.ok) · No reversibles $($r.notReversible) · Avisos $($r.warnings)"
+          $r.cases | Where-Object outcome -ne 'ok' | Format-Table id, outcome, detail -Wrap | Out-String -Width 200
+          if ($p.ExitCode -eq 1) { throw 'Hay ajustes que no vuelven a su estado original (ver roundtrip.json).' }
+          if ($p.ExitCode -ne 0) { throw "La prueba no pudo ejecutarse (código $($p.ExitCode))." }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: adminops-${{ github.sha }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            dist-portable/*.zip
+            roundtrip.json
+          if-no-files-found: ignore

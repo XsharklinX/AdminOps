@@ -53,6 +53,18 @@ pub fn validate(tweaks: &[Tweak]) -> Vec<String> {
                 }
             }
         }
+        // Los scripts deben actuar sobre el usuario destino, no sobre la cuenta
+        // que elevó AdminOps (ver target_user::script_prelude).
+        if let Some(sc) = script {
+            for body in [&sc.detect, &sc.apply, &sc.revert, &sc.run].into_iter().flatten() {
+                let lower = body.to_ascii_lowercase();
+                for bad in ["$env:temp", "$env:tmp", "$env:localappdata", "$env:appdata", "$env:userprofile", "hkcu:", "clear-recyclebin"] {
+                    if lower.contains(bad) {
+                        errors.push(format!("{}: usa {bad}; usa las variables $User* del usuario destino", t.id));
+                    }
+                }
+            }
+        }
         for r in &t.registry {
             if !r.path.contains('\\') {
                 errors.push(format!("{}: ruta de registro inválida {}", t.id, r.path));

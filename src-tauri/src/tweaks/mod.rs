@@ -9,6 +9,7 @@ pub(crate) mod journal;
 pub mod model;
 pub(crate) mod registry;
 mod restore;
+pub mod roundtrip;
 mod service;
 pub mod startup;
 
@@ -18,6 +19,7 @@ use model::{Kind, Risk, Tweak};
 use serde::Serialize;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use crate::task::Task;
 use tauri::State;
 
 /// No crear más de un punto de restauración automático cada 30 min: aplicar
@@ -36,7 +38,11 @@ pub struct TweakState {
 
 impl TweakState {
     pub fn new(app: &tauri::AppHandle) -> Self {
-        let dir = crate::paths::machine_data_dir(app);
+        Self::with_data_dir(crate::paths::machine_data_dir(app))
+    }
+
+    /// Estado con el diario en `dir` (modo línea de comandos y pruebas).
+    pub fn with_data_dir(dir: std::path::PathBuf) -> Self {
         let build = registry::read_string(r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber")
             .and_then(|b| b.parse().ok())
             .unwrap_or(0);
@@ -66,6 +72,17 @@ impl TweakState {
         self.journal.lock().unwrap().push(e)
     }
 
+    /// Registra en el diario una operación ajena al catálogo (finalizar un
+    /// proceso, actualizar software…). No se puede deshacer.
+    pub fn record<T>(&self, op: Op, title: &str, result: &Result<T, String>) {
+        let mut e = entry(op, None, title);
+        if let Err(err) = result {
+            e.ok = false;
+            e.message = Some(err.clone());
+        }
+        self.log(e);
+    }
+
     /// Cuántos ajustes (toggle) del catálogo están aplicados ahora mismo.
     pub fn applied_count(&self) -> usize {
         let toggles: Vec<&Tweak> = self.catalog.iter().filter(|t| t.kind == Kind::Toggle).collect();
@@ -85,14 +102,15 @@ impl TweakState {
 
 /// Crea un punto de restauración salvo que ya haya uno reciente de esta sesión.
 /// Devuelve si lo creó. Si falla, el error lleva el prefijo `RP_FAILED`.
-fn ensure_restore_point(state: &TweakState, what: &str, tweak_id: Option<&str>) -> Result<bool, String> {
+fn ensure_restore_point(state: &TweakState, task: &Task, what: &str, tweak_id: Option<&str>) -> Result<bool, String> {
     let recent = state.last_restore_point.lock().unwrap().is_some_and(|i| i.elapsed() < RESTORE_POINT_COOLDOWN);
     if recent {
         return Ok(false);
     }
+    task.step("Creando punto de restauración (puede tardar 1–2 minutos)…");
     let desc = format!("AdminOps: antes de '{what}'");
     let mut e = entry(Op::RestorePoint, tweak_id, &desc);
-    let result = restore::create(&desc);
+    let result = restore::create(&desc, task);
     if let Err(err) = &result {
         e.ok = false;
         e.message = Some(err.clone());
@@ -168,25 +186,32 @@ pub fn list_tweaks(category: Option<String>, state: State<'_, TweakState>) -> Re
 }
 
 #[tauri::command(async)]
-pub fn apply_tweak(id: String, skip_restore_point: bool, state: State<'_, TweakState>) -> Result<OpResult, String> {
+pub fn apply_tweak(
+    app: tauri::AppHandle,
+    id: String,
+    skip_restore_point: bool,
+    state: State<'_, TweakState>,
+) -> Result<OpResult, String> {
     let t = state.find(&id)?;
+    let task = Task::new(&app, format!("tweak:{id}"));
     if t.kind != Kind::Toggle {
         return Err("Esto es una tarea puntual, no un ajuste.".into());
     }
     state.check_can_modify(t)?;
 
     let restore_point_created =
-        t.risk >= Risk::Medium && !skip_restore_point && ensure_restore_point(&state, &t.name, Some(&t.id))?;
+        t.risk >= Risk::Medium && !skip_restore_point && ensure_restore_point(&state, &task, &t.name, Some(&t.id))?;
+    task.step(format!("Aplicando {}…", t.name));
 
-    apply_logged(&state, t)?;
+    apply_logged(&state, t, Some(&task))?;
     let message = if t.reboot { "Aplicado. Reinicia para que surta efecto." } else { "Aplicado." };
     Ok(OpResult { status: engine::detect(t), message: message.into(), restore_point_created })
 }
 
 /// Aplica un ajuste y lo registra en el diario (sin punto de restauración).
-fn apply_logged(state: &TweakState, t: &Tweak) -> Result<(), String> {
+fn apply_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<(), String> {
     let mut e = entry(Op::Apply, Some(&t.id), &t.name);
-    match engine::apply(t) {
+    match engine::apply(t, task) {
         Ok(backups) => {
             e.backups = backups;
             state.log(e);
@@ -203,17 +228,17 @@ fn apply_logged(state: &TweakState, t: &Tweak) -> Result<(), String> {
 
 /// Deshace la última aplicación hecha por AdminOps usando su copia del diario.
 /// `Ok(false)` si no había nada que deshacer.
-fn revert_logged(state: &TweakState, t: &Tweak) -> Result<bool, String> {
+fn revert_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<bool, String> {
     let pending = state.journal.lock().unwrap().pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
     let Some((entry_id, backups)) = pending else { return Ok(false) };
-    let result = engine::restore(Some(t), &backups);
+    let result = engine::restore(Some(t), &backups, task);
     finish_revert(state, Some(t), &t.name, Some(entry_id), result).map(|_| true)
 }
 
 /// Ejecuta una tarea puntual y la registra en el diario.
-fn run_logged(state: &TweakState, t: &Tweak) -> Result<String, String> {
+fn run_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<String, String> {
     let mut e = entry(Op::Run, Some(&t.id), &t.name);
-    let result = engine::run_action(t);
+    let result = engine::run_action(t, task);
     match &result {
         Ok(msg) => e.message = Some(msg.clone()),
         Err(err) => {
@@ -228,20 +253,22 @@ fn run_logged(state: &TweakState, t: &Tweak) -> Result<String, String> {
 /// Deshace un ajuste: con la copia exacta del diario si AdminOps lo aplicó,
 /// o con los valores de fábrica del catálogo si ya venía aplicado.
 #[tauri::command(async)]
-pub fn revert_tweak(id: String, state: State<'_, TweakState>) -> Result<OpResult, String> {
+pub fn revert_tweak(app: tauri::AppHandle, id: String, state: State<'_, TweakState>) -> Result<OpResult, String> {
     let t = state.find(&id)?;
     state.check_can_modify(t)?;
+    let task = Task::new(&app, format!("tweak:{id}"));
+    task.step(format!("Deshaciendo {}…", t.name));
     let pending = state.journal.lock().unwrap().pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
     let result = match &pending {
-        Some((_, backups)) => engine::restore(Some(t), backups),
-        None => engine::revert_to_defaults(t),
+        Some((_, backups)) => engine::restore(Some(t), backups, Some(&task)),
+        None => engine::revert_to_defaults(t, Some(&task)),
     };
     finish_revert(&state, Some(t), &t.name, pending.map(|p| p.0), result)
 }
 
 /// Deshace una entrada concreta del historial (ajuste, cambio de Inicio o app quitada).
 #[tauri::command(async)]
-pub fn revert_entry(entry_id: u64, state: State<'_, TweakState>) -> Result<OpResult, String> {
+pub fn revert_entry(app: tauri::AppHandle, entry_id: u64, state: State<'_, TweakState>) -> Result<OpResult, String> {
     let e = state.journal.lock().unwrap().get(entry_id).cloned().ok_or("Entrada no encontrada")?;
     if !e.undoable || e.reverted {
         return Err("Esta entrada no se puede deshacer.".into());
@@ -257,7 +284,9 @@ pub fn revert_entry(entry_id: u64, state: State<'_, TweakState>) -> Result<OpRes
         }
         None => {}
     }
-    let result = engine::restore(tweak, &e.backups);
+    let task = Task::new(&app, format!("entry:{entry_id}"));
+    task.step(format!("Deshaciendo {}…", e.title));
+    let result = engine::restore(tweak, &e.backups, Some(&task));
     finish_revert(&state, tweak, &e.title, Some(entry_id), result)
 }
 
@@ -299,13 +328,15 @@ fn finish_revert(
 }
 
 #[tauri::command(async)]
-pub fn run_action(id: String, state: State<'_, TweakState>) -> Result<OpResult, String> {
+pub fn run_action(app: tauri::AppHandle, id: String, state: State<'_, TweakState>) -> Result<OpResult, String> {
     let t = state.find(&id)?;
     if t.kind != Kind::Action {
         return Err("Esto es un ajuste, no una tarea.".into());
     }
     state.check_can_modify(t)?;
-    run_logged(&state, t).map(|message| OpResult { status: Status::Action, message, restore_point_created: false })
+    let task = Task::new(&app, format!("tweak:{id}"));
+    task.step(format!("Ejecutando {}…", t.name));
+    run_logged(&state, t, Some(&task)).map(|message| OpResult { status: Status::Action, message, restore_point_created: false })
 }
 
 #[tauri::command]
@@ -314,13 +345,15 @@ pub fn get_journal(state: State<'_, TweakState>) -> Vec<Entry> {
 }
 
 #[tauri::command(async)]
-pub fn create_restore_point(state: State<'_, TweakState>) -> Result<(), String> {
+pub fn create_restore_point(app: tauri::AppHandle, state: State<'_, TweakState>) -> Result<(), String> {
     if !crate::elevation::is_elevated() {
         return Err("Requiere ejecutar AdminOps como administrador.".into());
     }
     let desc = "AdminOps: punto manual";
     let mut e = entry(Op::RestorePoint, None, desc);
-    let result = restore::create(desc);
+    let task = Task::new(&app, "restore-point");
+    task.step("Creando punto de restauración (puede tardar 1–2 minutos)…");
+    let result = restore::create(desc, &task);
     match &result {
         Ok(()) => *state.last_restore_point.lock().unwrap() = Some(Instant::now()),
         Err(err) => {

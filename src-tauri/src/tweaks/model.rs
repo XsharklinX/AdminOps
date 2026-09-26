@@ -104,6 +104,10 @@ pub struct Tweak {
     pub min_build: u32,
     #[serde(default)]
     pub max_build: Option<u32>,
+    /// Límite en segundos para sus scripts (0 = sin límite; el usuario puede cancelar).
+    /// Por defecto 120 s en ajustes y 900 s en tareas.
+    #[serde(default)]
+    pub timeout: Option<u64>,
     /// Forzar que requiera admin (para scripts; registro HKLM y servicios lo infieren solos).
     #[serde(default)]
     pub admin: bool,

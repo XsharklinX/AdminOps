@@ -1,6 +1,6 @@
 [package]
 name = "adminops"
-version = "0.5.0"
+version = "0.9.0"
 description = "AdminOps - optimizacion y diagnostico de Windows"
 authors = ["David Bonilla"]
 edition = "2021"
@@ -25,6 +25,13 @@ sysinfo = "0.38.4"
 toml = "1.1.6"
 base64 = "0.23.1"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+tauri-plugin-log = "2.9.2"
+log = "0.4.34"
+futures-util = "0.3.34"
+rayon = "1.12.0"
+tokio = { version = "1.53.1", features = ["time", "sync", "macros", "rt"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["native-tls", "stream", "json", "http2"] }
+bytes = "1.12.1"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
@@ -36,5 +43,5 @@ panic = "abort"
 strip = true
 
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_Storage_FileSystem", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.56.0"

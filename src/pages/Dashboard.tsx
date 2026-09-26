@@ -6,7 +6,7 @@ import { api, type SystemInfo } from "../lib/api";
 import { bytes, duration, loadColor, pct, rate } from "../lib/format";
 
 export function Dashboard() {
-  const { metrics: m, history, error } = useLiveMetrics();
+  const { metrics: m, history, error } = useLiveMetrics(2000);
   const [info, setInfo] = useState<SystemInfo | null>(null);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export function Dashboard() {
                 <div key={i} className="relative h-7 flex-1 overflow-hidden rounded-sm bg-line" title={`Hilo ${i}: ${pct(v)}`}>
                   <div
                     className="absolute inset-x-0 bottom-0"
-                    style={{ height: `${v}%`, background: loadColor(v), opacity: 0.85, transition: "height .5s" }}
+                    style={{ height: `${v}%`, background: loadColor(v), opacity: 0.85 }}
                   />
                 </div>
               ))}
@@ -160,7 +160,7 @@ export function Dashboard() {
                 <td className="py-1.5 pl-6">
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
-                      <Bar value={p.cpu} />
+                      <Bar value={p.cpu} glow={false} />
                     </div>
                     <span className="w-12 text-right">{p.cpu.toFixed(1)}%</span>
                   </div>

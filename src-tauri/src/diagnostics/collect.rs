@@ -275,6 +275,8 @@ pub struct SystemHealth {
     pub activated: Option<bool>,
     pub secure_boot: Option<bool>,
     pub tpm_ready: Option<bool>,
+    #[serde(default)]
+    pub quick_scan_age_days: Option<u32>,
 }
 
 pub fn system() -> Result<SystemHealth, String> {
@@ -300,6 +302,7 @@ ConvertTo-Json -Compress -InputObject ([pscustomobject]@{
   antivirus = $av
   activated = if ($lic) { $lic.LicenseStatus -eq 1 } else { $null }
   secureBoot = $sb; tpmReady = $tpm
+  quickScanAgeDays = if ($mp -and $mp.QuickScanAge -lt 10000) { [uint32]$mp.QuickScanAge } else { $null }
 })
 "#)
 }

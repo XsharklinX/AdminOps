@@ -1,8 +1,21 @@
-import { CheckCircle2, ExternalLink, History as HistoryIcon, LifeBuoy, Loader2, Play, Plus, Undo2, Wrench, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  History as HistoryIcon,
+  LifeBuoy,
+  Loader2,
+  Play,
+  Plus,
+  ScrollText,
+  Undo2,
+  Wrench,
+  XCircle,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
+import { TaskStatus } from "../components/TaskStatus";
 import { Card } from "../components/ui";
-import { tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
+import { appApi, tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
 
 const OP = {
   apply: { label: "Aplicado", icon: Wrench },
@@ -90,8 +103,9 @@ export function History({ isAdmin }: { isAdmin: boolean }) {
           className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-md border border-neon/40 py-2 text-sm font-medium text-neon transition-colors hover:bg-neon/10 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-          {creating ? "Creando… (puede tardar un minuto)" : "Crear punto ahora"}
+          {creating ? "Creando punto de restauración…" : "Crear punto ahora"}
         </button>
+        <TaskStatus task="restore-point" active={creating} fallback="Creando…" className="-mt-2 mb-4" />
         {!isAdmin ? (
           <p className="text-xs text-warn">Requiere ejecutar como administrador.</p>
         ) : pointsError ? (
@@ -159,6 +173,57 @@ export function History({ isAdmin }: { isAdmin: boolean }) {
           </ol>
         )}
       </Card>
+
+      <LogViewer />
     </div>
+  );
+}
+
+function LogViewer() {
+  const [text, setText] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const toast = useToast();
+  const load = useCallback(() => {
+    appApi.readLog(400).then(setText).catch((e) => toast("error", String(e)));
+  }, [toast]);
+
+  useEffect(() => {
+    if (open) load();
+  }, [open, load]);
+
+  return (
+    <Card
+      title="Registro técnico"
+      icon={<ScrollText size={14} />}
+      className="col-span-12"
+      right={
+        <div className="flex gap-3 text-[11px]">
+          {open && (
+            <button onClick={load} className="text-mute hover:text-ink">
+              Actualizar
+            </button>
+          )}
+          <button
+            onClick={() => appApi.openLogsFolder().catch((e) => toast("error", String(e)))}
+            className="flex items-center gap-1 text-mute hover:text-ink"
+          >
+            Abrir carpeta <ExternalLink size={10} />
+          </button>
+          <button onClick={() => setOpen(!open)} className="text-neon hover:underline">
+            {open ? "Ocultar" : "Mostrar"}
+          </button>
+        </div>
+      }
+    >
+      {open ? (
+        <pre className="max-h-96 overflow-auto rounded-md border border-line bg-void/60 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-dim select-text">
+          {text === null ? "Cargando…" : text || "El registro está vacío."}
+        </pre>
+      ) : (
+        <p className="text-xs text-dim">
+          Todo lo que AdminOps ejecuta (scripts, errores, tiempos) queda registrado. Adjúntalo si algo falla.
+        </p>
+      )}
+    </Card>
   );
 }

@@ -1,5 +1,15 @@
 import {
   Briefcase,
+  Copy,
+  GraduationCap,
+  House,
+  Import,
+  Pencil,
+  Plus,
+  Shield,
+  Trash2,
+  Wrench,
+  Zap,
   CheckCircle2,
   CircleDashed,
   EyeOff,
@@ -15,13 +25,21 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { RP_FAILED, profilesApi, type ProfileResult, type ProfileView } from "../lib/api";
+import { ProfileEditor } from "../components/ProfileEditor";
+import { TaskStatus } from "../components/TaskStatus";
+import { RP_FAILED, profilesApi, workApi, type ProfileDef, type ProfileResult, type ProfileView } from "../lib/api";
 
 const ICONS: Record<string, LucideIcon> = {
   briefcase: Briefcase,
   gamepad: Gamepad2,
   turtle: Turtle,
   "eye-off": EyeOff,
+  layers: Layers,
+  zap: Zap,
+  wrench: Wrench,
+  shield: Shield,
+  "graduation-cap": GraduationCap,
+  house: House,
 };
 
 const OUTCOME = {
@@ -36,8 +54,54 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
   const [profiles, setProfiles] = useState<ProfileView[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<{ profile: string; title: string; r: ProfileResult } | null>(null);
+  const [editing, setEditing] = useState<ProfileDef | null | undefined>(undefined);
+  const [importing, setImporting] = useState(false);
+  const [importText, setImportText] = useState("");
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
+
+  const toDef = (p: ProfileView): ProfileDef => ({
+    id: p.id,
+    name: p.name,
+    icon: p.icon,
+    description: p.description,
+    items: p.items.map((i) => i.id),
+    custom: p.custom,
+  });
+
+  const exportAll = async () => {
+    try {
+      const json = await workApi.exportProfiles();
+      await navigator.clipboard.writeText(json);
+      toast("ok", "Perfiles propios copiados al portapapeles (JSON). Pégalos en otro AdminOps con «Importar».");
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+
+  const doImport = async () => {
+    try {
+      const n = await workApi.importProfiles(importText);
+      toast("ok", `${n} perfil(es) importado(s).`);
+      setImporting(false);
+      setImportText("");
+      load();
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+
+  const removeCustom = async (p: ProfileView) => {
+    const ok = await confirm({
+      title: `¿Eliminar el perfil "${p.name}"?`,
+      danger: true,
+      confirmLabel: "Eliminar",
+      body: <p>Solo se borra el perfil; los ajustes ya aplicados en el equipo no cambian.</p>,
+    });
+    if (!ok) return;
+    await workApi.deleteProfile(p.id);
+    load();
+  };
 
   const load = useCallback(async () => {
     try {
@@ -155,6 +219,26 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
+      <div className="mb-4 flex items-center gap-2">
+        <p className="text-sm text-dim">Aplica varios ajustes de una vez con un solo punto de restauración.</p>
+        <button
+          onClick={() => setEditing(null)}
+          className="ml-auto flex items-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon hover:bg-neon/20"
+        >
+          <Plus size={13} /> Nuevo perfil
+        </button>
+        <button onClick={() => setImporting(true)} className="flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-xs text-dim hover:text-ink">
+          <Import size={13} /> Importar
+        </button>
+        <button
+          onClick={exportAll}
+          disabled={!profiles.some((p) => p.custom)}
+          className="flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-xs text-dim hover:text-ink disabled:opacity-40"
+        >
+          <Copy size={13} /> Exportar los míos
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {profiles.map((p) => {
           const Icon = ICONS[p.icon] ?? Layers;
@@ -169,7 +253,20 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
                   <Icon size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-semibold">{p.name}</h2>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    {p.name}
+                    {p.custom && <span className="rounded border border-neon-2/40 px-1.5 text-[10px] font-normal text-neon-2">propio</span>}
+                    {p.custom && (
+                      <span className="ml-auto flex gap-2">
+                        <button onClick={() => setEditing(toDef(p))} className="text-mute hover:text-ink" title="Editar">
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => removeCustom(p)} className="text-mute hover:text-bad" title="Eliminar">
+                          <Trash2 size={13} />
+                        </button>
+                      </span>
+                    )}
+                  </h2>
                   <p className="text-sm text-dim">{p.description}</p>
                 </div>
               </div>
@@ -224,11 +321,50 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
                   </button>
                 )}
               </div>
+              <TaskStatus task={`profile:${p.id}`} active={isBusy} fallback="Aplicando…" className="mt-2" />
             </article>
           );
         })}
       </div>
       {dialog}
+      {editing !== undefined && (
+        <ProfileEditor
+          initial={editing}
+          icons={ICONS}
+          onClose={() => setEditing(undefined)}
+          onSaved={(saved) => {
+            setEditing(undefined);
+            toast("ok", `Perfil "${saved.name}" guardado.`);
+            load();
+          }}
+        />
+      )}
+      {importing && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm" onClick={() => setImporting(false)}>
+          <div className="w-[560px] rounded-xl border border-line-2 bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 font-semibold">Importar perfiles</h3>
+            <p className="mb-3 text-xs text-dim">Pega el JSON exportado desde otro AdminOps.</p>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              rows={10}
+              className="w-full resize-y rounded-md border border-line bg-void/60 px-3 py-2 font-mono text-xs text-ink outline-none focus:border-neon/50"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button onClick={() => setImporting(false)} className="rounded-md px-3 py-1.5 text-sm text-dim hover:text-ink">
+                Cancelar
+              </button>
+              <button
+                onClick={doImport}
+                disabled={!importText.trim()}
+                className="rounded-md border border-neon/50 bg-neon/10 px-4 py-1.5 text-sm text-neon hover:bg-neon/20 disabled:opacity-40"
+              >
+                Importar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

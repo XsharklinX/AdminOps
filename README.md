@@ -2,6 +2,8 @@
 
 Herramienta de escritorio para técnicos de soporte: diagnóstico y optimización de Windows 10/11.
 
+**Autor:** David Bonilla
+
 **Stack:** Tauri 2 (Rust) + React 19 + Vite + Tailwind CSS 4.
 
 ## Desarrollo
@@ -132,7 +134,20 @@ de un ajuste, lo ya cambiado se revierte antes de devolver el error.
 La UI nunca envía scripts ni comandos libres al backend. Cada acción es un comando Rust
 concreto (y, desde la Fase 2, un `id` de tweak del catálogo embebido en el binario).
 
+## Calidad y rendimiento
+
+- **CI** (`.github/workflows/ci.yml`): tipos, Clippy, tests, instalador, portable y prueba de ida y vuelta.
+- **Prueba de ida y vuelta**: `adminops.exe --roundtrip informe.json [--only id1,id2]` aplica y deshace
+  cada ajuste y comprueba que todo vuelve exactamente a su estado. **Modifica el sistema**: úsala en la
+  CI o en Windows Sandbox (`tests/sandbox/run-roundtrip.ps1`), no en un PC real.
+- **Registro de actividad**: `%LOCALAPPDATA%\com.adminops.app\logs\adminops.log` (o `AdminOps-data\equipos\<PC>\logs`
+  en portable). Visible en Historial → Registro técnico.
+- **Rendimiento**: `cargo test --release bench -- --ignored --nocapture` (consultas) y `scripts/bench.ps1`
+  (arranque, RAM y CPU; requiere compilar con `ADMINOPS_ASINVOKER=1`, solo para medir).
+- Las consultas a PowerShell usan procesos persistentes (`src-tauri/src/pspool.rs`); lo que modifica el
+  sistema o se puede cancelar va en procesos aislados (`ps.rs`). `ADMINOPS_NO_PS_POOL=1` lo desactiva.
+
 ## Roadmap
 
-Fases 1–5 completadas (v0.5.0). Lo siguiente, la deuda técnica conocida y los criterios de cada
+Fases 1–9 completadas (v0.9.0). Lo siguiente, la deuda técnica conocida y los criterios de cada
 fase están en [ROADMAP.md](ROADMAP.md).

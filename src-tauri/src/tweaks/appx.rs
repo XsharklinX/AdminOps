@@ -7,8 +7,42 @@ use super::journal::{entry, Backup, Op};
 use super::{ensure_restore_point, TweakState};
 use crate::ps;
 use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
+use crate::task::Task;
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 use tauri::State;
+
+/// El motor de paquetes de Windows (Appx/DISM) solo admite una operación a la
+/// vez: si Bloatware y el diagnóstico listan apps a la vez, uno falla con
+/// "Another operation on app packages is in progress". Todo lo de Appx pasa
+/// por este cerrojo.
+static APPX_LOCK: Mutex<()> = Mutex::new(());
+
+/// Ejecuta un script de Appx en exclusiva y reintenta si Windows está ocupado
+/// con otra operación de paquetes (p. ej. Microsoft Store actualizando apps).
+fn appx_script(script: &str, opts: ps::Opts) -> Result<String, String> {
+    let _guard = APPX_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    for attempt in 0..4 {
+        match ps::powershell_opts(script, opts) {
+            Ok(out) => return Ok(out),
+            Err(e) if is_busy(&e) && attempt < 3 => {
+                log::info!("Appx ocupado, reintento {}: {e}", attempt + 1);
+                std::thread::sleep(Duration::from_secs(2 << attempt));
+            }
+            Err(e) => return Err(if is_busy(&e) { busy_message() } else { e }),
+        }
+    }
+    Err(busy_message())
+}
+
+fn is_busy(e: &str) -> bool {
+    let e = e.to_lowercase();
+    e.contains("another operation") || e.contains("otra operación") || e.contains("0x80073d02") || e.contains("in progress")
+}
+
+fn busy_message() -> String {
+    "Windows está instalando o actualizando apps en este momento (a menudo Microsoft Store). Espera un minuto y vuelve a intentarlo.".into()
+}
 
 #[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -127,7 +161,9 @@ fn installed_packages() -> Result<Vec<RawPackage>, String> {
         r#"
 $admin = ${admin}
 $all = if ($admin) {{ Get-AppxPackage -AllUsers }} else {{ Get-AppxPackage }}
-$prov = if ($admin) {{ @(Get-AppxProvisionedPackage -Online | ForEach-Object DisplayName) }} else {{ @() }}
+# Aprovisionadas: dato secundario. Si DISM está ocupado, se lista igual sin él.
+$prov = @()
+if ($admin) {{ try {{ $prov = @(Get-AppxProvisionedPackage -Online -ErrorAction Stop | ForEach-Object DisplayName) }} catch {{}} }}
 $r = @($all | Where-Object {{ -not $_.IsFramework -and -not $_.NonRemovable -and $_.SignatureKind -ne 'System' }} |
   Group-Object Name | ForEach-Object {{
     $p = $_.Group[0]
@@ -140,7 +176,7 @@ $r = @($all | Where-Object {{ -not $_.IsFramework -and -not $_.NonRemovable -and
 ConvertTo-Json -InputObject $r -Compress
 "#
     );
-    let out = ps::powershell(&script)?;
+    let out = appx_script(&script, ps::Opts::default())?;
     if out.is_empty() {
         return Ok(vec![]);
     }
@@ -199,9 +235,9 @@ pub fn recommended_installed() -> Result<Vec<String>, String> {
         .collect())
 }
 
-fn remove(name: &str) -> Result<(), String> {
+fn remove(name: &str, task: &Task) -> Result<(), String> {
     let n = name.replace('\'', "''");
-    ps::powershell(&format!(
+    appx_script(&format!(
         r#"
 $n = '{n}'
 $pk = @(Get-AppxPackage -AllUsers -Name $n)
@@ -213,18 +249,21 @@ foreach ($p in $pk) {{
 Get-AppxProvisionedPackage -Online | Where-Object DisplayName -eq $n |
   Remove-AppxProvisionedPackage -Online -AllUsers | Out-Null
 "#
-    ))
+    ), task.opts(Some(Duration::from_secs(300))))
     .map(|_| ())
 }
 
 /// Reinstala desde Microsoft Store con winget.
-pub fn reinstall(name: &str, store_id: &str) -> Result<(), String> {
-    ps::exec(
+pub fn reinstall(name: &str, store_id: &str, task: Option<&Task>) -> Result<(), String> {
+    let timeout = Some(Duration::from_secs(15 * 60));
+    let opts = task.map_or(ps::Opts { timeout, task: None }, |t| t.opts(timeout));
+    ps::exec_opts(
         "winget",
         &[
             "install", "--id", store_id, "--source", "msstore", "--silent",
             "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity",
         ],
+        opts,
     )
     .map(|_| ())
     .map_err(|e| format!("No se pudo reinstalar {name} con winget: {e}"))
@@ -247,6 +286,7 @@ pub struct RemoveSummary {
 
 #[tauri::command(async)]
 pub fn remove_apps(
+    app: tauri::AppHandle,
     packages: Vec<String>,
     skip_restore_point: bool,
     state: State<'_, TweakState>,
@@ -254,6 +294,8 @@ pub fn remove_apps(
     if !crate::elevation::is_elevated() {
         return Err("Requiere ejecutar AdminOps como administrador.".into());
     }
+    let task = Task::new(&app, "apps");
+    task.step("Comprobando apps instaladas…");
     let installed = installed_packages()?;
     for p in &packages {
         if !valid_name(p) || is_protected(p) || !installed.iter().any(|i| &i.name == p) {
@@ -261,15 +303,21 @@ pub fn remove_apps(
         }
     }
     let what = if packages.len() == 1 { packages[0].clone() } else { format!("quitar {} apps", packages.len()) };
-    let restore_point_created = !skip_restore_point && ensure_restore_point(&state, &what, None)?;
+    let restore_point_created = !skip_restore_point && ensure_restore_point(&state, &task, &what, None)?;
 
+    let total = packages.len();
     let results = packages
         .into_iter()
-        .map(|p| {
+        .enumerate()
+        .map(|(i, p)| {
             let k = find_known(&p);
+            if task.cancelled() {
+                return RemoveResult { package: p, ok: false, message: crate::ps::CANCELLED_MSG.into() };
+            }
+            task.step(format!("{}/{total} · Quitando {}…", i + 1, k.map_or(p.as_str(), |k| k.name.as_str())));
             let title = format!("Quitar app: {}", k.map_or(p.as_str(), |k| k.name.as_str()));
             let mut e = entry(Op::Apply, None, &title);
-            let r = remove(&p);
+            let r = remove(&p, &task);
             match &r {
                 Ok(()) => e.backups = vec![Backup::Appx { name: p.clone(), store_id: k.and_then(|k| k.store_id.clone()) }],
                 Err(err) => {
@@ -286,11 +334,13 @@ pub fn remove_apps(
 
 /// Reinstala una app conocida (solo del catálogo, por su `store_id` verificado).
 #[tauri::command(async)]
-pub fn reinstall_app(package: String, state: State<'_, TweakState>) -> Result<(), String> {
+pub fn reinstall_app(app: tauri::AppHandle, package: String, state: State<'_, TweakState>) -> Result<(), String> {
     let k = find_known(&package).ok_or("Solo se pueden reinstalar apps del catálogo")?;
     let id = k.store_id.as_deref().ok_or("Esta app no se puede reinstalar automáticamente")?;
     let mut e = entry(Op::Run, None, &format!("Reinstalar app: {}", k.name));
-    let r = reinstall(&k.name, id);
+    let task = Task::new(&app, format!("reinstall:{package}"));
+    task.step(format!("Reinstalando {} desde Microsoft Store…", k.name));
+    let r = reinstall(&k.name, id, Some(&task));
     if let Err(err) = &r {
         e.ok = false;
         e.message = Some(err.clone());

@@ -25,3 +25,8 @@ dist-ssr
 
 # Paquetes portables generados
 dist-portable/
+
+# Salida de la prueba en Windows Sandbox
+tests/sandbox/work/
+roundtrip.json
+src-tauri/target-bench/

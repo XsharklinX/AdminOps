@@ -18,14 +18,14 @@ Clear-DnsClientCache
 [[tweak]]
 id = "cleanup.user-temp"
 name = "Limpiar temporales del usuario"
-description = "Vacía %TEMP%. Los archivos en uso se omiten automáticamente."
+description = "Vacía la carpeta temporal del usuario con la sesión abierta. Los archivos en uso se omiten automáticamente."
 category = "cleanup"
 risk = "low"
 kind = "action"
 
 [tweak.script]
 run = '''
-$p = $env:TEMP
+$p = $UserTemp
 $size = { (Get-ChildItem $p -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum }
 $before = & $size
 Get-ChildItem $p -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
@@ -63,8 +63,18 @@ note = "No se puede deshacer."
 
 [tweak.script]
 run = '''
-Clear-RecycleBin -Force -ErrorAction SilentlyContinue
-'Papelera vaciada'
+# Papelera del usuario destino en cada unidad ($Recycle.Bin\<SID>), no la de la cuenta elevada.
+$freed = 0
+foreach ($d in Get-PSDrive -PSProvider FileSystem) {
+  $bin = Join-Path $d.Root ('$Recycle.Bin\' + $UserSid)
+  if ($UserSid -and (Test-Path -LiteralPath $bin)) {
+    $freed += (Get-ChildItem -LiteralPath $bin -Recurse -Force -File -ErrorAction SilentlyContinue |
+      Where-Object Name -ne 'desktop.ini' | Measure-Object Length -Sum).Sum
+    Get-ChildItem -LiteralPath $bin -Force -ErrorAction SilentlyContinue | Where-Object Name -ne 'desktop.ini' |
+      Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+'Papelera vaciada ({0:N1} MB)' -f ($freed / 1MB)
 '''
 
 [[tweak]]
@@ -87,6 +97,7 @@ $freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
 
 [[tweak]]
 id = "cleanup.disk-cleanup"
+timeout = 3600
 name = "Liberador de espacio (silencioso)"
 description = "Ejecuta cleanmgr con temporales, caché de miniaturas y de shaders, restos de actualizaciones y registros de instalación."
 category = "cleanup"
@@ -114,6 +125,7 @@ $freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
 
 [[tweak]]
 id = "cleanup.component-store"
+timeout = 0
 name = "Limpiar almacén de componentes (WinSxS)"
 description = "Elimina versiones antiguas de componentes de Windows reemplazadas por actualizaciones."
 category = "cleanup"

@@ -3,21 +3,32 @@ import type { AppInfo, TargetUser } from "../lib/api";
 import {
   Activity,
   Brush,
+  ClipboardCheck,
   Cog,
+  Cpu,
+  Download,
   FileText,
   Gauge,
+  HardDrive,
   History,
   Layers,
   Package,
   Power,
+  Settings as SettingsIcon,
   ShieldHalf,
   Stethoscope,
+  Users,
+  Wifi,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 
 export type PageId =
   | "dashboard"
+  | "processes"
+  | "diagnostics"
+  | "network"
+  | "space"
   | "profiles"
   | "cleanup"
   | "privacy"
@@ -25,25 +36,58 @@ export type PageId =
   | "bloatware"
   | "services"
   | "startup"
-  | "diagnostics"
+  | "software"
+  | "session"
+  | "clients"
   | "repair"
   | "report"
-  | "history";
+  | "history"
+  | "settings";
 
-export const NAV: { id: PageId; label: string; icon: LucideIcon }[] = [
-  { id: "dashboard", label: "Panel", icon: Activity },
-  { id: "profiles", label: "Perfiles", icon: Layers },
-  { id: "cleanup", label: "Limpieza", icon: Brush },
-  { id: "performance", label: "Rendimiento", icon: Gauge },
-  { id: "privacy", label: "Privacidad", icon: ShieldHalf },
-  { id: "bloatware", label: "Bloatware", icon: Package },
-  { id: "services", label: "Servicios", icon: Cog },
-  { id: "startup", label: "Inicio", icon: Power },
-  { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope },
-  { id: "repair", label: "Reparaciones", icon: Wrench },
-  { id: "report", label: "Informe", icon: FileText },
-  { id: "history", label: "Historial", icon: History },
+interface NavItem {
+  id: PageId;
+  label: string;
+  icon: LucideIcon;
+}
+
+export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "Sistema",
+    items: [
+      { id: "dashboard", label: "Panel", icon: Activity },
+      { id: "processes", label: "Procesos", icon: Cpu },
+      { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope },
+      { id: "network", label: "Red y velocidad", icon: Wifi },
+      { id: "space", label: "Espacio en disco", icon: HardDrive },
+    ],
+  },
+  {
+    title: "Optimizar",
+    items: [
+      { id: "profiles", label: "Perfiles", icon: Layers },
+      { id: "cleanup", label: "Limpieza", icon: Brush },
+      { id: "performance", label: "Rendimiento", icon: Gauge },
+      { id: "privacy", label: "Privacidad", icon: ShieldHalf },
+      { id: "bloatware", label: "Bloatware", icon: Package },
+      { id: "services", label: "Servicios", icon: Cog },
+      { id: "startup", label: "Inicio", icon: Power },
+      { id: "software", label: "Actualizar software", icon: Download },
+    ],
+  },
+  {
+    title: "Servicio técnico",
+    items: [
+      { id: "session", label: "Sesión de servicio", icon: ClipboardCheck },
+      { id: "clients", label: "Clientes", icon: Users },
+      { id: "repair", label: "Reparaciones", icon: Wrench },
+      { id: "report", label: "Informe", icon: FileText },
+      { id: "history", label: "Historial", icon: History },
+      { id: "settings", label: "Ajustes", icon: SettingsIcon },
+    ],
+  },
 ];
+
+export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 export function Sidebar({
   active,
@@ -51,16 +95,20 @@ export function Sidebar({
   isAdmin,
   targetUser,
   appInfo,
+  sessionActive,
+  onAbout,
 }: {
   active: PageId;
   onSelect: (id: PageId) => void;
   isAdmin: boolean | null;
   targetUser: TargetUser | null;
   appInfo: AppInfo | null;
+  sessionActive: boolean;
+  onAbout: () => void;
 }) {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-panel/60">
-      <div className="flex items-center gap-2.5 px-5 pt-5 pb-6">
+      <button onClick={onAbout} className="flex items-center gap-2.5 px-5 pt-4 pb-3 text-left" title="Acerca de AdminOps">
         <img src={logo} alt="" className="size-9 drop-shadow-[0_0_10px_rgba(34,225,255,0.35)]" draggable={false} />
         <div>
           <div className="text-[15px] font-semibold tracking-tight">AdminOps</div>
@@ -76,28 +124,36 @@ export function Sidebar({
             )}
           </div>
         </div>
-      </div>
+      </button>
 
-      <nav className="flex flex-1 flex-col gap-0.5 px-3">
-        {NAV.map(({ id, label, icon: Icon }) => {
-          const on = id === active;
-          return (
-            <button
-              key={id}
-              onClick={() => onSelect(id)}
-              className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                on ? "bg-neon/10 text-neon" : "text-dim hover:bg-panel-2 hover:text-ink"
-              }`}
-            >
-              {on && <span className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-neon shadow-[0_0_8px_var(--color-neon)]" />}
-              <Icon size={16} strokeWidth={1.8} />
-              <span className="flex-1">{label}</span>
-            </button>
-          );
-        })}
+      <nav className="flex flex-1 flex-col overflow-y-auto px-3 pb-2">
+        {NAV_GROUPS.map((g) => (
+          <div key={g.title} className="mb-1.5">
+            <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold tracking-[0.14em] text-mute uppercase">{g.title}</div>
+            {g.items.map(({ id, label, icon: Icon }) => {
+              const on = id === active;
+              return (
+                <button
+                  key={id}
+                  onClick={() => onSelect(id)}
+                  className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-[5px] text-left text-[13px] transition-colors ${
+                    on ? "bg-neon/10 text-neon" : "text-dim hover:bg-panel-2 hover:text-ink"
+                  }`}
+                >
+                  {on && <span className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-neon shadow-[0_0_8px_var(--color-neon)]" />}
+                  <Icon size={15} strokeWidth={1.8} />
+                  <span className="flex-1">{label}</span>
+                  {id === "session" && sessionActive && (
+                    <span className="size-2 animate-pulse rounded-full bg-ok" title="Sesión en curso" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      <div className="m-3 rounded-lg border border-line bg-void/60 px-3 py-2.5">
+      <div className="mx-3 mb-2 rounded-lg border border-line bg-void/60 px-3 py-2.5">
         <div className="flex items-center gap-2 text-xs">
           <span
             className={`size-2 rounded-full ${isAdmin ? "bg-ok shadow-[0_0_8px_var(--color-ok)]" : "bg-warn shadow-[0_0_8px_var(--color-warn)]"}`}
@@ -116,6 +172,9 @@ export function Sidebar({
           </div>
         )}
       </div>
+      <button onClick={onAbout} className="mb-3 text-center text-[10px] tracking-wide text-mute transition-colors hover:text-neon">
+        by <span className="font-semibold">David Bonilla</span>
+      </button>
     </aside>
   );
 }

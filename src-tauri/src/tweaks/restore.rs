@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// - Por defecto solo permite uno cada 24 h (`SystemRestorePointCreationFrequency`):
 ///   lo ponemos a 0 durante la llamada y lo dejamos como estaba.
 /// - Si la Protección del sistema está desactivada en C:, la activamos.
-pub fn create(description: &str) -> Result<(), String> {
+pub fn create(description: &str, task: &crate::task::Task) -> Result<(), String> {
     let desc = description.replace('\'', "''");
     let script = format!(
         r#"
@@ -23,7 +23,7 @@ try {{
 }}
 "#
     );
-    ps::powershell(&script).map(|_| ())
+    ps::powershell_opts(&script, task.opts(Some(std::time::Duration::from_secs(10 * 60)))).map(|_| ())
 }
 
 #[derive(Serialize, Deserialize, Debug)]

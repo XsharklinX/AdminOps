@@ -1,5 +1,7 @@
 import {
   AlertOctagon,
+  ArrowRight,
+  ExternalLink,
   BatteryMedium,
   CircleCheck,
   Cpu,
@@ -12,8 +14,20 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useToast } from "../components/feedback";
+import { TaskStatus } from "../components/TaskStatus";
+import type { PageId } from "../components/Sidebar";
 import { Bar, Card } from "../components/ui";
-import { diagApi, type Diagnostics as Diag, type Finding, type Section, type Severity } from "../lib/api";
+import {
+  diagApi,
+  toolsApi,
+  type Diagnostics as Diag,
+  type Finding,
+  type FindingAction,
+  type Section,
+  type Severity,
+  type Tool,
+} from "../lib/api";
 import { bytes } from "../lib/format";
 
 // El análisis tarda unos segundos: se conserva al cambiar de página, y una
@@ -58,10 +72,62 @@ const flag = (v: boolean | null, yes: string, no: string, goodWhenTrue = true) =
     <span className={v === goodWhenTrue ? "text-ok" : "text-warn"}>{v ? yes : no}</span>
   );
 
-export function Diagnostics() {
+function ToolButton({ tool, label, onOpen }: { tool: Tool; label: string; onOpen: (t: Tool) => void }) {
+  return (
+    <button onClick={() => onOpen(tool)} className="flex items-center gap-1 text-[11px] text-mute hover:text-neon">
+      {label} <ExternalLink size={10} />
+    </button>
+  );
+}
+
+export function Diagnostics({
+  focus,
+  onNavigate,
+}: {
+  focus?: string | null;
+  onNavigate: (page: PageId, focus?: string | null) => void;
+}) {
   const [d, setD] = useState<Diag | null>(cached);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hl, setHl] = useState<string | null>(null);
+  const toast = useToast();
+
+  // Resaltar y llevar a una sección de esta misma página.
+  const goTo = useCallback((section: string) => {
+    const el = document.getElementById(`focus-${section}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setHl(section);
+    window.setTimeout(() => setHl((h) => (h === section ? null : h)), 2500);
+  }, []);
+
+  useEffect(() => {
+    if (focus && d) goTo(focus);
+  }, [focus, d, goTo]);
+
+  const openTool = (tool: Tool) => diagApi.openTool(tool).catch((e) => toast("error", String(e)));
+
+  const act = (a: FindingAction) => {
+    if (a.kind === "tool") openTool(a.tool);
+    else if (a.page === "diagnostics") {
+      if (a.focus) goTo(a.focus);
+    } else onNavigate(a.page as PageId, a.focus);
+  };
+
+  const ring = (section: string) => (hl === section ? "border-neon! glow-neon" : "");
+
+  const [backingUp, setBackingUp] = useState(false);
+  const backupDrivers = async () => {
+    setBackingUp(true);
+    try {
+      toast("ok", await toolsApi.backupDrivers());
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setBackingUp(false);
+    }
+  };
 
   const run = useCallback(async () => {
     setRunning(true);
@@ -137,14 +203,36 @@ export function Diagnostics() {
             {d.findings.map((f: Finding, i) => {
               const S = SEV[f.severity];
               return (
-                <li key={i} className="flex gap-3 rounded-lg px-2 py-2 hover:bg-panel-2">
+                <li
+                  key={i}
+                  onClick={() => f.actions[0] && act(f.actions[0])}
+                  className={`group flex gap-3 rounded-lg px-2 py-2 hover:bg-panel-2 ${f.actions.length ? "cursor-pointer" : ""}`}
+                  title={f.actions[0]?.label}
+                >
                   <S.icon size={15} className={`mt-0.5 shrink-0 ${S.cls}`} />
-                  <div className="min-w-0">
-                    <p className="text-sm text-ink">{f.title}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-ink group-hover:text-neon">{f.title}</p>
                     <p className="text-xs break-words text-dim">
                       <span className="text-mute">{f.area}</span>
                       {f.detail && <> · {f.detail}</>}
                     </p>
+                    {f.actions.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {f.actions.map((a) => (
+                          <button
+                            key={a.label}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              act(a);
+                            }}
+                            className="flex items-center gap-1 rounded-md border border-line-2 px-2 py-0.5 text-[11px] text-dim transition-colors hover:border-neon/50 hover:text-neon"
+                          >
+                            {a.label}
+                            {a.kind === "tool" ? <ExternalLink size={10} /> : <ArrowRight size={10} />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </li>
               );
@@ -155,7 +243,17 @@ export function Diagnostics() {
 
       <div className="grid grid-cols-12 gap-4">
         {/* Discos */}
-        <Card title="Salud de discos" icon={<HardDrive size={14} />} className="col-span-12 lg:col-span-7">
+        <Card
+          id="focus-disks"
+          title="Salud de discos"
+          icon={<HardDrive size={14} />}
+          className={`col-span-12 lg:col-span-7 ${ring("disks")}`}
+          right={
+            <button onClick={() => onNavigate("cleanup")} className="flex items-center gap-1 text-[11px] text-mute hover:text-neon">
+              Liberar espacio <ArrowRight size={10} />
+            </button>
+          }
+        >
           <Unavailable section={d.disks}>
             {(disks) => (
               <table className="w-full text-sm">
@@ -191,7 +289,18 @@ export function Diagnostics() {
         </Card>
 
         {/* Seguridad */}
-        <Card title="Sistema y seguridad" icon={<ShieldCheck size={14} />} className="col-span-12 lg:col-span-5">
+        <Card
+          id="focus-security"
+          title="Sistema y seguridad"
+          icon={<ShieldCheck size={14} />}
+          className={`col-span-12 lg:col-span-5 ${ring("security")}`}
+          right={
+            <div className="flex gap-3">
+              <ToolButton tool="windowsSecurity" label="Seguridad" onOpen={openTool} />
+              <ToolButton tool="windowsUpdate" label="Update" onOpen={openTool} />
+            </div>
+          }
+        >
           <Unavailable section={d.system}>
             {(s) => (
               <>
@@ -211,7 +320,18 @@ export function Diagnostics() {
         </Card>
 
         {/* Estabilidad */}
-        <Card title="Estabilidad" icon={<Zap size={14} />} className="col-span-12 lg:col-span-7">
+        <Card
+          id="focus-stability"
+          title="Estabilidad"
+          icon={<Zap size={14} />}
+          className={`col-span-12 lg:col-span-7 ${ring("stability")}`}
+          right={
+            <div className="flex gap-3">
+              <ToolButton tool="reliability" label="Confiabilidad" onOpen={openTool} />
+              <ToolButton tool="eventViewer" label="Eventos" onOpen={openTool} />
+            </div>
+          }
+        >
           <Unavailable section={d.stability}>
             {(s) => (
               <>
@@ -271,7 +391,26 @@ export function Diagnostics() {
 
         <div className="col-span-12 flex flex-col gap-4 lg:col-span-5">
           {/* Drivers */}
-          <Card title="Drivers" icon={<Cpu size={14} />}>
+          <Card
+            id="focus-drivers"
+            title="Drivers"
+            icon={<Cpu size={14} />}
+            className={ring("drivers")}
+            right={
+              <div className="flex gap-3">
+                <button
+                  onClick={backupDrivers}
+                  disabled={backingUp}
+                  className="flex items-center gap-1 text-[11px] text-mute hover:text-neon disabled:opacity-50"
+                  title="Exporta los drivers de terceros para reinstalarlos tras formatear"
+                >
+                  Copia de drivers <ArrowRight size={10} />
+                </button>
+                <ToolButton tool="deviceManager" label="Dispositivos" onOpen={openTool} />
+              </div>
+            }
+          >
+            <TaskStatus task="drivers-backup" active={backingUp} fallback="Copiando drivers…" cancellable={false} className="mb-2" />
             <Unavailable section={d.drivers}>
               {(drivers) =>
                 drivers.length === 0 ? (
@@ -295,7 +434,7 @@ export function Diagnostics() {
           </Card>
 
           {/* Batería */}
-          <Card title="Batería" icon={<BatteryMedium size={14} />}>
+          <Card id="focus-battery" title="Batería" icon={<BatteryMedium size={14} />} className={ring("battery")}>
             <Unavailable section={d.battery}>
               {(b) => {
                 if (!b) return <p className="text-sm text-mute">Equipo de sobremesa: sin batería.</p>;

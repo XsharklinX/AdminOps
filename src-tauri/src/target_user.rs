@@ -64,3 +64,39 @@ fn detect() -> Option<TargetUser> {
 pub fn get_target_user() -> Option<TargetUser> {
     get().cloned()
 }
+
+fn ps_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "''"))
+}
+
+/// Variables que reciben todos los scripts del catálogo para actuar sobre el
+/// usuario destino y no sobre la cuenta que elevó AdminOps:
+/// `$UserSid`, `$UserHive` (ruta de registro), `$UserProfile`, `$UserAppData`,
+/// `$UserLocalAppData` y `$UserTemp`.
+pub fn script_prelude() -> String {
+    let sid = get().map(|t| t.sid.as_str()).unwrap_or("");
+    match hkcu_redirect() {
+        Some(sid) => {
+            let profile = crate::tweaks::registry::read_string(
+                &format!(r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}"),
+                "ProfileImagePath",
+            )
+            .unwrap_or_default();
+            format!(
+                "$UserSid = {sid}\n$UserHive = {hive}\n\
+                 $UserProfile = [Environment]::ExpandEnvironmentVariables({profile})\n\
+                 $UserAppData = Join-Path $UserProfile 'AppData\\Roaming'\n\
+                 $UserLocalAppData = Join-Path $UserProfile 'AppData\\Local'\n\
+                 $UserTemp = Join-Path $UserLocalAppData 'Temp'\n",
+                sid = ps_quote(sid),
+                hive = ps_quote(&format!(r"Registry::HKEY_USERS\{sid}")),
+                profile = ps_quote(&profile),
+            )
+        }
+        None => format!(
+            "$UserSid = {}\n$UserHive = 'HKCU:'\n$UserProfile = $env:USERPROFILE\n\
+             $UserAppData = $env:APPDATA\n$UserLocalAppData = $env:LOCALAPPDATA\n$UserTemp = $env:TEMP\n",
+            ps_quote(sid)
+        ),
+    }
+}

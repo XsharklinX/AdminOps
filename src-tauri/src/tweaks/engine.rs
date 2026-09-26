@@ -5,7 +5,33 @@ use super::journal::Backup;
 use super::model::{Kind, RegData, Startup, Tweak};
 use super::{registry, service};
 use crate::ps;
+use crate::task::Task;
 use serde::Serialize;
+use std::time::Duration;
+
+const DETECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Límite de un script del ajuste: el declarado en el catálogo (`timeout`,
+/// 0 = sin límite) o 2 min para ajustes y 15 min para tareas.
+fn timeout_of(t: &Tweak) -> Option<Duration> {
+    match t.timeout {
+        Some(0) => None,
+        Some(s) => Some(Duration::from_secs(s)),
+        None if t.kind == Kind::Action => Some(Duration::from_secs(15 * 60)),
+        None => Some(ps::DEFAULT_TIMEOUT),
+    }
+}
+
+/// Ejecuta un script del catálogo con las variables del usuario destino
+/// (`$UserTemp`, `$UserHive`…) y el límite y la cancelación de la tarea.
+fn run_script(body: &str, task: Option<&Task>, timeout: Option<Duration>) -> Result<String, String> {
+    let script = format!("{}{body}", crate::target_user::script_prelude());
+    let opts = match task {
+        Some(task) => task.opts(timeout),
+        None => ps::Opts { timeout, task: None },
+    };
+    ps::powershell_opts(&script, opts)
+}
 
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -37,7 +63,7 @@ pub fn detect(t: &Tweak) -> Status {
         }
     }
     if let Some(script) = t.script.as_ref().and_then(|s| s.detect.as_deref()) {
-        match ps::powershell(script) {
+        match run_script(script, None, Some(DETECT_TIMEOUT)) {
             Ok(out) => checks.push(script_true(&out)),
             Err(_) => return Status::Unknown,
         }
@@ -52,7 +78,7 @@ pub fn detect(t: &Tweak) -> Status {
 }
 
 /// Aplica el ajuste. Si algo falla a mitad, deshace lo ya hecho antes de devolver el error.
-pub fn apply(t: &Tweak) -> Result<Vec<Backup>, String> {
+pub fn apply(t: &Tweak, task: Option<&Task>) -> Result<Vec<Backup>, String> {
     let mut done: Vec<Backup> = Vec::new();
     let result = (|| {
         for r in &t.registry {
@@ -73,7 +99,7 @@ pub fn apply(t: &Tweak) -> Result<Vec<Backup>, String> {
             }
         }
         if let Some(script) = t.script.as_ref().and_then(|s| s.apply.as_deref()) {
-            let out = ps::powershell(script).map_err(|e| format!("Script: {e}"))?;
+            let out = run_script(script, task, timeout_of(t)).map_err(|e| format!("Script: {e}"))?;
             let previous = out.lines().last().map(|l| l.trim().to_string()).filter(|l| !l.is_empty());
             done.push(Backup::Script { previous });
         }
@@ -85,7 +111,7 @@ pub fn apply(t: &Tweak) -> Result<Vec<Backup>, String> {
         Err(e) => {
             // `Backup::Script` solo se añade si el script tuvo éxito, así que esto
             // restaura únicamente el registro y los servicios ya tocados.
-            let _ = restore(Some(t), &done);
+            let _ = restore(Some(t), &done, None);
             Err(e)
         }
     }
@@ -93,7 +119,7 @@ pub fn apply(t: &Tweak) -> Result<Vec<Backup>, String> {
 
 /// Restaura un conjunto de copias guardadas en el diario. `t` es el ajuste del
 /// catálogo que las generó, si lo hay (cambios de Inicio o apps no tienen).
-pub fn restore(t: Option<&Tweak>, backups: &[Backup]) -> Result<(), String> {
+pub fn restore(t: Option<&Tweak>, backups: &[Backup], task: Option<&Task>) -> Result<(), String> {
     let mut errors = Vec::new();
     for b in backups.iter().rev() {
         let r = match b {
@@ -107,11 +133,11 @@ pub fn restore(t: Option<&Tweak>, backups: &[Backup]) -> Result<(), String> {
                 r
             }
             Backup::Script { previous } => match t {
-                Some(t) => run_revert_script(t, previous.as_deref()),
+                Some(t) => run_revert_script(t, previous.as_deref(), task),
                 None => Err("Falta el ajuste de origen del script".into()),
             },
             Backup::Task { path, name, was_enabled } => super::startup::set_task_enabled(path, name, *was_enabled),
-            Backup::Appx { name, store_id: Some(id) } => super::appx::reinstall(name, id),
+            Backup::Appx { name, store_id: Some(id) } => super::appx::reinstall(name, id, task),
             Backup::Appx { name, store_id: None } => Err(format!("{name} no se puede reinstalar automáticamente")),
         };
         if let Err(e) = r {
@@ -122,7 +148,7 @@ pub fn restore(t: Option<&Tweak>, backups: &[Backup]) -> Result<(), String> {
 }
 
 /// Revierte a los valores de fábrica declarados en el catálogo (sin historial).
-pub fn revert_to_defaults(t: &Tweak) -> Result<(), String> {
+pub fn revert_to_defaults(t: &Tweak, task: Option<&Task>) -> Result<(), String> {
     let mut errors = Vec::new();
     for r in &t.registry {
         let res = match &r.default {
@@ -143,34 +169,34 @@ pub fn revert_to_defaults(t: &Tweak) -> Result<(), String> {
         }
     }
     if t.script.as_ref().is_some_and(|s| s.revert.is_some()) {
-        if let Err(e) = run_revert_script(t, None) {
+        if let Err(e) = run_revert_script(t, None, task) {
             errors.push(e);
         }
     }
     if errors.is_empty() { Ok(()) } else { Err(errors.join(" · ")) }
 }
 
-fn run_revert_script(t: &Tweak, previous: Option<&str>) -> Result<(), String> {
+fn run_revert_script(t: &Tweak, previous: Option<&str>, task: Option<&Task>) -> Result<(), String> {
     match t.script.as_ref().and_then(|s| s.revert.as_deref()) {
         Some(script) => {
             let prelude = match previous {
                 Some(p) => format!("$Previous = '{}'\n", p.replace('\'', "''")),
                 None => "$Previous = $null\n".to_string(),
             };
-            ps::powershell(&format!("{prelude}{script}")).map(|_| ()).map_err(|e| format!("Script: {e}"))
+            run_script(&format!("{prelude}{script}"), task, timeout_of(t)).map(|_| ()).map_err(|e| format!("Script: {e}"))
         }
         None => Err("Este ajuste no tiene script para deshacer".into()),
     }
 }
 
 /// Ejecuta una tarea puntual y devuelve la última línea de su salida como resumen.
-pub fn run_action(t: &Tweak) -> Result<String, String> {
+pub fn run_action(t: &Tweak, task: Option<&Task>) -> Result<String, String> {
     let script = t
         .script
         .as_ref()
         .and_then(|s| s.run.as_deref())
         .ok_or("Esta tarea no tiene nada que ejecutar")?;
-    let out = ps::powershell(script)?;
+    let out = run_script(script, task, timeout_of(t))?;
     Ok(out.lines().last().unwrap_or("Completado").trim().to_string())
 }
 
@@ -236,6 +262,15 @@ value = "on"
     }
 
     #[test]
+    fn scripts_receive_target_user_variables() {
+        let out = run_script("\"$UserTemp|$UserLocalAppData|$UserHive|$UserSid\"", None, Some(DETECT_TIMEOUT)).unwrap();
+        let parts: Vec<&str> = out.split('|').collect();
+        assert_eq!(parts.len(), 4, "{out}");
+        assert!(parts.iter().all(|p| !p.trim().is_empty()), "variable vacía: {out}");
+        assert!(std::path::Path::new(parts[0]).is_dir(), "$UserTemp no existe: {}", parts[0]);
+    }
+
+    #[test]
     fn apply_then_restore_is_exact() {
         let _ = registry::delete(KEY, "Missing");
         // Valor previo con un tipo distinto al del ajuste: debe volver tal cual.
@@ -243,10 +278,10 @@ value = "on"
         let t = tweak();
         assert_eq!(detect(&t), Status::NotApplied);
 
-        let backups = apply(&t).unwrap();
+        let backups = apply(&t, None).unwrap();
         assert_eq!(detect(&t), Status::Applied);
 
-        restore(Some(&t), &backups).unwrap();
+        restore(Some(&t), &backups, None).unwrap();
         assert_eq!(detect(&t), Status::NotApplied);
         let raw = registry::read_raw(KEY, "Existing").unwrap();
         assert_eq!(raw.vtype, 11); // REG_QWORD

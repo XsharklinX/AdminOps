@@ -2,6 +2,7 @@
 
 [[tweak]]
 id = "repair.sfc"
+timeout = 0
 name = "Comprobar archivos del sistema (SFC)"
 description = "Busca y repara archivos de Windows dañados o modificados. Primer paso ante pantallazos azules o fallos raros."
 category = "repair"
@@ -24,6 +25,7 @@ else { "SFC terminó (código $code). Detalle en C:\Windows\Logs\CBS\CBS.log" }
 
 [[tweak]]
 id = "repair.dism"
+timeout = 0
 name = "Reparar imagen de Windows (DISM)"
 description = "Repara el almacén de componentes desde Windows Update. Necesario cuando SFC no puede reparar."
 category = "repair"
@@ -154,8 +156,8 @@ note = "Reinicia el Explorador; las ventanas de carpetas abiertas se cerrarán."
 run = '''
 Stop-Process -Name explorer -Force
 Start-Sleep -Milliseconds 300
-Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Explorer') -Filter 'iconcache*' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $env:LOCALAPPDATA 'IconCache.db') -Force -ErrorAction SilentlyContinue
+Get-ChildItem (Join-Path $UserLocalAppData 'Microsoft\Windows\Explorer') -Filter 'iconcache*' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $UserLocalAppData 'IconCache.db') -Force -ErrorAction SilentlyContinue
 # Ver 'Reiniciar Explorador': dejamos que winlogon lo relance sin privilegios.
 foreach ($i in 1..10) { Start-Sleep -Milliseconds 500; if (Get-Process explorer -ErrorAction SilentlyContinue) { break } }
 if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }
@@ -176,4 +178,24 @@ note = "Muestra una ventana de Windows para elegir cuándo reiniciar."
 run = '''
 Start-Process mdsched.exe
 'Elige "Reiniciar ahora y comprobar si existen problemas".'
+'''
+
+[[tweak]]
+id = "repair.defender-scan"
+name = "Análisis rápido de Microsoft Defender"
+description = "Busca malware en las zonas donde suele esconderse (memoria, inicio, carpetas del sistema)."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+timeout = 0
+note = "Suele tardar entre 2 y 10 minutos. Si hay otro antivirus activo, Defender puede no estar disponible."
+
+[tweak.script]
+run = '''
+$start = Get-Date
+Start-MpScan -ScanType QuickScan
+$found = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -ge $start })
+if ($found.Count) { "Análisis completado: $($found.Count) amenaza(s) detectada(s). Revísalas en Seguridad de Windows." }
+else { 'Análisis rápido completado: no se encontraron amenazas.' }
 '''

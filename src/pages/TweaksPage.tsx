@@ -4,13 +4,34 @@ import { useConfirm, useToast } from "../components/feedback";
 import { TweakCard } from "../components/TweakCard";
 import { RP_FAILED, tweaksApi, type OpResult, type TweakView } from "../lib/api";
 
-export function TweaksPage({ category, isAdmin }: { category: string; isAdmin: boolean }) {
+const CANCELLED = "Cancelado por el usuario.";
+
+export function TweaksPage({ category, isAdmin, focus }: { category: string; isAdmin: boolean; focus?: string | null }) {
   const [tweaks, setTweaks] = useState<TweakView[] | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [highlight, setHighlight] = useState<string | null>(null);
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
+
+  const fail = (t: TweakView, e: unknown) => {
+    const err = String(e);
+    if (err === CANCELLED) toast("info", `${t.name}: cancelado. Lo que ya se hubiera cambiado se deshizo.`);
+    else toast("error", `${t.name}: ${err}`);
+  };
+
+  // Llegada desde un hallazgo del diagnóstico: ir al ajuste y resaltarlo.
+  const loaded = tweaks !== null;
+  useEffect(() => {
+    if (!focus || !loaded) return;
+    const el = document.getElementById(`focus-${focus}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlight(focus);
+    const t = window.setTimeout(() => setHighlight(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [focus, loaded]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,7 +86,7 @@ export function TweaksPage({ category, isAdmin }: { category: string; isAdmin: b
         });
         if (go) return apply(t, true);
       } else {
-        toast("error", `${t.name}: ${err}`);
+        fail(t, err);
       }
     } finally {
       setBusyFor(t.id);
@@ -79,7 +100,7 @@ export function TweaksPage({ category, isAdmin }: { category: string; isAdmin: b
       try {
         done(t, await tweaksApi.revert(t.id));
       } catch (e) {
-        toast("error", `${t.name}: ${e}`);
+        fail(t, e);
       } finally {
         setBusyFor(t.id);
         load();
@@ -117,7 +138,7 @@ export function TweaksPage({ category, isAdmin }: { category: string; isAdmin: b
     try {
       done(t, await tweaksApi.run(t.id));
     } catch (e) {
-      toast("error", `${t.name}: ${e}`);
+      fail(t, e);
     } finally {
       setBusyFor(t.id);
     }
@@ -157,6 +178,7 @@ export function TweaksPage({ category, isAdmin }: { category: string; isAdmin: b
             busy={!!busy[t.id]}
             busyLabel={busy[t.id]}
             lastMessage={messages[t.id]}
+            highlighted={highlight === t.id}
             onToggle={() => toggle(t)}
             onRun={() => run(t)}
           />

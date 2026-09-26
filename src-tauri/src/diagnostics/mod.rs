@@ -23,6 +23,35 @@ pub enum Severity {
     Bad,
 }
 
+/// Herramientas de Windows que la UI puede abrir (lista cerrada).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum Tool {
+    DeviceManager,
+    EventViewer,
+    Reliability,
+    WindowsUpdate,
+    WindowsSecurity,
+    Activation,
+    Storage,
+}
+
+/// A dónde lleva un hallazgo: una página/sección de AdminOps o una herramienta de Windows.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Action {
+    Page { label: String, page: String, focus: Option<String> },
+    Tool { label: String, tool: Tool },
+}
+
+fn page(label: &str, page: &str, focus: Option<&str>) -> Action {
+    Action::Page { label: label.into(), page: page.into(), focus: focus.map(str::to_string) }
+}
+
+fn tool(label: &str, tool: Tool) -> Action {
+    Action::Tool { label: label.into(), tool }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Finding {
@@ -30,6 +59,9 @@ pub struct Finding {
     pub area: String,
     pub title: String,
     pub detail: Option<String>,
+    /// La primera es la acción principal (clic en el hallazgo).
+    #[serde(default)]
+    pub actions: Vec<Action>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -42,10 +74,16 @@ pub struct Volume {
 
 /// Resultado de un recolector: el dato o por qué no se pudo obtener.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", bound(deserialize = "T: Deserialize<'de>"))]
 pub struct Section<T> {
     pub data: Option<T>,
     pub error: Option<String>,
+}
+
+impl<T> Default for Section<T> {
+    fn default() -> Self {
+        Section { data: None, error: Some("No disponible en este análisis.".into()) }
+    }
 }
 
 impl<T> From<Result<T, String>> for Section<T> {
@@ -75,6 +113,9 @@ pub struct Diagnostics {
     pub system: Section<SystemHealth>,
     pub startup_enabled: Section<Vec<String>>,
     pub bloat_installed: Section<Vec<String>>,
+    /// Programas con actualización disponible (winget). Ausente en análisis antiguos.
+    #[serde(default)]
+    pub software_updates: Section<Vec<crate::software::SoftwareUpdate>>,
     pub tweaks_applied: usize,
     pub findings: Vec<Finding>,
 }
@@ -103,75 +144,127 @@ fn gb(b: u64) -> String {
 }
 
 fn finding(severity: Severity, area: &str, title: String, detail: Option<String>) -> Finding {
-    Finding { severity, area: area.into(), title, detail }
+    Finding { severity, area: area.into(), title, detail, actions: vec![] }
+}
+
+trait WithActions {
+    fn with(self, actions: Vec<Action>) -> Self;
+}
+
+impl WithActions for Finding {
+    fn with(mut self, actions: Vec<Action>) -> Self {
+        self.actions = actions;
+        self
+    }
 }
 
 /// Convierte los datos en una lista de hallazgos priorizada (lo peor primero).
+/// Cada hallazgo lleva a su detalle y a la herramienta que lo soluciona.
 fn evaluate(d: &Diagnostics) -> Vec<Finding> {
     use Severity::*;
     let mut f = Vec::new();
     let sys_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+    let disks_detail = || page("Ver discos", "diagnostics", Some("disks"));
+    let stability_detail = || page("Ver estabilidad", "diagnostics", Some("stability"));
+    let security_detail = || page("Ver seguridad", "diagnostics", Some("security"));
 
     for v in &d.volumes {
         let pct = if v.total > 0 { v.free as f64 * 100.0 / v.total as f64 } else { 100.0 };
         let is_sys = v.mount.to_uppercase().starts_with(&sys_drive.to_uppercase());
         let sev = if pct < 10.0 { Some(Bad) } else if pct < 20.0 && is_sys { Some(Warn) } else { None };
         if let Some(sev) = sev {
-            f.push(finding(
-                sev,
-                "Almacenamiento",
-                format!("{} con poco espacio libre ({pct:.0}%)", v.mount),
-                Some(format!("Quedan {} de {}.{}", gb(v.free), gb(v.total), if is_sys { " Windows necesita espacio para actualizarse y paginar." } else { "" })),
-            ));
+            f.push(
+                finding(
+                    sev,
+                    "Almacenamiento",
+                    format!("{} con poco espacio libre ({pct:.0}%)", v.mount),
+                    Some(format!(
+                        "Quedan {} de {}.{}",
+                        gb(v.free),
+                        gb(v.total),
+                        if is_sys { " Windows necesita espacio para actualizarse y paginar." } else { "" }
+                    )),
+                )
+                .with(vec![page("Liberar espacio", "cleanup", None), tool("Almacenamiento de Windows", Tool::Storage)]),
+            );
         }
     }
 
     if let Some(disks) = &d.disks.data {
         for k in disks {
             if !k.health.eq_ignore_ascii_case("Healthy") {
-                f.push(finding(Bad, "Discos", format!("{}: estado {}", k.name, k.health), Some(format!("Estado operativo: {}. Hacer copia de seguridad cuanto antes.", k.operational))));
+                let detail = format!("Estado operativo: {}. Hacer copia de seguridad cuanto antes.", k.operational);
+                f.push(finding(Bad, "Discos", format!("{}: estado {}", k.name, k.health), Some(detail)).with(vec![disks_detail()]));
             }
             match k.wear {
-                Some(w) if w >= 80 => f.push(finding(Bad, "Discos", format!("{}: {w}% de vida útil consumida", k.name), Some("Planificar el reemplazo del SSD.".into()))),
-                Some(w) if w >= 50 => f.push(finding(Warn, "Discos", format!("{}: {w}% de vida útil consumida", k.name), None)),
+                Some(w) if w >= 80 => f.push(
+                    finding(Bad, "Discos", format!("{}: {w}% de vida útil consumida", k.name), Some("Planificar el reemplazo del SSD.".into()))
+                        .with(vec![disks_detail()]),
+                ),
+                Some(w) if w >= 50 => {
+                    f.push(finding(Warn, "Discos", format!("{}: {w}% de vida útil consumida", k.name), None).with(vec![disks_detail()]))
+                }
                 _ => {}
             }
             if let Some(t) = k.temperature.filter(|t| *t >= 60) {
-                f.push(finding(Warn, "Discos", format!("{}: temperatura alta ({t} °C)", k.name), Some("Revisar ventilación o disipador del SSD.".into())));
+                f.push(
+                    finding(Warn, "Discos", format!("{}: temperatura alta ({t} °C)", k.name), Some("Revisar ventilación o disipador del SSD.".into()))
+                        .with(vec![disks_detail()]),
+                );
             }
             let errors = k.read_errors.unwrap_or(0) + k.write_errors.unwrap_or(0);
             if errors > 0 {
-                f.push(finding(Warn, "Discos", format!("{}: {errors} errores de lectura/escritura", k.name), None));
+                f.push(finding(Warn, "Discos", format!("{}: {errors} errores de lectura/escritura", k.name), None).with(vec![disks_detail()]));
             }
         }
     }
 
     if let Some(s) = &d.stability.data {
-        if !s.bugchecks.is_empty() {
-            let last = s.bugchecks.first().unwrap();
+        if let Some(last) = s.bugchecks.first() {
             let name = last.name.clone().unwrap_or_else(|| last.code.clone());
-            f.push(finding(
-                Bad,
-                "Estabilidad",
-                format!("{} pantallazo(s) azul(es) en {} días (último: {name})", s.bugchecks.len(), s.days),
-                last.hint.clone(),
-            ));
+            f.push(
+                finding(
+                    Bad,
+                    "Estabilidad",
+                    format!("{} pantallazo(s) azul(es) en {} días (último: {name})", s.bugchecks.len(), s.days),
+                    last.hint.clone(),
+                )
+                .with(vec![
+                    stability_detail(),
+                    page("Comprobar archivos (SFC)", "repair", Some("repair.sfc")),
+                    tool("Monitor de confiabilidad", Tool::Reliability),
+                ]),
+            );
         }
         let unexpected = s.unexpected_shutdowns.len().saturating_sub(s.bugchecks.len());
         if unexpected >= 2 {
-            f.push(finding(
-                Warn,
-                "Estabilidad",
-                format!("{unexpected} apagados inesperados en {} días", s.days),
-                Some("Cortes de corriente, botón de encendido mantenido o fuente/temperatura.".into()),
-            ));
+            f.push(
+                finding(
+                    Warn,
+                    "Estabilidad",
+                    format!("{unexpected} apagados inesperados en {} días", s.days),
+                    Some("Cortes de corriente, botón de encendido mantenido o fuente/temperatura.".into()),
+                )
+                .with(vec![stability_detail(), tool("Visor de eventos", Tool::EventViewer)]),
+            );
         }
         for c in s.crashes.iter().filter(|c| c.count >= 5) {
-            f.push(finding(Warn, "Estabilidad", format!("{} se ha cerrado inesperadamente {} veces", c.app, c.count), None));
+            f.push(
+                finding(Warn, "Estabilidad", format!("{} se ha cerrado inesperadamente {} veces", c.app, c.count), None)
+                    .with(vec![stability_detail(), tool("Monitor de confiabilidad", Tool::Reliability)]),
+            );
         }
         if let Some(b) = s.boot_times.as_ref().and_then(|b| b.first()) {
             if b.ms >= 60_000 {
-                f.push(finding(Warn, "Rendimiento", format!("El último arranque tardó {} s", b.ms / 1000), Some("Revisar programas de inicio y el tipo de disco.".into())));
+                f.push(
+                    finding(
+                        Warn,
+                        "Rendimiento",
+                        format!("El último arranque tardó {} s", b.ms / 1000),
+                        Some("Revisar programas de inicio y el tipo de disco.".into()),
+                    )
+                    .with(vec![page("Revisar programas de inicio", "startup", None)]),
+                );
             }
         }
     }
@@ -179,59 +272,126 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
     if let Some(drivers) = &d.drivers.data {
         for dev in drivers {
             let sev = if dev.code == 22 { Info } else { Warn };
-            f.push(finding(sev, "Drivers", format!("{}: {}", dev.name, dev.problem), Some(format!("Código {} · {}", dev.code, dev.device_id))));
+            f.push(
+                finding(sev, "Drivers", format!("{}: {}", dev.name, dev.problem), Some(format!("Código {} · {}", dev.code, dev.device_id)))
+                    .with(vec![page("Ver drivers", "diagnostics", Some("drivers")), tool("Administrador de dispositivos", Tool::DeviceManager)]),
+            );
         }
     }
 
     if let Some(Some(b)) = &d.battery.data {
         let h = b.health();
         if h > 0.0 && h < 80.0 {
-            f.push(finding(
-                if h < 60.0 { Bad } else { Warn },
-                "Batería",
-                format!("Batería al {h:.0}% de su capacidad original"),
-                Some(format!("{} mWh de {} mWh de fábrica{}.", b.full, b.design, b.cycles.map(|c| format!(", {c} ciclos")).unwrap_or_default())),
-            ));
+            let cycles = b.cycles.map(|c| format!(", {c} ciclos")).unwrap_or_default();
+            f.push(
+                finding(
+                    if h < 60.0 { Bad } else { Warn },
+                    "Batería",
+                    format!("Batería al {h:.0}% de su capacidad original"),
+                    Some(format!("{} mWh de {} mWh de fábrica{cycles}.", b.full, b.design)),
+                )
+                .with(vec![page("Ver batería", "diagnostics", Some("battery"))]),
+            );
         }
     }
 
     if let Some(s) = &d.system.data {
         if s.pending_reboot {
-            f.push(finding(Warn, "Sistema", "Hay un reinicio pendiente".into(), Some("Actualizaciones o cambios esperando a reiniciar.".into())));
+            f.push(
+                finding(Warn, "Sistema", "Hay un reinicio pendiente".into(), Some("Actualizaciones o cambios esperando a reiniciar.".into()))
+                    .with(vec![security_detail(), tool("Windows Update", Tool::WindowsUpdate)]),
+            );
         }
         if let Some(days) = days_since(&s.last_boot).filter(|d| *d >= 14) {
-            f.push(finding(Info, "Sistema", format!("Sin reiniciar desde hace {days} días"), Some("Muchos problemas de lentitud se resuelven reiniciando.".into())));
+            f.push(
+                finding(Info, "Sistema", format!("Sin reiniciar desde hace {days} días"), Some("Muchos problemas de lentitud se resuelven reiniciando.".into()))
+                    .with(vec![security_detail()]),
+            );
         }
+        let update_actions =
+            || vec![tool("Windows Update", Tool::WindowsUpdate), page("Reparar Windows Update", "repair", Some("repair.windows-update"))];
         match s.last_update.as_deref().and_then(days_since) {
-            Some(days) if days >= 90 => f.push(finding(Bad, "Seguridad", format!("Última actualización hace {days} días"), Some("Revisar Windows Update.".into()))),
-            Some(days) if days >= 45 => f.push(finding(Warn, "Seguridad", format!("Última actualización hace {days} días"), None)),
+            Some(days) if days >= 90 => f.push(
+                finding(Bad, "Seguridad", format!("Última actualización hace {days} días"), Some("Revisar Windows Update.".into()))
+                    .with(update_actions()),
+            ),
+            Some(days) if days >= 45 => {
+                f.push(finding(Warn, "Seguridad", format!("Última actualización hace {days} días"), None).with(update_actions()))
+            }
             _ => {}
         }
         let third_party_av = s.antivirus.iter().any(|a| !a.to_lowercase().contains("defender"));
         if s.defender_realtime == Some(false) && !third_party_av {
-            f.push(finding(Bad, "Seguridad", "Protección en tiempo real desactivada".into(), Some("No hay otro antivirus activo.".into())));
+            f.push(
+                finding(Bad, "Seguridad", "Protección en tiempo real desactivada".into(), Some("No hay otro antivirus activo.".into()))
+                    .with(vec![tool("Seguridad de Windows", Tool::WindowsSecurity)]),
+            );
         }
         if let Some(age) = s.signature_age_days.filter(|a| *a >= 7) {
-            f.push(finding(Warn, "Seguridad", format!("Firmas del antivirus con {age} días de antigüedad"), None));
+            f.push(
+                finding(Warn, "Seguridad", format!("Firmas del antivirus con {age} días de antigüedad"), None)
+                    .with(vec![tool("Seguridad de Windows", Tool::WindowsSecurity)]),
+            );
         }
         if s.activated == Some(false) {
-            f.push(finding(Warn, "Sistema", "Windows no está activado".into(), None));
+            f.push(finding(Warn, "Sistema", "Windows no está activado".into(), None).with(vec![tool("Activación", Tool::Activation)]));
         }
     }
 
     if let Some(s) = &d.startup_enabled.data {
         if s.len() >= 12 {
-            f.push(finding(Warn, "Rendimiento", format!("{} programas arrancan con Windows", s.len()), Some("Revisar la página Inicio.".into())));
+            f.push(
+                finding(Warn, "Rendimiento", format!("{} programas arrancan con Windows", s.len()), Some("Revisar la página Inicio.".into()))
+                    .with(vec![page("Revisar programas de inicio", "startup", None)]),
+            );
         }
+    }
+    if let Some(u) = d.software_updates.data.as_ref().filter(|u| !u.is_empty()) {
+        let names: Vec<&str> = u.iter().take(6).map(|x| x.name.as_str()).collect();
+        f.push(
+            finding(
+                if u.len() >= 10 { Warn } else { Info },
+                "Software",
+                format!("{} programas tienen actualizaciones pendientes", u.len()),
+                Some(format!("{}{}", names.join(", "), if u.len() > 6 { "…" } else { "" })),
+            )
+            .with(vec![page("Actualizar software", "software", None)]),
+        );
+    }
+    if let Some(days) = d.system.data.as_ref().and_then(|s| s.quick_scan_age_days).filter(|d| *d >= 14) {
+        f.push(
+            finding(Warn, "Seguridad", format!("Sin análisis antivirus desde hace {days} días"), None)
+                .with(vec![page("Analizar ahora", "repair", Some("repair.defender-scan"))]),
+        );
     }
     if let Some(b) = &d.bloat_installed.data {
         if !b.is_empty() {
-            f.push(finding(Info, "Rendimiento", format!("{} apps promocionales o retiradas instaladas", b.len()), Some(b.join(", "))));
+            f.push(
+                finding(Info, "Rendimiento", format!("{} apps promocionales o retiradas instaladas", b.len()), Some(b.join(", ")))
+                    .with(vec![page("Revisar Bloatware", "bloatware", None)]),
+            );
         }
     }
 
     f.sort_by(|a, b| b.severity.cmp(&a.severity));
     f
+}
+
+/// Abre una herramienta de Windows de la lista cerrada `Tool`.
+#[tauri::command]
+pub fn open_system_tool(tool: Tool) -> Result<(), String> {
+    let (program, args): (&str, &[&str]) = match tool {
+        Tool::DeviceManager => ("mmc.exe", &["devmgmt.msc"]),
+        Tool::EventViewer => ("mmc.exe", &["eventvwr.msc"]),
+        Tool::Reliability => ("perfmon.exe", &["/rel"]),
+        // Los URI de Configuración se abren vía explorer para no heredar la elevación.
+        Tool::WindowsUpdate => ("explorer.exe", &["ms-settings:windowsupdate"]),
+        Tool::WindowsSecurity => ("explorer.exe", &["windowsdefender:"]),
+        Tool::Activation => ("explorer.exe", &["ms-settings:activation"]),
+        Tool::Storage => ("explorer.exe", &["ms-settings:storagesense"]),
+    };
+    log::info!("Abriendo herramienta {tool:?}");
+    std::process::Command::new(program).args(args).spawn().map(|_| ()).map_err(|e| format!("No se pudo abrir: {e}"))
 }
 
 fn snapshots_dir(app: &tauri::AppHandle) -> PathBuf {
@@ -293,7 +453,7 @@ fn collect(state: &TweakState) -> Diagnostics {
     volumes.sort_by(|a, b| a.mount.cmp(&b.mount));
 
     // Todos los recolectores en paralelo: el total es el del más lento, no la suma.
-    let (disks, stability, drivers, battery, system, startup, bloat, tweaks_applied) = std::thread::scope(|s| {
+    let (disks, stability, drivers, battery, system, startup, bloat, updates, tweaks_applied) = std::thread::scope(|s| {
         let disks = s.spawn(collect::disks);
         let stability = s.spawn(collect::stability);
         let drivers = s.spawn(collect::drivers);
@@ -301,6 +461,7 @@ fn collect(state: &TweakState) -> Diagnostics {
         let system = s.spawn(collect::system);
         let startup = s.spawn(crate::tweaks::startup::enabled_names);
         let bloat = s.spawn(crate::tweaks::appx::recommended_installed);
+        let updates = s.spawn(crate::software::list);
         let tweaks = s.spawn(|| state.applied_count());
         (
             join(disks.join()),
@@ -310,6 +471,7 @@ fn collect(state: &TweakState) -> Diagnostics {
             join(system.join()),
             join(startup.join()),
             join(bloat.join()),
+            join(updates.join()),
             tweaks.join().unwrap_or(0),
         )
     });
@@ -329,6 +491,7 @@ fn collect(state: &TweakState) -> Diagnostics {
         system: system.into(),
         startup_enabled: startup.into(),
         bloat_installed: bloat.into(),
+        software_updates: updates.into(),
         tweaks_applied,
         findings: vec![],
     };
@@ -336,11 +499,16 @@ fn collect(state: &TweakState) -> Diagnostics {
     d
 }
 
+/// Analiza el equipo y guarda la foto (snapshot) para comparaciones.
+pub fn run_and_save(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
+    let d = collect(state);
+    save_snapshot(app, &d);
+    d
+}
+
 #[tauri::command(async)]
 pub fn run_diagnostics(app: tauri::AppHandle, state: State<'_, TweakState>) -> Result<Diagnostics, String> {
-    let d = collect(&state);
-    save_snapshot(&app, &d);
-    Ok(d)
+    Ok(run_and_save(&app, &state))
 }
 
 #[derive(Serialize)]

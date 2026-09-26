@@ -38,7 +38,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-line-2 bg-panel-2/95 px-3.5 py-3 text-sm shadow-2xl backdrop-blur"
             >
               <Icon size={16} className={`mt-0.5 shrink-0 ${color[t.kind]}`} />
-              <p className="flex-1 text-ink">{t.text}</p>
+              <p className="max-h-32 min-w-0 flex-1 overflow-y-auto text-ink [overflow-wrap:anywhere]">{t.text}</p>
               <button onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))} className="text-mute hover:text-ink">
                 <X size={14} />
               </button>

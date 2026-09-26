@@ -20,7 +20,7 @@ fn find_edge() -> Option<PathBuf> {
 
     let from_defaults = ["ProgramFiles(x86)", "ProgramFiles"]
         .iter()
-        .filter_map(|v| std::env::var_os(v))
+        .filter_map(std::env::var_os)
         .map(|p| PathBuf::from(p).join(r"Microsoft\Edge\Application\msedge.exe"));
 
     from_registry.chain(from_defaults).find(|p| p.is_file())

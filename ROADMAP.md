@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.5.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.9.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.5)
+## Hecho (v0.1 – v0.9)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -15,100 +15,104 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 3. Catálogo | 0.3 | Limpieza, privacidad, rendimiento, servicios, bloatware (Appx) e Inicio; usuario destino para HKCU |
 | 4. Diagnóstico | 0.4 | Discos, BSOD, drivers, batería, seguridad, reparaciones, informe PDF antes/después, ícono |
 | 5. Pulido | 0.5 | Perfiles de un clic, modo portable, firma de código preparada, versión unificada |
+| 6. Robustez y calidad | 0.7 | Timeouts y Cancelar, progreso en vivo, scripts sobre el usuario destino, registro de actividad, prueba de ida y vuelta, CI, diagnóstico interactivo |
+| 7. Rendimiento | 0.7 | PowerShell persistente, Inicio por COM, carga diferida de páginas, pintado más barato, WebView2 con GPU en proceso |
+| 8. Herramientas | 0.9 | Procesos (finalizar proceso/árbol), red y speedtest, actualizar software (winget), analizador de espacio, copia de drivers, análisis de Defender |
+| 9. Flujo del técnico | 0.9 | Sesión de servicio, clientes, perfiles propios (importar/exportar), marca en el informe, checklist, "by David Bonilla" |
+
+### Fase 6 en detalle
+
+- **Nada puede colgar la interfaz.** Todo proceso tiene límite de tiempo (120 s por defecto; las tareas
+  declaran el suyo con `timeout`). SFC, DISM y WinSxS no tienen límite, pero se pueden **cancelar**:
+  se termina el árbol de procesos completo y lo ya cambiado se deshace.
+- **Progreso en vivo** (evento `task-progress`) en ajustes, perfiles ("3/10 · …"), apps y puntos de restauración.
+- **Usuario destino en scripts:** todos reciben `$UserSid`, `$UserHive`, `$UserProfile`, `$UserTemp`…
+  `cargo test` rechaza scripts del catálogo que usen `$env:TEMP`, `HKCU:` o `Clear-RecycleBin`.
+- **Registro de actividad** con rotación (5 × 1 MB) y visor en Historial → "Registro técnico".
+- **Errores legibles:** sin "At line: … ~~~~" ni CategoryInfo.
+- **Apps:** las operaciones Appx van una a una y se reintentan si Windows está ocupado (corrige
+  "Another operation on app packages is in progress").
+- **Prueba de ida y vuelta:** `adminops.exe --roundtrip informe.json` aplica y deshace cada ajuste y
+  falla si el registro o los servicios no vuelven exactamente a su estado. Corre en la CI y en
+  Windows Sandbox (`tests/sandbox/run-roundtrip.ps1`).
+- **CI** (`.github/workflows/ci.yml`): tipos, Clippy `-D warnings`, tests, instalador, portable y
+  prueba de ida y vuelta; los artefactos quedan en cada ejecución.
+- **Diagnóstico interactivo:** cada hallazgo lleva a su detalle, al ajuste que lo resuelve o a la
+  herramienta de Windows (lista cerrada: Administrador de dispositivos, Confiabilidad, Update…).
+
+### Fase 7: medido
+
+Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --nocapture`
+(Ryzen 5 5500, Windows 11 26200).
+
+| Métrica | Antes | Después | Objetivo |
+|---|---|---|---|
+| Listar Inicio | 3 398 ms | **310 ms** | < 500 ms ✅ |
+| Listar apps | 834 ms | **370 ms** | < 500 ms ✅ |
+| 10 consultas PowerShell | 3 022 ms | **435 ms** | — |
+| Detectar el catálogo | 329 ms | **70 ms** | — |
+| Arranque hasta ventana | — | **~400–600 ms** | < 1 s ✅ |
+| JS inicial | 308 KB | **253 KB** | — |
+| RAM privada total | ~260 MB | **~175 MB** | ver nota |
+| RAM del proceso de AdminOps | — | **~10 MB** | ✅ |
+| CPU minimizada | — | **~0 %** | < 1 % ✅ |
+| CPU con el Panel visible | 18 % de un núcleo | **~4–10 %** | ver nota |
+
+**Notas honestas:**
+- El objetivo de "< 80 MB" no es alcanzable con WebView2: su runtime ya ocupa ~165 MB por sí solo.
+  AdminOps en sí usa ~10 MB. Bajar de ahí exigiría cambiar de motor de interfaz.
+- La CPU con el Panel visible se midió con el PC en uso y varió mucho entre pasadas. Repetir la
+  medición con el equipo en reposo antes de dar la cifra por buena.
 
 ---
 
 ## Deuda técnica conocida
 
-Cosas que funcionan pero tienen límites o riesgos. Las marcadas ⚠️ conviene resolverlas pronto.
-
-- ⚠️ **PowerShell sin timeout.** `ps::powershell` espera indefinidamente; un script colgado
-  deja la tarjeta en "Trabajando…" para siempre. No se puede cancelar SFC/DISM.
-- ⚠️ **Scripts y usuario destino.** La redirección de HKCU al usuario con sesión abierta solo cubre
-  las acciones de registro. Los scripts que usan `$env:LOCALAPPDATA`, `$env:TEMP` o `HKCU:`
-  (caché de iconos, temporales, papelera) siguen actuando sobre la cuenta que elevó AdminOps.
-- ⚠️ **Sin CI ni pruebas de ida y vuelta.** Los tests cubren el catálogo, el registro y el formato
-  de fechas, pero nadie verifica automáticamente que *cada* ajuste se aplique y se deshaga bien.
-- **Un PowerShell por consulta.** Cada detección por script arranca un proceso (~300 ms).
-  Listar apps o el Inicio tarda 1–2 s.
 - **Portable deja rastro de WebView2.** La caché del webview va a `%LOCALAPPDATA%\com.adminops.app`
   aunque el resto de datos esté en el USB.
 - **SMART limitado.** `Get-StorageReliabilityCounter` no reporta temperatura/desgaste en muchos
   discos SATA; faltan los atributos SMART crudos (sectores reasignados, pendientes).
-- **Punto de restauración sin progreso.** Crearlo puede tardar más de un minuto sin feedback.
+- **La prueba de ida y vuelta aún no se ha ejecutado** en un Windows 11 cliente limpio: la CI usa
+  Windows Server. Ejecutarla en Sandbox al menos una vez por versión.
 - **Dependencia de Edge para el PDF.** Si falta, el informe cae a HTML.
 - **Solo español.**
 
 ---
 
-## Fase 6 — Robustez y calidad
+## Fases 8 y 9: hecho
 
-**Prioridad: alta.** Antes de añadir funciones, que lo existente sea fiable en equipos de clientes.
+- **Procesos**: lista en vivo (CPU, RAM, disco, usuario, ruta), finalizar proceso o árbol. Los críticos
+  de Windows no se pueden cerrar; los sensibles (svchost, explorer, dwm…) avisan de las consecuencias.
+  Antes de cerrar se comprueba que el PID sigue siendo el mismo programa. Todo queda en el diario.
+- **Red y velocidad**: adaptadores, SSID y señal, ping ICMP nativo a router/DNS/Internet, DNS,
+  detección de portal cautivo. **Speedtest** contra Cloudflare: 6/4 conexiones TCP en paralelo durante
+  10 s, se descartan 2 s de arranque, latencia sin el tiempo del servidor (`server-timing`), jitter y
+  latencia con carga (bufferbloat). Medido en el equipo de desarrollo: 36 ms (RTT TCP del servidor: 35 ms).
+- **Actualizar software** con winget (tabla interpretada por columnas: independiente del idioma).
+- **Espacio en disco**: `FindFirstFileExW` + rayon; `C:\Windows` (215 000 archivos) en 2,1 s (antes 124 s).
+- **Copia de drivers** (`pnputil /export-driver`) y **análisis rápido de Defender**.
+- Diagnóstico e informe incluyen software pendiente, antigüedad del último análisis y el último speedtest.
+- **Sesión de servicio**, **clientes** con equipos e historial, **perfiles propios**, **marca del técnico**
+  (logo, empresa, contacto, condiciones) y **checklist** configurable en el informe.
 
-- Timeout configurable por script y **botón Cancelar** en tareas largas (matar el proceso de PowerShell).
-- Redirección completa al usuario destino en scripts: inyectar `$UserProfile`, `$UserTemp` y
-  `$UserHive` y reescribir los scripts del catálogo para usarlos.
-- **Registro de actividad** a archivo (`tauri-plugin-log`), con rotación y un visor en la app
-  para adjuntarlo cuando algo falle.
-- **Pruebas de ida y vuelta** en Windows Sandbox: script que aplica y deshace todo el catálogo
-  y compara el registro/servicios antes y después.
-- **CI con GitHub Actions**: `cargo test`, `cargo clippy -D warnings`, `tsc`, compilación y
-  artefactos (instalador + zip portable) en cada push a `main`.
-- Progreso visible al crear puntos de restauración.
-
-**Terminado cuando:** ninguna operación puede colgar la interfaz, la prueba de ida y vuelta pasa
-en limpio sobre Windows 10 22H2 y Windows 11 24H2, y la CI está en verde.
-
----
-
-## Fase 7 — Rendimiento de la propia app
-
-**Prioridad: alta.** Una app que optimiza el PC tiene que ser ligera.
-
-- Sustituir PowerShell por APIs nativas donde sea posible: WMI (`wmi` crate) para discos,
-  drivers y batería; `windows` crate para Appx y tareas programadas.
-- Para lo que siga en PowerShell: un proceso persistente reutilizado (runspace) en vez de uno por consulta.
-- Caché de detección con invalidación al aplicar/deshacer.
-- Carga diferida de páginas (`React.lazy`) y medición del tamaño del bundle.
-
-**Objetivos medibles:** arranque < 1 s, < 80 MB de RAM y < 1 % de CPU en reposo,
-listas de Apps e Inicio en < 500 ms.
+### Pendiente de verificar a mano (requiere administrador o modifica el equipo)
+- Finalizar procesos de otros usuarios, actualizar software con winget y la copia de drivers.
+- Una sesión de servicio completa de principio a fin (inicio → trabajo → informe archivado).
 
 ---
 
-## Fase 8 — Nuevas herramientas de diagnóstico y mantenimiento
+## Fase 10 — Diagnóstico avanzado
 
-**Prioridad: media.** Lo que más tiempo ahorra en el día a día de soporte.
+**Prioridad: media.** Lo que quedó fuera de la Fase 8 por requerir componentes externos.
 
-- **Actualizar software** con `winget upgrade`: lista de apps desactualizadas y actualización por lotes.
-- **Analizador de espacio**: carpetas y archivos más grandes por unidad, con acceso directo a limpiarlos.
 - **SMART completo** con `smartctl` opcional (sectores reasignados/pendientes, CRC), con alertas.
 - **Temperaturas** de CPU y GPU (LibreHardwareMonitor) en el panel y en el informe.
-- **Diagnóstico de red**: adaptadores, ping a puerta de enlace/DNS/Internet, resolución DNS, velocidad.
-- **Copia de drivers** (`pnputil /export-driver`) antes de formatear o actualizar.
-- **Escaneo rápido de Defender** desde la app, con resultado en el informe.
-- **Benchmark antes/después**: tiempo de arranque, lectura/escritura de disco y latencia de apertura de apps.
-
-**Terminado cuando:** cada herramienta aparece también en el diagnóstico o en el informe, no solo en su página.
+- **Benchmark de disco** antes/después (lectura/escritura secuencial y aleatoria).
+- **Enviar el informe por correo** o compartir enlace desde la sesión.
 
 ---
 
-## Fase 9 — Flujo de trabajo del técnico
-
-**Prioridad: media.** Convertir AdminOps en la herramienta de "sesión de servicio".
-
-- **Sesión de trabajo**: al empezar hace el diagnóstico "antes"; al terminar genera el informe
-  con comparación y trabajo realizado, en un solo flujo.
-- **Perfiles personalizados**: crear, editar, exportar e importar (TOML/JSON) los tuyos.
-- **Fichas de cliente y equipo**: nombre, contacto, equipos atendidos y el historial de informes de cada uno.
-- **Informe con marca propia**: logo, datos de contacto y condiciones del técnico o empresa.
-- **Checklist de servicio** configurable (copia de seguridad hecha, antivirus revisado…) que se incluye en el informe.
-
-**Terminado cuando:** una visita completa (diagnóstico → trabajo → informe) se hace sin salir de la app.
-
----
-
-## Fase 10 — Distribución
+## Fase 11 — Distribución
 
 **Prioridad: media-baja** (pasa a alta al empezar a repartir la app a otros).
 

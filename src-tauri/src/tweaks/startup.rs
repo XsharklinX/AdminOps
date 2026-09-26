@@ -172,15 +172,27 @@ fn enrich(items: &[StartupItem]) -> Result<Enriched, String> {
         r#"
 $items = [System.Collections.ArrayList]::new()
 foreach ($x in (ConvertFrom-Json '{json}')) {{ [void]$items.Add($x) }}
-$tasks = @(Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object {{
-    $_.TaskPath -notlike '\Microsoft\*' -and
-    @($_.Triggers | Where-Object {{ $_.CimClass.CimClassName -in 'MSFT_TaskLogonTrigger','MSFT_TaskBootTrigger' }}).Count -gt 0
-  }} | ForEach-Object {{
-    $cmd = (@($_.Actions | Where-Object {{ $_.Execute }} | ForEach-Object {{ ('"' + $_.Execute.Trim('"') + '" ' + $_.Arguments).Trim() }}) -join ' ; ')
-    $t = [pscustomobject]@{{ path = $_.TaskPath; name = $_.TaskName; enabled = ($_.State -ne 'Disabled'); command = "$cmd" }}
-    [void]$items.Add([pscustomobject]@{{ i = "task|$($_.TaskPath)|$($_.TaskName)"; c = "$cmd" }})
-    $t
-  }})
+# Programador de tareas por COM (≈50 ms) en vez de Get-ScheduledTask (≈1 s):
+# se salta \Microsoft entero y solo se leen los disparadores de cada tarea.
+$tasks = [System.Collections.ArrayList]::new()
+$svc = New-Object -ComObject Schedule.Service
+$svc.Connect()
+$pending = [System.Collections.Queue]::new()
+$pending.Enqueue($svc.GetFolder('\'))
+while ($pending.Count) {{
+  $folder = $pending.Dequeue()
+  foreach ($sub in $folder.GetFolders(0)) {{ if ($sub.Path -notlike '\Microsoft*') {{ $pending.Enqueue($sub) }} }}
+  $taskPath = if ($folder.Path -eq '\') {{ '\' }} else {{ $folder.Path + '\' }}
+  foreach ($task in $folder.GetTasks(1)) {{
+    $def = $task.Definition
+    # 8 = al arrancar, 9 = al iniciar sesión
+    if (-not @($def.Triggers | Where-Object {{ $_.Type -in 8, 9 }}).Count) {{ continue }}
+    $cmd = (@($def.Actions | Where-Object {{ $_.Type -eq 0 -and $_.Path }} | ForEach-Object {{ ('"' + $_.Path.Trim('"') + '" ' + $_.Arguments).Trim() }}) -join ' ; ')
+    [void]$tasks.Add([pscustomobject]@{{ path = $taskPath; name = $task.Name; enabled = [bool]$task.Enabled; command = "$cmd" }})
+    [void]$items.Add([pscustomobject]@{{ i = "task|$taskPath|$($task.Name)"; c = "$cmd" }})
+  }}
+}}
+$tasks = @($tasks)
 $sh = New-Object -ComObject WScript.Shell
 $info = @(foreach ($it in $items) {{
   $c = [Environment]::ExpandEnvironmentVariables("$($it.c)").Trim()
