@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #07090d;
+  --color-panel: #0c1016;
+  --color-panel-2: #111722;
+  --color-line: #1b2331;
+  --color-line-2: #263041;
+  --color-ink: #e6edf7;
+  --color-dim: #8b97aa;
+  --color-mute: #56627a;
+
+  --color-neon: #22e1ff;
+  --color-neon-2: #b56cff;
+  --color-ok: #3dff9a;
+  --color-warn: #ffc53d;
+  --color-bad: #ff4d6d;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    overflow: hidden;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-neon) 35%, transparent);
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-2);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@utility glow-neon {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-neon) 45%, transparent),
+    0 0 18px -4px color-mix(in srgb, var(--color-neon) 60%, transparent);
+}
+
+@utility text-glow {
+  text-shadow: 0 0 12px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
