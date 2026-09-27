@@ -40,3 +40,8 @@ export function money(v: number, currency: string): string {
   const cur = currency.trim();
   return `${n < 0 ? "-" : ""}${cur}${cur ? " " : ""}${s}`;
 }
+
+/** Ruta sin el nombre del usuario de Windows: "C:\Users\ana\Documents\x" → "Carpeta personal\Documents\x". */
+export function friendlyPath(p: string): string {
+  return p.replace(/^[a-z]:\\users\\[^\\]+/i, "Carpeta personal");
+}

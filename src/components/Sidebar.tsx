@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Gauge,
   Headset,
+  Lock,
   Monitor,
   Network,
   Package,
@@ -49,6 +50,10 @@ export type PageId =
   | "migrate"
   | "printers"
   | "repair"
+  | "vault"
+  | "wipe"
+  | "recover"
+  | "family"
   | "settings";
 
 /** Cada página: su nombre completo (búsqueda, títulos) y el corto de su pestaña. */
@@ -92,6 +97,10 @@ export const NAV: NavItem[] = [
   { id: "migrate", label: "Copia de datos", tab: "Copia de datos" },
   { id: "printers", label: "Impresoras", tab: "Impresoras" },
   { id: "repair", label: "Reparaciones", tab: "Reparaciones" },
+  { id: "vault", label: "Caja fuerte y carpetas cifradas", tab: "Caja fuerte" },
+  { id: "wipe", label: "Borrado seguro", tab: "Borrado seguro" },
+  { id: "recover", label: "Recuperar archivos borrados", tab: "Recuperar archivos" },
+  { id: "family", label: "Control parental", tab: "Control parental" },
   { id: "settings", label: "Ajustes", tab: "Ajustes" },
 ];
 
@@ -102,7 +111,7 @@ export interface Area {
   pages: PageId[];
 }
 
-/** Las 7 áreas de la barra lateral; sus páginas son pestañas. */
+/** Las áreas de la barra lateral; sus páginas son pestañas. */
 export const AREAS: Area[] = [
   { id: "panel", label: "Panel", icon: Gauge, pages: ["dashboard"] },
   { id: "equipo", label: "Equipo", icon: Monitor, pages: ["diagnostics", "security", "hardware", "processes", "space"] },
@@ -110,6 +119,7 @@ export const AREAS: Area[] = [
   { id: "programas", label: "Programas", icon: Package, pages: ["software", "install", "uninstall", "winupdate"] },
   { id: "red", label: "Red", icon: Network, pages: ["router", "devices", "network", "nettools"] },
   { id: "soporte", label: "Soporte", icon: Headset, pages: ["session", "tickets", "clients", "report", "history", "shortcuts"] },
+  { id: "datos", label: "Datos y familia", icon: Lock, pages: ["vault", "wipe", "recover", "family"] },
   { id: "admin", label: "Administración", icon: Wrench, pages: ["tools", "users", "domain", "migrate", "printers", "repair"] },
 ];
 

@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.20.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.21.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.20)
+## Hecho (v0.1 – v0.21)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -30,6 +30,7 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 18. Rediseño | 0.18 | Lenguaje visual sobrio (IBM Plex, un acento, color solo para estados, sin brillos ni degradados), tema claro, navegación en 7 áreas con pestañas, Panel y Herramientas rehechos, icono nuevo, informe e instalador con el mismo estilo |
 | 19. Informe y cliente | 0.19 | Informe PDF rehecho con dos plantillas (cliente y técnica), presupuesto o recibo con impuestos, firma del cliente y del técnico, envío por correo con adjunto, garantías, recordatorios de mantenimiento, evolución entre visitas, icono del medidor con llave |
 | 20. Red y router | 0.20 | Mi red (conexión, router, DNS, IP pública), panel del router dentro de la app con acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT/CGNAT, QR de la Wi-Fi, dispositivos en la red con fabricante, nombres propios y aviso de nuevos |
+| 21. Caja fuerte y privacidad | 0.21 | Caja fuerte (.vhdx con BitLocker que se abre sin AdminOps), carpeta cifrada AES-256, borrado seguro y del espacio libre, checklist antes de vender, recuperar archivos borrados (Windows File Recovery), control parental (filtro DNS, sitios bloqueados, horario de uso) |
 
 ### Fase 6 en detalle
 
@@ -327,20 +328,28 @@ Entrar al router y saber qué hay en la red sin abrir el navegador ni buscar la 
   opcional en Internet solo del prefijo, con caché), nombres propios para cada dispositivo y marca
   de **nuevo** para los que no estaban la última vez.
 
-### Fase 21 — Caja fuerte y privacidad (v0.21)
+### Fase 21 — Caja fuerte y privacidad (v0.21) ✅
 
-**Prioridad: media.** Proteger los datos del cliente con lo que ya trae Windows, para que siga
-funcionando aunque se desinstale AdminOps.
+Proteger los datos del cliente con lo que ya trae Windows, para que siga funcionando aunque se
+desinstale AdminOps. Nueva área **Datos y familia** en la barra lateral.
 
-- **Caja fuerte**: disco virtual (.vhdx) cifrado con BitLocker y contraseña; se abre con doble clic
-  desde Windows. Crear, abrir, cerrar, cambiar la contraseña y guardar la clave de recuperación.
+- **Caja fuerte**: un .vhdx dinámico (API de discos virtuales de Windows, sin Hyper-V) cifrado con
+  BitLocker XTS-AES 256 y contraseña. Se abre con doble clic desde Windows sin AdminOps. En la app:
+  crear, abrir, cerrar (bloquea antes de expulsar y avisa si hay archivos abiertos), cambiar la
+  contraseña, ver la clave de recuperación y guardarla en un archivo, añadir una existente, quitar o
+  eliminar. La clave de recuperación no se guarda: se muestra y hay que copiarla o guardarla.
   Requiere Windows Pro para crearla.
-- **Carpeta cifrada** (Windows Home): comprimir con AES-256 y contraseña, y borrar la original de
-  forma segura.
-- **Borrado seguro** de archivos y del espacio libre, y checklist "antes de vender o donar el PC".
-- **Recuperar archivos borrados** con Windows File Recovery desde una interfaz sencilla.
-- **Bloqueo de webs** (adultos, apuestas, malware) por hosts o DNS, y **horario de uso** por
-  usuario local.
+- **Carpeta cifrada** (cualquier Windows): .zip AES-256 que abren 7-Zip, WinRAR o AdminOps. Se
+  comprueba que se descifra bien antes de borrar la original (opcional, con borrado seguro).
+- **Borrado seguro** de archivos y carpetas (sobrescritura y renombrado antes de borrar; nunca
+  rutas del sistema), **vaciar el espacio libre** (cipher /w, cancelable) y checklist **antes de
+  vender o donar el equipo** con accesos directos a cada paso.
+- **Recuperar archivos borrados** con Windows File Recovery: se instala desde la Store, se elige
+  unidad, destino (siempre otra), tipos de archivo o carpeta y búsqueda rápida o a fondo.
+- **Control parental**: filtro de navegación por DNS (Cloudflare for Families, CleanBrowsing) en
+  todos los adaptadores, sitios bloqueados en una sección propia del archivo hosts y **horario de
+  uso** por usuario local (cuadrícula de 7×24, plantillas; API de Windows, independiente del idioma).
+- Las contraseñas nunca se guardan ni aparecen en el registro de actividad.
 
 ### Fase 22 — La oficina completa (v0.22)
 

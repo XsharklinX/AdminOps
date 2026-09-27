@@ -218,14 +218,14 @@ pub fn list_ports() -> Result<Vec<PortEntry>, String> {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsAdapter {
-    index: u32,
-    name: String,
-    description: String,
+    pub index: u32,
+    pub name: String,
+    pub description: String,
     #[serde(rename = "virtual")]
-    is_virtual: bool,
-    dns: Vec<String>,
+    pub is_virtual: bool,
+    pub dns: Vec<String>,
     /// DNS escritos a mano (si no, los da el router por DHCP).
-    manual: bool,
+    pub manual: bool,
 }
 
 const DNS_SCRIPT: &str = r#"
@@ -281,7 +281,7 @@ pub fn set_dns(index: u32, servers: Vec<String>, tweaks: State<'_, TweakState>) 
 
 // ---------- Archivo hosts ----------
 
-fn hosts_path() -> PathBuf {
+pub(crate) fn hosts_path() -> PathBuf {
     let windows = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
     PathBuf::from(windows).join(r"System32\drivers\etc\hosts")
 }

@@ -29,6 +29,10 @@ mod users;
 mod window_state;
 mod winupdate;
 mod workflow;
+mod vault;
+mod wipe;
+mod recover;
+mod family;
 
 use tauri::Manager;
 
@@ -225,6 +229,34 @@ pub fn run() {
             network::lan::set_device_alias,
             network::lan::open_device_page,
             network::lan::lookup_vendors,
+            vault::vault_support,
+            vault::vault_list,
+            vault::vault_create,
+            vault::vault_open,
+            vault::vault_close,
+            vault::vault_change_password,
+            vault::vault_recovery_key,
+            vault::vault_save_recovery,
+            vault::vault_add_existing,
+            vault::vault_pick_location,
+            vault::vault_remove,
+            vault::pick_folder,
+            vault::pick_encrypted_zip,
+            vault::encrypt_folder,
+            vault::decrypt_archive,
+            wipe::wipe_pick,
+            wipe::wipe_items,
+            wipe::wipe_free_space,
+            wipe::open_ms_settings,
+            recover::recover_status,
+            recover::recover_install,
+            recover::recover_run,
+            family::dns_filter_status,
+            family::set_dns_filter,
+            family::blocked_sites,
+            family::set_blocked_sites,
+            family::logon_hours,
+            family::set_logon_hours,
             portals::router_portal,
             network::tools::start_ping,
             network::tools::start_trace,
