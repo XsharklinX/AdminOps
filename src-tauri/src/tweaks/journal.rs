@@ -131,6 +131,22 @@ impl Journal {
     pub fn newest_first(&self) -> Vec<Entry> {
         self.entries.iter().rev().cloned().collect()
     }
+
+    /// Borra las entradas anteriores a `ts`, salvo los ajustes aplicados que aún se
+    /// pueden deshacer (guardan los valores originales). Devuelve cuántas borró.
+    pub fn prune_before(&mut self, ts: u64) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|e| e.timestamp >= ts || (e.op == Op::Apply && e.ok && !e.reverted));
+        let removed = before - self.entries.len();
+        if removed > 0 {
+            self.save();
+        }
+        removed
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
 }
 
 pub fn entry(op: Op, tweak_id: Option<&str>, title: &str) -> Entry {

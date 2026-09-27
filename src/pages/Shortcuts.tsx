@@ -1,3 +1,4 @@
+import { usePageActive } from "../lib/pageActive";
 import { Keyboard, Play, Radar, Search, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
@@ -60,6 +61,7 @@ function Keys({ keys }: { keys: string[] }) {
 }
 
 export function Shortcuts() {
+  const active = usePageActive();
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>(readFavs);
@@ -69,7 +71,7 @@ export function Shortcuts() {
 
   // Modo descubrir: captura la combinación pulsada y busca qué hace.
   useEffect(() => {
-    if (!discover) return;
+    if (!discover || !active) return;
     const onKey = (e: KeyboardEvent) => {
       const k = keyName(e);
       if (!k) return;
@@ -83,7 +85,7 @@ export function Shortcuts() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [discover]);
+  }, [discover, active]);
 
   const toggleFav = (s: Shortcut) => {
     const id = idOf(s);

@@ -241,7 +241,7 @@ pub fn router_portal(app: tauri::AppHandle, key: String, name: String, url: Stri
 #[tauri::command]
 pub fn save_portal(app: tauri::AppHandle, portal: Portal) -> Result<Portal, String> {
     let mut p = validate(portal)?;
-    let _guard = FILE_LOCK.lock().unwrap();
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut list = load(&app);
     match list.iter_mut().find(|x| !p.id.is_empty() && x.id == p.id) {
         Some(x) => {
@@ -269,7 +269,7 @@ pub fn delete_portal(app: tauri::AppHandle, id: String) -> Result<(), String> {
     if let Some(w) = app.get_webview_window(&window_label(&id)) {
         let _ = w.close();
     }
-    let _guard = FILE_LOCK.lock().unwrap();
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut list = load(&app);
     list.retain(|p| p.id != id);
     crate::paths::write_json(&path(&app), &list)
@@ -302,6 +302,14 @@ pub fn portal_bounds(app: tauri::AppHandle, id: String, x: f64, y: f64, width: f
     if let Some(v) = app.get_webview(&embedded_label(&id)) {
         let _ = v.set_position(LogicalPosition::new(x, y));
         let _ = v.set_size(LogicalSize::new(width.max(50.0), height.max(50.0)));
+    }
+}
+
+/// Oculta un portal incrustado (su página se tapa o deja de estar visible).
+#[tauri::command(async)]
+pub fn portal_hide(app: tauri::AppHandle, id: String) {
+    if let Some(v) = app.get_webview(&embedded_label(&id)) {
+        let _ = v.hide();
     }
 }
 
@@ -352,6 +360,30 @@ pub fn portal_open_window(app: tauri::AppHandle, id: String) -> Result<(), Strin
 pub fn portal_open_external(app: tauri::AppHandle, id: String) -> Result<(), String> {
     open_external(&find(&app, &id)?.url);
     Ok(())
+}
+
+/// Portales de Tickets (no los de routers) para la copia de la configuración.
+pub fn export_portals(app: &tauri::AppHandle) -> Vec<Portal> {
+    load(app).into_iter().filter(|p| p.kind != "router").collect()
+}
+
+/// Añade los portales importados que no estén ya (por dirección).
+pub fn import_portals(app: &tauri::AppHandle, portals: Vec<Portal>) -> Result<usize, String> {
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut list = load(app);
+    let mut added = 0;
+    for p in portals {
+        let Ok(mut p) = validate(Portal { kind: String::new(), ..p }) else { continue };
+        if list.iter().any(|x| x.url.eq_ignore_ascii_case(&p.url)) {
+            continue;
+        }
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+        p.id = format!("p{stamp:x}");
+        list.push(p);
+        added += 1;
+    }
+    crate::paths::write_json(&path(app), &list)?;
+    Ok(added)
 }
 
 #[cfg(test)]

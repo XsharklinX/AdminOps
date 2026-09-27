@@ -85,7 +85,7 @@ impl Drop for Task {
         ps::finish_task(&self.key);
         if let Some(app) = &self.app {
             let elapsed = self.started.elapsed();
-            if elapsed >= NOTIFY_AFTER {
+            if elapsed >= NOTIFY_AFTER && crate::workflow::settings(app).notify_tasks {
                 notify_done(app, &self.name, elapsed, cancelled);
             }
         }

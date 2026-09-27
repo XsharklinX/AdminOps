@@ -67,6 +67,17 @@ pub fn save(window: &tauri::Window) {
     let _ = crate::paths::write_json(&path(app), &s);
 }
 
+/// Tamaño de toda la interfaz (Ajustes → Apariencia). Las vistas web de Tickets y del router no se escalan.
+#[tauri::command]
+pub fn set_ui_zoom(app: tauri::AppHandle, scale: f64) -> Result<(), String> {
+    use tauri::Manager;
+    if !(0.5..=2.0).contains(&scale) {
+        return Err("Tamaño no válido.".into());
+    }
+    let w = app.get_webview_window("main").ok_or("No se encontró la ventana principal.")?;
+    w.set_zoom(scale).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

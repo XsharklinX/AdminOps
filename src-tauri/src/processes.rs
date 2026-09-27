@@ -109,7 +109,7 @@ fn own_tree(sys: &System) -> HashSet<u32> {
 
 #[tauri::command(async)]
 pub fn list_processes(state: State<'_, ProcessState>) -> Vec<ProcessView> {
-    let mut guard = state.inner.lock().unwrap();
+    let mut guard = state.inner.lock().unwrap_or_else(|e| e.into_inner());
     let c = &mut *guard;
     c.sys.refresh_cpu_usage();
     c.sys.refresh_processes_specifics(
@@ -164,7 +164,7 @@ pub fn kill_process(
     tweaks: State<'_, TweakState>,
 ) -> Result<(), String> {
     let (current, protection) = {
-        let mut c = procs.inner.lock().unwrap();
+        let mut c = procs.inner.lock().unwrap_or_else(|e| e.into_inner());
         c.sys.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid)]), true);
         let own = own_tree(&c.sys);
         let p = c.sys.process(Pid::from_u32(pid)).ok_or("El proceso ya no existe.")?;
@@ -185,7 +185,7 @@ pub fn kill_process(
     let result = if tree {
         crate::ps::exec("taskkill.exe", &["/T", "/F", "/PID", &pid.to_string()]).map(|_| ())
     } else {
-        let c = procs.inner.lock().unwrap();
+        let c = procs.inner.lock().unwrap_or_else(|e| e.into_inner());
         match c.sys.process(Pid::from_u32(pid)) {
             Some(p) if p.kill() => Ok(()),
             Some(_) => Err(if crate::elevation::is_elevated() {
@@ -205,7 +205,7 @@ pub fn kill_process(
 #[tauri::command]
 pub fn open_process_location(pid: u32, procs: State<'_, ProcessState>) -> Result<(), String> {
     let exe = {
-        let mut c = procs.inner.lock().unwrap();
+        let mut c = procs.inner.lock().unwrap_or_else(|e| e.into_inner());
         c.sys.refresh_processes_specifics(
             ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
             true,

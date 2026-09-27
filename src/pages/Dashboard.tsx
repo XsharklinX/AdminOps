@@ -1,11 +1,12 @@
-import { Brush, ClipboardCheck, FileText, Gauge, HardDrive, LifeBuoy, Loader2, RefreshCw, RotateCcw, Stethoscope, Wifi } from "lucide-react";
+import { Brush, ClipboardCheck, FileText, Gauge, HardDrive, LifeBuoy, Loader2, RefreshCw, RotateCcw, Star, Stethoscope, Wifi } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { Bar, Sparkline } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
-import { api, diagApi, tweaksApi, type FindingAction, type JournalEntry, type SystemInfo } from "../lib/api";
+import { api, diagApi, toolboxApi, tweaksApi, type FindingAction, type JournalEntry, type SystemInfo } from "../lib/api";
+import { getPrefs } from "../lib/prefs";
 import { bytes, duration, loadColor, rate } from "../lib/format";
 
 type Latest = Awaited<ReturnType<typeof diagApi.latest>>;
@@ -64,7 +65,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: string | null) => void }) {
-  const { metrics: m, history, error } = useLiveMetrics(2000);
+  const { metrics: m, history, error } = useLiveMetrics(getPrefs().refreshMs);
   const { sensors } = useSensors(5000);
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [latest, setLatest] = useState<Latest>(null);
@@ -223,7 +224,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
           )}
         </Section>
 
-        <Section title="Acciones rápidas">
+        <Section title="Acciones rápidas" action={<LinkButton onClick={() => onNavigate("tools")}>Herramientas</LinkButton>}>
           <div className="flex flex-col py-1">
             {quickActions.map((q) => (
               <button
@@ -237,6 +238,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
               </button>
             ))}
           </div>
+          <FavoriteTools onNavigate={onNavigate} />
         </Section>
       </div>
 
@@ -308,6 +310,46 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         </div>
       </Section>
 
+    </div>
+  );
+}
+
+/** Herramientas marcadas con estrella en Herramientas, a un clic desde el Panel. */
+function FavoriteTools({ onNavigate }: { onNavigate: (p: PageId) => void }) {
+  const [items, setItems] = useState<{ id: string; name: string; confirm: boolean }[] | null>(null);
+  const toast = useToast();
+  useEffect(() => {
+    toolboxApi
+      .list()
+      .then((v) => {
+        const names = new Map<string, { name: string; confirm: boolean }>([
+          ...v.tools.filter((t) => !t.unavailable).map((t) => [t.id, { name: t.name, confirm: !!t.confirm }] as const),
+          ...v.custom.map((c) => [c.id, { name: c.name, confirm: false }] as const),
+        ]);
+        setItems(v.favorites.flatMap((id) => (names.has(id) ? [{ id, ...names.get(id)! }] : [])));
+      })
+      .catch(() => setItems([]));
+  }, []);
+  if (items === null) return null;
+  return (
+    <div className="border-t border-line/60 py-1">
+      {items.length === 0 ? (
+        <button onClick={() => onNavigate("tools")} className="py-2 text-left text-xs text-mute hover:text-ink">
+          Marca herramientas con ★ en Herramientas para tenerlas aquí.
+        </button>
+      ) : (
+        items.slice(0, 8).map((t) => (
+          <button
+            key={t.id}
+            // Las que piden confirmación (reinicios) se abren en Herramientas, con su aviso.
+            onClick={() => (t.confirm ? onNavigate("tools") : toolboxApi.launch(t.id).catch((e) => toast("error", String(e))))}
+            className="-mx-2 flex h-9 w-full items-center gap-3 rounded-lg px-2 text-left text-[13px] text-ink transition-colors hover:bg-panel-2"
+          >
+            <Star size={16} strokeWidth={1.6} className="text-mute" />
+            <span className="truncate">{t.name}</span>
+          </button>
+        ))
+      )}
     </div>
   );
 }

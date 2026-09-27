@@ -26,6 +26,19 @@ use tauri::State;
 /// cinco ajustes seguidos no debe generar cinco puntos.
 const RESTORE_POINT_COOLDOWN: Duration = Duration::from_secs(30 * 60);
 
+/// Cuándo crear un punto de restauración antes de cambiar el sistema (Ajustes → General):
+/// 0 = solo antes de cambios con riesgo (por defecto), 1 = antes de cualquier cambio, 2 = nunca.
+static RP_POLICY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+pub fn set_restore_point_policy(policy: &str) {
+    let v = match policy {
+        "always" => 1,
+        "never" => 2,
+        _ => 0,
+    };
+    RP_POLICY.store(v, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Prefijo de error que la UI reconoce para ofrecer "continuar sin punto de restauración".
 const RP_FAILED: &str = "RESTORE_POINT_FAILED::";
 
@@ -98,7 +111,7 @@ impl TweakState {
     }
 
     fn log(&self, e: Entry) -> u64 {
-        self.journal.lock().unwrap().push(e)
+        self.journal.lock().unwrap_or_else(|e| e.into_inner()).push(e)
     }
 
     /// Registra en el diario una operación ajena al catálogo (finalizar un
@@ -122,8 +135,17 @@ impl TweakState {
     }
 
     /// Entradas del diario desde `since` (segundos epoch), de más antigua a más reciente.
+    /// Historial antiguo fuera (ver `Journal::prune_before`).
+    pub fn prune_journal(&self, before: u64) -> usize {
+        self.journal.lock().unwrap_or_else(|e| e.into_inner()).prune_before(before)
+    }
+
+    pub fn journal_len(&self) -> usize {
+        self.journal.lock().unwrap_or_else(|e| e.into_inner()).len()
+    }
+
     pub fn journal_since(&self, since: u64) -> Vec<Entry> {
-        let mut v: Vec<Entry> = self.journal.lock().unwrap().newest_first().into_iter().filter(|e| e.timestamp >= since).collect();
+        let mut v: Vec<Entry> = self.journal.lock().unwrap_or_else(|e| e.into_inner()).newest_first().into_iter().filter(|e| e.timestamp >= since).collect();
         v.reverse();
         v
     }
@@ -131,8 +153,13 @@ impl TweakState {
 
 /// Crea un punto de restauración salvo que ya haya uno reciente de esta sesión.
 /// Devuelve si lo creó. Si falla, el error lleva el prefijo `RP_FAILED`.
-fn ensure_restore_point(state: &TweakState, task: &Task, what: &str, tweak_id: Option<&str>) -> Result<bool, String> {
-    let recent = state.last_restore_point.lock().unwrap().is_some_and(|i| i.elapsed() < RESTORE_POINT_COOLDOWN);
+fn ensure_restore_point(state: &TweakState, task: &Task, what: &str, tweak_id: Option<&str>, risky: bool) -> Result<bool, String> {
+    match RP_POLICY.load(std::sync::atomic::Ordering::Relaxed) {
+        2 => return Ok(false),
+        0 if !risky => return Ok(false),
+        _ => {}
+    }
+    let recent = state.last_restore_point.lock().unwrap_or_else(|e| e.into_inner()).is_some_and(|i| i.elapsed() < RESTORE_POINT_COOLDOWN);
     if recent {
         return Ok(false);
     }
@@ -147,7 +174,7 @@ fn ensure_restore_point(state: &TweakState, task: &Task, what: &str, tweak_id: O
     state.log(e);
     match result {
         Ok(()) => {
-            *state.last_restore_point.lock().unwrap() = Some(Instant::now());
+            *state.last_restore_point.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
             Ok(true)
         }
         Err(err) => Err(format!("{RP_FAILED}{err}")),
@@ -194,7 +221,7 @@ fn view(state: &TweakState, t: &Tweak, status: Status) -> TweakView {
         needs_admin: t.needs_admin(),
         supported: t.supported_on(state.build),
         status,
-        has_backup: state.journal.lock().unwrap().pending_apply(&t.id).is_some(),
+        has_backup: state.journal.lock().unwrap_or_else(|e| e.into_inner()).pending_apply(&t.id).is_some(),
         changes: engine::describe(t),
     }
 }
@@ -248,7 +275,7 @@ pub fn apply_tweak(
     state.check_can_modify(t)?;
 
     let restore_point_created =
-        t.risk >= Risk::Medium && !skip_restore_point && ensure_restore_point(&state, &task, &t.name, Some(&t.id))?;
+        !skip_restore_point && ensure_restore_point(&state, &task, &t.name, Some(&t.id), t.risk >= Risk::Medium)?;
     task.step(format!("Aplicando {}…", t.name));
 
     apply_logged(&state, t, Some(&task))?;
@@ -277,7 +304,7 @@ fn apply_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<()
 /// Deshace la última aplicación hecha por AdminOps usando su copia del diario.
 /// `Ok(false)` si no había nada que deshacer.
 fn revert_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<bool, String> {
-    let pending = state.journal.lock().unwrap().pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
+    let pending = state.journal.lock().unwrap_or_else(|e| e.into_inner()).pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
     let Some((entry_id, backups)) = pending else { return Ok(false) };
     let result = engine::restore(Some(t), &backups, task);
     finish_revert(state, Some(t), &t.name, Some(entry_id), result).map(|_| true)
@@ -306,7 +333,7 @@ pub fn revert_tweak(app: tauri::AppHandle, id: String, state: State<'_, TweakSta
     state.check_can_modify(t)?;
     let task = Task::new(&app, format!("tweak:{id}")).named(t.name.clone());
     task.step(format!("Deshaciendo {}…", t.name));
-    let pending = state.journal.lock().unwrap().pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
+    let pending = state.journal.lock().unwrap_or_else(|e| e.into_inner()).pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
     let result = match &pending {
         Some((_, backups)) => engine::restore(Some(t), backups, Some(&task)),
         None => engine::revert_to_defaults(t, Some(&task)),
@@ -317,7 +344,7 @@ pub fn revert_tweak(app: tauri::AppHandle, id: String, state: State<'_, TweakSta
 /// Deshace una entrada concreta del historial (ajuste, cambio de Inicio o app quitada).
 #[tauri::command(async)]
 pub fn revert_entry(app: tauri::AppHandle, entry_id: u64, state: State<'_, TweakState>) -> Result<OpResult, String> {
-    let e = state.journal.lock().unwrap().get(entry_id).cloned().ok_or("Entrada no encontrada")?;
+    let e = state.journal.lock().unwrap_or_else(|e| e.into_inner()).get(entry_id).cloned().ok_or("Entrada no encontrada")?;
     if !e.undoable || e.reverted {
         return Err("Esta entrada no se puede deshacer.".into());
     }
@@ -356,7 +383,7 @@ fn finish_revert(
     match result {
         Ok(()) => {
             if let Some(id) = applied_entry {
-                state.journal.lock().unwrap().mark_reverted(id);
+                state.journal.lock().unwrap_or_else(|e| e.into_inner()).mark_reverted(id);
             } else {
                 e.message = Some("Sin copia previa: restaurados valores de fábrica.".into());
             }
@@ -389,7 +416,7 @@ pub fn run_action(app: tauri::AppHandle, id: String, state: State<'_, TweakState
 
 #[tauri::command]
 pub fn get_journal(state: State<'_, TweakState>) -> Vec<Entry> {
-    state.journal.lock().unwrap().newest_first()
+    state.journal.lock().unwrap_or_else(|e| e.into_inner()).newest_first()
 }
 
 #[tauri::command(async)]
@@ -403,7 +430,7 @@ pub fn create_restore_point(app: tauri::AppHandle, state: State<'_, TweakState>)
     task.step("Creando punto de restauración (puede tardar 1–2 minutos)…");
     let result = restore::create(desc, &task);
     match &result {
-        Ok(()) => *state.last_restore_point.lock().unwrap() = Some(Instant::now()),
+        Ok(()) => *state.last_restore_point.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now()),
         Err(err) => {
             e.ok = false;
             e.message = Some(err.clone());

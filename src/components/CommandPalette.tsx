@@ -1,6 +1,6 @@
 import { AppWindow, CornerDownLeft, Search, SlidersHorizontal, Wrench, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NAV, type PageId } from "./Sidebar";
+import { NAV, pageLabel, type PageId } from "./Sidebar";
 import { useToast } from "./feedback";
 import { toolboxApi, tweaksApi, type ToolboxView } from "../lib/api";
 
@@ -69,7 +69,7 @@ export function CommandPalette({
   }, [open]);
 
   const entries = useMemo<Entry[]>(() => {
-    const out: Entry[] = NAV.map((n) => ({ key: `page:${n.id}`, kind: "page", title: n.label, search: norm(n.label), run: () => onNavigate(n.id) }));
+    const out: Entry[] = NAV.map((n) => ({ key: `page:${n.id}`, kind: "page", title: pageLabel(n.id), search: norm(`${pageLabel(n.id)} ${n.label}`), run: () => onNavigate(n.id) }));
     for (const a of actions) out.push({ key: `action:${a.id}`, kind: "action", title: a.title, subtitle: a.subtitle, search: norm(`${a.title} ${a.subtitle ?? ""}`), run: a.run });
     for (const t of tweaks ?? []) {
       const page = CATEGORY_PAGE[t.category];
@@ -78,7 +78,7 @@ export function CommandPalette({
         key: `tweak:${t.id}`,
         kind: t.category === "repair" ? "repair" : "tweak",
         title: t.name,
-        subtitle: NAV.find((n) => n.id === page)?.label,
+        subtitle: pageLabel(page),
         search: norm(`${t.name} ${t.description}`),
         run: () => onNavigate(page, t.id),
       });

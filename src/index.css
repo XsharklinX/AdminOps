@@ -88,6 +88,16 @@
 }
 
 /* Antes era un halo neón; ahora un borde de acento discreto. */
+/* Ajustes → Apariencia → Reducir animaciones. */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 @utility glow-neon {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-neon) 45%, transparent);
 }

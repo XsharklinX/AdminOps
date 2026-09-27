@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.21.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v1.1.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.21)
+## Hecho (v0.1 – v1.1)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -31,6 +31,10 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 19. Informe y cliente | 0.19 | Informe PDF rehecho con dos plantillas (cliente y técnica), presupuesto o recibo con impuestos, firma del cliente y del técnico, envío por correo con adjunto, garantías, recordatorios de mantenimiento, evolución entre visitas, icono del medidor con llave |
 | 20. Red y router | 0.20 | Mi red (conexión, router, DNS, IP pública), panel del router dentro de la app con acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT/CGNAT, QR de la Wi-Fi, dispositivos en la red con fabricante, nombres propios y aviso de nuevos |
 | 21. Caja fuerte y privacidad | 0.21 | Caja fuerte (.vhdx con BitLocker que se abre sin AdminOps), carpeta cifrada AES-256, borrado seguro y del espacio libre, checklist antes de vender, recuperar archivos borrados (Windows File Recovery), control parental (filtro DNS, sitios bloqueados, horario de uso) |
+| 22. La oficina completa | 0.22 | Inventario de equipos con veredicto (bien/mejorar/renovar) y exportación a Excel, acceso remoto (Escritorio remoto, Asistencia rápida, Wake-on-LAN), carpetas compartidas y permisos, IP duplicadas, mapa de la red en la ficha del cliente |
+| 23. Ajustes, rendimiento y red a fondo | 0.23 | Panel y diagnóstico más rápidos, Ajustes en pestañas, acento, tamaño, navegación a medida, bloqueo con PIN, copia de la configuración, identificación de dispositivos (tipo, marca, modelo), contraseña de la Wi-Fi, 26 herramientas nuevas |
+| 24. Versión 1.0 | 1.0 | Las páginas conservan su contenido (Recargar/F5), atajos propios, favoritas en el Panel, punto de restauración configurable, inicio con Windows, limpieza de datos antiguos, aviso de versiones nuevas |
+| 25. Pulido | 1.1 | Sin cierres por fallos internos, vigilancia de errores de Windows con explicación, acceso remoto a fondo (agenda, opciones, credenciales, AnyDesk/RustDesk/TeamViewer), navegación totalmente personalizable, 283 atajos |
 
 ### Fase 6 en detalle
 
@@ -84,7 +88,7 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
   Windows Server. Ejecutarla en Sandbox al menos una vez por versión.
 - **Dependencia de Edge para el PDF.** Si falta, el informe cae a HTML.
 - **Sin firma de código** (decisión: no se contempla por coste). SmartScreen avisará al instalar.
-- **Solo español** (inglés en la Fase 25).
+- **Solo español** (inglés en la Fase 28).
 - **Notificaciones en portable**: sin instalador, Windows puede mostrarlas con otro nombre de app.
 - **Tickets incrustados** usan la API "unstable" de Tauri (vistas hijas); si una versión futura la
   cambia, queda la ventana aparte como alternativa.
@@ -113,7 +117,7 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
 
 ---
 
-## Plan (v0.10 – v1.1)
+## Plan (v0.10 – v1.4)
 
 Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo**, sin costes
 (nada de certificados de pago ni servicios de suscripción). Cada fase es una versión.
@@ -351,20 +355,109 @@ desinstale AdminOps. Nueva área **Datos y familia** en la barra lateral.
   uso** por usuario local (cuadrícula de 7×24, plantillas; API de Windows, independiente del idioma).
 - Las contraseñas nunca se guardan ni aparecen en el registro de actividad.
 
-### Fase 22 — La oficina completa (v0.22)
+### Fase 22 — La oficina completa (v0.22) ✅
 
-**Prioridad: media.** Pasar de "un equipo" a "la red del cliente".
+Pasar de "un equipo" a "la red del cliente".
 
-- **Wake-on-LAN** y **conexión remota** (escritorio remoto, Asistencia rápida) desde la ficha del
-  equipo, del cliente o desde Dispositivos en la red.
-- **Carpetas compartidas y permisos** del equipo: qué se comparte y con quién.
-- **Inventario de la oficina**: cada equipo diagnosticado queda en la ficha del cliente con su
-  hardware, para ver el parque completo y qué equipos conviene renovar.
-- **Detectar IP duplicadas** y guardar el mapa de la red del cliente en su ficha.
+- **Inventario de equipos** (Soporte → Inventario): cada equipo que pasa por una sesión (o que se
+  añade con un clic) queda en la ficha de su cliente con fabricante, modelo, serie, CPU, memoria,
+  discos, gráfica, Windows, año aproximado (BIOS), TPM, nota de seguridad, batería, IP y MAC, y un
+  veredicto **Bien / Mejorar / Renovar** con los motivos (SSD, memoria, batería, disco con fallos,
+  Windows 10 sin soporte o sin TPM, antigüedad). Filtros, vista de todos los clientes y **exportar
+  a Excel (CSV)**.
+- **Acceso remoto** (Red → Acceso remoto): conectar por Escritorio remoto, abrir Asistencia rápida,
+  **encender equipos por la red** (Wake-on-LAN); para este equipo, activar/desactivar recibir
+  Escritorio remoto (con autenticación de red y firewall) y **prepararlo para Wake-on-LAN**
+  (paquete mágico en el adaptador por cable e inicio rápido desactivado).
+- Encender y conectar con un clic desde el **Inventario**, la **ficha del cliente** y
+  **Dispositivos en la red**.
+- **Carpetas compartidas** (Administración): qué se comparte, con qué permisos, archivos en uso y
+  quién está conectado; compartir una carpeta (todos o un usuario, lectura o escritura, también
+  permisos NTFS) y dejar de compartir; aviso y arreglo si la red es pública o el firewall bloquea.
+- **IP duplicadas**: conflictos que Windows detectó en los últimos 30 días, con el dispositivo que
+  usaba la misma IP.
+- **Mapa de la red** guardado en la ficha del cliente desde Dispositivos en la red.
 
-**Terminado cuando:** el técnico puede describir y mantener la red entera de un cliente pequeño.
+### Fase 23 — Ajustes, rendimiento y red a fondo (v0.23) ✅
 
-### Fase 23 — Negocio (v0.23)
+- **Rendimiento** (medido): lectura del Panel un 23 % más ligera (solo CPU y memoria de cada
+  proceso; discos cada 10 s) y diagnóstico un 15 % más rápido (5 procesos de PowerShell en lugar
+  de 3; los que sobran se cierran tras 3 minutos sin uso). Buscador, asistente y «Acerca de» se
+  cargan al abrirlos.
+- **Ajustes en pestañas**: General, Apariencia, Navegación, Seguridad, Informes y cobros, Acerca de.
+- **Personalización**: color de acento (6), tamaño de toda la interfaz (zoom), reducir animaciones,
+  página al abrir, cada cuánto se actualiza el Panel, avisos al terminar tareas largas.
+- **Navegación a medida**: reordenar y renombrar secciones, cambiar su icono, mover cada página a
+  otra sección, crear secciones propias, ocultar páginas (siguen en Ctrl+K) y restablecer. Las
+  páginas de versiones futuras aparecen solas en su sección de fábrica.
+- **Bloqueo con PIN o contraseña** al abrir y por inactividad (Ctrl+L o el candado para bloquear
+  al momento). Hash PBKDF2-HMAC-SHA256 con sal; espera tras 5 fallos. Si se olvida, se desbloquea
+  con la contraseña de Windows de la cuenta (máximo 3 intentos cada 15 min, para no bloquear la
+  cuenta de Windows).
+- **Copia de la configuración**: exportar e importar ajustes, portales de Tickets y preferencias.
+- **Dispositivos en la red a fondo**: tipo (router, PC, móvil, TV, Chromecast, impresora, cámara,
+  NAS, consola, altavoz, domótica…), fabricante, modelo, nombre anunciado, sistema aproximado,
+  servicios y puertos abiertos (UPnP/SSDP, mDNS/Bonjour, NetBIOS, puertos, título web y TTL, todo
+  en la red local), filtros por tipo, ficha de cada dispositivo y **contraseña de la Wi-Fi** de la
+  red actual (oculta hasta pulsar el ojo; por cable, la Wi-Fi guardada con el mismo nombre).
+- **Herramientas**: 26 accesos nuevos (variables de entorno, opciones de rendimiento, nombre del
+  equipo, BitLocker, historial de archivos, copia de Windows 7, apps del firewall, calibrar color,
+  licencia de Windows, informes de batería, Wi-Fi y energía, solucionadores, proxy, VPN, redes
+  Wi-Fi, gráficos por app, permisos de cámara y micrófono, inicio de sesión, sensor de
+  almacenamiento, accesibilidad, teclado en pantalla, lupa, mapa de caracteres, Sandbox, Hyper-V).
+
+### Fase 24 — Versión 1.0 (v1.0) ✅
+
+Pulido para el uso diario.
+
+- **Las páginas conservan su contenido**: al volver a Diagnóstico, Red, Tickets, etc. no se vuelve a
+  cargar ni analizar nada; cada página se mantiene viva (con su scroll y sus tareas) hasta pulsar
+  **Recargar** (o F5) o cerrar la app. Las páginas ocultas pausan sus lecturas en vivo, escuchas de
+  teclado y vistas web. Como mucho 12 a la vez (se descarta la menos usada).
+- **Atajos de teclado propios** para abrir cualquier página (Ctrl+Alt+letra, teclas F…), sin
+  interferir con AltGr ni con los atajos de la app o de Windows.
+- **Herramientas favoritas en el Panel** (las marcadas con ★ en Herramientas).
+- **Punto de restauración** configurable: solo antes de cambios con riesgo, antes de cualquier
+  cambio o nunca.
+- **Iniciar con Windows**, minimizada, mediante una tarea programada con permisos de administrador
+  (sin aviso de UAC en cada inicio de sesión).
+- **Datos antiguos**: uso de historial, análisis, informes y registros; limpieza manual por
+  antigüedad y automática al abrir. Nunca se borra lo que aún se puede deshacer, el último análisis ni
+  el de una sesión en curso; los informes van a la papelera.
+- **Aviso de versiones nuevas** consultando GitHub Releases (sin descargar ni instalar nada solo).
+- **1.0.1**: la identificación de dispositivos cerraba la app (esperaba un futuro desde dentro del
+  runtime de Tauri); ahora usa su propio hilo. Un fallo inesperado ya no cierra la app: se anota en el
+  registro («Fallo interno») y la tarea termina con error.
+
+### Fase 25 — Pulido (v1.1) ✅
+
+- **Revisión de fallos**: ningún error inesperado cierra la app (se anota en el registro como «Fallo
+  interno»); los bloqueos internos se recuperan tras un fallo en lugar de propagarlo (44 sitios);
+  el test de velocidad ya no puede fallar con una medición inválida (NaN).
+- **Vigilancia de errores de Windows**: mientras AdminOps está abierta, revisa el Visor de eventos
+  cada minuto y avisa (campana en la cabecera, aviso en la app y notificación de Windows si está en
+  segundo plano) de pantallazos azules, apagados inesperados, discos con sectores dañados o lentos
+  (con el modelo del disco), errores del sistema de archivos, errores de hardware (WHEA), driver de
+  vídeo reiniciado, conflictos de IP, servicios caídos, memoria agotada, fallos de Windows Update,
+  procesador limitado por temperatura, programas que se cierran o se cuelgan, amenazas de Defender y
+  poco espacio en el disco del sistema. Cada aviso explica qué es y qué hacer, con un botón a la
+  página donde se arregla. Agrupa repeticiones y se puede desactivar en Ajustes.
+- **Acceso remoto a fondo**: agenda de conexiones (Escritorio remoto, AnyDesk, RustDesk, TeamViewer)
+  con cliente y notas; Escritorio remoto con opciones (pantalla completa, monitores, portapapeles,
+  unidades, impresoras, sonido) y contraseña guardada en el Administrador de credenciales de Windows;
+  prueba de conexión con la causa si falla; ID de este equipo en AnyDesk/RustDesk/TeamViewer,
+  instalarlos y conectar a un ID; usuarios con permiso de Escritorio remoto.
+- **Navegación a medida**: arrastrar y soltar secciones y páginas, renombrar cualquier página,
+  selector visual de iconos (32), barra completa o solo iconos (con pestañas), a la izquierda o a la
+  derecha, tres anchos y densidades, secciones desplegadas (solo la actual / las que deje abiertas /
+  todas), qué hace el clic en una sección, pestañas bajo el título, **Favoritos** (★ también desde
+  la barra) y **Recientes**, y ocultar buscador, aviso de sesión o pie.
+- **Atajos**: 283 (antes 155), con grupos nuevos (problemas típicos, Escritorio remoto, Word,
+  Outlook, PowerPoint, reuniones de Teams/Zoom/Meet) y más en Windows, Explorador, navegador, Excel
+  y técnico. Una prueba comprueba que todos los que tienen botón «Probar» se pueden simular.
+- Las barras de «Guardar» ya no dependen de la posición ni del ancho de la barra lateral.
+
+### Fase 26 — Negocio (más adelante)
 
 **Prioridad: media.** Lo que ayuda a cobrar y a que el cliente vuelva.
 
@@ -373,7 +466,7 @@ desinstale AdminOps. Nueva área **Datos y familia** en la barra lateral.
 - **Avisos al abrir la app**: mantenimientos vencidos y garantías que terminan.
 - **Asistencia remota** apuntada en la sesión (código de Asistencia rápida o AnyDesk).
 
-### Fase 24 — Recetas (v0.24)
+### Fase 27 — Recetas (más adelante)
 
 **Prioridad: media.** Automatizar lo que el técnico repite en cada equipo.
 
@@ -384,20 +477,15 @@ desinstale AdminOps. Nueva área **Datos y familia** en la barra lateral.
 
 **Terminado cuando:** preparar un equipo nuevo es elegir una receta y esperar.
 
-### Fase 25 — Versión 1.0 y distribución (v1.0)
-
-**Prioridad: alta cuando lo anterior esté probado en uso real.**
+### Fase 28 — Distribución (más adelante)
 
 - **Actualización automática** con `tauri-plugin-updater` y GitHub Releases (clave de firma propia y
-  gratuita: la app solo instala actualizaciones publicadas por ti).
+  gratuita: la app solo instala actualizaciones publicadas por ti). La 1.0 ya avisa de versiones nuevas.
 - **Releases automáticas** desde la CI al crear una etiqueta `vX.Y.Z` (instalador + portable).
 - **Inglés** completo (interfaz, catálogos e informe) y selector de idioma.
 - **Página de descarga** en GitHub Pages con capturas, novedades y la nota sobre SmartScreen.
 
-**v1.0 cuando:** actualizaciones automáticas funcionando, inglés completo y dos semanas de uso real sin
-fallos graves.
-
-### Fase 26 — Preparación comercial (v1.1)
+### Fase 29 — Preparación comercial (más adelante)
 
 **Prioridad: a decidir** según cómo se quiera vender.
 

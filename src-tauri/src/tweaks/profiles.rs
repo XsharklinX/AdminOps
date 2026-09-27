@@ -201,7 +201,7 @@ pub fn list_profiles(app: tauri::AppHandle, state: State<'_, TweakState>) -> Vec
                     risk: t.risk,
                     status: status_of(&t.id),
                     supported: t.supported_on(state.build),
-                    has_backup: state.journal.lock().unwrap().pending_apply(&t.id).is_some(),
+                    has_backup: state.journal.lock().unwrap_or_else(|e| e.into_inner()).pending_apply(&t.id).is_some(),
                 })
                 .collect();
             ProfileView {
@@ -258,7 +258,7 @@ pub fn apply_profile(
         .collect();
     let restore_point_created = !skip_restore_point
         && pending.iter().any(|t| t.kind == Kind::Toggle)
-        && ensure_restore_point(&state, &task, &format!("perfil {}", p.name), None)?;
+        && ensure_restore_point(&state, &task, &format!("perfil {}", p.name), None, true)?;
 
     let mut reboot = false;
     let total = pending.len();

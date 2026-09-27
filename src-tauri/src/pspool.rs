@@ -17,7 +17,16 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Condvar, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
-const MAX_HOSTS: usize = 3;
+/// 5 procesos: el diagnóstico lanza ~10 consultas a la vez (medido: 15 % más rápido que con 3).
+/// Los que sobran de `KEEP_IDLE` se cierran tras `IDLE_TTL` sin uso, así que en reposo no gasta más.
+const MAX_HOSTS: usize = 5;
+const KEEP_IDLE: usize = 2;
+const IDLE_TTL: Duration = Duration::from_secs(180);
+
+/// Tamaño del pool (se puede forzar con ADMINOPS_PS_HOSTS para medir).
+fn max_hosts() -> usize {
+    std::env::var("ADMINOPS_PS_HOSTS").ok().and_then(|v| v.parse().ok()).filter(|n| (1..=8).contains(n)).unwrap_or(MAX_HOSTS)
+}
 const MARKER: &str = "\u{1e}ADMINOPS ";
 
 /// Bucle del proceso anfitrión. Cada línea de entrada es un script en base64
@@ -148,7 +157,8 @@ impl Host {
 }
 
 struct Pool {
-    idle: Vec<Host>,
+    /// Procesos libres y desde cuándo.
+    idle: Vec<(Host, Instant)>,
     live: usize,
 }
 
@@ -157,31 +167,55 @@ static POOL: LazyLock<(Mutex<Pool>, Condvar)> =
 
 fn acquire() -> Result<Host, String> {
     let (lock, cv) = &*POOL;
-    let mut pool = lock.lock().unwrap();
+    let mut pool = lock.lock().unwrap_or_else(|e| e.into_inner());
     loop {
-        if let Some(h) = pool.idle.pop() {
+        if let Some((h, _)) = pool.idle.pop() {
             return Ok(h);
         }
-        if pool.live < MAX_HOSTS {
+        if pool.live < max_hosts() {
             pool.live += 1;
             drop(pool);
             return Host::spawn().inspect_err(|_| {
-                lock.lock().unwrap().live -= 1;
+                lock.lock().unwrap_or_else(|e| e.into_inner()).live -= 1;
                 cv.notify_one();
             });
         }
-        pool = cv.wait(pool).unwrap();
+        pool = cv.wait(pool).unwrap_or_else(|e| e.into_inner());
     }
 }
 
 fn release(host: Option<Host>) {
     let (lock, cv) = &*POOL;
-    let mut pool = lock.lock().unwrap();
+    let mut pool = lock.lock().unwrap_or_else(|e| e.into_inner());
     match host {
-        Some(h) => pool.idle.push(h),
+        Some(h) => pool.idle.push((h, Instant::now())),
         None => pool.live -= 1,
     }
     cv.notify_one();
+}
+
+/// Cierra los procesos que llevan tiempo sin usarse (dejando `KEEP_IDLE`).
+fn reap() {
+    let (lock, _) = &*POOL;
+    let expired: Vec<Host> = {
+        let mut pool = lock.lock().unwrap_or_else(|e| e.into_inner());
+        // Los más recientes quedan al final (pop los reutiliza primero).
+        let keep_from = pool.idle.len().saturating_sub(KEEP_IDLE);
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < keep_from.min(pool.idle.len()) {
+            if pool.idle[i].1.elapsed() >= IDLE_TTL {
+                out.push(pool.idle.remove(i).0);
+                pool.live -= 1;
+            } else {
+                i += 1;
+            }
+        }
+        out
+    };
+    for h in expired {
+        h.kill();
+    }
 }
 
 /// Ejecuta un script de consulta en un proceso persistente.
@@ -217,6 +251,10 @@ pub fn query(script: &str, timeout: Option<Duration>, detail: &str) -> Result<St
 pub fn warm_up() {
     std::thread::spawn(|| {
         let _ = query("1", Some(Duration::from_secs(30)), "calentamiento");
+        loop {
+            std::thread::sleep(Duration::from_secs(60));
+            reap();
+        }
     });
 }
 

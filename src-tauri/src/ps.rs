@@ -65,11 +65,11 @@ fn kill_tree(pid: u32) {
 
 /// Cancela todo lo que se esté ejecutando bajo `task`. Devuelve si había algo.
 pub fn cancel(task: &str) -> bool {
-    let pids = RUNNING.lock().unwrap().get(task).cloned().unwrap_or_default();
+    let pids = RUNNING.lock().unwrap_or_else(|e| e.into_inner()).get(task).cloned().unwrap_or_default();
     if pids.is_empty() {
         return false;
     }
-    CANCELLED.lock().unwrap().insert(task.to_string());
+    CANCELLED.lock().unwrap_or_else(|e| e.into_inner()).insert(task.to_string());
     log::warn!("Cancelando tarea {task} (pids {pids:?})");
     for pid in pids {
         kill_tree(pid);
@@ -79,11 +79,11 @@ pub fn cancel(task: &str) -> bool {
 
 /// Marca una tarea como terminada (limpia el estado de cancelación).
 pub fn finish_task(task: &str) {
-    CANCELLED.lock().unwrap().remove(task);
+    CANCELLED.lock().unwrap_or_else(|e| e.into_inner()).remove(task);
 }
 
 pub fn is_cancelled(task: &str) -> bool {
-    CANCELLED.lock().unwrap().contains(task)
+    CANCELLED.lock().unwrap_or_else(|e| e.into_inner()).contains(task)
 }
 
 pub const CANCELLED_MSG: &str = "Cancelado por el usuario.";
@@ -104,7 +104,7 @@ fn run(mut cmd: Command, label: &str, detail: &str, opts: Opts) -> Result<String
     let mut child = cmd.spawn().map_err(|e| format!("No se pudo iniciar {label}: {e}"))?;
     let pid = child.id();
     if let Some(t) = opts.task {
-        RUNNING.lock().unwrap().entry(t.to_string()).or_default().push(pid);
+        RUNNING.lock().unwrap_or_else(|e| e.into_inner()).entry(t.to_string()).or_default().push(pid);
     }
 
     // Leer en hilos aparte: si la salida llena el buffer del pipe y nadie la
@@ -138,7 +138,7 @@ fn run(mut cmd: Command, label: &str, detail: &str, opts: Opts) -> Result<String
     };
 
     if let Some(t) = opts.task {
-        if let Some(v) = RUNNING.lock().unwrap().get_mut(t) {
+        if let Some(v) = RUNNING.lock().unwrap_or_else(|e| e.into_inner()).get_mut(t) {
             v.retain(|p| *p != pid);
         }
     }

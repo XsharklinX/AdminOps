@@ -1,6 +1,7 @@
-import { BellRing, ExternalLink, History, Mail, Monitor, PenLine, Plus, Save, Search, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { BellRing, ExternalLink, History, Mail, Monitor, Network, PenLine, Plus, Save, Search, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
+import { inventoryLines, MachineActions, VerdictChip } from "../components/inventory";
 import { SendReportModal } from "../components/service";
 import { Button, Card, inputClass } from "../components/ui";
 import { diagApi, workApi, type Client, type SessionRecord, type VisitMetrics } from "../lib/api";
@@ -9,7 +10,7 @@ import { bytes, money } from "../lib/format";
 const DAY = 86400;
 const date = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { dateStyle: "medium" });
 const now = () => Date.now() / 1000;
-const EMPTY = { id: "", name: "", contact: "", phone: "", email: "", address: "", notes: "", created: 0, machines: [], sessions: [] } as Client;
+const EMPTY = { id: "", name: "", contact: "", phone: "", email: "", address: "", notes: "", created: 0, machines: [], sessions: [], network: null } as Client;
 
 /** Próximo mantenimiento del cliente (el de su última visita). */
 const nextOf = (c: Client) => c.sessions[0]?.nextMaintenance ?? null;
@@ -248,19 +249,58 @@ export function Clients() {
 
                 <Evolution sessions={form.sessions} />
 
+                {form.network && form.network.devices.length > 0 && (
+                  <Card title={`Red de la oficina · ${form.network.devices.length} dispositivos`} icon={<Network size={14} />}>
+                    <p className="mb-2 text-xs text-mute">
+                      {form.network.name && `${form.network.name} · `}router {form.network.gateway} · guardado el {date(form.network.saved)}
+                    </p>
+                    <ul className="grid grid-cols-1 gap-x-6 gap-y-0.5 text-xs md:grid-cols-2">
+                      {form.network.devices.map((d) => (
+                        <li key={d.ip + d.mac} className="flex gap-2">
+                          <span className="w-24 shrink-0 font-mono text-ink">{d.ip}</span>
+                          <span className="truncate text-dim">{d.alias || d.name || d.vendor || d.mac || "—"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+
                 <Card title={`Equipos · ${form.machines.length}`} icon={<Monitor size={14} />}>
                   {form.machines.length === 0 ? (
-                    <p className="text-sm text-mute">Los equipos se registran al finalizar una sesión de servicio.</p>
+                    <p className="text-sm text-mute">Los equipos se registran al finalizar una sesión de servicio o desde Soporte → Inventario.</p>
                   ) : (
-                    <ul className="space-y-1 text-sm">
+                    <ul className="divide-y divide-line/60 text-sm">
                       {form.machines.map((m) => (
-                        <li key={m.host} className="flex items-center gap-3">
-                          <span className="font-mono text-ink">{m.host}</span>
-                          <span className="min-w-0 flex-1 truncate text-xs text-dim" title={m.hardware}>
-                            {m.os}
-                            {m.hardware && <span className="block truncate text-[11px] text-mute">{m.hardware}</span>}
-                          </span>
-                          <span className="ml-auto text-xs text-mute">última visita {date(m.lastSeen)}</span>
+                        <li key={m.host} className="flex items-start gap-3 py-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-ink">{m.host}</span>
+                              <VerdictChip inv={m.inventory} />
+                            </div>
+                            {m.inventory ? (
+                              <>
+                                {inventoryLines(m.inventory).map((l) => (
+                                  <div key={l} className="truncate text-xs text-dim">
+                                    {l}
+                                  </div>
+                                ))}
+                                {m.inventory.reasons.map((r) => (
+                                  <div key={r} className="text-xs text-ink">
+                                    → {r}
+                                  </div>
+                                ))}
+                              </>
+                            ) : (
+                              <div className="truncate text-xs text-dim" title={m.hardware}>
+                                {m.os}
+                                {m.hardware && ` · ${m.hardware}`}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <span className="text-xs text-mute">última visita {date(m.lastSeen)}</span>
+                            <MachineActions machine={m} />
+                          </div>
                         </li>
                       ))}
                     </ul>

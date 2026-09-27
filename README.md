@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.21.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-1.1.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -95,6 +95,8 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | **Tickets** | Abre la web de tickets de tu empresa (intranet, GLPI, osTicket…) dentro de AdminOps, con la sesión recordada. |
 | **Mi red y router** | La red actual (IP, router, DNS, IP pública), el panel del router dentro de AdminOps con su acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT y QR para conectar un móvil. |
 | **Dispositivos en la red** | Todo lo conectado a la red local con IP, MAC, fabricante y nombre; ponles nombre y detecta los nuevos. |
+| **Acceso remoto** | Agenda de conexiones, Escritorio remoto con opciones y contraseña guardada en Windows, prueba de conexión, AnyDesk/RustDesk/TeamViewer con el ID de este equipo, Asistencia rápida y encendido por red. |
+| **Avisos de errores de Windows** | Mientras está abierta, detecta pantallazos azules, discos que fallan, programas que se cierran, falta de memoria o espacio, amenazas… y explica qué son y qué hacer. |
 | **Caja fuerte** | Una unidad cifrada con BitLocker y contraseña guardada en un archivo que se abre con doble clic, aunque no esté AdminOps. En Windows Home, carpetas cifradas en .zip AES-256. |
 | **Borrado seguro** | Borra archivos sin posibilidad de recuperarlos, sobrescribe el espacio libre y guía para dejar el equipo listo antes de venderlo o donarlo. |
 | **Recuperar archivos** | Recupera archivos borrados con Windows File Recovery de Microsoft, sin tocar la consola. |
@@ -102,8 +104,10 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | **Dominio** | Estado del dominio, comprobaciones previas, unir o sacar el equipo, reparar la relación de confianza y cambiar el nombre. |
 | **Sesión de servicio** | Registra el trabajo en un equipo: diagnóstico inicial, cambios, checklist, presupuesto o recibo y cierre con la firma del cliente en pantalla. |
 | **Clientes** | Fichas de clientes y sus equipos, historial de visitas, evolución entre visitas, garantías vigentes y recordatorios de mantenimiento. |
+| **Inventario de equipos** | El parque de cada cliente con su hardware y qué conviene hacer con cada equipo (seguir, mejorar o renovar), exportable a Excel. |
 | **Herramientas** | ~90 accesos directos a CMD, services.msc, ncpa.cpl, regedit, visor de eventos, BIOS/UEFI… con buscador, favoritos y tus propios accesos. Incluye la ficha del equipo (serie y clave OEM) para copiar. |
 | **Usuarios locales** | Crea usuarios, cambia contraseñas, hazlos administradores o estándar, desactívalos o elimínalos con su perfil. Funciona también en Windows Home. |
+| **Carpetas compartidas** | Qué comparte el equipo y con quién, quién está conectado; compartir o dejar de compartir en un clic. |
 | **Copia de datos** | Copia Escritorio, Documentos, Imágenes, marcadores y redes Wi-Fi a un USB y restáuralos en el equipo nuevo sin sobrescribir nada. |
 | **Impresoras** | Estado, atascos, vaciar la cola, página de prueba y quitar impresoras fantasma. |
 | **Reparaciones** | SFC, DISM, reinicio de red, Windows Update, cola de impresión, Explorador, hora, caché de iconos y prueba de RAM. |

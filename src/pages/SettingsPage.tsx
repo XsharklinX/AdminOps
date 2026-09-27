@@ -1,21 +1,57 @@
-import { ArrowDown, ArrowUp, BadgeCheck, ImagePlus, PenLine, Plus, Receipt, Save, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowDown, ArrowUp, BadgeCheck, Download, ImagePlus, PenLine, Plus, Receipt, Save, Trash2, Upload, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import logo from "../assets/logo.svg";
 import { useToast } from "../components/feedback";
 import { SignaturePad } from "../components/service";
-import { Card } from "../components/ui";
-import { appApi, workApi, type AppInfo, type Settings } from "../lib/api";
+import { NAV } from "../components/Sidebar";
+import { Button, Card, inputClass } from "../components/ui";
+import { appApi, appcareApi, configApi, workApi, type AppInfo, type DataUsage, type Settings } from "../lib/api";
+import { bytes } from "../lib/format";
+import { ACCENTS, applyAppearance, exportPrefs, importPrefs, setPrefs, usePrefs, ZOOMS, type Accent } from "../lib/prefs";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
+import { LockSettings } from "./settings/LockSettings";
+import { NavEditor } from "./settings/NavEditor";
+import { ShortcutEditor } from "./settings/ShortcutEditor";
+
+const TABS = [
+  ["general", "General"],
+  ["appearance", "Apariencia"],
+  ["navigation", "Navegación"],
+  ["security", "Seguridad"],
+  ["reports", "Informes y cobros"],
+  ["about", "Acerca de"],
+] as const;
+type Tab = (typeof TABS)[number][0];
+const TAB_KEY = "adminops.settingsTab";
+
+function readTab(): Tab {
+  try {
+    const t = localStorage.getItem(TAB_KEY);
+    if (TABS.some(([id]) => id === t)) return t as Tab;
+  } catch {
+    /* sin almacenamiento */
+  }
+  return "general";
+}
 
 export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
   const [s, setS] = useState<Settings | null>(null);
-  const [newItem, setNewItem] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [tab, setTab] = useState<Tab>(readTab);
   const toast = useToast();
 
   useEffect(() => {
     workApi.settings().then(setS);
   }, []);
+
+  const pickTab = (t: Tab) => {
+    setTab(t);
+    try {
+      localStorage.setItem(TAB_KEY, t);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
 
   if (!s) return <p className="p-8 font-mono text-sm text-mute">Cargando…</p>;
 
@@ -28,11 +64,365 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
     try {
       await workApi.saveSettings(s);
       setDirty(false);
-      toast("ok", "Ajustes guardados. Se usarán en los próximos informes.");
+      toast("ok", "Ajustes guardados.");
     } catch (e) {
       toast("error", String(e));
     }
   };
+
+  return (
+    <div className="mx-auto max-w-5xl p-6">
+      <div className="mb-5 flex flex-wrap gap-1 border-b border-line">
+        {TABS.map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => pickTab(id)}
+            className={`-mb-px border-b-2 px-3.5 py-2 text-sm transition-colors ${tab === id ? "border-neon font-medium text-ink" : "border-transparent text-dim hover:text-ink"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "general" && <General s={s} set={set} onImported={() => workApi.settings().then(setS)} />}
+      {tab === "appearance" && <Appearance />}
+      {tab === "navigation" && (
+        <div className="space-y-4">
+          <ShortcutEditor />
+          <NavEditor />
+        </div>
+      )}
+      {tab === "security" && <LockSettings />}
+      {tab === "reports" && <Reports s={s} set={set} />}
+      {tab === "about" && <About appInfo={appInfo} />}
+
+      {dirty && (
+        <div className="sticky bottom-0 z-30 -mx-6 -mb-6 mt-6 border-t border-line bg-panel px-6 py-3">
+          <div className="mx-auto flex max-w-5xl items-center justify-between">
+            <span className="text-sm text-warn">Cambios sin guardar</span>
+            <Button onClick={save}>
+              <Save size={14} /> Guardar ajustes
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type SettingsProps = { s: Settings; set: (patch: Partial<Settings>) => void };
+
+function Row({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-4 border-t border-line/60 py-3 first:border-t-0 first:pt-0">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm text-ink">{title}</div>
+        {sub && <div className="text-xs text-mute">{sub}</div>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+const selectClass = "rounded-md border border-line bg-void/60 px-3 py-1.5 text-sm text-ink outline-none focus:border-neon/50";
+
+function General({ s, set, onImported }: SettingsProps & { onImported: () => void }) {
+  const prefs = usePrefs();
+  const toast = useToast();
+  const pages = NAV.filter((n) => n.id !== "settings");
+
+  const doExport = async () => {
+    try {
+      const p = await configApi.export(exportPrefs());
+      if (p) toast("ok", "Configuración exportada.");
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+  const doImport = async () => {
+    try {
+      const prefsIn = await configApi.import();
+      if (prefsIn === null) return;
+      importPrefs(prefsIn);
+      onImported();
+      window.dispatchEvent(new Event("adminops-lock"));
+      toast("ok", "Configuración importada.");
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card title="Inicio y actualización">
+        <Row title="Página al abrir AdminOps" sub="La que se muestra al arrancar.">
+          <select value={prefs.startPage} onChange={(e) => setPrefs({ startPage: e.target.value as typeof prefs.startPage })} className={selectClass}>
+            <option value="last">La última que usé</option>
+            {pages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <Row title="Actualización del Panel" sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo.">
+          <select value={prefs.refreshMs} onChange={(e) => setPrefs({ refreshMs: Number(e.target.value) })} className={selectClass}>
+            <option value={1000}>Cada segundo</option>
+            <option value={2000}>Cada 2 segundos</option>
+            <option value={5000}>Cada 5 segundos</option>
+          </select>
+        </Row>
+        <Row title="Vigilar errores de Windows" sub="Mientras AdminOps está abierta, revisa el Visor de eventos cada minuto y avisa (campana de arriba y notificación) de pantallazos, discos con fallos, programas que se cierran, falta de memoria o espacio…">
+          <input type="checkbox" checked={s.watchWindows} onChange={(e) => set({ watchWindows: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+        </Row>
+        <Row title="Avisar al terminar tareas largas" sub="Notificación de Windows cuando una tarea de más de 20 s acaba con AdminOps en segundo plano.">
+          <input type="checkbox" checked={s.notifyTasks} onChange={(e) => set({ notifyTasks: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+        </Row>
+      </Card>
+
+      <Card title="Cambios en el sistema">
+        <Row title="Punto de restauración antes de cambiar el sistema" sub="Permite volver atrás con Restaurar sistema si algo sale mal. Crear uno tarda 1–2 minutos (como mucho uno cada 30 min).">
+          <select value={s.restorePoints} onChange={(e) => set({ restorePoints: e.target.value as Settings["restorePoints"] })} className={selectClass}>
+            <option value="risky">Solo antes de cambios con riesgo</option>
+            <option value="always">Antes de cualquier cambio</option>
+            <option value="never">Nunca (no recomendado)</option>
+          </select>
+        </Row>
+        <Autostart />
+      </Card>
+
+      <DataCare s={s} set={set} />
+
+      <Card title="Red y dominio">
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Dominio habitual (se propone al unir equipos)</span>
+          <input value={s.defaultDomain} onChange={(e) => set({ defaultDomain: e.target.value })} placeholder="p. ej. empresa.local" className={inputClass} />
+        </label>
+      </Card>
+
+      <Card title="Copia de la configuración">
+        <p className="mb-3 text-sm text-dim">
+          Guarda en un archivo tus ajustes (marca, precios, checklist, firma), los portales de Tickets y las preferencias de la interfaz, para llevarlos a
+          otro equipo o recuperarlos. No incluye contraseñas ni clientes.
+        </p>
+        <div className="flex gap-2">
+          <Button kind="ghost" onClick={doExport}>
+            <Download size={14} /> Exportar
+          </Button>
+          <Button kind="ghost" onClick={doImport}>
+            <Upload size={14} /> Importar
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function Autostart() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const toast = useToast();
+  useEffect(() => {
+    appcareApi.autostart().then(setOn).catch(() => setOn(false));
+  }, []);
+  const toggle = async (v: boolean) => {
+    try {
+      await appcareApi.setAutostart(v);
+      setOn(v);
+      toast("ok", v ? "AdminOps se abrirá minimizada al iniciar sesión." : "AdminOps ya no se abre al iniciar sesión.");
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+  return (
+    <Row title="Abrir AdminOps al iniciar Windows" sub="Minimizada en la barra de tareas, sin pedir permiso de administrador cada vez. En modo portable, si mueves la carpeta, vuelve a activarlo.">
+      <input type="checkbox" checked={!!on} disabled={on === null} onChange={(e) => toggle(e.target.checked)} className="size-4 accent-[var(--color-neon)]" />
+    </Row>
+  );
+}
+
+function DataCare({ s, set }: SettingsProps) {
+  const [usage, setUsage] = useState<DataUsage | null>(null);
+  const [months, setMonths] = useState(6);
+  const [parts, setParts] = useState({ journal: true, snapshots: true, reports: false });
+  const [busy, setBusy] = useState(false);
+  const [update, setUpdate] = useState<string | null>(null);
+  const toast = useToast();
+  const load = useCallback(() => {
+    appcareApi.usage().then(setUsage).catch(() => {});
+  }, []);
+  useEffect(load, [load]);
+
+  const clean = async () => {
+    setBusy(true);
+    try {
+      const r = await appcareApi.cleanup(months, parts.journal, parts.snapshots, parts.reports);
+      toast("ok", `Limpieza hecha: ${r.journal} entradas del historial, ${r.snapshots} análisis y ${r.reports} informes (${bytes(r.freed)}).`);
+      load();
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const checkNow = async () => {
+    setUpdate("Buscando…");
+    try {
+      const u = await appcareApi.checkUpdate();
+      setUpdate(u.newer ? `Hay una versión nueva: ${u.latest}. Aparece en la barra lateral.` : `Tienes la última versión (${u.current}).`);
+      if (u.newer) appcareApi.openRelease(u.url).catch(() => {});
+    } catch (e) {
+      setUpdate(String(e));
+    }
+  };
+
+  const check = (key: keyof typeof parts, label: string) => (
+    <label className="flex items-center gap-2 text-sm text-dim">
+      <input type="checkbox" checked={parts[key]} onChange={(e) => setParts({ ...parts, [key]: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+      {label}
+    </label>
+  );
+
+  return (
+    <>
+      <Card title="Datos de AdminOps">
+        {usage && (
+          <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
+            <span className="text-dim">
+              Historial: <span className="text-ink">{usage.journalEntries} entradas</span>
+            </span>
+            <span className="text-dim">
+              Análisis: <span className="text-ink">{usage.snapshots} · {bytes(usage.snapshotsBytes)}</span>
+            </span>
+            <span className="text-dim">
+              Informes: <span className="text-ink">{usage.reports} · {bytes(usage.reportsBytes)}</span>
+            </span>
+            <span className="text-dim">
+              Registros: <span className="text-ink">{bytes(usage.logsBytes)}</span>
+            </span>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-dim">Borrar lo que tenga más de</span>
+          <select value={months} onChange={(e) => setMonths(Number(e.target.value))} className={selectClass}>
+            {[3, 6, 12, 24].map((m) => (
+              <option key={m} value={m}>
+                {m} meses
+              </option>
+            ))}
+          </select>
+          {check("journal", "Historial")}
+          {check("snapshots", "Análisis")}
+          {check("reports", "Informes (a la papelera)")}
+          <Button kind="ghost" onClick={clean} disabled={busy || (!parts.journal && !parts.snapshots && !parts.reports)}>
+            Limpiar ahora
+          </Button>
+        </div>
+        <p className="mt-2 text-[11px] text-mute">
+          Nunca se borran los ajustes aplicados que aún se pueden deshacer, el último análisis ni el de una sesión en curso. Los informes van a la papelera.
+        </p>
+        <div className="mt-3 border-t border-line/60 pt-3">
+          <Row title="Limpieza automática al abrir" sub="Una vez al día como mucho: historial, análisis e informes más antiguos que lo elegido.">
+            <select value={s.autoCleanupMonths} onChange={(e) => set({ autoCleanupMonths: Number(e.target.value) })} className={selectClass}>
+              <option value={0}>Desactivada</option>
+              {[6, 12, 24].map((m) => (
+                <option key={m} value={m}>
+                  Más de {m} meses
+                </option>
+              ))}
+            </select>
+          </Row>
+        </div>
+      </Card>
+
+      <Card title="Actualizaciones">
+        <Row title="Avisar de versiones nuevas" sub="Al abrir, consulta en GitHub si hay una versión nueva de AdminOps y lo indica en la barra lateral. No descarga ni instala nada solo.">
+          <input type="checkbox" checked={s.checkUpdates} onChange={(e) => set({ checkUpdates: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+        </Row>
+        <div className="flex items-center gap-3 pt-1">
+          <Button kind="ghost" onClick={checkNow}>
+            Buscar ahora
+          </Button>
+          {update && <span className="text-xs text-dim">{update}</span>}
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function Appearance() {
+  const prefs = usePrefs();
+  const [theme, setThemeState] = useState<Theme>(getTheme);
+  const pick = (t: Theme) => {
+    setTheme(t);
+    setThemeState(t);
+    applyAppearance();
+  };
+  const option = (t: Theme, title: string, sub: string, bg: string, bar: string) => (
+    <button
+      onClick={() => pick(t)}
+      aria-pressed={theme === t}
+      className={`flex flex-1 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${theme === t ? "border-neon" : "border-line hover:border-line-2"}`}
+    >
+      <span className="flex h-10 w-14 shrink-0 flex-col justify-end gap-1 rounded-md border border-line-2 p-1.5" style={{ background: bg }}>
+        <span className="h-1 w-8 rounded-full" style={{ background: bar }} />
+        <span className="h-1 w-5 rounded-full" style={{ background: bar, opacity: 0.5 }} />
+      </span>
+      <span>
+        <span className="block text-sm font-medium text-ink">{title}</span>
+        <span className="block text-xs text-mute">{sub}</span>
+      </span>
+    </button>
+  );
+  return (
+    <div className="space-y-4">
+      <Card title="Tema">
+        <div className="flex gap-3">
+          {option("dark", "Oscuro", "Menos brillo en talleres y de noche", "#111315", "#a5acb5")}
+          {option("light", "Claro", "Más legible con mucha luz y en oficinas", "#f6f6f4", "#4b5058")}
+        </div>
+      </Card>
+      <Card title="Color de acento">
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(ACCENTS) as Accent[]).map((a) => (
+            <button
+              key={a}
+              onClick={() => setPrefs({ accent: a })}
+              aria-pressed={prefs.accent === a}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${prefs.accent === a ? "border-neon text-ink" : "border-line text-dim hover:border-line-2"}`}
+            >
+              <span className="size-4 rounded-full" style={{ background: theme === "light" ? ACCENTS[a].light : ACCENTS[a].dark }} />
+              {ACCENTS[a].label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] text-mute">Se usa en la selección, los botones principales y los enlaces. Los estados (bien, aviso, error) no cambian.</p>
+      </Card>
+      <Card title="Tamaño y movimiento">
+        <Row title="Tamaño de la interfaz" sub="Textos, botones y espacios, todo a la vez.">
+          <div className="inline-flex rounded-lg border border-line bg-void p-0.5">
+            {ZOOMS.map((z) => (
+              <button
+                key={z.value}
+                onClick={() => setPrefs({ zoom: z.value })}
+                className={`rounded-md px-3 py-1.5 text-[13px] ${prefs.zoom === z.value ? "bg-panel-2 font-medium text-ink" : "text-dim hover:text-ink"}`}
+              >
+                {z.label}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row title="Reducir animaciones" sub="Quita transiciones y giros (más cómodo si marean o en equipos lentos).">
+          <input type="checkbox" checked={prefs.reduceMotion} onChange={(e) => setPrefs({ reduceMotion: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+        </Row>
+      </Card>
+    </div>
+  );
+}
+
+function Reports({ s, set }: SettingsProps) {
+  const [newItem, setNewItem] = useState("");
+  const toast = useToast();
 
   const pickLogo = (file: File | undefined) => {
     if (!file) return;
@@ -53,6 +443,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
     set({ checklist: list });
   };
 
+  const input = inputClass;
   const numField = (key: "taxRate" | "laborWarrantyDays" | "maintenanceMonths" | "quoteValidityDays", label: string, max: number) => (
     <label className="block">
       <span className="mb-1 block truncate text-xs text-dim" title={label}>
@@ -70,8 +461,6 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
     </label>
   );
   const setItem = (i: number, patch: Partial<Settings["catalog"][number]>) => set({ catalog: s.catalog.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
-
-  const input = "w-full rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50";
   const field = (key: keyof Settings, label: string, placeholder = "") => (
     <label className="block">
       <span className="mb-1 block text-xs text-dim">{label}</span>
@@ -80,7 +469,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
   );
 
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-12 gap-4 p-6 pb-20">
+    <div className="grid grid-cols-12 gap-4">
       <Card title="Tu marca en los informes" className="col-span-12 lg:col-span-7">
         <div className="grid grid-cols-2 gap-3">
           {field("technician", "Técnico", "Tu nombre")}
@@ -88,7 +477,6 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
           {field("phone", "Teléfono")}
           {field("email", "Correo")}
           <div className="col-span-2">{field("website", "Web o redes")}</div>
-          <div className="col-span-2">{field("defaultDomain", "Dominio habitual (se propone al unir equipos)", "p. ej. empresa.local")}</div>
           <label className="col-span-2 block">
             <span className="mb-1 block text-xs text-dim">Condiciones / garantía (pie del informe)</span>
             <textarea
@@ -127,11 +515,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
           {s.checklist.map((item, i) => (
             <li key={i} className="group flex items-center gap-2 rounded-md px-2 py-1 hover:bg-panel-2">
               <span className="w-5 font-mono text-[11px] text-mute">{i + 1}</span>
-              <input
-                value={item}
-                onChange={(e) => set({ checklist: s.checklist.map((x, j) => (j === i ? e.target.value : x)) })}
-                className="flex-1 bg-transparent text-sm text-ink outline-none"
-              />
+              <input value={item} onChange={(e) => set({ checklist: s.checklist.map((x, j) => (j === i ? e.target.value : x)) })} className="flex-1 bg-transparent text-sm text-ink outline-none" />
               <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                 <button onClick={() => move(i, -1)} className="text-mute hover:text-ink">
                   <ArrowUp size={12} />
@@ -161,6 +545,11 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
           </button>
         </form>
         <p className="mt-2 text-[11px] text-mute">Se copia en cada sesión nueva; las sesiones en curso no cambian.</p>
+      </Card>
+
+      <Card title="Tu firma" icon={<PenLine size={14} />} className="col-span-12 lg:col-span-5">
+        <SignaturePad value={s.techSignature} onChange={(techSignature) => set({ techSignature })} height={130} />
+        <p className="mt-1 text-[11px] text-mute">Aparece sobre tu nombre en todos los informes. Opcional.</p>
       </Card>
 
       <Card title="Presupuestos, recibos y garantías" icon={<Receipt size={14} />} className="col-span-12">
@@ -231,102 +620,61 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
           En la sesión o el informe se añaden con un clic. Las piezas pueden llevar su propia garantía, que aparece en el recibo y en la ficha del cliente.
         </p>
       </Card>
-
-      <Card title="Tu firma" icon={<PenLine size={14} />} className="col-span-12 lg:col-span-5">
-        <SignaturePad value={s.techSignature} onChange={(techSignature) => set({ techSignature })} height={130} />
-        <p className="mt-1 text-[11px] text-mute">Aparece sobre tu nombre en todos los informes. Opcional.</p>
-      </Card>
-
-      <Appearance />
-
-      <Card title="Acerca de" icon={<BadgeCheck size={14} />} className="col-span-12 lg:col-span-5">
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="" className="size-12" />
-          <div>
-            <div className="font-semibold">AdminOps v{appInfo?.version}</div>
-            <div className="text-sm text-dim">
-              by <span className="font-semibold text-neon">David Bonilla</span>
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          {(
-            [
-              ["data", "Carpeta de datos"],
-              ["reports", "Carpeta de informes"],
-              ["logs", "Registros"],
-            ] as const
-          ).map(([kind, label]) => (
-            <button
-              key={kind}
-              onClick={() => appApi.openFolder(kind).catch((e) => toast("error", String(e)))}
-              className="rounded-md border border-line-2 px-2.5 py-1 text-dim hover:border-neon/40 hover:text-neon"
-            >
-              {label} →
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 border-t border-line/60 pt-3">
-          <button
-            onClick={() =>
-              appApi
-                .supportPackage()
-                .then(() => toast("ok", "Paquete de soporte creado: se abrió su carpeta."))
-                .catch((e) => toast("error", String(e)))
-            }
-            className="rounded-md border border-neon/40 px-3 py-1.5 text-xs text-neon hover:bg-neon/10"
-          >
-            Crear paquete de soporte
-          </button>
-          <p className="mt-1.5 text-[11px] text-mute">
-            Un .zip con el registro de actividad, el último diagnóstico y la versión, para enviarlo si algo falla. Puede contener el nombre del
-            equipo y del usuario: revísalo antes de compartirlo.
-          </p>
-        </div>
-      </Card>
-
-      {dirty && (
-        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
-          <div className="mx-auto flex max-w-5xl items-center justify-between">
-            <span className="text-sm text-warn">Cambios sin guardar</span>
-            <button onClick={save} className="flex items-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-4 py-1.5 text-sm font-medium text-neon hover:bg-neon/20">
-              <Save size={14} /> Guardar ajustes
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-/** Tema oscuro o claro (se aplica al momento). */
-function Appearance() {
-  const [theme, set] = useState<Theme>(getTheme);
-  const pick = (t: Theme) => {
-    setTheme(t);
-    set(t);
-  };
-  const option = (t: Theme, title: string, sub: string, bg: string, bar: string) => (
-    <button
-      onClick={() => pick(t)}
-      aria-pressed={theme === t}
-      className={`flex flex-1 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${theme === t ? "border-neon" : "border-line hover:border-line-2"}`}
-    >
-      <span className="flex h-10 w-14 shrink-0 flex-col justify-end gap-1 rounded-md border border-line-2 p-1.5" style={{ background: bg }}>
-        <span className="h-1 w-8 rounded-full" style={{ background: bar }} />
-        <span className="h-1 w-5 rounded-full" style={{ background: bar, opacity: 0.5 }} />
-      </span>
-      <span>
-        <span className="block text-sm font-medium text-ink">{title}</span>
-        <span className="block text-xs text-mute">{sub}</span>
-      </span>
-    </button>
-  );
+function About({ appInfo }: { appInfo: AppInfo | null }) {
+  const toast = useToast();
   return (
-    <Card title="Apariencia" className="col-span-12 lg:col-span-7">
-      <div className="flex gap-3">
-        {option("dark", "Oscuro", "Menos brillo en talleres y de noche", "#111315", "#a5acb5")}
-        {option("light", "Claro", "Más legible con mucha luz y en oficinas", "#f6f6f4", "#4b5058")}
+    <Card title="Acerca de" icon={<BadgeCheck size={14} />}>
+      <div className="flex items-center gap-3">
+        <img src={logo} alt="" className="size-12" />
+        <div>
+          <div className="font-semibold">AdminOps v{appInfo?.version}</div>
+          <div className="text-sm text-dim">
+            by <span className="font-semibold text-neon">David Bonilla</span>
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+        {(
+          [
+            ["data", "Carpeta de datos"],
+            ["reports", "Carpeta de informes"],
+            ["logs", "Registros"],
+          ] as const
+        ).map(([kind, label]) => (
+          <button key={kind} onClick={() => appApi.openFolder(kind).catch((e) => toast("error", String(e)))} className="rounded-md border border-line-2 px-2.5 py-1 text-dim hover:border-neon/40 hover:text-neon">
+            {label} →
+          </button>
+        ))}
+      </div>
+      <div className="mt-4 border-t border-line/60 pt-3">
+        <Button
+          kind="ghost"
+          onClick={() =>
+            appApi
+              .supportPackage()
+              .then(() => toast("ok", "Paquete de soporte creado: se abrió su carpeta."))
+              .catch((e) => toast("error", String(e)))
+          }
+        >
+          Crear paquete de soporte
+        </Button>
+        <p className="mt-1.5 text-[11px] text-mute">
+          Un .zip con el registro de actividad, el último diagnóstico y la versión, para enviarlo si algo falla. Puede contener el nombre del equipo y del
+          usuario: revísalo antes de compartirlo.
+        </p>
+      </div>
+      <div className="mt-4 border-t border-line/60 pt-3 text-xs text-dim">
+        <div className="mb-1 font-medium text-ink">Atajos de AdminOps</div>
+        <div className="grid grid-cols-2 gap-1">
+          <span>Ctrl + K · buscar o ejecutar</span>
+          <span>Ctrl + , · Ajustes</span>
+          <span>Ctrl + L · bloquear (si hay PIN)</span>
+          <span>Alt + ← / → · página anterior / siguiente</span>
+        </div>
       </div>
     </Card>
   );

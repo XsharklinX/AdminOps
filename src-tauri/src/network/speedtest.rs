@@ -168,7 +168,8 @@ fn median(v: &mut [f64]) -> f64 {
     if v.is_empty() {
         return 0.0;
     }
-    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    // total_cmp: un NaN (medición fallida) no puede hacer fallar la ordenación.
+    v.sort_by(|a, b| a.total_cmp(b));
     let m = v.len() / 2;
     if v.len().is_multiple_of(2) { (v[m - 1] + v[m]) / 2.0 } else { v[m] }
 }
@@ -461,7 +462,7 @@ mod tests {
     fn speedtest_real() {
         let last = std::sync::Mutex::new(String::new());
         let on = |phase: &'static str, mbps: f64, _p: f64, _l: Option<f64>| {
-            let mut l = last.lock().unwrap();
+            let mut l = last.lock().unwrap_or_else(|e| e.into_inner());
             if *l != phase {
                 println!("fase: {phase}");
                 *l = phase.to_string();

@@ -21,11 +21,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useToast } from "../components/feedback";
 import { Button, Card, inputClass, Modal } from "../components/ui";
 import { lanApi, portalsApi, type LanInfo, type PublicIp, type RouterCheck, type RouterProfile } from "../lib/api";
+import { windowRect } from "../lib/prefs";
 
-const rectOf = (el: HTMLElement) => {
-  const r = el.getBoundingClientRect();
-  return { x: r.left, y: r.top, width: r.width, height: r.height };
-};
+// Con el zoom de la interfaz aplicado: la vista web va en píxeles de la ventana.
+const rectOf = windowRect;
 
 const DOT = { ok: "bg-ok", info: "bg-mute", warn: "bg-warn", bad: "bg-bad" } as const;
 
@@ -114,8 +113,10 @@ export function Router({ covered = false }: { covered?: boolean }) {
     load();
   }, [load]);
 
-  // Al salir de la página, la vista del router (nativa, por encima de todo) se oculta.
-  useEffect(() => () => void portalsApi.hideAll(), []);
+  // Al cerrar la página, la vista del router (nativa, por encima de todo) se oculta.
+  const panelRef = useRef<string | null>(null);
+  panelRef.current = panel;
+  useEffect(() => () => void (panelRef.current && portalsApi.hide(panelRef.current)), []);
 
   useEffect(() => {
     if (!panel) return;
@@ -130,8 +131,9 @@ export function Router({ covered = false }: { covered?: boolean }) {
   const overlay = covered || qr !== null;
   useLayoutEffect(() => {
     const el = area.current;
+    // Solo la vista de esta página: la de Tickets puede estar viva en otra.
     if (!panel || !el || overlay) {
-      portalsApi.hideAll();
+      if (panel) portalsApi.hide(panel);
       return;
     }
     portalsApi.show(panel, rectOf(el)).catch((e) => toast("error", String(e)));
@@ -245,7 +247,7 @@ export function Router({ covered = false }: { covered?: boolean }) {
           </button>
           <button
             onClick={() => {
-              portalsApi.hideAll();
+              portalsApi.hide(panel);
               setPanel(null);
             }}
             className={iconBtn}

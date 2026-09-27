@@ -315,14 +315,14 @@ pub fn uninstall_program(app: tauri::AppHandle, id: String, silent: bool, tweaks
     } else {
         vec![]
     };
-    LEFTOVERS.lock().unwrap().insert(id, leftovers.iter().map(|l| l.path.clone()).collect());
+    LEFTOVERS.lock().unwrap_or_else(|e| e.into_inner()).insert(id, leftovers.iter().map(|l| l.path.clone()).collect());
     Ok(UninstallResult { removed, message, leftovers })
 }
 
 /// Envía a la papelera los restos elegidos (solo los calculados para ese programa).
 #[tauri::command(async)]
 pub fn remove_leftovers(id: String, paths: Vec<String>, tweaks: State<'_, TweakState>) -> Result<usize, String> {
-    let allowed = LEFTOVERS.lock().unwrap().get(&id).cloned().unwrap_or_default();
+    let allowed = LEFTOVERS.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned().unwrap_or_default();
     let chosen: Vec<&String> = paths.iter().filter(|p| allowed.contains(p)).collect();
     if chosen.len() != paths.len() {
         return Err("Alguna carpeta no corresponde a los restos detectados.".into());

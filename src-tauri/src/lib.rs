@@ -33,11 +33,22 @@ mod vault;
 mod wipe;
 mod recover;
 mod family;
+mod office;
+mod applock;
+mod appcare;
+mod winwatch;
+mod remote;
 
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Un fallo inesperado queda en el registro (con dónde ocurrió) en lugar de perderse.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log::error!("Fallo interno: {info}");
+        default_hook(info);
+    }));
     // Modo prueba: `adminops.exe --roundtrip informe.json [--only id1,id2]`.
     // No abre ventana; ver tweaks/roundtrip.rs.
     let args: Vec<String> = std::env::args().collect();
@@ -90,6 +101,23 @@ pub fn run() {
             );
             app.manage(tweaks::TweakState::new(app.handle()));
             window_state::restore(app.handle());
+            let settings = workflow::settings(app.handle());
+            tweaks::set_restore_point_policy(&settings.restore_points);
+            // Arranque con Windows: minimizada en la barra de tareas.
+            if std::env::args().any(|a| a == "--minimized") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.minimize();
+                }
+            }
+            // Vigilancia de errores de Windows (Ajustes → General).
+            winwatch::start(app.handle().clone());
+            // Limpieza de datos antiguos, si está activada (en segundo plano).
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                use tauri::Manager;
+                let state = handle.state::<tweaks::TweakState>();
+                appcare::auto_cleanup(&handle, &state);
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -227,6 +255,7 @@ pub fn run() {
             network::lan::wifi_qr,
             network::lan::scan_lan,
             network::lan::set_device_alias,
+            network::lan::identify_lan,
             network::lan::open_device_page,
             network::lan::lookup_vendors,
             vault::vault_support,
@@ -257,7 +286,56 @@ pub fn run() {
             family::set_blocked_sites,
             family::logon_hours,
             family::set_logon_hours,
+            office::wake_on_lan,
+            office::remote_status,
+            office::enable_wake_on_lan,
+            office::set_remote_desktop,
+            office::open_remote_desktop,
+            office::open_quick_assist,
+            office::list_shares,
+            office::create_share,
+            office::remove_share,
+            office::enable_file_sharing,
+            office::ip_conflicts,
+            office::export_csv,
+            applock::lock_status,
+            applock::lock_verify,
+            applock::lock_set,
+            applock::lock_set_idle,
+            applock::lock_disable,
+            applock::lock_verify_windows,
+            window_state::set_ui_zoom,
+            appcare::autostart_enabled,
+            appcare::set_autostart,
+            appcare::data_usage,
+            appcare::data_cleanup,
+            appcare::check_update,
+            appcare::open_release_page,
+            winwatch::list_windows_alerts,
+            winwatch::mark_windows_alerts_read,
+            winwatch::clear_windows_alerts,
+            winwatch::check_windows_now,
+            winwatch::unread_windows_alerts,
+            remote::list_connections,
+            remote::save_connection,
+            remote::delete_connection,
+            remote::set_connection_password,
+            remote::connect_rdp,
+            remote::connect_saved,
+            remote::test_connection,
+            remote::remote_tools,
+            remote::connect_tool_id,
+            remote::open_remote_tool,
+            remote::install_remote_tool,
+            remote::rdp_server,
+            remote::set_rdp_user,
+            workflow::export_config,
+            workflow::import_config,
+            workflow::inventory_add_this,
+            workflow::inventory_remove,
+            workflow::save_network_map,
             portals::router_portal,
+            portals::portal_hide,
             network::tools::start_ping,
             network::tools::start_trace,
             network::tools::stop_probe,

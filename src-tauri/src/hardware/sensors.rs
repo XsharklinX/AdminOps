@@ -79,13 +79,13 @@ static LAST_FAILURE: std::sync::Mutex<Option<(std::time::Instant, String)>> = st
 
 fn raw(app: &tauri::AppHandle) -> Result<Vec<Sensor>, String> {
     let dir = lhm_dir(app).ok_or("No se encontró LibreHardwareMonitor junto a AdminOps.")?;
-    if let Some((when, err)) = LAST_FAILURE.lock().unwrap().as_ref() {
+    if let Some((when, err)) = LAST_FAILURE.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
         if when.elapsed() < Duration::from_secs(60) {
             return Err(err.clone());
         }
     }
     let r = raw_from_dir(&dir);
-    *LAST_FAILURE.lock().unwrap() = r.as_ref().err().map(|e| (std::time::Instant::now(), e.clone()));
+    *LAST_FAILURE.lock().unwrap_or_else(|e| e.into_inner()) = r.as_ref().err().map(|e| (std::time::Instant::now(), e.clone()));
     r
 }
 

@@ -868,3 +868,267 @@ group = "remote"
 icon = "settings"
 open = "ms-settings:remotedesktop"
 keywords = "rdp escritorio remoto permitir"
+
+# ---------- Añadidos en la 0.23 ----------
+
+[[tool]]
+id = "env-vars"
+name = "Variables de entorno"
+description = "PATH y demás variables del usuario y del sistema."
+group = "panel"
+icon = "list"
+run = "{System32}\\rundll32.exe"
+args = "sysdm.cpl,EditEnvironmentVariables"
+keywords = "path variables entorno environment"
+
+[[tool]]
+id = "perf-options"
+name = "Opciones de rendimiento"
+description = "Efectos visuales y memoria virtual (archivo de paginación)."
+group = "panel"
+icon = "gauge"
+run = "{System32}\\SystemPropertiesPerformance.exe"
+keywords = "efectos visuales memoria virtual paginacion pagefile rendimiento"
+
+[[tool]]
+id = "computer-name"
+name = "Nombre del equipo"
+description = "Cambiar el nombre del equipo o el grupo de trabajo."
+group = "panel"
+icon = "monitor"
+run = "{System32}\\SystemPropertiesComputerName.exe"
+admin = true
+keywords = "nombre equipo hostname grupo trabajo workgroup"
+
+[[tool]]
+id = "bitlocker"
+name = "Cifrado BitLocker"
+description = "Estado del cifrado de cada unidad, activar o suspender BitLocker."
+group = "admin"
+icon = "lock"
+run = "{System32}\\control.exe"
+args = "/name Microsoft.BitLockerDriveEncryption"
+keywords = "bitlocker cifrado encriptar disco"
+
+[[tool]]
+id = "file-history"
+name = "Historial de archivos"
+description = "Copias automáticas de las carpetas del usuario a otro disco."
+group = "admin"
+icon = "clock"
+run = "{System32}\\control.exe"
+args = "/name Microsoft.FileHistory"
+keywords = "copia seguridad backup historial archivos"
+
+[[tool]]
+id = "backup7"
+name = "Copia de seguridad (Windows 7)"
+description = "Imagen completa del sistema y restaurar copias antiguas."
+group = "admin"
+icon = "hard-drive"
+run = "{System32}\\sdclt.exe"
+keywords = "imagen sistema backup copia seguridad windows 7 sdclt"
+
+[[tool]]
+id = "firewall-apps"
+name = "Apps permitidas en el firewall"
+description = "Qué programas pueden recibir conexiones, por tipo de red."
+group = "panel"
+icon = "flame"
+run = "{System32}\\control.exe"
+args = "/name Microsoft.WindowsFirewall /page pageConfigureApps"
+keywords = "firewall permitir aplicacion puertos"
+
+[[tool]]
+id = "color-calibration"
+name = "Calibrar colores de pantalla"
+description = "Gamma, brillo, contraste y equilibrio de color del monitor."
+group = "panel"
+icon = "monitor"
+run = "{System32}\\dccw.exe"
+as_user = true
+keywords = "calibrar color pantalla monitor gamma"
+
+[[tool]]
+id = "license-status"
+name = "Estado de la licencia de Windows"
+description = "Edición, canal (OEM, retail, volumen) y caducidad de la activación."
+group = "diag"
+icon = "key"
+run = "{System32}\\wscript.exe"
+args = "{System32}\\slmgr.vbs /dlv"
+keywords = "licencia activacion slmgr clave producto oem kms"
+
+[[tool]]
+id = "battery-report"
+name = "Informe de batería"
+description = "Capacidad original y actual, ciclos y uso de los últimos días (portátiles)."
+group = "diag"
+icon = "activity"
+run = "{System32}\\cmd.exe"
+args = "/s /c \"powercfg /batteryreport /output \"{UserTemp}\\informe-bateria.html\" && explorer \"{UserTemp}\\informe-bateria.html\" || pause\""
+keywords = "bateria informe powercfg capacidad ciclos portatil"
+
+[[tool]]
+id = "wlan-report"
+name = "Informe de Wi-Fi"
+description = "Conexiones, desconexiones y errores de la Wi-Fi de los últimos 3 días."
+group = "diag"
+icon = "wifi"
+run = "{System32}\\cmd.exe"
+args = "/s /c \"netsh wlan show wlanreport && explorer \"{ProgramData}\\Microsoft\\Windows\\WlanReport\\wlan-report-latest.html\" || pause\""
+admin = true
+keywords = "wifi informe desconexiones wlan report red inalambrica"
+
+[[tool]]
+id = "energy-report"
+name = "Informe de energía"
+description = "Analiza durante 60 s qué impide ahorrar batería o suspender el equipo."
+group = "diag"
+icon = "power"
+run = "{System32}\\cmd.exe"
+args = "/s /c \"echo Analizando durante 60 segundos... && powercfg /energy /output \"{UserTemp}\\informe-energia.html\" & explorer \"{UserTemp}\\informe-energia.html\"\""
+admin = true
+keywords = "energia bateria suspension powercfg energy"
+
+[[tool]]
+id = "troubleshoot"
+name = "Solucionadores de problemas"
+description = "Asistentes de Windows para audio, red, impresoras, Windows Update…"
+group = "settings"
+icon = "life-buoy"
+open = "ms-settings:troubleshoot"
+keywords = "solucionar problemas troubleshoot asistente"
+
+[[tool]]
+id = "proxy"
+name = "Proxy"
+description = "Proxy manual o automático (a veces lo cambia el malware)."
+group = "settings"
+icon = "globe"
+open = "ms-settings:network-proxy"
+keywords = "proxy red internet"
+
+[[tool]]
+id = "vpn"
+name = "VPN"
+description = "Conexiones VPN integradas de Windows."
+group = "settings"
+icon = "shield"
+open = "ms-settings:network-vpn"
+keywords = "vpn red privada"
+
+[[tool]]
+id = "wifi-known"
+name = "Redes Wi-Fi conocidas"
+description = "Redes guardadas, olvidar una y propiedades de la Wi-Fi."
+group = "settings"
+icon = "wifi"
+open = "ms-settings:network-wifisettings"
+keywords = "wifi redes conocidas guardadas olvidar"
+
+[[tool]]
+id = "graphics"
+name = "Gráficos por aplicación"
+description = "Qué tarjeta gráfica usa cada programa y opciones de la GPU."
+group = "settings"
+icon = "cpu"
+open = "ms-settings:display-advancedgraphics"
+keywords = "grafica gpu tarjeta juego rendimiento nvidia amd"
+
+[[tool]]
+id = "privacy-camera"
+name = "Permisos de la cámara"
+description = "Qué aplicaciones pueden usar la cámara."
+group = "settings"
+icon = "shield"
+open = "ms-settings:privacy-webcam"
+keywords = "camara webcam permisos privacidad no funciona"
+
+[[tool]]
+id = "privacy-mic"
+name = "Permisos del micrófono"
+description = "Qué aplicaciones pueden usar el micrófono."
+group = "settings"
+icon = "volume"
+open = "ms-settings:privacy-microphone"
+keywords = "microfono permisos privacidad no funciona"
+
+[[tool]]
+id = "signin-options"
+name = "Opciones de inicio de sesión"
+description = "PIN, Windows Hello, contraseña e inicio automático."
+group = "settings"
+icon = "key"
+open = "ms-settings:signinoptions"
+keywords = "pin hello contraseña inicio sesion"
+
+[[tool]]
+id = "storage-sense"
+name = "Sensor de almacenamiento"
+description = "Borrado automático de temporales y de la papelera."
+group = "settings"
+icon = "trash"
+open = "ms-settings:storagepolicies"
+keywords = "sensor almacenamiento espacio automatico"
+
+[[tool]]
+id = "accessibility"
+name = "Accesibilidad"
+description = "Texto más grande, contraste, lupa, narrador y teclado."
+group = "settings"
+icon = "type"
+open = "ms-settings:easeofaccess"
+keywords = "accesibilidad texto grande contraste narrador"
+
+[[tool]]
+id = "osk"
+name = "Teclado en pantalla"
+description = "Para cuando falla el teclado físico o hay que escribir con el ratón."
+group = "console"
+icon = "grid"
+run = "{System32}\\osk.exe"
+as_user = true
+keywords = "teclado pantalla osk virtual"
+
+[[tool]]
+id = "magnify"
+name = "Lupa"
+description = "Amplía una parte de la pantalla."
+group = "console"
+icon = "search"
+run = "{System32}\\Magnify.exe"
+as_user = true
+keywords = "lupa ampliar zoom"
+
+[[tool]]
+id = "charmap"
+name = "Mapa de caracteres"
+description = "Símbolos y letras especiales para copiar."
+group = "console"
+icon = "type"
+run = "{System32}\\charmap.exe"
+as_user = true
+keywords = "caracteres simbolos especiales"
+
+[[tool]]
+id = "sandbox"
+name = "Windows Sandbox"
+description = "Escritorio aislado y desechable para probar programas dudosos."
+group = "admin"
+icon = "shield"
+run = "{System32}\\WindowsSandbox.exe"
+requires = "{System32}\\WindowsSandbox.exe"
+as_user = true
+keywords = "sandbox aislado probar programa virus"
+
+[[tool]]
+id = "hyperv"
+name = "Administrador de Hyper-V"
+description = "Máquinas virtuales de Windows."
+group = "admin"
+icon = "layout"
+run = "{System32}\\mmc.exe"
+args = "{System32}\\virtmgmt.msc"
+requires = "{System32}\\virtmgmt.msc"
+keywords = "hyper-v maquina virtual vm"

@@ -7,7 +7,7 @@
 use serde::Serialize;
 use std::sync::Mutex;
 use std::time::Instant;
-use sysinfo::{Disks, Networks, ProcessesToUpdate, System};
+use sysinfo::{Disks, Networks, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 pub struct MetricsState {
     inner: Mutex<Collector>,
@@ -18,7 +18,12 @@ struct Collector {
     disks: Disks,
     networks: Networks,
     last_net: Instant,
+    /// Los discos cambian poco: se releen cada pocos segundos, no en cada lectura.
+    last_disks: Instant,
 }
+
+/// Cada cuánto se vuelve a leer el espacio de los discos.
+const DISKS_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
 
 impl MetricsState {
     pub fn new() -> Self {
@@ -31,6 +36,7 @@ impl MetricsState {
                 disks: Disks::new_with_refreshed_list(),
                 networks: Networks::new_with_refreshed_list(),
                 last_net: Instant::now(),
+                last_disks: Instant::now(),
             }),
         }
     }
@@ -90,7 +96,7 @@ pub struct LiveMetrics {
 
 #[tauri::command]
 pub fn get_system_info(state: tauri::State<MetricsState>) -> SystemInfo {
-    let c = state.inner.lock().unwrap();
+    let c = state.inner.lock().unwrap_or_else(|e| e.into_inner());
     let cpus = c.sys.cpus();
     SystemInfo {
         host_name: System::host_name().unwrap_or_default(),
@@ -110,13 +116,20 @@ pub fn get_system_info(state: tauri::State<MetricsState>) -> SystemInfo {
 
 #[tauri::command]
 pub fn get_live_metrics(state: tauri::State<MetricsState>) -> LiveMetrics {
-    let mut guard = state.inner.lock().unwrap();
-    let c = &mut *guard;
+    let mut guard = state.inner.lock().unwrap_or_else(|e| e.into_inner());
+    collect(&mut guard)
+}
 
+fn collect(c: &mut Collector) -> LiveMetrics {
     c.sys.refresh_cpu_usage();
     c.sys.refresh_memory();
-    c.sys.refresh_processes(ProcessesToUpdate::All, true);
-    c.disks.refresh(true);
+    // Solo CPU y memoria de cada proceso: el nombre se lee una vez (la ruta y la
+    // línea de comandos, que son lo caro, no se usan aquí).
+    c.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_cpu().with_memory().with_exe(UpdateKind::Never));
+    if c.last_disks.elapsed() >= DISKS_EVERY {
+        c.disks.refresh(true);
+        c.last_disks = Instant::now();
+    }
     c.networks.refresh(true);
 
     let elapsed = c.last_net.elapsed().as_secs_f64().max(0.001);
@@ -175,5 +188,26 @@ pub fn get_live_metrics(state: tauri::State<MetricsState>) -> LiveMetrics {
             })
             .collect(),
         top_processes: procs,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Coste de cada lectura del Panel: `cargo test --release metrics_cost -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn metrics_cost() {
+        let state = MetricsState::new();
+        let mut c = state.inner.lock().unwrap_or_else(|e| e.into_inner());
+        collect(&mut c);
+        let n = 20;
+        let t = Instant::now();
+        for _ in 0..n {
+            let m = collect(&mut c);
+            assert!(m.memory_total > 0 && m.process_count > 0);
+        }
+        println!("media por lectura: {:.1} ms", t.elapsed().as_secs_f64() * 1000.0 / n as f64);
     }
 }

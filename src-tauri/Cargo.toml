@@ -1,6 +1,6 @@
 [package]
 name = "adminops"
-version = "0.21.0"
+version = "1.1.0"
 description = "AdminOps - optimizacion y diagnostico de Windows"
 authors = ["David Bonilla"]
 edition = "2021"
@@ -37,6 +37,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 zip = { version = "8.6.0", default-features = false, features = ["aes-crypto", "deflate"] }
+sha2 = "0.11"
+pbkdf2 = { version = "0.13", default-features = false, features = ["hmac"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
@@ -44,11 +46,12 @@ zip = { version = "8.6.0", default-features = false, features = ["aes-crypto", "
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+# "unwind": un fallo inesperado en un comando no cierra la app (se anota en el registro).
+panic = "unwind"
 strip = true
 
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_NetManagement", "Win32_NetworkManagement_WiFi", "Win32_Networking_WinSock", "Win32_Security", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_Storage_Vhd", "Win32_System_IO", "Win32_System_JobObjects", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_NetManagement", "Win32_NetworkManagement_WiFi", "Win32_Networking_WinSock", "Win32_Security", "Win32_Security_Credentials", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_Storage_Vhd", "Win32_System_IO", "Win32_System_JobObjects", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.56.0"
 # Mismas versiones que usa Tauri: activar "recordar contraseña" en los portales de Tickets.
 webview2-com = "0.38.2"

@@ -248,7 +248,7 @@ pub fn scan_space(app: tauri::AppHandle, path: String) -> Result<SpaceView, Stri
             })
             .collect(),
     };
-    *LAST.lock().unwrap() = Some(Scan { root, tree, top });
+    *LAST.lock().unwrap_or_else(|e| e.into_inner()) = Some(Scan { root, tree, top });
     Ok(view)
 }
 
@@ -260,7 +260,7 @@ pub fn cancel_space_scan() {
 /// Subcarpetas de `path` dentro del último análisis.
 #[tauri::command]
 pub fn space_children(path: String) -> Result<Vec<SpaceEntry>, String> {
-    let last = LAST.lock().unwrap();
+    let last = LAST.lock().unwrap_or_else(|e| e.into_inner());
     let scan = last.as_ref().ok_or("No hay ningún análisis.")?;
     let rel = Path::new(&path).strip_prefix(&scan.root).map_err(|_| "Ruta fuera del análisis".to_string())?;
     let mut node = &scan.tree;
@@ -275,7 +275,7 @@ pub fn space_children(path: String) -> Result<Vec<SpaceEntry>, String> {
 #[tauri::command]
 pub fn reveal_in_explorer(path: String) -> Result<(), String> {
     {
-        let last = LAST.lock().unwrap();
+        let last = LAST.lock().unwrap_or_else(|e| e.into_inner());
         let scan = last.as_ref().ok_or("No hay ningún análisis.")?;
         let in_scan = Path::new(&path).starts_with(&scan.root) || scan.top.iter().any(|(_, p)| p.as_os_str() == path.as_str());
         if !in_scan {

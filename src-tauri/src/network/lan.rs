@@ -25,6 +25,8 @@ pub struct LanInfo {
     pub index: u32,
     pub wireless: bool,
     pub link_speed: String,
+    /// MAC de este equipo en esa red (para encenderlo con Wake-on-LAN).
+    pub mac: String,
     pub ip: String,
     pub prefix: u32,
     pub gateway: String,
@@ -55,7 +57,7 @@ $a = $c.NetAdapter
 [pscustomobject]@{
   adapter = "$($c.InterfaceAlias)"; description = "$($a.InterfaceDescription)"; index = [int]$c.InterfaceIndex
   wireless = [bool]("$($a.PhysicalMediaType)" -match '802\.11' -or "$($a.InterfaceDescription)" -match 'Wi-?Fi|Wireless|WLAN|802\.11')
-  linkSpeed = "$($a.LinkSpeed)"
+  linkSpeed = "$($a.LinkSpeed)"; mac = "$($a.MacAddress)"
   ip = "$($ip.IPAddress)"; prefix = [int]$ip.PrefixLength
   gateway = $gw; gatewayMac = if ($n) { "$($n.LinkLayerAddress)" } else { '' }
   dns = @($c.DNSServer | Where-Object { $_.AddressFamily -eq 2 } | ForEach-Object { $_.ServerAddresses } | Where-Object { $_ })
@@ -84,6 +86,7 @@ pub fn current() -> Result<Option<LanInfo>, String> {
     let mut info: Option<LanInfo> = serde_json::from_str(out.trim()).map_err(|e| format!("Respuesta inesperada: {e}"))?;
     if let Some(i) = info.as_mut() {
         i.gateway_mac = norm_mac(&i.gateway_mac);
+        i.mac = norm_mac(&i.mac);
         i.key = network_key(&i.gateway, &i.gateway_mac);
         if i.wireless {
             if let Some(w) = super::wifi::list().ok().and_then(|l| l.into_iter().find(|w| w.connected)) {
@@ -260,6 +263,11 @@ async fn fetch_panel(url: &str) -> Option<(String, String)> {
     let title = html_title(&body);
     let hay = format!("{title} {server} {realm} {}", body.chars().take(20_000).collect::<String>());
     Some((title, hay))
+}
+
+/// Título de la página web de un dispositivo de la red local (vacío si no tiene).
+pub async fn page_title(url: &str) -> String {
+    fetch_panel(url).await.map(|(t, _)| t).unwrap_or_default()
 }
 
 /// Segundo salto hacia Internet: otro router privado = doble NAT; 100.64/10 = CGNAT del proveedor.
@@ -573,6 +581,15 @@ pub struct Device {
     /// No se había visto antes en esta red.
     pub new: bool,
     pub first_seen: u64,
+    /// De la identificación a fondo (se recuerda entre búsquedas).
+    pub kind: String,
+    pub manufacturer: String,
+    pub model: String,
+    pub friendly: String,
+    pub os: String,
+    pub services: Vec<String>,
+    pub ports: Vec<u16>,
+    pub netbios: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -583,6 +600,7 @@ struct Known {
     vendor: String,
     first_seen: u64,
     last_seen: u64,
+    info: Option<super::identify::DeviceInfo>,
 }
 
 type Memory = HashMap<String, HashMap<String, Known>>;
@@ -729,7 +747,16 @@ pub fn scan_lan(app: tauri::AppHandle) -> Result<Scan, String> {
             if !name.is_empty() {
                 k.name = name.clone();
             }
+            let info = k.info.clone().unwrap_or_default();
             Device {
+                kind: info.kind,
+                manufacturer: info.manufacturer,
+                model: info.model,
+                friendly: info.friendly,
+                os: info.os,
+                services: info.services,
+                ports: info.ports,
+                netbios: info.netbios,
                 ip: a.to_string(),
                 private_mac: private_mac(&mac),
                 name: if name.is_empty() { k.name.clone() } else { name },
@@ -759,6 +786,55 @@ pub fn open_device_page(ip: String) -> Result<(), String> {
     }
     // A través del Explorador: el navegador no hereda los permisos de administrador.
     std::process::Command::new("explorer.exe").arg(format!("http://{addr}/")).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// Identificación a fondo de los dispositivos encontrados: tipo, fabricante, modelo…
+#[tauri::command]
+pub async fn identify_lan(app: tauri::AppHandle, key: String, devices: Vec<Device>) -> Result<Vec<Device>, String> {
+    tauri::async_runtime::spawn_blocking(move || identify_blocking(&app, key, devices)).await.map_err(|e| format!("La identificación falló: {e}"))?
+}
+
+fn identify_blocking(app: &tauri::AppHandle, key: String, devices: Vec<Device>) -> Result<Vec<Device>, String> {
+    let app = app.clone();
+    let task = crate::task::Task::new(&app, "lan-identify").named("Identificar dispositivos");
+    task.step(format!("Preguntando a {} dispositivos qué son…", devices.len()));
+    let parsed: Vec<(Ipv4Addr, &Device)> = devices.iter().filter_map(|d| d.ip.parse().ok().map(|ip| (ip, d))).filter(|(ip, _)| private_v4(*ip)).collect();
+    let targets: Vec<(Ipv4Addr, super::identify::Hints)> = parsed
+        .iter()
+        .map(|(ip, d)| (*ip, super::identify::Hints { gateway: d.gateway, this_pc: d.this_pc, private_mac: d.private_mac, vendor: &d.vendor, name: &d.name }))
+        .collect();
+    let local = current().ok().flatten().and_then(|i| i.ip.parse().ok()).unwrap_or(Ipv4Addr::UNSPECIFIED);
+    let infos = super::identify::identify(local, &targets);
+
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut memory: Memory = crate::paths::read_json(&memory_path(&app));
+    let known = memory.entry(key).or_default();
+    let out: Vec<Device> = devices
+        .into_iter()
+        .map(|mut d| {
+            if let Some(i) = infos.iter().find(|i| i.ip == d.ip) {
+                d.kind = i.kind.clone();
+                d.manufacturer = i.manufacturer.clone();
+                d.model = i.model.clone();
+                d.friendly = i.friendly.clone();
+                d.os = i.os.clone();
+                d.services = i.services.clone();
+                d.ports = i.ports.clone();
+                d.netbios = i.netbios.clone();
+                if d.name.is_empty() && !i.netbios.is_empty() {
+                    d.name = i.netbios.clone();
+                }
+                let id = if d.mac.is_empty() { format!("ip-{}", d.ip) } else { d.mac.clone() };
+                if let Some(k) = known.get_mut(&id) {
+                    k.info = Some(i.clone());
+                }
+            }
+            d
+        })
+        .collect();
+    crate::paths::write_json(&memory_path(&app), &memory)?;
+    log::info!("Red local: {} dispositivos identificados", infos.iter().filter(|i| i.kind != "unknown").count());
+    Ok(out)
 }
 
 #[tauri::command]

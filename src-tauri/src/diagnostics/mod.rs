@@ -526,7 +526,7 @@ pub fn open_system_tool(tool: Tool) -> Result<(), String> {
     std::process::Command::new(program).args(args).spawn().map(|_| ()).map_err(|e| format!("No se pudo abrir: {e}"))
 }
 
-fn snapshots_dir(app: &tauri::AppHandle) -> PathBuf {
+pub fn snapshots_dir(app: &tauri::AppHandle) -> PathBuf {
     crate::paths::machine_data_dir(app).join("snapshots")
 }
 
@@ -546,7 +546,7 @@ fn save_snapshot(app: &tauri::AppHandle, d: &Diagnostics) {
     }
 }
 
-fn snapshot_files(dir: &PathBuf) -> Vec<(u64, PathBuf)> {
+pub fn snapshot_files(dir: &PathBuf) -> Vec<(u64, PathBuf)> {
     std::fs::read_dir(dir)
         .into_iter()
         .flatten()
@@ -768,5 +768,35 @@ mod tests {
         assert!(super::parse_time("2026-09-26T08:56:22.5000000-04:00").is_some());
         assert!(super::parse_time("2026-09-16T00:00:00.0000000").is_some());
         assert!(super::parse_time("basura").is_none());
+    }
+}
+
+#[cfg(test)]
+mod pool_bench {
+    /// Tiempo de los recolectores con PowerShell en paralelo, como en el diagnóstico:
+    /// `ADMINOPS_PS_HOSTS=3 cargo test --release diag_collectors_cost -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn diag_collectors_cost() {
+        // Calentar el pool para medir solo el trabajo.
+        let _ = crate::pspool::query("1", None, "calentar");
+        let t = std::time::Instant::now();
+        std::thread::scope(|s| {
+            let h = [
+                s.spawn(|| super::collect::disks().is_ok()),
+                s.spawn(|| super::collect::stability().is_ok()),
+                s.spawn(|| super::collect::drivers().is_ok()),
+                s.spawn(|| super::collect::battery().is_ok()),
+                s.spawn(|| super::collect::system().is_ok()),
+                s.spawn(|| crate::tweaks::startup::enabled_names().is_ok()),
+                s.spawn(|| crate::tweaks::appx::recommended_installed().is_ok()),
+                s.spawn(|| crate::security::extra().is_ok()),
+                s.spawn(|| crate::security::accounts().is_some()),
+            ];
+            for x in h {
+                let _ = x.join();
+            }
+        });
+        println!("hosts {:?}: {:.1} s", std::env::var("ADMINOPS_PS_HOSTS").ok(), t.elapsed().as_secs_f64());
     }
 }

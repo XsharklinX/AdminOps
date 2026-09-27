@@ -142,7 +142,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl p-6 pb-24">
+    <div className="mx-auto max-w-6xl p-6">
       {/* Listas */}
       <section className="mb-5">
         <h2 className="mb-2 text-[11px] font-semibold text-dim">Listas</h2>
@@ -264,7 +264,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {selected.length > 0 && (
-        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
+        <div className="sticky bottom-0 z-30 -mx-6 -mb-6 mt-6 border-t border-line bg-panel px-6 py-3">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
             {running ? (
               <TaskStatus task="install-apps" active={running} fallback="Instalando…" />

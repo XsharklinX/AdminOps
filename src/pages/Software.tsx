@@ -63,7 +63,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
-    <div className="mx-auto max-w-5xl p-6 pb-24">
+    <div className="mx-auto max-w-5xl p-6">
       <div className="mb-4 flex items-center gap-3">
         <p className="text-sm text-dim">
           {updates === null ? (
@@ -148,7 +148,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {selected.size > 0 && (
-        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
+        <div className="sticky bottom-0 z-30 -mx-6 -mb-6 mt-6 border-t border-line bg-panel px-6 py-3">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
             {running ? (
               <TaskStatus task="software" active={running} fallback="Actualizando…" />

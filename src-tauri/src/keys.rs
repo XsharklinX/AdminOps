@@ -76,6 +76,21 @@ pub fn try_shortcut(keys: Vec<String>) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    /// Todo atajo marcado con `try: true` en la página Atajos se puede simular.
+    #[test]
+    fn every_tryable_shortcut_parses() {
+        let catalog = include_str!("../../src/lib/shortcuts.ts");
+        let mut checked = 0;
+        for line in catalog.lines().filter(|l| l.contains("try: true")) {
+            let start = line.find("keys: [").expect("línea con keys") + 7;
+            let end = start + line[start..].find(']').expect("fin de keys");
+            let keys: Vec<String> = line[start..end].split(',').map(|k| k.trim().trim_matches('"').to_string()).collect();
+            assert!(parse(&keys).is_ok(), "no se puede probar: {keys:?}");
+            checked += 1;
+        }
+        assert!(checked > 30, "solo {checked} atajos probables");
+    }
+
     fn k(s: &[&str]) -> Vec<String> {
         s.iter().map(|x| x.to_string()).collect()
     }

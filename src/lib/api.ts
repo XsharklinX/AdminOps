@@ -502,6 +502,11 @@ export interface Settings {
   checklist: string[];
   onboarded: boolean;
   defaultDomain: string;
+  notifyTasks: boolean;
+  restorePoints: "risky" | "always" | "never";
+  autoCleanupMonths: number;
+  checkUpdates: boolean;
+  watchWindows: boolean;
   currency: string;
   taxName: string;
   taxRate: number;
@@ -576,6 +581,45 @@ export interface Machine {
   firstSeen: number;
   lastSeen: number;
   hardware: string;
+  inventory: MachineInventory | null;
+}
+
+export interface MachineInventory {
+  manufacturer: string;
+  model: string;
+  serial: string;
+  cpu: string;
+  cores: number;
+  ramGb: number;
+  disks: string;
+  gpu: string;
+  os: string;
+  biosYear: number | null;
+  installed: string;
+  tpm: boolean | null;
+  secureBoot: boolean | null;
+  security: number | null;
+  battery: number | null;
+  ip: string;
+  mac: string;
+  verdict: "ok" | "upgrade" | "replace";
+  reasons: string[];
+  updated: number;
+}
+
+export interface MapDevice {
+  ip: string;
+  mac: string;
+  name: string;
+  vendor: string;
+  alias: string;
+}
+
+export interface NetworkMap {
+  name: string;
+  gateway: string;
+  saved: number;
+  devices: MapDevice[];
 }
 
 export interface SessionRecord {
@@ -612,6 +656,7 @@ export interface Client {
   created: number;
   machines: Machine[];
   sessions: SessionRecord[];
+  network: NetworkMap | null;
 }
 
 export interface ChecklistItem {
@@ -653,13 +698,16 @@ export const workApi = {
   clients: () => invoke<Client[]>("list_clients"),
   saveClient: (client: Partial<Client> & { name: string }) =>
     invoke<Client>("save_client", {
-      client: { id: "", contact: "", phone: "", email: "", address: "", notes: "", created: 0, machines: [], sessions: [], ...client },
+      client: { id: "", contact: "", phone: "", email: "", address: "", notes: "", created: 0, machines: [], sessions: [], network: null, ...client },
     }),
   deleteClient: (id: string) => invoke<void>("delete_client", { id }),
   session: () => invoke<ActiveSession | null>("get_session"),
   startSession: (clientId: string) => invoke<ActiveSession>("start_session", { clientId }),
   updateSession: (session: ActiveSession) => invoke<void>("update_session", { session }),
   setNextMaintenance: (clientId: string, date: number | null) => invoke<void>("set_next_maintenance", { clientId, date }),
+  inventoryAddThis: (clientId: string) => invoke<Client>("inventory_add_this", { clientId }),
+  inventoryRemove: (clientId: string, host: string) => invoke<void>("inventory_remove", { clientId, host }),
+  saveNetworkMap: (clientId: string, map: Omit<NetworkMap, "saved">) => invoke<void>("save_network_map", { clientId, map: { ...map, saved: 0 } }),
   cancelSession: () => invoke<void>("cancel_session"),
   finishSession: () => invoke<string>("finish_session"),
   saveProfile: (profile: ProfileDef) => invoke<ProfileDef>("save_custom_profile", { profile }),
@@ -1001,6 +1049,7 @@ export const portalsApi = {
   show: (id: string, r: { x: number; y: number; width: number; height: number }) => invoke<void>("portal_show", { id, ...r }),
   bounds: (id: string, r: { x: number; y: number; width: number; height: number }) => invoke<void>("portal_bounds", { id, ...r }),
   hideAll: () => invoke<void>("portal_hide_all"),
+  hide: (id: string) => invoke<void>("portal_hide", { id }),
   nav: (id: string, action: "back" | "forward" | "reload" | "home") => invoke<void>("portal_nav", { id, action }),
   openWindow: (id: string) => invoke<void>("portal_open_window", { id }),
   openExternal: (id: string) => invoke<void>("portal_open_external", { id }),
@@ -1172,6 +1221,7 @@ export interface LanInfo {
   index: number;
   wireless: boolean;
   linkSpeed: string;
+  mac: string;
   ip: string;
   prefix: number;
   gateway: string;
@@ -1232,6 +1282,14 @@ export interface LanDevice {
   ms: number | null;
   new: boolean;
   firstSeen: number;
+  kind: string;
+  manufacturer: string;
+  model: string;
+  friendly: string;
+  os: string;
+  services: string[];
+  ports: number[];
+  netbios: string;
 }
 
 export interface LanScan {
@@ -1249,6 +1307,7 @@ export const lanApi = {
   deleteRouter: (key: string) => invoke<void>("delete_router", { key }),
   wifiQr: (ssid: string, password: string, auth: string) => invoke<string>("wifi_qr", { ssid, password, auth }),
   scan: () => invoke<LanScan>("scan_lan"),
+  identify: (key: string, devices: LanDevice[]) => invoke<LanDevice[]>("identify_lan", { key, devices }),
   setAlias: (key: string, mac: string, alias: string) => invoke<void>("set_device_alias", { key, mac, alias }),
   vendors: (key: string, macs: string[]) => invoke<Record<string, string>>("lookup_vendors", { key, macs }),
   routerPortal: (key: string, name: string, url: string) => invoke<Portal>("router_portal", { key, name, url }),
@@ -1352,4 +1411,205 @@ export const familyApi = {
   setBlocked: (sites: string[]) => invoke<string[]>("set_blocked_sites", { sites }),
   hours: () => invoke<UserHours[]>("logon_hours"),
   setHours: (name: string, hours: boolean[][]) => invoke<void>("set_logon_hours", { name, hours }),
+};
+
+// ---------- La oficina completa (v0.22) ----------
+
+export interface WolAdapter {
+  name: string;
+  description: string;
+  magicPacket: string;
+  wired: boolean;
+}
+
+export interface RemoteStatus {
+  rdpEnabled: boolean;
+  rdpSupported: boolean;
+  fastStartup: boolean;
+  adapters: WolAdapter[];
+  host: string;
+  ip: string;
+  mac: string;
+}
+
+export interface Share {
+  name: string;
+  path: string;
+  description: string;
+  access: { account: string; right: string; allow: boolean }[];
+  openFiles: number;
+}
+
+export interface SharingStatus {
+  shares: Share[];
+  category: string;
+  fileSharing: boolean;
+  discovery: boolean;
+  sessions: string[];
+}
+
+export interface IpConflict {
+  time: string;
+  ip: string;
+  mac: string;
+}
+
+export const officeApi = {
+  wake: (mac: string) => invoke<void>("wake_on_lan", { mac }),
+  remoteStatus: () => invoke<RemoteStatus>("remote_status"),
+  enableWol: () => invoke<void>("enable_wake_on_lan"),
+  setRdp: (enabled: boolean) => invoke<void>("set_remote_desktop", { enabled }),
+  rdp: (host: string) => invoke<void>("open_remote_desktop", { host }),
+  quickAssist: () => invoke<void>("open_quick_assist"),
+  shares: () => invoke<SharingStatus>("list_shares"),
+  createShare: (path: string, name: string, who: string, write: boolean) => invoke<void>("create_share", { path, name, who, write }),
+  removeShare: (name: string) => invoke<void>("remove_share", { name }),
+  enableSharing: () => invoke<void>("enable_file_sharing"),
+  conflicts: () => invoke<IpConflict[]>("ip_conflicts"),
+  exportCsv: (name: string, content: string) => invoke<string | null>("export_csv", { name, content }),
+};
+
+/** Filas → CSV con ";" (lo que espera Excel en español) y comillas donde haga falta. */
+export function toCsv(rows: (string | number | null | undefined)[][]): string {
+  const cell = (v: string | number | null | undefined) => {
+    const t = v === null || v === undefined ? "" : String(v);
+    return /[;"\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  return rows.map((r) => r.map(cell).join(";")).join("\r\n");
+}
+
+// ---------- Bloqueo de la app y copia de la configuración (v0.23) ----------
+
+export interface LockStatus {
+  enabled: boolean;
+  kind: "pin" | "password" | "";
+  idleMinutes: number;
+  waitSecs: number;
+}
+
+export const lockApi = {
+  status: () => invoke<LockStatus>("lock_status"),
+  verify: (secret: string) => invoke<boolean>("lock_verify", { secret }),
+  verifyWindows: (password: string) => invoke<boolean>("lock_verify_windows", { password }),
+  set: (kind: "pin" | "password", secret: string, idleMinutes: number, current: string) => invoke<void>("lock_set", { kind, secret, idleMinutes, current }),
+  setIdle: (idleMinutes: number, current: string) => invoke<void>("lock_set_idle", { idleMinutes, current }),
+  disable: (current: string) => invoke<void>("lock_disable", { current }),
+};
+
+export const configApi = {
+  export: (prefs: unknown) => invoke<string | null>("export_config", { prefs }),
+  import: () => invoke<unknown | null>("import_config"),
+};
+
+// ---------- Cuidado de la app (v1.0) ----------
+
+export interface DataUsage {
+  journalEntries: number;
+  snapshots: number;
+  snapshotsBytes: number;
+  reports: number;
+  reportsBytes: number;
+  speedtests: number;
+  logsBytes: number;
+}
+
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  newer: boolean;
+  url: string;
+  notes: string;
+}
+
+export const appcareApi = {
+  autostart: () => invoke<boolean>("autostart_enabled"),
+  setAutostart: (enabled: boolean) => invoke<void>("set_autostart", { enabled }),
+  usage: () => invoke<DataUsage>("data_usage"),
+  cleanup: (months: number, journal: boolean, snapshots: boolean, reports: boolean) =>
+    invoke<{ journal: number; snapshots: number; reports: number; freed: number }>("data_cleanup", { months, journal, snapshots, reports }),
+  checkUpdate: () => invoke<UpdateInfo>("check_update"),
+  openRelease: (url: string) => invoke<void>("open_release_page", { url }),
+};
+
+// ---------- Errores de Windows (vigilancia) ----------
+
+export interface WindowsAlert {
+  id: string;
+  time: number;
+  key: string;
+  level: "bad" | "warn" | "info";
+  title: string;
+  detail: string;
+  explanation: string;
+  advice: string;
+  page: string | null;
+  count: number;
+  read: boolean;
+}
+
+export const alertsApi = {
+  list: () => invoke<WindowsAlert[]>("list_windows_alerts"),
+  markRead: () => invoke<void>("mark_windows_alerts_read"),
+  clear: () => invoke<void>("clear_windows_alerts"),
+  checkNow: () => invoke<WindowsAlert[]>("check_windows_now"),
+};
+
+// ---------- Acceso remoto (agenda, herramientas) ----------
+
+export interface RdpOptions {
+  fullscreen: boolean;
+  multimon: boolean;
+  clipboard: boolean;
+  drives: boolean;
+  printers: boolean;
+  audio: boolean;
+}
+
+export interface Connection {
+  id: string;
+  name: string;
+  kind: string;
+  target: string;
+  username: string;
+  client: string;
+  notes: string;
+  options: RdpOptions;
+  savedPassword: boolean;
+  lastUsed: number;
+}
+
+export interface Reach {
+  resolved: string | null;
+  pingMs: number | null;
+  rdpOpen: boolean;
+  hint: string;
+}
+
+export interface RemoteTool {
+  id: string;
+  name: string;
+  installed: boolean;
+  thisId: string | null;
+}
+
+export interface RdpServer {
+  port: number;
+  nla: boolean;
+  users: string[];
+}
+
+export const remoteApi = {
+  list: () => invoke<Connection[]>("list_connections"),
+  save: (connection: Connection) => invoke<Connection>("save_connection", { connection }),
+  remove: (id: string) => invoke<void>("delete_connection", { id }),
+  setPassword: (id: string, password: string) => invoke<void>("set_connection_password", { id, password }),
+  connect: (id: string) => invoke<void>("connect_saved", { id }),
+  connectRdp: (target: string, username: string, options: RdpOptions) => invoke<void>("connect_rdp", { target, username, options }),
+  test: (target: string) => invoke<Reach>("test_connection", { target }),
+  tools: () => invoke<RemoteTool[]>("remote_tools"),
+  connectTool: (tool: string, target: string) => invoke<void>("connect_tool_id", { tool, target }),
+  openTool: (tool: string) => invoke<void>("open_remote_tool", { tool }),
+  install: (tool: string) => invoke<void>("install_remote_tool", { tool }),
+  server: () => invoke<RdpServer>("rdp_server"),
+  setUser: (user: string, allow: boolean) => invoke<void>("set_rdp_user", { user, allow }),
 };

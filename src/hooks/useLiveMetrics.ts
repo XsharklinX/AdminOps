@@ -1,3 +1,4 @@
+import { usePageActive } from "../lib/pageActive";
 import { useEffect, useRef, useState } from "react";
 import { api, type LiveMetrics } from "../lib/api";
 
@@ -17,6 +18,9 @@ const push = (arr: number[], v: number) => [...arr.slice(-(HISTORY - 1)), v];
  * oculta o minimizada para no gastar CPU en una app que pretende ahorrarla.
  */
 export function useLiveMetrics(intervalMs = 1500) {
+  const active = usePageActive();
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const [metrics, setMetrics] = useState<LiveMetrics | null>(null);
   const [history, setHistory] = useState<MetricsHistory>({ cpu: [], ram: [], rx: [], tx: [] });
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +30,7 @@ export function useLiveMetrics(intervalMs = 1500) {
     let timer: number | undefined;
 
     const tick = async () => {
-      if (busy.current || document.hidden) return;
+      if (busy.current || document.hidden || !activeRef.current) return;
       busy.current = true;
       try {
         const m = await api.liveMetrics();

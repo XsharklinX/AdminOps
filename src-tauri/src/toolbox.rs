@@ -340,7 +340,7 @@ pub fn launch_tool(app: tauri::AppHandle, id: String, tweaks: State<'_, TweakSta
 
 #[tauri::command]
 pub fn set_tool_favorite(app: tauri::AppHandle, id: String, favorite: bool) -> Result<Vec<String>, String> {
-    let _guard = FILE_LOCK.lock().unwrap();
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let path = data_path(&app);
     let mut data: ToolboxData = crate::paths::read_json(&path);
     data.favorites.retain(|f| f != &id);
@@ -354,7 +354,7 @@ pub fn set_tool_favorite(app: tauri::AppHandle, id: String, favorite: bool) -> R
 #[tauri::command]
 pub fn save_custom_tool(app: tauri::AppHandle, tool: CustomTool) -> Result<CustomTool, String> {
     let mut c = validate_custom(tool)?;
-    let _guard = FILE_LOCK.lock().unwrap();
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let path = data_path(&app);
     let mut data: ToolboxData = crate::paths::read_json(&path);
     match data.custom.iter_mut().find(|x| !c.id.is_empty() && x.id == c.id) {
@@ -371,7 +371,7 @@ pub fn save_custom_tool(app: tauri::AppHandle, tool: CustomTool) -> Result<Custo
 
 #[tauri::command]
 pub fn delete_custom_tool(app: tauri::AppHandle, id: String) -> Result<(), String> {
-    let _guard = FILE_LOCK.lock().unwrap();
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let path = data_path(&app);
     let mut data: ToolboxData = crate::paths::read_json(&path);
     data.custom.retain(|c| c.id != id);

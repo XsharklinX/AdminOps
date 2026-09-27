@@ -1,3 +1,4 @@
+import { usePageActive } from "../lib/pageActive";
 import { useEffect, useRef, useState } from "react";
 import { hwApi, type Sensors } from "../lib/api";
 
@@ -7,13 +8,16 @@ import { hwApi, type Sensors } from "../lib/api";
  * siguientes, unos milisegundos.
  */
 export function useSensors(intervalMs = 5000) {
+  const active = usePageActive();
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const [sensors, setSensors] = useState<Sensors | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
 
   useEffect(() => {
     const tick = async () => {
-      if (busy.current || document.hidden) return;
+      if (busy.current || document.hidden || !activeRef.current) return;
       busy.current = true;
       try {
         setSensors(await hwApi.sensors());

@@ -303,7 +303,7 @@ pub fn remove_apps(
         }
     }
     let what = if packages.len() == 1 { packages[0].clone() } else { format!("quitar {} apps", packages.len()) };
-    let restore_point_created = !skip_restore_point && ensure_restore_point(&state, &task, &what, None)?;
+    let restore_point_created = !skip_restore_point && ensure_restore_point(&state, &task, &what, None, true)?;
 
     let total = packages.len();
     let results = packages

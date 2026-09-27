@@ -172,7 +172,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
   );
 
   return (
-    <div className="mx-auto max-w-4xl p-6 pb-24">
+    <div className="mx-auto max-w-4xl p-6">
       {!isAdmin && (
         <p className="mb-4 rounded-lg border border-warn/30 bg-warn/5 px-3.5 py-2.5 text-sm text-warn">
           Sin administrador solo se ven las apps de tu usuario y no se pueden quitar.
@@ -258,7 +258,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {selected.size > 0 && (
-        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
+        <div className="sticky bottom-0 z-30 -mx-6 -mb-6 mt-6 border-t border-line bg-panel px-6 py-3">
           <div className="mx-auto flex max-w-4xl items-center justify-between">
             {removing ? (
               <TaskStatus task="apps" active={removing} fallback="Quitando apps…" />

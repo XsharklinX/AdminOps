@@ -227,7 +227,7 @@ pub fn save_app_list(app: tauri::AppHandle, list: AppList) -> Result<AppList, St
     for a in &mut l.apps {
         a.source = source_for(&a.id).into();
     }
-    let _guard = FILE_LOCK.lock().unwrap();
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let path = lists_path(&app);
     let mut lists: Vec<AppList> = crate::paths::read_json(&path);
     match lists.iter_mut().find(|x| !l.id.is_empty() && x.id == l.id) {
@@ -244,7 +244,7 @@ pub fn save_app_list(app: tauri::AppHandle, list: AppList) -> Result<AppList, St
 
 #[tauri::command]
 pub fn delete_app_list(app: tauri::AppHandle, id: String) -> Result<(), String> {
-    let _guard = FILE_LOCK.lock().unwrap();
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let path = lists_path(&app);
     let mut lists: Vec<AppList> = crate::paths::read_json(&path);
     lists.retain(|l| l.id != id);

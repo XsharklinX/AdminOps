@@ -1,3 +1,4 @@
+import { usePageActive } from "../lib/pageActive";
 import { ArrowDown, ArrowUp, FolderOpen, Lock, Pause, Play, Search, ShieldAlert, Skull, TriangleAlert, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
@@ -9,6 +10,7 @@ type SortKey = "name" | "pid" | "cpu" | "memory" | "disk";
 const rate = (b: number) => (b < 1024 ? "0 B/s" : `${bytes(b)}/s`);
 
 export function Processes({ isAdmin }: { isAdmin: boolean }) {
+  const active = usePageActive();
   const [procs, setProcs] = useState<ProcessView[] | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "cpu", desc: true });
@@ -33,10 +35,10 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     load();
-    if (paused) return;
+    if (paused || !active) return;
     const t = window.setInterval(load, 2000);
     return () => window.clearInterval(t);
-  }, [load, paused]);
+  }, [load, paused, active]);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();

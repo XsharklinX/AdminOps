@@ -4,13 +4,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Modal, inputClass } from "../components/ui";
 import { portalsApi, type Portal } from "../lib/api";
+import { windowRect } from "../lib/prefs";
 
 const LAST = "adminops.lastPortal";
 
-const rectOf = (el: HTMLElement) => {
-  const r = el.getBoundingClientRect();
-  return { x: r.left, y: r.top, width: r.width, height: r.height };
-};
+// Con el zoom de la interfaz aplicado: la vista web va en píxeles de la ventana.
+const rectOf = windowRect;
 
 /** `covered`: hay un diálogo de la app encima (la vista web nativa lo taparía). */
 export function Tickets({ covered = false }: { covered?: boolean }) {
@@ -43,8 +42,9 @@ export function Tickets({ covered = false }: { covered?: boolean }) {
     load().catch((e) => toast("error", String(e)));
   }, [load, toast]);
 
-  // Al salir de la página, la vista nativa (que va por encima de la interfaz) se oculta.
-  useEffect(() => () => void portalsApi.hideAll(), []);
+  // Al cerrar la página, su vista nativa (que va por encima de la interfaz) se oculta.
+  const shownRef = useRef<string | null>(null);
+  useEffect(() => () => void (shownRef.current && portalsApi.hide(shownRef.current)), []);
 
   useEffect(() => {
     const un = listen<{ id: string; url: string; loading: boolean }>("portal-load", (e) => {
@@ -61,10 +61,12 @@ export function Tickets({ covered = false }: { covered?: boolean }) {
   const overlay = editing !== null || confirming || covered;
   useLayoutEffect(() => {
     const el = area.current;
+    // Solo la vista de esta página: la del router puede estar viva en otra.
     if (!active || !el || overlay) {
-      portalsApi.hideAll();
+      if (shownRef.current) portalsApi.hide(shownRef.current);
       return;
     }
+    shownRef.current = active;
     try {
       localStorage.setItem(LAST, active);
     } catch {

@@ -52,6 +52,16 @@ pub struct Settings {
     pub catalog: Vec<CatalogItem>,
     /// Firma del técnico (data URL PNG) que aparece en los informes.
     pub tech_signature: Option<String>,
+    /// Notificación de Windows al terminar una tarea larga con la app en segundo plano.
+    pub notify_tasks: bool,
+    /// Punto de restauración antes de cambiar el sistema: risky | always | never.
+    pub restore_points: String,
+    /// Al abrir, borrar historial, análisis e informes con más de estos meses (0: nunca).
+    pub auto_cleanup_months: u32,
+    /// Al abrir, comprobar si hay una versión nueva en GitHub.
+    pub check_updates: bool,
+    /// Vigilar el Visor de eventos y avisar de errores típicos de Windows.
+    pub watch_windows: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -104,6 +114,11 @@ impl Default for Settings {
             .map(|name| CatalogItem { name: name.into(), ..Default::default() })
             .to_vec(),
             tech_signature: None,
+            notify_tasks: true,
+            restore_points: "risky".into(),
+            auto_cleanup_months: 0,
+            check_updates: true,
+            watch_windows: true,
         }
     }
 }
@@ -148,6 +163,10 @@ pub fn save_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), St
     if settings.catalog.iter().any(|c| !c.price.is_finite() || c.price < 0.0) {
         return Err("Los precios del catálogo no pueden ser negativos.".into());
     }
+    if !["risky", "always", "never"].contains(&settings.restore_points.as_str()) {
+        return Err("Opción de puntos de restauración no válida.".into());
+    }
+    crate::tweaks::set_restore_point_policy(&settings.restore_points);
     crate::paths::write_json(&settings_path(&app), &settings)
 }
 
@@ -274,6 +293,148 @@ pub struct Machine {
     pub last_seen: u64,
     /// Resumen del hardware en la última visita (CPU, RAM, GPU, placa).
     pub hardware: String,
+    /// Ficha completa del equipo (inventario de la oficina).
+    pub inventory: Option<MachineInventory>,
+}
+
+/// Lo que hay que saber de un equipo para el inventario y para decidir si renovarlo.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MachineInventory {
+    pub manufacturer: String,
+    pub model: String,
+    pub serial: String,
+    pub cpu: String,
+    pub cores: u32,
+    pub ram_gb: f64,
+    /// "SSD NVMe 477 GB + HDD 932 GB"
+    pub disks: String,
+    pub gpu: String,
+    pub os: String,
+    pub bios_year: Option<i32>,
+    pub installed: String,
+    pub tpm: Option<bool>,
+    pub secure_boot: Option<bool>,
+    pub security: Option<u32>,
+    pub battery: Option<f64>,
+    pub ip: String,
+    pub mac: String,
+    /// ok | upgrade | replace
+    pub verdict: String,
+    pub reasons: Vec<String>,
+    pub updated: u64,
+}
+
+impl MachineInventory {
+    pub fn from(d: &diagnostics::Diagnostics, lan: Option<&crate::network::lan::LanInfo>) -> Self {
+        use chrono::Datelike;
+        let hw = d.hardware.data.as_ref();
+        let sys = d.system.data.as_ref();
+        let disks = d.disks.data.as_deref().unwrap_or(&[]);
+        let gb = |b: u64| b as f64 / 1024f64.powi(3);
+        let disk_text = disks
+            .iter()
+            .map(|k| {
+                let kind = if k.media_type.eq_ignore_ascii_case("SSD") {
+                    if k.bus_type.eq_ignore_ascii_case("NVMe") { "SSD NVMe" } else { "SSD" }
+                } else if k.media_type.eq_ignore_ascii_case("HDD") {
+                    "HDD"
+                } else {
+                    "Disco"
+                };
+                let size = gb(k.size);
+                if size >= 1000.0 { format!("{kind} {:.1} TB", size / 1024.0) } else { format!("{kind} {size:.0} GB") }
+            })
+            .collect::<Vec<_>>()
+            .join(" + ");
+        let bios_year = hw.and_then(|h| h.bios_date.as_deref()).and_then(diagnostics::parse_time).map(|t| t.year());
+        let ram_gb = gb(d.ram_total);
+        let battery = d.battery.data.as_ref().and_then(|b| b.as_ref().map(|b| b.health()));
+        let mut replace = Vec::new();
+        let mut upgrade = Vec::new();
+        if let Some(y) = bios_year {
+            if chrono::Local::now().year() - y >= 7 {
+                replace.push(format!("Equipo de hacia {y}: más de 7 años"));
+            }
+        }
+        if ram_gb < 3.5 {
+            replace.push(format!("Solo {ram_gb:.0} GB de memoria"));
+        } else if ram_gb < 7.5 {
+            upgrade.push(format!("Ampliar la memoria ({ram_gb:.0} GB → 8-16 GB)"));
+        }
+        let win10 = d.os.contains("Windows 10");
+        if win10 && sys.and_then(|s| s.tpm_ready) == Some(false) {
+            replace.push("Windows 10 sin soporte y no puede pasar a Windows 11 (sin TPM 2.0)".into());
+        } else if win10 {
+            upgrade.push("Actualizar a Windows 11 (Windows 10 sin soporte desde octubre de 2025)".into());
+        }
+        if !disks.is_empty() && disks.iter().all(|k| k.media_type.eq_ignore_ascii_case("HDD")) {
+            upgrade.push("Cambiar el disco duro por un SSD (el cambio que más se nota)".into());
+        }
+        for k in disks.iter().filter(|k| !k.health.eq_ignore_ascii_case("Healthy")) {
+            upgrade.push(format!("Reemplazar el disco {} ({})", k.name, k.health));
+        }
+        for k in d.smart.data.iter().flatten() {
+            if k.predict_failure || k.pending.unwrap_or(0) > 0 || k.uncorrectable.unwrap_or(0) > 0 {
+                let text = format!("Reemplazar el disco {} (sectores dañados)", k.model.trim());
+                if !upgrade.contains(&text) {
+                    upgrade.push(text);
+                }
+            }
+        }
+        if let Some(b) = battery.filter(|b| *b < 60.0) {
+            upgrade.push(format!("Cambiar la batería ({b:.0}% de su capacidad)"));
+        }
+        let verdict = if !replace.is_empty() {
+            "replace"
+        } else if !upgrade.is_empty() {
+            "upgrade"
+        } else {
+            "ok"
+        };
+        MachineInventory {
+            manufacturer: hw.map(|h| h.manufacturer.trim().to_string()).unwrap_or_default(),
+            model: hw.map(|h| h.model.trim().to_string()).unwrap_or_default(),
+            serial: hw.map(|h| h.serial.trim().to_string()).unwrap_or_default(),
+            cpu: d.cpu.clone(),
+            cores: hw.map_or(0, |h| h.cores),
+            ram_gb: (ram_gb * 10.0).round() / 10.0,
+            disks: disk_text,
+            gpu: hw.map(|h| h.gpus.iter().map(|g| g.name.clone()).collect::<Vec<_>>().join(" + ")).unwrap_or_default(),
+            os: d.os.clone(),
+            bios_year,
+            installed: sys.map(|s| s.install_date.chars().take(10).collect()).unwrap_or_default(),
+            tpm: sys.and_then(|s| s.tpm_ready),
+            secure_boot: sys.and_then(|s| s.secure_boot),
+            security: d.security.data.as_ref().map(|a| a.score),
+            battery,
+            ip: lan.map(|l| l.ip.clone()).unwrap_or_default(),
+            mac: lan.map(|l| l.mac.clone()).unwrap_or_default(),
+            verdict: verdict.into(),
+            reasons: replace.into_iter().chain(upgrade).collect(),
+            updated: now(),
+        }
+    }
+}
+
+/// Mapa de la red de la oficina del cliente (dispositivos encontrados).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct NetworkMap {
+    pub name: String,
+    pub gateway: String,
+    pub saved: u64,
+    pub devices: Vec<MapDevice>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MapDevice {
+    pub ip: String,
+    pub mac: String,
+    pub name: String,
+    pub vendor: String,
+    pub alias: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -363,6 +524,7 @@ pub struct Client {
     pub created: u64,
     pub machines: Vec<Machine>,
     pub sessions: Vec<SessionRecord>,
+    pub network: Option<NetworkMap>,
 }
 
 fn clients_path(app: &tauri::AppHandle) -> PathBuf {
@@ -407,7 +569,7 @@ pub fn save_client(app: tauri::AppHandle, client: Client) -> Result<Client, Stri
             existing.clone()
         }
         None => {
-            let c = Client { id: new_id(), name: client.name.trim().into(), created: now(), machines: vec![], sessions: vec![], ..client };
+            let c = Client { id: new_id(), name: client.name.trim().into(), created: now(), machines: vec![], sessions: vec![], network: None, ..client };
             all.push(c.clone());
             c
         }
@@ -454,24 +616,73 @@ pub fn maintenance_date(months: u32, from: u64) -> Option<u64> {
 
 /// Archiva una visita en la ficha del cliente y registra (o actualiza) el equipo.
 pub fn archive_visit(app: &tauri::AppHandle, client_id: &str, after: &diagnostics::Diagnostics, mut record: SessionRecord) -> Result<(), String> {
-    let hardware = after.hardware.data.as_ref().map(|h| h.summary()).unwrap_or_default();
     let mut all = load_clients(app);
     let Some(c) = all.iter_mut().find(|c| c.id == client_id) else { return Ok(()) };
-    match c.machines.iter_mut().find(|m| m.host.eq_ignore_ascii_case(&record.host)) {
+    record.hardware_change = upsert_machine(c, after, record.started);
+    c.sessions.insert(0, record);
+    save_clients(app, &all)
+}
+
+/// Registra o actualiza el equipo en la ficha del cliente. Devuelve el cambio de hardware, si lo hubo.
+fn upsert_machine(c: &mut Client, d: &diagnostics::Diagnostics, since: u64) -> Option<String> {
+    let hardware = d.hardware.data.as_ref().map(|h| h.summary()).unwrap_or_default();
+    let lan = crate::network::lan::current().ok().flatten();
+    let inventory = Some(MachineInventory::from(d, lan.as_ref()));
+    match c.machines.iter_mut().find(|m| m.host.eq_ignore_ascii_case(&d.host)) {
         Some(m) => {
-            if !m.hardware.is_empty() && !hardware.is_empty() && m.hardware != hardware {
-                record.hardware_change = Some(format!("{} → {}", m.hardware, hardware));
-            }
+            let change = (!m.hardware.is_empty() && !hardware.is_empty() && m.hardware != hardware).then(|| format!("{} → {}", m.hardware, hardware));
             m.last_seen = now();
-            m.os = after.os.clone();
+            m.os = d.os.clone();
             if !hardware.is_empty() {
                 m.hardware = hardware;
             }
+            m.inventory = inventory;
+            change
         }
-        None => c.machines.push(Machine { host: record.host.clone(), os: after.os.clone(), first_seen: record.started, last_seen: now(), hardware }),
+        None => {
+            c.machines.push(Machine { host: d.host.clone(), os: d.os.clone(), first_seen: since.min(now()), last_seen: now(), hardware, inventory });
+            None
+        }
     }
-    c.sessions.insert(0, record);
-    save_clients(app, &all)
+}
+
+/// Añade (o actualiza) este equipo en el inventario de un cliente, sin sesión de servicio.
+/// Usa el último diagnóstico si es reciente; si no, hace uno.
+#[tauri::command(async)]
+pub fn inventory_add_this(app: tauri::AppHandle, state: State<'_, TweakState>, client_id: String) -> Result<Client, String> {
+    let recent = diagnostics::latest_snapshot(&app).filter(|d| now().saturating_sub(d.timestamp) < 12 * 3600);
+    let d = match recent {
+        Some(d) => d,
+        None => {
+            let task = crate::task::Task::new(&app, "inventory");
+            task.step("Analizando este equipo…");
+            diagnostics::run_and_save(&app, &state)
+        }
+    };
+    let mut all = load_clients(&app);
+    let c = all.iter_mut().find(|c| c.id == client_id).ok_or("Cliente no encontrado.")?;
+    upsert_machine(c, &d, d.timestamp);
+    let saved = c.clone();
+    save_clients(&app, &all)?;
+    Ok(saved)
+}
+
+/// Quita un equipo del inventario del cliente (las visitas no se tocan).
+#[tauri::command]
+pub fn inventory_remove(app: tauri::AppHandle, client_id: String, host: String) -> Result<(), String> {
+    let mut all = load_clients(&app);
+    let c = all.iter_mut().find(|c| c.id == client_id).ok_or("Cliente no encontrado.")?;
+    c.machines.retain(|m| !m.host.eq_ignore_ascii_case(&host));
+    save_clients(&app, &all)
+}
+
+/// Guarda en la ficha del cliente los dispositivos encontrados en su red.
+#[tauri::command]
+pub fn save_network_map(app: tauri::AppHandle, client_id: String, map: NetworkMap) -> Result<(), String> {
+    let mut all = load_clients(&app);
+    let c = all.iter_mut().find(|c| c.id == client_id).ok_or("Cliente no encontrado.")?;
+    c.network = Some(NetworkMap { saved: now(), devices: map.devices.into_iter().take(1024).collect(), ..map });
+    save_clients(&app, &all)
 }
 
 // ---------- Sesión de servicio ----------
@@ -506,6 +717,11 @@ pub struct ActiveSession {
     pub signer: String,
     pub labor_warranty_days: u32,
     pub maintenance_months: u32,
+}
+
+/// Análisis «antes» de la sesión en curso (no se borra al limpiar datos antiguos).
+pub fn active_baseline(app: &tauri::AppHandle) -> Option<u64> {
+    load_session(app).map(|s| s.baseline)
 }
 
 fn session_path(app: &tauri::AppHandle) -> PathBuf {
@@ -639,6 +855,68 @@ pub fn finish_session(app: tauri::AppHandle, state: State<'_, TweakState>) -> Re
     Ok(created.path)
 }
 
+// ---------- Copia de la configuración ----------
+
+/// Ajustes, portales de Tickets y preferencias de la interfaz en un .json (sin contraseñas).
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct ConfigBackup {
+    app: String,
+    version: String,
+    settings: Option<Settings>,
+    portals: Vec<crate::portals::Portal>,
+    prefs: serde_json::Value,
+}
+
+#[tauri::command(async)]
+pub fn export_config(app: tauri::AppHandle, prefs: serde_json::Value) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let backup = ConfigBackup {
+        app: "AdminOps".into(),
+        version: app.package_info().version.to_string(),
+        settings: Some(settings(&app)),
+        portals: crate::portals::export_portals(&app),
+        prefs,
+    };
+    let Some(file) = app
+        .dialog()
+        .file()
+        .set_file_name(format!("Configuración AdminOps {}.json", chrono::Local::now().format("%Y-%m-%d")))
+        .add_filter("Configuración de AdminOps", &["json"])
+        .blocking_save_file()
+        .and_then(|p| p.into_path().ok())
+    else {
+        return Ok(None);
+    };
+    let json = serde_json::to_string_pretty(&backup).map_err(|e| e.to_string())?;
+    std::fs::write(&file, json).map_err(|e| format!("No se pudo guardar: {e}"))?;
+    Ok(Some(file.display().to_string()))
+}
+
+/// Devuelve las preferencias de la interfaz para aplicarlas (los ajustes y portales ya quedan guardados).
+#[tauri::command(async)]
+pub fn import_config(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let Some(file) = app.dialog().file().add_filter("Configuración de AdminOps", &["json"]).blocking_pick_file().and_then(|p| p.into_path().ok()) else {
+        return Ok(None);
+    };
+    let text = std::fs::read_to_string(&file).map_err(|e| format!("No se pudo leer: {e}"))?;
+    if text.len() > 5_000_000 {
+        return Err("El archivo es demasiado grande.".into());
+    }
+    let backup: ConfigBackup = serde_json::from_str(&text).map_err(|_| "No es una configuración de AdminOps.".to_string())?;
+    if backup.app != "AdminOps" {
+        return Err("No es una configuración de AdminOps.".into());
+    }
+    if let Some(mut s) = backup.settings {
+        // El asistente del primer arranque ya se hizo en este equipo.
+        s.onboarded = true;
+        save_settings(app.clone(), s)?;
+    }
+    crate::portals::import_portals(&app, backup.portals)?;
+    Ok(Some(backup.prefs))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,6 +956,21 @@ mod tests {
         let neg = Billing { discount: -1.0, ..b };
         assert!(neg.validate().is_err());
         assert_eq!(maintenance_date(0, 5), None);
+    }
+
+    /// Con un análisis real: `ADMINOPS_SNAPSHOTS=<carpeta> cargo test inventory_real -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn inventory_real() {
+        let dir = std::path::PathBuf::from(std::env::var("ADMINOPS_SNAPSHOTS").unwrap());
+        let mut files: Vec<_> = std::fs::read_dir(dir).unwrap().flatten().map(|e| e.path()).collect();
+        files.sort();
+        let d: diagnostics::Diagnostics = serde_json::from_str(&std::fs::read_to_string(files.last().unwrap()).unwrap()).unwrap();
+        let inv = MachineInventory::from(&d, None);
+        println!("{} {} · {} · {} GB · {} · {} · año {:?} · {}", inv.manufacturer, inv.model, inv.cpu, inv.ram_gb, inv.disks, inv.os, inv.bios_year, inv.verdict);
+        for r in inv.reasons {
+            println!("  → {r}");
+        }
     }
 
     #[test]
