@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.11.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.12.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.11)
+## Hecho (v0.1 – v0.12)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -21,6 +21,7 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 9. Flujo del técnico | 0.9 | Sesión de servicio, clientes, perfiles propios (importar/exportar), marca en el informe, checklist, "by David Bonilla" |
 | 10. Hardware | 0.10 | Inventario (placa, BIOS, RAM por ranura, GPU, monitores, clave OEM), temperaturas (LibreHardwareMonitor), SMART, prueba de RAM, speedtest con medidor animado e IP/proveedor |
 | 11. Caja de herramientas | 0.11 | ~90 accesos rápidos a utilidades de Windows (favoritos y accesos propios), usuarios locales (crear, contraseña, admin/estándar, activar, eliminar con perfil), ficha rápida del equipo, redes Wi-Fi guardadas con contraseña |
+| 12. Después de formatear | 0.12 | Instalar programas en lote (winget, listas propias), copia y restauración de datos del usuario, herramientas de red (ping/traza, DNS, puertos, hosts), impresoras, driver probable de los pantallazos azules |
 
 ### Fase 6 en detalle
 
@@ -138,22 +139,25 @@ Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo
 - Pendiente de verificar a mano: crear, modificar y borrar usuarios reales y olvidar una red Wi-Fi
   (se hará en la VM de la Fase 13).
 
-### Fase 12 — Después de formatear (v0.12)
+### Fase 12 — Después de formatear (v0.12) ✅
 
-**Prioridad: alta.** Lo que el técnico hace en cada equipo recién instalado o migrado.
-
-- **Instalación de programas en lote** con winget: listas propias (navegador, 7-Zip, VLC, AnyDesk,
-  Office…) que se instalan de una vez, con progreso y resultado por programa.
-- **Copia de datos del usuario** a un USB o disco (Escritorio, Documentos, Imágenes, favoritos de los
-  navegadores, perfiles Wi-Fi) y restauración en el equipo nuevo.
-- **Red avanzada**: cambiar DNS con un clic (Cloudflare, Google, automático) por adaptador, editor del
-  archivo hosts, ping y tracert integrados, puertos en uso por programa.
-- **Impresoras**: lista, limpiar la cola atascada, página de prueba, quitar impresoras fantasma.
-- **Pantallazos azules**: driver culpable a partir de los minidumps.
-- **Informe de batería** en portátiles: capacidad real frente a la de fábrica.
-
-**Terminado cuando:** dejar listo un equipo recién formateado (programas, datos y red) no requiere
-salir de AdminOps.
+- **Instalar programas**: catálogo de ~75 programas con ids de winget verificados (`src-tauri/tools/apps.toml`),
+  listas predefinidas (Básico, Oficina, Gaming, Kit del técnico) y listas propias, búsqueda en winget para
+  cualquier otro programa y marca de los ya instalados (`winget export`, independiente del idioma).
+- **Copia de datos**: Escritorio, Documentos, Imágenes, Música, Vídeos, Descargas (respetando las carpetas
+  redirigidas a OneDrive), marcadores de Chrome/Edge/Brave/Firefox y redes Wi-Fi, a un USB con
+  `adminops-backup.json`. Los archivos que solo están en la nube no se descargan. Al restaurar nunca se
+  sobrescribe: lo distinto se guarda como «nombre (AdminOps)».
+- **Herramientas de red**: ping y traza de ruta en vivo con ICMP nativo, DNS por adaptador (Cloudflare,
+  Google, Quad9, familia o propios), puertos en uso por programa y editor del archivo hosts con copia.
+- **Impresoras**: estado y errores (atasco, sin papel…), vaciar la cola, página de prueba, predeterminada,
+  quitar impresoras fantasma y reiniciar la cola completa.
+- **Pantallazos azules**: el diagnóstico lee los minivolcados (formato de triaje de 64 bits) y señala el
+  driver probable a partir de la pila del fallo, con una pista de qué hacer.
+- El informe de batería ya existía en Diagnóstico (capacidad real frente a la de fábrica).
+- Pendiente de verificar a mano (VM de la Fase 13): instalar en lote, restaurar una copia real, cambiar DNS,
+  guardar hosts, quitar una impresora y analizar un volcado real (provocado con NotMyFault de Sysinternals,
+  que debe señalar `myfault.sys`).
 
 ### Fase 13 — Base sólida antes de crecer (v0.13)
 

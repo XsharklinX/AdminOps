@@ -11,15 +11,19 @@ import {
   FileText,
   Gauge,
   HardDrive,
+  HardDriveDownload,
   History,
   Layers,
   Package,
+  PackagePlus,
   Power,
+  Printer,
   Settings as SettingsIcon,
   ShieldHalf,
   Stethoscope,
   Toolbox,
   UserCog,
+  Waypoints,
   Users,
   Wifi,
   Wrench,
@@ -32,6 +36,7 @@ export type PageId =
   | "diagnostics"
   | "hardware"
   | "network"
+  | "nettools"
   | "space"
   | "profiles"
   | "cleanup"
@@ -41,9 +46,12 @@ export type PageId =
   | "services"
   | "startup"
   | "software"
+  | "install"
   | "session"
   | "tools"
   | "users"
+  | "migrate"
+  | "printers"
   | "clients"
   | "repair"
   | "report"
@@ -65,6 +73,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope },
       { id: "hardware", label: "Hardware", icon: CircuitBoard },
       { id: "network", label: "Red y velocidad", icon: Wifi },
+      { id: "nettools", label: "Herramientas de red", icon: Waypoints },
       { id: "space", label: "Espacio en disco", icon: HardDrive },
     ],
   },
@@ -79,6 +88,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "services", label: "Servicios", icon: Cog },
       { id: "startup", label: "Inicio", icon: Power },
       { id: "software", label: "Actualizar software", icon: Download },
+      { id: "install", label: "Instalar programas", icon: PackagePlus },
     ],
   },
   {
@@ -88,6 +98,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "clients", label: "Clientes", icon: Users },
       { id: "tools", label: "Herramientas", icon: Toolbox },
       { id: "users", label: "Usuarios locales", icon: UserCog },
+      { id: "migrate", label: "Copia de datos", icon: HardDriveDownload },
+      { id: "printers", label: "Impresoras", icon: Printer },
       { id: "repair", label: "Reparaciones", icon: Wrench },
       { id: "report", label: "Informe", icon: FileText },
       { id: "history", label: "Historial", icon: History },
@@ -137,15 +149,16 @@ export function Sidebar({
 
       <nav className="flex flex-1 flex-col overflow-y-auto px-3 pb-2">
         {NAV_GROUPS.map((g) => (
-          <div key={g.title} className="mb-1.5">
-            <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold tracking-[0.14em] text-mute uppercase">{g.title}</div>
+          <div key={g.title} className="mb-1">
+            <div className="px-3 pt-1 pb-px text-[10px] font-semibold tracking-[0.14em] text-mute uppercase">{g.title}</div>
             {g.items.map(({ id, label, icon: Icon }) => {
               const on = id === active;
               return (
                 <button
                   key={id}
+                  ref={on ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
                   onClick={() => onSelect(id)}
-                  className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-[3px] text-left text-[13px] transition-colors ${
+                  className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-[2px] text-left text-[13px] transition-colors ${
                     on ? "bg-neon/10 text-neon" : "text-dim hover:bg-panel-2 hover:text-ink"
                   }`}
                 >
@@ -162,7 +175,7 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="mx-3 mb-2 rounded-lg border border-line bg-void/60 px-3 py-2.5">
+      <div className="mx-3 mb-1.5 rounded-lg border border-line bg-void/60 px-3 py-2">
         <div className="flex items-center gap-2 text-xs">
           <span
             className={`size-2 rounded-full ${isAdmin ? "bg-ok shadow-[0_0_8px_var(--color-ok)]" : "bg-warn shadow-[0_0_8px_var(--color-warn)]"}`}
@@ -181,7 +194,7 @@ export function Sidebar({
           </div>
         )}
       </div>
-      <button onClick={onAbout} className="mb-3 text-center text-[10px] tracking-wide text-mute transition-colors hover:text-neon">
+      <button onClick={onAbout} className="mb-2 text-center text-[10px] tracking-wide text-mute transition-colors hover:text-neon">
         by <span className="font-semibold">David Bonilla</span>
       </button>
     </aside>

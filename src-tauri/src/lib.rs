@@ -1,10 +1,13 @@
+mod apps;
 mod diagnostics;
 mod drivers;
 mod elevation;
 mod hardware;
 mod metrics;
+mod migrate;
 mod network;
 mod paths;
+mod printers;
 mod processes;
 mod software;
 mod space;
@@ -112,6 +115,23 @@ pub fn run() {
             space::reveal_in_explorer,
             software::list_software_updates,
             software::upgrade_software,
+            apps::app_catalog,
+            apps::installed_apps,
+            apps::search_apps,
+            apps::install_apps,
+            apps::save_app_list,
+            apps::delete_app_list,
+            migrate::migrate_profiles,
+            migrate::migrate_estimate,
+            migrate::migrate_pick_folder,
+            migrate::migrate_backup,
+            migrate::migrate_read_backup,
+            migrate::migrate_restore,
+            printers::list_printers,
+            printers::clear_printer_queue,
+            printers::print_test_page,
+            printers::set_default_printer,
+            printers::remove_printer,
             processes::list_processes,
             processes::kill_process,
             processes::open_process_location,
@@ -121,6 +141,14 @@ pub fn run() {
             network::speedtest::list_speedtests,
             network::wifi::list_wifi_profiles,
             network::wifi::forget_wifi_profile,
+            network::tools::start_ping,
+            network::tools::start_trace,
+            network::tools::stop_probe,
+            network::tools::list_ports,
+            network::tools::list_dns_adapters,
+            network::tools::set_dns,
+            network::tools::read_hosts,
+            network::tools::save_hosts,
             toolbox::list_tools,
             toolbox::launch_tool,
             toolbox::set_tool_favorite,

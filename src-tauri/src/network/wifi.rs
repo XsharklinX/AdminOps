@@ -151,6 +151,13 @@ mod native {
             Some(text)
         }
 
+        /// Crea o reemplaza un perfil a partir de su XML. Devuelve el código de error (0 = bien).
+        pub fn set_profile(&self, guid: &GUID, xml: &str) -> u32 {
+            let xml_w = wide(xml);
+            let mut reason = 0;
+            unsafe { WlanSetProfile(self.0, guid, 0, xml_w.as_ptr(), std::ptr::null(), 1, std::ptr::null(), &mut reason) }
+        }
+
         pub fn delete(&self, guid: &GUID, name: &str) -> u32 {
             let name_w = wide(name);
             unsafe { WlanDeleteProfile(self.0, guid, name_w.as_ptr(), std::ptr::null()) }
@@ -182,6 +189,42 @@ pub fn list() -> Result<Vec<WifiProfile>, String> {
     }
     out.sort_by_key(|p| (!p.connected, p.name.to_lowercase()));
     Ok(out)
+}
+
+/// XML de cada perfil con la clave en claro (con administrador), para copiarlos a otro equipo.
+#[cfg(windows)]
+pub fn export_all() -> Result<Vec<(String, String)>, String> {
+    let s = native::Session::open()?;
+    let mut out: Vec<(String, String)> = Vec::new();
+    for guid in s.interfaces() {
+        for name in s.profile_names(&guid) {
+            if out.iter().any(|(n, _)| *n == name) {
+                continue;
+            }
+            if let Some(xml) = s.profile_xml(&guid, &name) {
+                out.push((name, xml));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Importa perfiles (XML) en el primer adaptador Wi-Fi. Devuelve cuántos se importaron.
+#[cfg(windows)]
+pub fn import_all(profiles: &[String]) -> Result<usize, String> {
+    let s = native::Session::open()?;
+    let guid = s.interfaces().into_iter().next().ok_or("Este equipo no tiene ningún adaptador Wi-Fi.")?;
+    Ok(profiles.iter().filter(|xml| s.set_profile(&guid, xml) == 0).count())
+}
+
+#[cfg(not(windows))]
+pub fn export_all() -> Result<Vec<(String, String)>, String> {
+    Err("Solo disponible en Windows.".into())
+}
+
+#[cfg(not(windows))]
+pub fn import_all(_: &[String]) -> Result<usize, String> {
+    Err("Solo disponible en Windows.".into())
 }
 
 #[cfg(not(windows))]

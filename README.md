@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.11.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-0.12.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -39,7 +39,7 @@ CPU por núcleo, memoria, discos, red, temperaturas y los procesos que más cons
 ### 🩺 Diagnóstico
 Un análisis completo en segundos: salud de discos (SMART), pantallazos azules y apagados inesperados,
 aplicaciones que fallan, drivers con error, batería, Defender, Windows Update, activación y TPM.
-Cada hallazgo viene priorizado y con **un botón para resolverlo**. Los análisis se guardan para comparar el antes y el después.
+Cada hallazgo viene priorizado y con **un botón para resolverlo**. En los pantallazos azules señala el **driver probable** analizando los volcados de memoria. Los análisis se guardan para comparar el antes y el después.
 
 <img src="docs/screenshots/diagnostics.png" alt="Diagnóstico" width="860" />
 
@@ -54,6 +54,9 @@ Test de velocidad profesional (descarga, subida, latencia y jitter con varias co
 datos de la conexión (proveedor, IP pública con opción de ocultarla, servidor), diagnóstico de red (adaptadores, puerta de enlace, DNS y conectividad) y **redes Wi-Fi guardadas con su contraseña**.
 
 <img src="docs/screenshots/network.png" alt="Red y velocidad" width="860" />
+
+### 🛰️ Herramientas de red
+Ping y traza de ruta en vivo, cambio de DNS con un clic (Cloudflare, Google, Quad9…), puertos abiertos por programa y editor del archivo hosts.
 
 ### ⚙️ Procesos
 Lista en vivo con CPU, memoria y disco por proceso. Busca por nombre, PID, ruta o usuario y **finaliza procesos**
@@ -77,6 +80,7 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | **Servicios** | Desactiva servicios innecesarios con explicación y reversión. |
 | **Inicio** | Controla qué arranca con Windows (igual que el Administrador de tareas, sin borrar nada). |
 | **Actualizar software** | Detecta programas desactualizados y los actualiza con winget. |
+| **Instalar programas** | Tras formatear: marca Chrome, 7-Zip, VLC, AnyDesk… (o una lista guardada) y se instalan todos solos con winget. |
 | **Espacio en disco** | Analiza qué carpetas ocupan más, muy rápido incluso en discos grandes. |
 
 ### 🧰 Servicio técnico
@@ -86,6 +90,8 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | **Clientes** | Fichas de clientes y sus equipos, con historial de cada visita. |
 | **Herramientas** | ~90 accesos directos a CMD, services.msc, ncpa.cpl, regedit, visor de eventos, BIOS/UEFI… con buscador, favoritos y tus propios accesos. Incluye la ficha del equipo (serie y clave OEM) para copiar. |
 | **Usuarios locales** | Crea usuarios, cambia contraseñas, hazlos administradores o estándar, desactívalos o elimínalos con su perfil. Funciona también en Windows Home. |
+| **Copia de datos** | Copia Escritorio, Documentos, Imágenes, marcadores y redes Wi-Fi a un USB y restáuralos en el equipo nuevo sin sobrescribir nada. |
+| **Impresoras** | Estado, atascos, vaciar la cola, página de prueba y quitar impresoras fantasma. |
 | **Reparaciones** | SFC, DISM, reinicio de red, Windows Update, cola de impresión, Explorador, hora, caché de iconos y prueba de RAM. |
 | **Informe** | PDF profesional listo para entregar: estado del equipo, hardware, hallazgos, cambios y velocidad. |
 | **Historial** | Todo lo aplicado, con opción de deshacer, y el registro técnico de actividad. |

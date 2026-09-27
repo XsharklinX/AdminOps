@@ -8,7 +8,6 @@
 
 use crate::tweaks::journal::Op;
 use crate::tweaks::TweakState;
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::State;
@@ -77,14 +76,7 @@ fn check_sid(sid: &str) -> Result<(), String> {
     if ok { Ok(()) } else { Err("Identificador de usuario no válido.".into()) }
 }
 
-fn b64(s: &str) -> String {
-    base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
-}
-
-/// Línea de PowerShell que recupera un texto enviado en base64.
-fn ps_text(var: &str, value: &str) -> String {
-    format!("${var} = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{}'))\n", b64(value))
-}
+use crate::ps::text_var as ps_text;
 
 fn run(script: &str, detail: &str, timeout_secs: u64) -> Result<String, String> {
     // Directo al pool con una descripción propia: el registro nunca ve el script.

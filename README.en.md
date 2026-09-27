@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-0.11.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-0.12.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Download](https://img.shields.io/badge/download-installer%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -42,7 +42,7 @@ Per-core CPU, memory, disks, network, temperatures and the top processes, refres
 ### 🩺 Diagnostics
 A full scan in seconds: disk health (SMART), blue screens and unexpected shutdowns, crashing apps,
 faulty drivers, battery, Defender, Windows Update, activation and TPM.
-Every finding is prioritized and comes with **a button to fix it**. Scans are saved so you can compare before and after.
+Every finding is prioritized and comes with **a button to fix it**. For blue screens it points to the **likely driver** by analyzing the memory dumps. Scans are saved so you can compare before and after.
 
 <img src="docs/screenshots/diagnostics.png" alt="Diagnostics" width="860" />
 
@@ -57,6 +57,9 @@ Professional speed test (download, upload, latency and jitter over several paral
 connection details (ISP, public IP with a hide option, server), network diagnostics (adapters, gateway, DNS and connectivity) and **saved Wi-Fi networks with their passwords**.
 
 <img src="docs/screenshots/network.png" alt="Network and speed test" width="860" />
+
+### 🛰️ Network tools
+Live ping and traceroute, one-click DNS change (Cloudflare, Google, Quad9…), open ports per program and a hosts file editor.
 
 ### ⚙️ Processes
 Live list with CPU, memory and disk usage per process. Search by name, PID, path or user and **end processes**
@@ -80,6 +83,7 @@ or build your own. One restore point per profile, and it can be undone as a whol
 | **Services** | Disables unnecessary services, with explanations and revert. |
 | **Startup** | Controls what runs at boot (same as Task Manager, nothing gets deleted). |
 | **Software updates** | Finds outdated programs and updates them with winget. |
+| **Install software** | After a clean install: tick Chrome, 7-Zip, VLC, AnyDesk… (or a saved list) and they all install unattended with winget. |
 | **Disk space** | Shows which folders take the most space, very fast even on large disks. |
 
 ### 🧰 Tech support
@@ -89,6 +93,8 @@ or build your own. One restore point per profile, and it can be undone as a whol
 | **Customers** | Customer records and their PCs, with the history of every visit. |
 | **Tools** | ~90 shortcuts to CMD, services.msc, ncpa.cpl, regedit, Event Viewer, BIOS/UEFI… with search, favorites and your own shortcuts. Includes a copyable PC sheet (serial number and OEM key). |
 | **Local users** | Create users, change passwords, make them admin or standard, disable them or delete them along with their profile. Works on Windows Home too. |
+| **Data backup** | Copies Desktop, Documents, Pictures, bookmarks and Wi-Fi networks to a USB drive and restores them on the new PC without overwriting anything. |
+| **Printers** | Status, paper jams, clear the queue, test page and remove ghost printers. |
 | **Repairs** | SFC, DISM, network reset, Windows Update, print spooler, Explorer, time sync, icon cache and RAM test. |
 | **Report** | Professional PDF ready to hand over: PC status, hardware, findings, changes and speed. |
 | **History** | Everything that was applied, with undo, plus the technical activity log. |

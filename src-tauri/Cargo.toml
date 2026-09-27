@@ -1,6 +1,6 @@
 [package]
 name = "adminops"
-version = "0.11.0"
+version = "0.12.0"
 description = "AdminOps - optimizacion y diagnostico de Windows"
 authors = ["David Bonilla"]
 edition = "2021"

@@ -25,6 +25,10 @@ const Session = lazyPage("Session", () => import("./pages/Session"));
 const Clients = lazyPage("Clients", () => import("./pages/Clients"));
 const Tools = lazyPage("Tools", () => import("./pages/Tools"));
 const Users = lazyPage("Users", () => import("./pages/Users"));
+const Install = lazyPage("Install", () => import("./pages/Install"));
+const NetTools = lazyPage("NetTools", () => import("./pages/NetTools"));
+const Printers = lazyPage("Printers", () => import("./pages/Printers"));
+const Migrate = lazyPage("Migrate", () => import("./pages/Migrate"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
 
 /** Páginas que son una lista de ajustes del catálogo, por categoría. */
@@ -53,7 +57,13 @@ export default function App() {
   useEffect(() => {
     api.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
     systemApi.targetUser().then(setTargetUser).catch(() => {});
-    appApi.info().then(setAppInfo).catch(() => {});
+    appApi
+      .info()
+      .then((info) => {
+        setAppInfo(info);
+        if (info.startPage && NAV.some((n) => n.id === info.startPage)) setPage(info.startPage as PageId);
+      })
+      .catch(() => {});
     workApi.session().then((s) => setSessionActive(!!s)).catch(() => {});
   }, []);
 
@@ -77,6 +87,10 @@ export default function App() {
   else if (page === "clients") content = <Clients />;
   else if (page === "tools") content = <Tools isAdmin={!!isAdmin} />;
   else if (page === "users") content = <Users isAdmin={!!isAdmin} />;
+  else if (page === "install") content = <Install isAdmin={!!isAdmin} />;
+  else if (page === "nettools") content = <NetTools isAdmin={!!isAdmin} />;
+  else if (page === "printers") content = <Printers isAdmin={!!isAdmin} />;
+  else if (page === "migrate") content = <Migrate />;
   else if (page === "settings") content = <SettingsPage appInfo={appInfo} />;
   else if (category) content = <TweaksPage key={category} category={category} isAdmin={!!isAdmin} focus={focus} />;
   else content = null;

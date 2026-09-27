@@ -213,7 +213,14 @@ export interface Stability {
   bugchecks: { time: string; code: string; name: string | null; hint: string | null }[];
   unexpectedShutdowns: string[];
   crashes: { app: string; count: number; last: string }[];
-  minidumps: { name: string; time: string; size: number }[] | null;
+  minidumps:
+    | {
+        name: string;
+        time: string;
+        size: number;
+        analysis: { bugcheck: string | null; culprit: string | null; culpritHint: string | null; stackDrivers: string[] } | null;
+      }[]
+    | null;
   bootTimes: { time: string; ms: number }[] | null;
 }
 
@@ -321,6 +328,7 @@ export interface AppInfo {
   portable: boolean;
   dataDir: string;
   reportsDir: string;
+  startPage: string | null;
 }
 
 export const profilesApi = {
@@ -734,4 +742,142 @@ export const usersApi = {
 export const wifiApi = {
   list: () => invoke<WifiProfile[]>("list_wifi_profiles"),
   forget: (name: string) => invoke<void>("forget_wifi_profile", { name }),
+};
+
+// ---------- Instalar programas y red avanzada (v0.12) ----------
+
+export interface CatalogApp {
+  id: string;
+  name: string;
+  category: string;
+  source: string;
+}
+
+export interface AppList {
+  id: string;
+  name: string;
+  description?: string;
+  apps: CatalogApp[];
+}
+
+export interface AppCatalog {
+  apps: CatalogApp[];
+  presets: { id: string; name: string; description: string; apps: string[] }[];
+  lists: AppList[];
+}
+
+export interface InstallResult {
+  id: string;
+  name: string;
+  ok: boolean;
+  message: string;
+}
+
+export const appsApi = {
+  catalog: () => invoke<AppCatalog>("app_catalog"),
+  installed: () => invoke<string[]>("installed_apps"),
+  search: (query: string) => invoke<(CatalogApp & { version: string })[]>("search_apps", { query }),
+  install: (apps: CatalogApp[]) => invoke<InstallResult[]>("install_apps", { apps }),
+  saveList: (list: AppList) => invoke<AppList>("save_app_list", { list }),
+  deleteList: (id: string) => invoke<void>("delete_app_list", { id }),
+};
+
+export interface Probe {
+  seq: number;
+  from: string | null;
+  ms: number | null;
+  status: "ok" | "timeout" | "unreachable" | "error";
+  reached: boolean;
+}
+
+export interface PortEntry {
+  protocol: "TCP" | "UDP";
+  localAddress: string;
+  localPort: number;
+  remoteAddress: string | null;
+  remotePort: number | null;
+  state: string;
+  pid: number;
+  process: string | null;
+}
+
+export interface DnsAdapter {
+  index: number;
+  name: string;
+  description: string;
+  virtual: boolean;
+  dns: string[];
+  manual: boolean;
+}
+
+export const netApi = {
+  ping: (host: string, count: number) => invoke<{ target: string; ip: string }>("start_ping", { host, count }),
+  trace: (host: string) => invoke<{ target: string; ip: string }>("start_trace", { host }),
+  stop: () => invoke<void>("stop_probe"),
+  ports: () => invoke<PortEntry[]>("list_ports"),
+  dnsAdapters: () => invoke<DnsAdapter[]>("list_dns_adapters"),
+  setDns: (index: number, servers: string[]) => invoke<void>("set_dns", { index, servers }),
+  readHosts: () => invoke<string>("read_hosts"),
+  saveHosts: (content: string) => invoke<void>("save_hosts", { content }),
+};
+
+export interface PrinterInfo {
+  name: string;
+  driver: string | null;
+  port: string | null;
+  default: boolean;
+  network: boolean;
+  shared: boolean;
+  offline: boolean;
+  status: number;
+  error: string | null;
+  jobs: number;
+  virtual: boolean;
+}
+
+export const printersApi = {
+  list: () => invoke<PrinterInfo[]>("list_printers"),
+  clearQueue: (name: string) => invoke<void>("clear_printer_queue", { name }),
+  testPage: (name: string) => invoke<void>("print_test_page", { name }),
+  setDefault: (name: string) => invoke<void>("set_default_printer", { name }),
+  remove: (name: string) => invoke<void>("remove_printer", { name }),
+};
+
+export interface MigrateEstimate {
+  id: string;
+  label: string;
+  bytes: number;
+  files: number;
+  note: string | null;
+  available: boolean;
+}
+
+export interface MigrateSummary {
+  folder: string;
+  files: number;
+  bytes: number;
+  cloudOnly: number;
+  unchanged: number;
+  renamed: number;
+  errors: string[];
+  notes: string[];
+  cancelled: boolean;
+}
+
+export interface BackupManifest {
+  app: string;
+  version: string;
+  created: string;
+  computer: string;
+  user: string;
+  items: { id: string; label: string; files: number; bytes: number; cloudOnly: number; errors: number }[];
+}
+
+export const migrateApi = {
+  profiles: () => invoke<{ sid: string; name: string; isTarget: boolean }[]>("migrate_profiles"),
+  estimate: (sid: string) => invoke<MigrateEstimate[]>("migrate_estimate", { sid }),
+  pickFolder: () => invoke<string | null>("migrate_pick_folder"),
+  backup: (sid: string, items: string[], dest: string) => invoke<MigrateSummary>("migrate_backup", { sid, items, dest }),
+  readBackup: (folder: string) => invoke<BackupManifest>("migrate_read_backup", { folder }),
+  restore: (folder: string, items: string[]) => invoke<MigrateSummary>("migrate_restore", { folder, items }),
 };

@@ -265,7 +265,6 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
         <div className="relative w-96">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input
-            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar: services, red, bios, impresoras, ncpa.cpl…"

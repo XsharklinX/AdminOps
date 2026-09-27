@@ -75,6 +75,9 @@ pub struct Dump {
     pub name: String,
     pub time: String,
     pub size: u64,
+    /// Código de error y driver probable (solo los 10 más recientes).
+    #[serde(default)]
+    pub analysis: Option<super::minidump::DumpAnalysis>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -130,6 +133,10 @@ ConvertTo-Json -Depth 4 -Compress -InputObject ([pscustomobject]@{{
 }})
 "#
     ))?;
+    let dir = std::path::PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into())).join("Minidump");
+    for d in s.minidumps.iter_mut().flatten().take(10) {
+        d.analysis = super::minidump::analyze_file(&dir.join(&d.name));
+    }
     for b in &mut s.bugchecks {
         let (name, hint) = bugcheck_info(&b.code);
         b.name = name.map(str::to_string);

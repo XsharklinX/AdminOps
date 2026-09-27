@@ -150,6 +150,8 @@ pub struct AppInfo {
     portable: bool,
     data_dir: String,
     reports_dir: String,
+    /// Página inicial para capturas y mediciones (`ADMINOPS_START_PAGE`, ver scripts/bench.ps1).
+    start_page: Option<String>,
 }
 
 #[tauri::command]
@@ -159,5 +161,6 @@ pub fn get_app_info(app: tauri::AppHandle) -> AppInfo {
         portable: is_portable(),
         data_dir: machine_data_dir(&app).display().to_string(),
         reports_dir: reports_dir(&app).display().to_string(),
+        start_page: std::env::var("ADMINOPS_START_PAGE").ok().filter(|p| p.len() < 32),
     }
 }

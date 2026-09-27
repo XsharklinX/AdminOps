@@ -2,6 +2,7 @@
 //! (snapshot) de cada análisis para comparar antes/después en el informe.
 
 pub mod collect;
+pub mod minidump;
 mod pdf;
 pub mod report;
 
@@ -253,12 +254,27 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
     if let Some(s) = &d.stability.data {
         if let Some(last) = s.bugchecks.first() {
             let name = last.name.clone().unwrap_or_else(|| last.code.clone());
+            // Driver que más se repite como probable culpable en los minivolcados.
+            let analyses: Vec<&minidump::DumpAnalysis> =
+                s.minidumps.iter().flatten().filter_map(|m| m.analysis.as_ref()).filter(|a| a.culprit.is_some()).collect();
+            let top = analyses
+                .iter()
+                .filter_map(|a| a.culprit.as_deref())
+                .max_by_key(|c| analyses.iter().filter(|a| a.culprit.as_deref() == Some(*c)).count());
+            let culprit = top.map(|c| {
+                let times = analyses.iter().filter(|a| a.culprit.as_deref() == Some(c)).count();
+                format!(" · driver probable: {c} (en {times} de {} volcados)", s.minidumps.as_ref().map_or(0, Vec::len))
+            });
+            let hint = top
+                .and_then(|c| analyses.iter().find(|a| a.culprit.as_deref() == Some(c)))
+                .and_then(|a| a.culprit_hint.clone())
+                .or_else(|| last.hint.clone());
             f.push(
                 finding(
                     Bad,
                     "Estabilidad",
-                    format!("{} pantallazo(s) azul(es) en {} días (último: {name})", s.bugchecks.len(), s.days),
-                    last.hint.clone(),
+                    format!("{} pantallazo(s) azul(es) en {} días (último: {name}){}", s.bugchecks.len(), s.days, culprit.unwrap_or_default()),
+                    hint,
                 )
                 .with(vec![
                     stability_detail(),

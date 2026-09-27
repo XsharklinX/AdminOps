@@ -18,14 +18,14 @@ pub struct SoftwareUpdate {
 }
 
 /// Última línea "real" de una salida con barras de progreso (`\r`).
-fn visible(line: &str) -> &str {
+pub fn visible(line: &str) -> &str {
     line.rsplit('\r').next().unwrap_or(line)
 }
 
-/// Interpreta las tablas de `winget upgrade`. Las columnas se localizan por la
-/// posición de cada palabra del encabezado (la línea anterior a "-----"), así
-/// que no depende del idioma de winget.
-pub fn parse_upgrades(output: &str) -> Vec<SoftwareUpdate> {
+/// Filas de las tablas que imprime winget (`upgrade`, `search`, `list`). Las
+/// columnas se localizan por la posición de cada palabra del encabezado (la
+/// línea anterior a "-----"), así que no depende del idioma de winget.
+pub fn table(output: &str) -> Vec<Vec<String>> {
     let lines: Vec<&str> = output.lines().map(visible).collect();
     let mut out = Vec::new();
     for (i, line) in lines.iter().enumerate() {
@@ -37,7 +37,7 @@ pub fn parse_upgrades(output: &str) -> Vec<SoftwareUpdate> {
         let starts: Vec<usize> = (0..header.len())
             .filter(|&k| header[k] != ' ' && (k == 0 || header[k - 1] == ' '))
             .collect();
-        if starts.len() < 4 {
+        if starts.len() < 3 {
             continue;
         }
         for row in &lines[i + 1..] {
@@ -50,22 +50,44 @@ pub fn parse_upgrades(output: &str) -> Vec<SoftwareUpdate> {
                 let to = starts.get(k + 1).copied().unwrap_or(chars.len()).min(chars.len());
                 chars[from..to].iter().collect::<String>().trim().to_string()
             };
-            let u = SoftwareUpdate {
-                name: col(0),
-                id: col(1),
-                version: col(2),
-                available: col(3),
-                source: if starts.len() > 4 { col(4) } else { String::new() },
-            };
-            if !u.id.is_empty() && !u.available.is_empty() {
-                out.push(u);
-            }
+            out.push((0..starts.len()).map(col).collect());
         }
     }
     out
 }
 
-fn valid_id(id: &str) -> bool {
+/// Interpreta las tablas de `winget upgrade`.
+pub fn parse_upgrades(output: &str) -> Vec<SoftwareUpdate> {
+    table(output)
+        .into_iter()
+        .filter(|r| r.len() >= 4)
+        .map(|r| SoftwareUpdate {
+            name: r[0].clone(),
+            id: r[1].clone(),
+            version: r[2].clone(),
+            available: r[3].clone(),
+            source: r.get(4).cloned().unwrap_or_default(),
+        })
+        .filter(|u| !u.id.is_empty() && !u.available.is_empty())
+        .collect()
+}
+
+/// Código de salida (el script termina con `"EXIT:$LASTEXITCODE"`) y última
+/// línea útil de la salida de winget (sin barras de progreso).
+pub fn outcome(out: &str) -> (Option<i64>, String) {
+    let code = out.lines().last().and_then(|l| l.strip_prefix("EXIT:")).and_then(|c| c.trim().parse::<i64>().ok());
+    let last = out
+        .lines()
+        .rev()
+        .skip(1)
+        .map(|l| visible(l).trim())
+        .find(|l| l.len() > 3 && !l.chars().all(|c| "-\\|/ █▒".contains(c)))
+        .unwrap_or("")
+        .to_string();
+    (code, last)
+}
+
+pub fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() < 128 && id.chars().all(|c| c.is_ascii_alphanumeric() || "._+-".contains(c))
 }
 
@@ -121,15 +143,7 @@ pub fn upgrade_software(app: tauri::AppHandle, ids: Vec<String>, state: State<'_
              --accept-source-agreements --disable-interactivity | Out-String\n$o\n\"EXIT:$LASTEXITCODE\""
         );
         let r = crate::ps::powershell_opts(&script, task.opts(Some(Duration::from_secs(30 * 60)))).and_then(|out| {
-            let code = out.lines().last().and_then(|l| l.strip_prefix("EXIT:")).and_then(|c| c.trim().parse::<i64>().ok());
-            let last = out
-                .lines()
-                .rev()
-                .skip(1)
-                .map(|l| visible(l).trim())
-                .find(|l| l.len() > 3 && !l.chars().all(|c| "-\\|/ █▒".contains(c)))
-                .unwrap_or("")
-                .to_string();
+            let (code, last) = outcome(&out);
             match code {
                 Some(0) => Ok(format!("Actualizado a {}", u.available)),
                 _ => Err(if last.is_empty() { format!("winget terminó con código {code:?}") } else { last }),

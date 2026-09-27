@@ -199,6 +199,15 @@ pub fn powershell_opts(script: &str, opts: Opts) -> Result<String, String> {
     run(cmd, "PowerShell", &summary(script), opts)
 }
 
+/// Línea de PowerShell que define `$var` con un texto cualquiera. Va en base64,
+/// así que comillas, `$()` o saltos de línea del texto nunca se interpretan.
+pub fn text_var(var: &str, value: &str) -> String {
+    format!(
+        "${var} = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{}'))\n",
+        base64::engine::general_purpose::STANDARD.encode(value.as_bytes())
+    )
+}
+
 /// Ejecuta un programa del sistema (sc.exe, winget…) sin ventana.
 pub fn exec(program: &str, args: &[&str]) -> Result<String, String> {
     exec_opts(program, args, Opts::default())

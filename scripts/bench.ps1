@@ -16,7 +16,9 @@ param(
   # Clics adicionales en secuencia: "x,y,segundos;x,y,segundos"
   [string]$ThenClicks = '',
   # Guarda una captura de la ventana medida (para comprobar que se pinta bien).
-  [string]$Screenshot = ''
+  [string]$Screenshot = '',
+  # Página con la que arranca (id de la barra lateral: tools, users, install…), sin hacer clics.
+  [string]$Page = ''
 )
 $ErrorActionPreference = 'Stop'
 Add-Type @'
@@ -48,6 +50,7 @@ public class BenchWin {
 }
 '@
 
+if ($Page) { $env:ADMINOPS_START_PAGE = $Page }
 $udf = Join-Path $env:TEMP "adminops-bench-$PID"
 $env:WEBVIEW2_USER_DATA_FOLDER = $udf
 if ($BrowserArgs) { $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = $BrowserArgs }

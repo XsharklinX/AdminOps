@@ -1,0 +1,345 @@
+# Programas que se pueden instalar en lote con winget (página Instalar programas).
+# Cada id está verificado con `winget show --id <id> --exact` (ver el test
+# `apps::tests::catalog_ids_exist`, ignorado por defecto porque usa la red).
+# source = "msstore" para las apps de Microsoft Store (por defecto "winget").
+#
+# Categorías: browser compress media chat remote office utils tech security runtime games dev
+
+# ---------- Navegadores ----------
+[[app]]
+id = "Google.Chrome"
+name = "Google Chrome"
+category = "browser"
+[[app]]
+id = "Mozilla.Firefox"
+name = "Mozilla Firefox"
+category = "browser"
+[[app]]
+id = "Brave.Brave"
+name = "Brave"
+category = "browser"
+[[app]]
+id = "Opera.Opera"
+name = "Opera"
+category = "browser"
+[[app]]
+id = "Vivaldi.Vivaldi"
+name = "Vivaldi"
+category = "browser"
+
+# ---------- Compresión ----------
+[[app]]
+id = "7zip.7zip"
+name = "7-Zip"
+category = "compress"
+[[app]]
+id = "RARLab.WinRAR"
+name = "WinRAR"
+category = "compress"
+[[app]]
+id = "Bandisoft.Bandizip"
+name = "Bandizip"
+category = "compress"
+
+# ---------- Multimedia ----------
+[[app]]
+id = "VideoLAN.VLC"
+name = "VLC media player"
+category = "media"
+[[app]]
+id = "CodecGuide.K-LiteCodecPack.Standard"
+name = "K-Lite Codec Pack"
+category = "media"
+[[app]]
+id = "Spotify.Spotify"
+name = "Spotify"
+category = "media"
+[[app]]
+id = "IrfanSkiljan.IrfanView"
+name = "IrfanView"
+category = "media"
+[[app]]
+id = "GIMP.GIMP.3"
+name = "GIMP"
+category = "media"
+[[app]]
+id = "Audacity.Audacity"
+name = "Audacity"
+category = "media"
+[[app]]
+id = "OBSProject.OBSStudio"
+name = "OBS Studio"
+category = "media"
+[[app]]
+id = "HandBrake.HandBrake"
+name = "HandBrake"
+category = "media"
+[[app]]
+id = "ShareX.ShareX"
+name = "ShareX"
+category = "media"
+[[app]]
+id = "Greenshot.Greenshot"
+name = "Greenshot"
+category = "media"
+
+# ---------- Comunicación ----------
+[[app]]
+id = "9NKSQGP7F2NH"
+name = "WhatsApp"
+category = "chat"
+source = "msstore"
+[[app]]
+id = "Telegram.TelegramDesktop"
+name = "Telegram"
+category = "chat"
+[[app]]
+id = "Zoom.Zoom"
+name = "Zoom"
+category = "chat"
+[[app]]
+id = "Microsoft.Teams"
+name = "Microsoft Teams"
+category = "chat"
+[[app]]
+id = "Discord.Discord"
+name = "Discord"
+category = "chat"
+[[app]]
+id = "SlackTechnologies.Slack"
+name = "Slack"
+category = "chat"
+
+# ---------- Control remoto ----------
+[[app]]
+id = "AnyDesk.AnyDesk"
+name = "AnyDesk"
+category = "remote"
+[[app]]
+id = "TeamViewer.TeamViewer"
+name = "TeamViewer"
+category = "remote"
+
+# ---------- Oficina y PDF ----------
+[[app]]
+id = "TheDocumentFoundation.LibreOffice"
+name = "LibreOffice"
+category = "office"
+[[app]]
+id = "ONLYOFFICE.DesktopEditors"
+name = "ONLYOFFICE"
+category = "office"
+[[app]]
+id = "Adobe.Acrobat.Reader.64-bit"
+name = "Adobe Acrobat Reader"
+category = "office"
+[[app]]
+id = "SumatraPDF.SumatraPDF"
+name = "SumatraPDF"
+category = "office"
+[[app]]
+id = "PDFsam.PDFsam"
+name = "PDFsam Basic"
+category = "office"
+[[app]]
+id = "Notepad++.Notepad++"
+name = "Notepad++"
+category = "office"
+[[app]]
+id = "Obsidian.Obsidian"
+name = "Obsidian"
+category = "office"
+[[app]]
+id = "Notion.Notion"
+name = "Notion"
+category = "office"
+[[app]]
+id = "Google.GoogleDrive"
+name = "Google Drive"
+category = "office"
+[[app]]
+id = "Dropbox.Dropbox"
+name = "Dropbox"
+category = "office"
+[[app]]
+id = "Microsoft.OneDrive"
+name = "OneDrive"
+category = "office"
+
+# ---------- Utilidades ----------
+[[app]]
+id = "voidtools.Everything"
+name = "Everything"
+category = "utils"
+[[app]]
+id = "Microsoft.PowerToys"
+name = "PowerToys"
+category = "utils"
+[[app]]
+id = "qBittorrent.qBittorrent"
+name = "qBittorrent"
+category = "utils"
+[[app]]
+id = "Microsoft.WindowsTerminal"
+name = "Windows Terminal"
+category = "utils"
+[[app]]
+id = "Logitech.GHUB"
+name = "Logitech G HUB"
+category = "utils"
+
+# ---------- Herramientas del técnico ----------
+[[app]]
+id = "CPUID.CPU-Z"
+name = "CPU-Z"
+category = "tech"
+[[app]]
+id = "TechPowerUp.GPU-Z"
+name = "GPU-Z"
+category = "tech"
+[[app]]
+id = "REALiX.HWiNFO"
+name = "HWiNFO"
+category = "tech"
+[[app]]
+id = "CrystalDewWorld.CrystalDiskInfo"
+name = "CrystalDiskInfo"
+category = "tech"
+[[app]]
+id = "CrystalDewWorld.CrystalDiskMark"
+name = "CrystalDiskMark"
+category = "tech"
+[[app]]
+id = "WinDirStat.WinDirStat"
+name = "WinDirStat"
+category = "tech"
+[[app]]
+id = "Klocman.BulkCrapUninstaller"
+name = "Bulk Crap Uninstaller"
+category = "tech"
+[[app]]
+id = "Microsoft.Sysinternals.Autoruns"
+name = "Autoruns (Sysinternals)"
+category = "tech"
+[[app]]
+id = "Microsoft.Sysinternals.ProcessExplorer"
+name = "Process Explorer (Sysinternals)"
+category = "tech"
+[[app]]
+id = "Rufus.Rufus"
+name = "Rufus"
+category = "tech"
+[[app]]
+id = "Ventoy.Ventoy"
+name = "Ventoy"
+category = "tech"
+[[app]]
+id = "Piriform.Recuva"
+name = "Recuva"
+category = "tech"
+[[app]]
+id = "BleachBit.BleachBit"
+name = "BleachBit"
+category = "tech"
+[[app]]
+id = "WiresharkFoundation.Wireshark"
+name = "Wireshark"
+category = "tech"
+[[app]]
+id = "PuTTY.PuTTY"
+name = "PuTTY"
+category = "tech"
+[[app]]
+id = "WinSCP.WinSCP"
+name = "WinSCP"
+category = "tech"
+
+# ---------- Seguridad ----------
+[[app]]
+id = "Malwarebytes.Malwarebytes"
+name = "Malwarebytes"
+category = "security"
+[[app]]
+id = "Bitwarden.Bitwarden"
+name = "Bitwarden"
+category = "security"
+[[app]]
+id = "KeePassXCTeam.KeePassXC"
+name = "KeePassXC"
+category = "security"
+
+# ---------- Componentes (muchos juegos y programas los necesitan) ----------
+[[app]]
+id = "Microsoft.VCRedist.2015+.x64"
+name = "Visual C++ 2015-2022 (x64)"
+category = "runtime"
+[[app]]
+id = "Microsoft.VCRedist.2015+.x86"
+name = "Visual C++ 2015-2022 (x86)"
+category = "runtime"
+[[app]]
+id = "Microsoft.DotNet.DesktopRuntime.8"
+name = ".NET Desktop Runtime 8"
+category = "runtime"
+[[app]]
+id = "Microsoft.DotNet.DesktopRuntime.9"
+name = ".NET Desktop Runtime 9"
+category = "runtime"
+[[app]]
+id = "Microsoft.DirectX"
+name = "DirectX (runtime de juegos)"
+category = "runtime"
+[[app]]
+id = "Oracle.JavaRuntimeEnvironment"
+name = "Java (JRE)"
+category = "runtime"
+
+# ---------- Juegos ----------
+[[app]]
+id = "Valve.Steam"
+name = "Steam"
+category = "games"
+[[app]]
+id = "EpicGames.EpicGamesLauncher"
+name = "Epic Games Launcher"
+category = "games"
+
+# ---------- Desarrollo ----------
+[[app]]
+id = "Microsoft.VisualStudioCode"
+name = "Visual Studio Code"
+category = "dev"
+[[app]]
+id = "Git.Git"
+name = "Git"
+category = "dev"
+[[app]]
+id = "Python.Python.3.13"
+name = "Python 3.13"
+category = "dev"
+
+# ---------- Listas predefinidas ----------
+
+[[list]]
+id = "basic"
+name = "Básico"
+description = "Lo que casi todo equipo necesita tras formatear."
+apps = ["Google.Chrome", "7zip.7zip", "VideoLAN.VLC", "Adobe.Acrobat.Reader.64-bit", "Microsoft.VCRedist.2015+.x64", "Microsoft.VCRedist.2015+.x86", "Microsoft.DotNet.DesktopRuntime.8"]
+
+[[list]]
+id = "office"
+name = "Oficina"
+description = "Trabajo diario, documentos y videollamadas."
+apps = ["Google.Chrome", "7zip.7zip", "TheDocumentFoundation.LibreOffice", "Adobe.Acrobat.Reader.64-bit", "Zoom.Zoom", "AnyDesk.AnyDesk", "Microsoft.VCRedist.2015+.x64"]
+
+[[list]]
+id = "gaming"
+name = "Gaming"
+description = "Plataformas de juegos, chat y componentes."
+apps = ["Valve.Steam", "EpicGames.EpicGamesLauncher", "Discord.Discord", "Microsoft.VCRedist.2015+.x64", "Microsoft.VCRedist.2015+.x86", "Microsoft.DirectX", "Microsoft.DotNet.DesktopRuntime.8"]
+
+[[list]]
+id = "tech"
+name = "Kit del técnico"
+description = "Diagnóstico de hardware y utilidades de soporte."
+apps = ["CPUID.CPU-Z", "REALiX.HWiNFO", "CrystalDewWorld.CrystalDiskInfo", "voidtools.Everything", "Microsoft.Sysinternals.Autoruns", "AnyDesk.AnyDesk"]

@@ -150,7 +150,11 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
                   {u.isSelf && <Badge tone="neon">Ejecuta AdminOps</Badge>}
                 </div>
                 <div className="mt-0.5 text-[11px] text-mute">
-                  {when(u.lastLogon) ? `Último inicio: ${when(u.lastLogon)}` : "Nunca ha iniciado sesión"}
+                  {when(u.lastLogon)
+                    ? `Último inicio: ${when(u.lastLogon)}`
+                    : u.signedIn || u.hasProfile
+                      ? "Último inicio: sin registrar"
+                      : "Nunca ha iniciado sesión"}
                   {u.passwordLastSet && ` · Contraseña cambiada: ${when(u.passwordLastSet)}`}
                   {u.passwordExpires && ` · Caduca: ${when(u.passwordExpires)}`}
                 </div>

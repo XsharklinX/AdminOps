@@ -372,6 +372,30 @@ export function Diagnostics({
                     ))}
                   </>
                 )}
+                {s.minidumps?.some((m) => m.analysis?.culprit) && (
+                  <>
+                    <p className="mt-2 mb-1 text-[10px] tracking-widest text-mute uppercase">Volcados analizados</p>
+                    {s.minidumps
+                      .filter((m) => m.analysis)
+                      .map((m) => (
+                        <div key={m.name} className="py-1 text-sm" title={m.analysis!.stackDrivers.length ? `En la pila: ${m.analysis!.stackDrivers.join(", ")}` : undefined}>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-mute">{date(m.time)}</span>
+                            <span className="font-mono text-xs text-dim">{m.analysis!.bugcheck}</span>
+                            <span className="min-w-0 flex-1 truncate text-right">
+                              {m.analysis!.culprit ? (
+                                <span className="font-mono text-xs text-warn">{m.analysis!.culprit}</span>
+                              ) : (
+                                <span className="text-xs text-mute">sin driver concreto</span>
+                              )}
+                            </span>
+                          </div>
+                          {m.analysis!.culpritHint && <p className="text-xs text-dim">{m.analysis!.culpritHint}</p>}
+                        </div>
+                      ))}
+                    <p className="mt-1 text-[11px] text-mute">Driver probable según la pila del fallo: es una pista para empezar, no un veredicto.</p>
+                  </>
+                )}
                 <p className="mt-3 text-xs text-mute">
                   Tiempo de arranque:{" "}
                   {s.bootTimes === null ? (
