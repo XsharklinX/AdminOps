@@ -1032,6 +1032,7 @@ pub fn create_report(app: &tauri::AppHandle, state: &TweakState, input: ReportIn
     let path = match super::pdf::html_to_pdf(&html, &pdf) {
         Ok(()) => pdf,
         Err(e) => {
+            log::warn!("No se pudo crear el PDF, se guarda en HTML: {e}");
             // Sin Edge (muy raro) el informe no se pierde: se guarda como HTML.
             let html_path = dir.join(format!("{base_name}.html"));
             std::fs::write(&html_path, &html).map_err(|w| format!("{e} · No se pudo guardar el HTML: {w}"))?;

@@ -9,17 +9,17 @@ use serde::Serialize;
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WifiProfile {
-    name: String,
-    ssid: String,
+    pub name: String,
+    pub ssid: String,
     /// open | WPA2PSK | WPA3SAE | WPA2 (empresa)…
-    authentication: String,
+    pub authentication: String,
     /// `None` si la red es abierta o Windows no la dio (sin administrador o red de empresa).
-    password: Option<String>,
+    pub password: Option<String>,
     /// La clave existe pero Windows no la dio en claro.
-    protected: bool,
+    pub protected: bool,
     /// Se conecta sola cuando está al alcance.
-    auto_connect: bool,
-    connected: bool,
+    pub auto_connect: bool,
+    pub connected: bool,
 }
 
 /// Contenido del primer `<tag>…</tag>` (sin atributos), con las entidades XML decodificadas.

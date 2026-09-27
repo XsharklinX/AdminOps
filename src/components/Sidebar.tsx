@@ -33,6 +33,8 @@ export type PageId =
   | "install"
   | "uninstall"
   | "winupdate"
+  | "router"
+  | "devices"
   | "network"
   | "nettools"
   | "session"
@@ -74,6 +76,8 @@ export const NAV: NavItem[] = [
   { id: "install", label: "Instalar programas", tab: "Instalar" },
   { id: "uninstall", label: "Desinstalar programas", tab: "Desinstalar" },
   { id: "winupdate", label: "Windows Update", tab: "Windows Update" },
+  { id: "router", label: "Mi red y router", tab: "Mi red" },
+  { id: "devices", label: "Dispositivos en la red", tab: "Dispositivos" },
   { id: "network", label: "Velocidad y diagnóstico de red", tab: "Velocidad y diagnóstico" },
   { id: "nettools", label: "Herramientas de red", tab: "Herramientas" },
   { id: "session", label: "Sesión de servicio", tab: "Sesión" },
@@ -104,7 +108,7 @@ export const AREAS: Area[] = [
   { id: "equipo", label: "Equipo", icon: Monitor, pages: ["diagnostics", "security", "hardware", "processes", "space"] },
   { id: "optimizar", label: "Optimizar", icon: SlidersHorizontal, pages: ["profiles", "cleanup", "performance", "privacy", "services", "startup", "bloatware"] },
   { id: "programas", label: "Programas", icon: Package, pages: ["software", "install", "uninstall", "winupdate"] },
-  { id: "red", label: "Red", icon: Network, pages: ["network", "nettools"] },
+  { id: "red", label: "Red", icon: Network, pages: ["router", "devices", "network", "nettools"] },
   { id: "soporte", label: "Soporte", icon: Headset, pages: ["session", "tickets", "clients", "report", "history", "shortcuts"] },
   { id: "admin", label: "Administración", icon: Wrench, pages: ["tools", "users", "domain", "migrate", "printers", "repair"] },
 ];

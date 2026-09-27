@@ -50,7 +50,7 @@ fn resolve(host: &str) -> Result<Ipv4Addr, String> {
 
 /// Un eco ICMP con el TTL indicado. Devuelve (estado, quién respondió, ms).
 #[cfg(windows)]
-fn echo(addr: Ipv4Addr, ttl: u8, timeout_ms: u32) -> (u32, Option<Ipv4Addr>, u32) {
+pub(crate) fn echo(addr: Ipv4Addr, ttl: u8, timeout_ms: u32) -> (u32, Option<Ipv4Addr>, u32) {
     use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
     use windows_sys::Win32::NetworkManagement::IpHelper::{
         IcmpCloseHandle, IcmpCreateFile, IcmpSendEcho, ICMP_ECHO_REPLY, IP_OPTION_INFORMATION,
@@ -85,7 +85,7 @@ fn echo(addr: Ipv4Addr, ttl: u8, timeout_ms: u32) -> (u32, Option<Ipv4Addr>, u32
 }
 
 #[cfg(not(windows))]
-fn echo(_: Ipv4Addr, _: u8, _: u32) -> (u32, Option<Ipv4Addr>, u32) {
+pub(crate) fn echo(_: Ipv4Addr, _: u8, _: u32) -> (u32, Option<Ipv4Addr>, u32) {
     (u32::MAX, None, 0)
 }
 

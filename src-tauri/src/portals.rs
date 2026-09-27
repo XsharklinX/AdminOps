@@ -23,6 +23,9 @@ pub struct Portal {
     /// Dominios adicionales por los que puede navegar (p. ej. el del inicio de sesión).
     #[serde(default)]
     pub extra_domains: Vec<String>,
+    /// "router": panel de un router (Mi red), no aparece en Tickets.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub kind: String,
 }
 
 fn path(app: &tauri::AppHandle) -> std::path::PathBuf {
@@ -112,6 +115,37 @@ fn enable_autofill<R: tauri::Runtime>(webview: &tauri::Webview<R>) {
     });
 }
 
+/// Los routers usan un certificado propio que el navegador no reconoce: en el
+/// panel de un router se acepta, pero solo para direcciones de la red local.
+fn accept_router_certificates<R: tauri::Runtime>(webview: &tauri::Webview<R>, p: &Portal) {
+    if p.kind != "router" {
+        return;
+    }
+    #[cfg(windows)]
+    let _ = webview.with_webview(|pw| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2_14, COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_ALWAYS_ALLOW};
+        use webview2_com::ServerCertificateErrorDetectedEventHandler;
+        use windows_core::Interface;
+        let Ok(core) = pw.controller().CoreWebView2() else { return };
+        let Ok(core14) = core.cast::<ICoreWebView2_14>() else { return };
+        let handler = ServerCertificateErrorDetectedEventHandler::create(Box::new(|_, args| {
+            if let Some(args) = args {
+                let mut uri = windows_core::PWSTR::null();
+                if args.RequestUri(&mut uri).is_ok() {
+                    let uri = webview2_com::take_pwstr(uri);
+                    let host = Url::parse(&uri).ok().and_then(|u| u.host_str().map(String::from)).unwrap_or_default();
+                    if crate::network::lan::is_private_host(&host) {
+                        let _ = args.SetAction(COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_ALWAYS_ALLOW);
+                    }
+                }
+            }
+            Ok(())
+        }));
+        let mut token = 0i64;
+        let _ = core14.add_ServerCertificateErrorDetected(&handler, &mut token);
+    });
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct LoadEvent {
@@ -181,7 +215,27 @@ fn hide_embedded(app: &tauri::AppHandle, except: Option<&str>) {
 
 #[tauri::command]
 pub fn list_portals(app: tauri::AppHandle) -> Vec<Portal> {
-    load(&app)
+    load(&app).into_iter().filter(|p| p.kind != "router").collect()
+}
+
+/// Portal del panel de un router (uno por red): lo crea o actualiza su dirección.
+#[tauri::command]
+pub fn router_portal(app: tauri::AppHandle, key: String, name: String, url: String) -> Result<Portal, String> {
+    let id: String = format!("r{}", key.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>());
+    let p = validate(Portal { id: id.clone(), name: if name.trim().is_empty() { "Router".into() } else { name.chars().take(40).collect() }, url, extra_domains: vec![], kind: "router".into() })?;
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut list = load(&app);
+    match list.iter_mut().find(|x| x.id == id) {
+        Some(x) if x.url == p.url => return Ok(x.clone()),
+        Some(x) => *x = p.clone(),
+        None => list.push(p.clone()),
+    }
+    // Cambió la dirección: la vista abierta se recrea con la nueva.
+    if let Some(v) = app.get_webview(&embedded_label(&id)) {
+        let _ = v.close();
+    }
+    crate::paths::write_json(&path(&app), &list)?;
+    Ok(p)
 }
 
 #[tauri::command]
@@ -238,6 +292,7 @@ pub fn portal_show(app: tauri::AppHandle, id: String, x: f64, y: f64, width: f64
     let builder = configure!(tauri::webview::WebviewBuilder::new(&label, WebviewUrl::External(url)), &app, p, label, get_webview);
     let v = main_window(&app)?.add_child(builder, pos, size).map_err(|e| format!("No se pudo abrir el portal: {e}"))?;
     enable_autofill(&v);
+    accept_router_certificates(&v, &p);
     log::info!("Tickets: abierto el portal «{}»", p.name);
     Ok(())
 }
@@ -289,6 +344,7 @@ pub fn portal_open_window(app: tauri::AppHandle, id: String) -> Result<(), Strin
         .theme(Some(tauri::Theme::Dark));
     let w = builder.build().map_err(|e| format!("No se pudo abrir la ventana: {e}"))?;
     enable_autofill(w.as_ref());
+    accept_router_certificates(w.as_ref(), &p);
     Ok(())
 }
 
@@ -303,7 +359,7 @@ mod tests {
     use super::*;
 
     fn portal() -> Portal {
-        Portal { id: "p1".into(), name: "Intranet".into(), url: "https://intranet.pgr.gob.do/tickets".into(), extra_domains: vec!["login.microsoftonline.com".into()] }
+        Portal { id: "p1".into(), name: "Intranet".into(), url: "https://intranet.pgr.gob.do/tickets".into(), extra_domains: vec!["login.microsoftonline.com".into()], kind: String::new() }
     }
 
     #[test]
@@ -323,7 +379,7 @@ mod tests {
 
     #[test]
     fn validates_portals() {
-        let v = validate(Portal { id: String::new(), name: " Intranet ".into(), url: "intranet.pgr.gob.do".into(), extra_domains: vec!["https://*.sso.pgr.gob.do/".into()] }).unwrap();
+        let v = validate(Portal { id: String::new(), name: " Intranet ".into(), url: "intranet.pgr.gob.do".into(), extra_domains: vec!["https://*.sso.pgr.gob.do/".into()], kind: String::new() }).unwrap();
         assert_eq!(v.url, "https://intranet.pgr.gob.do");
         assert_eq!(v.name, "Intranet");
         assert_eq!(v.extra_domains, vec!["sso.pgr.gob.do"]);

@@ -33,6 +33,8 @@ const NetTools = lazyPage("NetTools", () => import("./pages/NetTools"));
 const Printers = lazyPage("Printers", () => import("./pages/Printers"));
 const Migrate = lazyPage("Migrate", () => import("./pages/Migrate"));
 const Tickets = lazyPage("Tickets", () => import("./pages/Tickets"));
+const Router = lazyPage("Router", () => import("./pages/Router"));
+const Devices = lazyPage("Devices", () => import("./pages/Devices"));
 const Domain = lazyPage("Domain", () => import("./pages/Domain"));
 const Uninstall = lazyPage("Uninstall", () => import("./pages/Uninstall"));
 const Security = lazyPage("Security", () => import("./pages/Security"));
@@ -187,6 +189,8 @@ export default function App() {
   else if (page === "printers") content = <Printers isAdmin={!!isAdmin} />;
   else if (page === "migrate") content = <Migrate />;
   else if (page === "tickets") content = <Tickets covered={aboutOpen || paletteOpen || onboarding} />;
+  else if (page === "router") content = <Router covered={aboutOpen || paletteOpen || onboarding} />;
+  else if (page === "devices") content = <Devices />;
   else if (page === "domain") content = <Domain isAdmin={!!isAdmin} />;
   else if (page === "uninstall") content = <Uninstall isAdmin={!!isAdmin} />;
   else if (page === "shortcuts") content = <Shortcuts />;

@@ -119,11 +119,14 @@ fn stop_app(dir: &Path) {
     std::thread::sleep(Duration::from_millis(500));
 }
 
-/// Windows guarda en caché los iconos (barra de tareas, accesos): así muestra el nuevo.
+/// Windows guarda en caché los iconos (barra de tareas, accesos del menú Inicio):
+/// sin vaciarla, la barra de tareas sigue mostrando el icono de una versión anterior.
 fn refresh_icon_cache() {
     use std::os::windows::process::CommandExt;
     let exe = PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into())).join(r"System32\ie4uinit.exe");
-    let _ = std::process::Command::new(exe).arg("-show").creation_flags(0x0800_0000).status();
+    for arg in ["-ClearIconCache", "-show"] {
+        let _ = std::process::Command::new(&exe).arg(arg).creation_flags(0x0800_0000).status();
+    }
 }
 
 fn remove_desktop_shortcuts() {

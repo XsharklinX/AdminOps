@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-0.19.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-0.20.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Download](https://img.shields.io/badge/download-installer%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -96,6 +96,8 @@ or build your own. One restore point per profile, and it can be undone as a whol
 | Section | What it does |
 | --- | --- |
 | **Tickets** | Opens your company's ticketing site (intranet, GLPI, osTicket…) inside AdminOps, with the session remembered. |
+| **My network & router** | Current network (IP, router, DNS, public IP), the router's admin panel inside AdminOps with its saved, encrypted login, router and Wi-Fi security check, double NAT and a QR code to connect a phone. |
+| **Network devices** | Everything on the local network with IP, MAC, vendor and name; label yours and spot new ones. |
 | **Domain** | Domain status, pre-checks, join or leave, repair the trust relationship and rename the PC. |
 | **Service session** | Logs the work on a PC: initial diagnostics, changes, checklist, quote or receipt and wrap-up with the customer's on-screen signature. |
 | **Customers** | Customer records and their PCs, visit history, evolution between visits, active warranties and maintenance reminders. |

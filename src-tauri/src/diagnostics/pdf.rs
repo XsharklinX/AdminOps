@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 const TIMEOUT: Duration = Duration::from_secs(90);
+/// Tras salir el proceso lanzado, cuánto se espera a la instancia que lo sustituye.
+const HANDOFF: Duration = Duration::from_secs(30);
 
 fn find_edge() -> Option<PathBuf> {
     let from_registry = [
@@ -56,6 +58,8 @@ pub fn html_to_pdf(html: &str, out: &Path) -> Result<(), String> {
             .arg("--headless=new")
             .arg("--disable-gpu")
             .arg("--no-first-run")
+            // Que no se relance sin privilegios (el trabajo lo haría otro proceso).
+            .arg("--do-not-de-elevate")
             .arg("--no-default-browser-check")
             .arg("--disable-extensions")
             .arg(format!("--user-data-dir={}", work.join("profile").display()))
@@ -65,23 +69,33 @@ pub fn html_to_pdf(html: &str, out: &Path) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("No se pudo iniciar Edge: {e}"))?;
 
+        // Edge lanzado desde un proceso elevado puede volver a abrirse sin
+        // privilegios y cerrar el original enseguida: lo que manda es que el
+        // PDF aparezca completo, no que el proceso lanzado termine.
         let start = Instant::now();
+        let mut exited: Option<Instant> = None;
+        let mut last_size = 0u64;
         loop {
-            if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-                if !status.success() && !out.is_file() {
-                    return Err(format!("Edge terminó con código {:?}", status.code()));
+            if exited.is_none() {
+                if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+                    log::debug!("Edge (PDF) terminó con {:?}", status.code());
+                    exited = Some(Instant::now());
                 }
-                break;
+            }
+            let size = std::fs::metadata(out).map(|m| m.len()).unwrap_or(0);
+            // Completo: existe, no crece y el proceso ya terminó (o lleva un rato estable).
+            if size > 0 && size == last_size && (exited.is_some() || start.elapsed() > Duration::from_secs(20)) {
+                return Ok(());
+            }
+            last_size = size;
+            if exited.is_some_and(|t| t.elapsed() > HANDOFF) && size == 0 {
+                return Err("Edge no generó el PDF.".into());
             }
             if start.elapsed() > TIMEOUT {
                 let _ = child.kill();
                 return Err("Edge tardó demasiado en generar el PDF.".into());
             }
-            std::thread::sleep(Duration::from_millis(150));
-        }
-        match std::fs::metadata(out) {
-            Ok(m) if m.len() > 0 => Ok(()),
-            _ => Err("Edge no generó el PDF.".into()),
+            std::thread::sleep(Duration::from_millis(400));
         }
     })();
 

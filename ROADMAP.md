@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.19.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.20.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.19)
+## Hecho (v0.1 – v0.20)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -29,6 +29,7 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 17. Instalador y atajos | 0.17 | Instalador con interfaz propia (instalar/actualizar/reinstalar, progreso, consejos), instalador clásico para despliegues silenciosos, página de atajos de teclado con modo descubrir y prueba |
 | 18. Rediseño | 0.18 | Lenguaje visual sobrio (IBM Plex, un acento, color solo para estados, sin brillos ni degradados), tema claro, navegación en 7 áreas con pestañas, Panel y Herramientas rehechos, icono nuevo, informe e instalador con el mismo estilo |
 | 19. Informe y cliente | 0.19 | Informe PDF rehecho con dos plantillas (cliente y técnica), presupuesto o recibo con impuestos, firma del cliente y del técnico, envío por correo con adjunto, garantías, recordatorios de mantenimiento, evolución entre visitas, icono del medidor con llave |
+| 20. Red y router | 0.20 | Mi red (conexión, router, DNS, IP pública), panel del router dentro de la app con acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT/CGNAT, QR de la Wi-Fi, dispositivos en la red con fabricante, nombres propios y aviso de nuevos |
 
 ### Fase 6 en detalle
 
@@ -82,7 +83,7 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
   Windows Server. Ejecutarla en Sandbox al menos una vez por versión.
 - **Dependencia de Edge para el PDF.** Si falta, el informe cae a HTML.
 - **Sin firma de código** (decisión: no se contempla por coste). SmartScreen avisará al instalar.
-- **Solo español** (inglés en la Fase 22).
+- **Solo español** (inglés en la Fase 25).
 - **Notificaciones en portable**: sin instalador, Windows puede mostrarlas con otro nombre de app.
 - **Tickets incrustados** usan la API "unstable" de Tauri (vistas hijas); si una versión futura la
   cambia, queda la ventana aparte como alternativa.
@@ -305,21 +306,65 @@ Lo que convierte el trabajo técnico en algo que el cliente valora (y paga).
   presupuesto o recibo, y guardar la visita en su historial.
 - **Icono definitivo**: un medidor (diagnóstico) cuya aguja termina en una llave (reparación).
 
-### Fase 20 — La oficina completa (v0.20)
+### Fase 20 — Red y router (v0.20) ✅
+
+Entrar al router y saber qué hay en la red sin abrir el navegador ni buscar la IP a mano.
+
+- **Mi red**: nombre de la red, conexión (Wi-Fi o cable y velocidad), IP del equipo (fija o DHCP),
+  router, DNS e IP pública con el proveedor y la ciudad (oculta hasta pulsar el ojo). Aviso si
+  Windows trata la red como pública.
+- **Panel del router dentro de AdminOps** (como los portales de Tickets), en ventana aparte o en el
+  navegador. Acepta el certificado propio de los routers, solo para direcciones de la red local.
+- **Acceso guardado**: usuario, contraseña (cifrada con DPAPI: solo ese usuario de Windows en ese
+  equipo puede leerla), dirección del panel y notas, por red. En el panel, botones para copiar el
+  usuario y la contraseña. Pista de credenciales de fábrica según la marca detectada.
+- **Chequeo del router**: marca (por la página del panel), puertos abiertos (Telnet y FTP como
+  riesgo), panel sin HTTPS, cifrado de la Wi-Fi (abierta, WEP, WPA, WPA2, WPA3) y doble NAT o red
+  del proveedor / CGNAT (por el segundo salto hacia Internet).
+- **Wi-Fi**: contraseña de la red actual (mostrar y copiar) y **código QR** para conectar un móvil.
+- **Dispositivos en la red**: barrido de la subred (ping y tabla de vecinos, así aparecen también
+  los que no responden al ping), nombre, IP, MAC, MAC privada de móviles, fabricante (consulta
+  opcional en Internet solo del prefijo, con caché), nombres propios para cada dispositivo y marca
+  de **nuevo** para los que no estaban la última vez.
+
+### Fase 21 — Caja fuerte y privacidad (v0.21)
+
+**Prioridad: media.** Proteger los datos del cliente con lo que ya trae Windows, para que siga
+funcionando aunque se desinstale AdminOps.
+
+- **Caja fuerte**: disco virtual (.vhdx) cifrado con BitLocker y contraseña; se abre con doble clic
+  desde Windows. Crear, abrir, cerrar, cambiar la contraseña y guardar la clave de recuperación.
+  Requiere Windows Pro para crearla.
+- **Carpeta cifrada** (Windows Home): comprimir con AES-256 y contraseña, y borrar la original de
+  forma segura.
+- **Borrado seguro** de archivos y del espacio libre, y checklist "antes de vender o donar el PC".
+- **Recuperar archivos borrados** con Windows File Recovery desde una interfaz sencilla.
+- **Bloqueo de webs** (adultos, apuestas, malware) por hosts o DNS, y **horario de uso** por
+  usuario local.
+
+### Fase 22 — La oficina completa (v0.22)
 
 **Prioridad: media.** Pasar de "un equipo" a "la red del cliente".
 
-- **Escáner de red local**: equipos, impresoras y dispositivos con IP, MAC, fabricante y nombre;
-  detectar IP duplicadas y dispositivos desconocidos.
 - **Wake-on-LAN** y **conexión remota** (escritorio remoto, Asistencia rápida) desde la ficha del
-  equipo o del cliente.
+  equipo, del cliente o desde Dispositivos en la red.
 - **Carpetas compartidas y permisos** del equipo: qué se comparte y con quién.
 - **Inventario de la oficina**: cada equipo diagnosticado queda en la ficha del cliente con su
   hardware, para ver el parque completo y qué equipos conviene renovar.
+- **Detectar IP duplicadas** y guardar el mapa de la red del cliente en su ficha.
 
 **Terminado cuando:** el técnico puede describir y mantener la red entera de un cliente pequeño.
 
-### Fase 21 — Recetas (v0.21)
+### Fase 23 — Negocio (v0.23)
+
+**Prioridad: media.** Lo que ayuda a cobrar y a que el cliente vuelva.
+
+- **Estadísticas**: ingresos por mes, servicios más vendidos y clientes frecuentes (de los recibos).
+- **Enviar el informe por WhatsApp** con el número del cliente y el mensaje listo.
+- **Avisos al abrir la app**: mantenimientos vencidos y garantías que terminan.
+- **Asistencia remota** apuntada en la sesión (código de Asistencia rápida o AnyDesk).
+
+### Fase 24 — Recetas (v0.24)
 
 **Prioridad: media.** Automatizar lo que el técnico repite en cada equipo.
 
@@ -330,7 +375,7 @@ Lo que convierte el trabajo técnico en algo que el cliente valora (y paga).
 
 **Terminado cuando:** preparar un equipo nuevo es elegir una receta y esperar.
 
-### Fase 22 — Versión 1.0 y distribución (v1.0)
+### Fase 25 — Versión 1.0 y distribución (v1.0)
 
 **Prioridad: alta cuando lo anterior esté probado en uso real.**
 
@@ -343,7 +388,7 @@ Lo que convierte el trabajo técnico en algo que el cliente valora (y paga).
 **v1.0 cuando:** actualizaciones automáticas funcionando, inglés completo y dos semanas de uso real sin
 fallos graves.
 
-### Fase 23 — Preparación comercial (v1.1)
+### Fase 26 — Preparación comercial (v1.1)
 
 **Prioridad: a decidir** según cómo se quiera vender.
 

@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.19.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-0.20.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -93,6 +93,8 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | Sección | Qué hace |
 | --- | --- |
 | **Tickets** | Abre la web de tickets de tu empresa (intranet, GLPI, osTicket…) dentro de AdminOps, con la sesión recordada. |
+| **Mi red y router** | La red actual (IP, router, DNS, IP pública), el panel del router dentro de AdminOps con su acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT y QR para conectar un móvil. |
+| **Dispositivos en la red** | Todo lo conectado a la red local con IP, MAC, fabricante y nombre; ponles nombre y detecta los nuevos. |
 | **Dominio** | Estado del dominio, comprobaciones previas, unir o sacar el equipo, reparar la relación de confianza y cambiar el nombre. |
 | **Sesión de servicio** | Registra el trabajo en un equipo: diagnóstico inicial, cambios, checklist, presupuesto o recibo y cierre con la firma del cliente en pantalla. |
 | **Clientes** | Fichas de clientes y sus equipos, historial de visitas, evolución entre visitas, garantías vigentes y recordatorios de mantenimiento. |
