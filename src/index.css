@@ -1,23 +1,55 @@
 @import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-500.css";
+@import "@fontsource/ibm-plex-sans/latin-600.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
 
+/*
+ * Sistema visual de AdminOps (v0.18): instrumento técnico sobrio.
+ * - Un solo acento (azul apagado) para selección y acción principal.
+ * - El color significa estado: ok / warn / bad, apagados.
+ * - Los nombres de los tokens se conservan de versiones anteriores
+ *   ("neon" es ahora el acento; "neon-2" un segundo tono neutro para gráficos).
+ */
 @theme {
-  --color-void: #07090d;
-  --color-panel: #0c1016;
-  --color-panel-2: #111722;
-  --color-line: #1b2331;
-  --color-line-2: #263041;
-  --color-ink: #e6edf7;
-  --color-dim: #8b97aa;
-  --color-mute: #56627a;
+  --color-void: #111315;
+  --color-panel: #171a1d;
+  --color-panel-2: #1d2024;
+  --color-line: #262a2f;
+  --color-line-2: #30353b;
+  --color-ink: #e6e8eb;
+  --color-dim: #a5acb5;
+  --color-mute: #7e8691;
 
-  --color-neon: #22e1ff;
-  --color-neon-2: #b56cff;
-  --color-ok: #3dff9a;
-  --color-warn: #ffc53d;
-  --color-bad: #ff4d6d;
+  --color-neon: #5b8def;
+  --color-neon-2: #9aa7ba;
+  /* Texto sobre el acento (botón principal): legible en los dos temas. */
+  --color-on-neon: #0c1422;
+  --color-ok: #4caf7a;
+  --color-warn: #d9a441;
+  --color-bad: #e5605a;
 
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --font-sans: "IBM Plex Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+/* Tema claro: mismos tokens, otros valores (Ajustes → Apariencia). */
+:root[data-theme="light"] {
+  --color-void: #f6f6f4;
+  --color-panel: #ffffff;
+  --color-panel-2: #f1f1ee;
+  --color-line: #e3e3df;
+  --color-line-2: #d3d3ce;
+  --color-ink: #1b1d20;
+  --color-dim: #4b5058;
+  --color-mute: #6b7079;
+
+  --color-neon: #2459c9;
+  --color-neon-2: #6d7c93;
+  --color-on-neon: #ffffff;
+  --color-ok: #23794d;
+  --color-warn: #9a6b00;
+  --color-bad: #c2372f;
 }
 
 @layer base {
@@ -30,12 +62,13 @@
     background: var(--color-void);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-size: 14px;
     -webkit-font-smoothing: antialiased;
     user-select: none;
     overflow: hidden;
   }
   ::selection {
-    background: color-mix(in srgb, var(--color-neon) 35%, transparent);
+    background: color-mix(in srgb, var(--color-neon) 30%, transparent);
   }
   ::-webkit-scrollbar {
     width: 8px;
@@ -48,16 +81,19 @@
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+  :focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-neon) 70%, transparent);
+    outline-offset: 2px;
+  }
 }
 
+/* Antes era un halo neón; ahora un borde de acento discreto. */
 @utility glow-neon {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-neon) 45%, transparent),
-    0 0 18px -4px color-mix(in srgb, var(--color-neon) 60%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-neon) 45%, transparent);
 }
 
 @utility text-glow {
-  text-shadow: 0 0 12px color-mix(in srgb, currentColor 55%, transparent);
+  text-shadow: none;
 }
 
 @utility tabular {

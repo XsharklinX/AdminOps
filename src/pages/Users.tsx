@@ -244,7 +244,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
 
 function Badge({ tone, children }: { tone: "neon" | "mute" | "warn" | "ok"; children: React.ReactNode }) {
   const c = { neon: "border-neon/40 text-neon", mute: "border-line text-mute", warn: "border-warn/40 text-warn", ok: "border-ok/40 text-ok" }[tone];
-  return <span className={`rounded border px-1.5 py-px text-[10px] ${c}`}>{children}</span>;
+  return <span className={`rounded border px-1.5 py-px text-[11px] ${c}`}>{children}</span>;
 }
 
 function IconAction({

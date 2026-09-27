@@ -131,11 +131,11 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm text-ink">{p.name}</span>
                 {p.orphan && (
-                  <span className="flex shrink-0 items-center gap-1 text-[10px] text-warn" title="El desinstalador ya no existe">
+                  <span className="flex shrink-0 items-center gap-1 text-[11px] text-warn" title="El desinstalador ya no existe">
                     <FileWarning size={10} /> huérfana
                   </span>
                 )}
-                {p.perUser && <span className="shrink-0 rounded border border-line px-1 text-[9px] text-mute">solo este usuario</span>}
+                {p.perUser && <span className="shrink-0 rounded border border-line px-1 text-[10px] text-mute">solo este usuario</span>}
               </div>
               <div className="truncate text-[11px] text-mute">
                 {[p.publisher, p.version && `v${p.version}`, p.installed].filter(Boolean).join(" · ") || "—"}

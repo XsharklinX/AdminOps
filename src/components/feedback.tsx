@@ -35,7 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={t.id}
-              className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-line-2 bg-panel-2/95 px-3.5 py-3 text-sm shadow-2xl backdrop-blur"
+              className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-line-2 bg-panel-2 px-3.5 py-3 text-sm shadow-2xl"
             >
               <Icon size={16} className={`mt-0.5 shrink-0 ${color[t.kind]}`} />
               <p className="max-h-32 min-w-0 flex-1 overflow-y-auto text-ink [overflow-wrap:anywhere]">{t.text}</p>
@@ -68,7 +68,7 @@ export function ConfirmDialog({
 }) {
   if (!options) return null;
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm" onClick={() => onClose(false)}>
+    <div className="fixed inset-0 z-40 grid place-items-center bg-black/55" onClick={() => onClose(false)}>
       <div
         className="w-[440px] rounded-xl border border-line-2 bg-panel p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}

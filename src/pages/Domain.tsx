@@ -196,7 +196,7 @@ export function Domain({ isAdmin }: { isAdmin: boolean }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] tracking-widest text-mute uppercase">{label}</div>
+      <div className="text-[11px] text-mute">{label}</div>
       <div className="text-ink">{children}</div>
     </div>
   );
@@ -304,7 +304,7 @@ function JoinCard({ status, isAdmin, onJoined }: { status: DomainStatus; isAdmin
                 onChange={(e) => setNewName(e.target.value)}
                 maxLength={15}
                 placeholder={status.computerName}
-                className={`${inputClass} font-mono uppercase`}
+                className={`${inputClass} font-mono`}
               />
             </label>
             <label>
@@ -441,7 +441,7 @@ function CredentialsDialog({
             onChange={(e) => setNewName(e.target.value)}
             maxLength={15}
             placeholder={`Nuevo nombre (ahora: ${status.computerName})`}
-            className={`${inputClass} font-mono uppercase`}
+            className={`${inputClass} font-mono`}
           />
         )}
         {kind === "leave" && <input value={workgroup} onChange={(e) => setWorkgroup(e.target.value)} placeholder="Grupo de trabajo" className={inputClass} />}

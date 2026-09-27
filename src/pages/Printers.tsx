@@ -75,14 +75,14 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-medium text-ink">{p.name}</span>
             {p.default && (
-              <span className="flex items-center gap-1 rounded border border-neon/40 px-1.5 py-px text-[10px] text-neon">
+              <span className="flex items-center gap-1 rounded border border-neon/40 px-1.5 py-px text-[11px] text-neon">
                 <Star size={9} fill="currentColor" /> Predeterminada
               </span>
             )}
-            {p.network && <span className="rounded border border-line px-1.5 py-px text-[10px] text-mute">Red</span>}
-            {p.shared && <span className="rounded border border-line px-1.5 py-px text-[10px] text-mute">Compartida</span>}
+            {p.network && <span className="rounded border border-line px-1.5 py-px text-[11px] text-mute">Red</span>}
+            {p.shared && <span className="rounded border border-line px-1.5 py-px text-[11px] text-mute">Compartida</span>}
             {problem && (
-              <span className="flex items-center gap-1 rounded border border-warn/40 px-1.5 py-px text-[10px] text-warn">
+              <span className="flex items-center gap-1 rounded border border-warn/40 px-1.5 py-px text-[11px] text-warn">
                 <CircleAlert size={9} /> {problem}
               </span>
             )}
@@ -147,7 +147,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
 
       {virtual.length > 0 && (
         <>
-          <h2 className="mt-5 mb-2 text-[11px] font-semibold tracking-[0.14em] text-dim uppercase">Impresoras virtuales</h2>
+          <h2 className="mt-5 mb-2 text-[11px] font-semibold text-dim">Impresoras virtuales</h2>
           <div className="overflow-hidden rounded-xl border border-line bg-panel opacity-80">{virtual.map(row)}</div>
         </>
       )}

@@ -146,7 +146,7 @@ export function CommandPalette({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center bg-black/50 pt-[12vh] backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-center bg-black/50 pt-[12vh]" onClick={onClose}>
       <div className="flex h-fit max-h-[70vh] w-[620px] flex-col overflow-hidden rounded-xl border border-line-2 bg-panel shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-line px-4">
           <Search size={16} className="text-mute" />
@@ -171,7 +171,7 @@ export function CommandPalette({
             placeholder="Busca una página, herramienta, ajuste o reparación…"
             className="flex-1 bg-transparent py-3.5 text-sm text-ink outline-none placeholder:text-mute"
           />
-          <kbd className="rounded border border-line px-1.5 font-mono text-[10px] text-mute">Esc</kbd>
+          <kbd className="rounded border border-line px-1.5 font-mono text-[11px] text-mute">Esc</kbd>
         </div>
         <div ref={list} className="overflow-y-auto py-1">
           {results.map((e, i) => (
@@ -187,12 +187,12 @@ export function CommandPalette({
                 <span className={`block truncate text-sm ${i === index ? "text-neon" : "text-ink"}`}>{e.title}</span>
                 {e.subtitle && <span className="block truncate text-[11px] text-mute">{e.subtitle}</span>}
               </span>
-              <span className="shrink-0 text-[10px] tracking-wide text-mute uppercase">{KIND_LABEL[e.kind]}</span>
+              <span className="shrink-0 text-[11px] tracking-wide text-mute">{KIND_LABEL[e.kind]}</span>
             </button>
           ))}
           {results.length === 0 && <p className="px-4 py-6 text-center text-sm text-mute">Nada coincide con «{query}».</p>}
         </div>
-        <div className="flex gap-4 border-t border-line px-4 py-2 text-[10px] text-mute">
+        <div className="flex gap-4 border-t border-line px-4 py-2 text-[11px] text-mute">
           <span>↑↓ moverse</span>
           <span>Enter abrir</span>
           <span>Alt+← / Alt+→ página anterior / siguiente</span>

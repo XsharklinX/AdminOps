@@ -1,4 +1,3 @@
-import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { api } from "../lib/api";
 
@@ -18,19 +17,19 @@ export function AdminBanner() {
   };
 
   return (
-    <div className="flex items-center gap-3 border-b border-warn/25 bg-warn/[0.06] px-6 py-2.5 text-sm">
-      <ShieldAlert size={16} className="shrink-0 text-warn" />
+    <div className="flex items-center gap-3 border-b border-line bg-panel px-8 py-2 text-[13px]">
+      <span className="size-2 shrink-0 rounded-full bg-warn" />
       <p className="flex-1 text-dim">
-        <span className="text-warn">Sin permisos de administrador.</span> Puedes ver el sistema, pero no modificar el
-        registro ni los servicios.
+        <span className="font-medium text-ink">Modo de solo lectura.</span> Sin permisos de administrador puedes ver el equipo, pero no
+        cambiar el registro ni los servicios.
         {error && <span className="ml-2 text-bad">{error}</span>}
       </p>
       <button
         onClick={relaunch}
         disabled={busy}
-        className="rounded-md border border-warn/40 px-3 py-1 text-xs font-medium text-warn transition-colors hover:bg-warn/10 disabled:opacity-50"
+        className="h-7 rounded-md border border-line-2 px-3 text-xs font-medium text-ink transition-colors hover:bg-panel-2 disabled:opacity-50"
       >
-        {busy ? "Esperando UAC…" : "Reiniciar como admin"}
+        {busy ? "Esperando UAC…" : "Reiniciar como administrador"}
       </button>
     </div>
   );

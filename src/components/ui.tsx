@@ -21,8 +21,8 @@ export function Card({
     <section id={id} className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 [contain:layout_paint] ${className}`}>
       {title && (
         <header className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xs font-semibold tracking-[0.14em] text-dim uppercase">
-            {icon && <span className="text-neon">{icon}</span>}
+          <h2 className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+            {icon && <span className="text-mute">{icon}</span>}
             {title}
           </h2>
           {right}
@@ -33,7 +33,7 @@ export function Card({
   );
 }
 
-/** Anillo de porcentaje con brillo neón. */
+/** Anillo de porcentaje. */
 export function Ring({ value, size = 112, label }: { value: number; size?: number; label: string }) {
   const stroke = 8;
   const r = (size - stroke) / 2;
@@ -42,12 +42,6 @@ export function Ring({ value, size = 112, label }: { value: number; size?: numbe
   const color = loadColor(v);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      {/* Halo con degradado: sin filtros de desenfoque, que son caros de repintar. */}
-      <div
-        className="absolute -inset-2 rounded-full opacity-30"
-        style={{ background: `radial-gradient(circle, transparent 52%, ${color} 58%, transparent 72%)` }}
-        aria-hidden
-      />
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-line)" strokeWidth={stroke} />
         <circle
@@ -60,17 +54,15 @@ export function Ring({ value, size = 112, label }: { value: number; size?: numbe
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c - (v / 100) * c}
-          // Sin transición ni filtro: el arco cambia en cada actualización y un
-          // drop-shadow obliga a recalcular el desenfoque (medido en la Fase 7).
-          // El brillo lo da el halo estático de abajo.
+          // Sin transición ni filtro: el arco cambia en cada actualización (medido en la Fase 7).
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-2xl font-semibold tabular" style={{ color }}>
+        <span className="text-2xl font-semibold tabular" style={{ color: v >= 70 ? color : "var(--color-ink)" }}>
           {Math.round(v)}
           <span className="text-sm">%</span>
         </span>
-        <span className="text-[10px] tracking-widest text-mute uppercase">{label}</span>
+        <span className="text-[11px] text-mute">{label}</span>
       </div>
     </div>
   );
@@ -94,10 +86,10 @@ export function Sparkline({
   const pts = data.map((v, i) => `${(i / (n - 1)) * w},${height - (v / top) * (height - 2) - 1}`);
   const id = `g${color.replace(/[^a-z0-9]/gi, "")}`;
   return (
-    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="h-12 w-full">
+    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+          <stop offset="0%" stopColor={color} stopOpacity={0.12} />
           <stop offset="100%" stopColor={color} stopOpacity={0} />
         </linearGradient>
       </defs>
@@ -111,15 +103,13 @@ export function Sparkline({
   );
 }
 
-export function Bar({ value, color, glow = true }: { value: number; color?: string; glow?: boolean }) {
+/** Barra de progreso fina. `glow` se conserva por compatibilidad y no hace nada. */
+export function Bar({ value, color }: { value: number; color?: string; glow?: boolean }) {
   const v = Math.min(100, Math.max(0, value));
   const c = color ?? loadColor(v);
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
-      <div
-        className="h-full rounded-full"
-        style={{ width: `${v}%`, background: c, boxShadow: glow ? `0 0 8px ${c}` : undefined }}
-      />
+    <div className="h-1 w-full overflow-hidden rounded-full bg-line">
+      <div className="h-full rounded-full" style={{ width: `${v}%`, background: c }} />
     </div>
   );
 }
@@ -127,8 +117,8 @@ export function Bar({ value, color, glow = true }: { value: number; color?: stri
 export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] tracking-widest text-mute uppercase">{label}</div>
-      <div className="truncate font-mono text-sm tabular text-ink">{value}</div>
+      <div className="text-[11px] text-mute">{label}</div>
+      <div className="truncate text-sm font-medium tabular text-ink">{value}</div>
       {sub && <div className="truncate text-xs text-dim">{sub}</div>}
     </div>
   );
@@ -150,7 +140,7 @@ export function Modal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-40 grid place-items-center bg-black/55"
       onClick={onClose}
       onKeyDown={(e) => e.key === "Escape" && onClose()}
     >
@@ -185,7 +175,7 @@ export function Button({
   title?: string;
 }) {
   const style = {
-    primary: "border-neon/50 text-neon hover:bg-neon/10",
+    primary: "border-neon bg-neon text-on-neon hover:brightness-110",
     danger: "border-bad/50 text-bad hover:bg-bad/10",
     ghost: "border-transparent text-dim hover:bg-panel-2 hover:text-ink",
   }[kind];
@@ -194,7 +184,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`flex items-center gap-1.5 rounded-md border px-3.5 py-1.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${style}`}
+      className={`flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-[13px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${style}`}
     >
       {children}
     </button>

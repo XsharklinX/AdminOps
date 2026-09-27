@@ -56,7 +56,7 @@ export function ProfileEditor({
   const input = "w-full rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50";
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-40 grid place-items-center bg-black/55" onClick={onClose}>
       <div className="flex max-h-[88vh] w-[760px] flex-col rounded-xl border border-line-2 bg-panel shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <h3 className="font-semibold">{initial ? "Editar perfil" : "Nuevo perfil"}</h3>
@@ -90,14 +90,14 @@ export function ProfileEditor({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
           {groups.map(([cat, list]) => (
             <div key={cat} className="mb-3">
-              <div className="mb-1 text-[10px] font-semibold tracking-[0.14em] text-mute uppercase">{CATEGORY[cat] ?? cat}</div>
+              <div className="mb-1 text-[11px] font-semibold text-mute">{CATEGORY[cat] ?? cat}</div>
               <div className="grid grid-cols-2 gap-x-4">
                 {list.map((t) => (
                   <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-panel-2">
                     <input type="checkbox" checked={p.items.includes(t.id)} onChange={() => toggle(t.id)} className="accent-[var(--color-neon)]" />
                     <span className="truncate text-dim">{t.name}</span>
-                    {t.kind === "action" && <span className="text-[10px] text-mute">tarea</span>}
-                    {t.risk !== "low" && <span className={`text-[10px] ${t.risk === "high" ? "text-bad" : "text-warn"}`}>{t.risk === "high" ? "alto" : "medio"}</span>}
+                    {t.kind === "action" && <span className="text-[11px] text-mute">tarea</span>}
+                    {t.risk !== "low" && <span className={`text-[11px] ${t.risk === "high" ? "text-bad" : "text-warn"}`}>{t.risk === "high" ? "alto" : "medio"}</span>}
                   </label>
                 ))}
               </div>

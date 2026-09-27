@@ -4,6 +4,7 @@ import logo from "../assets/logo.svg";
 import { useToast } from "../components/feedback";
 import { Card } from "../components/ui";
 import { appApi, workApi, type AppInfo, type Settings } from "../lib/api";
+import { getTheme, setTheme, type Theme } from "../lib/theme";
 
 export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
   const [s, setS] = useState<Settings | null>(null);
@@ -143,6 +144,8 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
         <p className="mt-2 text-[11px] text-mute">Se copia en cada sesión nueva; las sesiones en curso no cambian.</p>
       </Card>
 
+      <Appearance />
+
       <Card title="Acerca de" icon={<BadgeCheck size={14} />} className="col-span-12 lg:col-span-5">
         <div className="flex items-center gap-3">
           <img src={logo} alt="" className="size-12" />
@@ -190,7 +193,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
       </Card>
 
       {dirty && (
-        <div className="fixed right-0 bottom-0 left-56 z-30 border-t border-line bg-panel/95 px-6 py-3 backdrop-blur">
+        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
           <div className="mx-auto flex max-w-5xl items-center justify-between">
             <span className="text-sm text-warn">Cambios sin guardar</span>
             <button onClick={save} className="flex items-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-4 py-1.5 text-sm font-medium text-neon hover:bg-neon/20">
@@ -200,5 +203,38 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Tema oscuro o claro (se aplica al momento). */
+function Appearance() {
+  const [theme, set] = useState<Theme>(getTheme);
+  const pick = (t: Theme) => {
+    setTheme(t);
+    set(t);
+  };
+  const option = (t: Theme, title: string, sub: string, bg: string, bar: string) => (
+    <button
+      onClick={() => pick(t)}
+      aria-pressed={theme === t}
+      className={`flex flex-1 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${theme === t ? "border-neon" : "border-line hover:border-line-2"}`}
+    >
+      <span className="flex h-10 w-14 shrink-0 flex-col justify-end gap-1 rounded-md border border-line-2 p-1.5" style={{ background: bg }}>
+        <span className="h-1 w-8 rounded-full" style={{ background: bar }} />
+        <span className="h-1 w-5 rounded-full" style={{ background: bar, opacity: 0.5 }} />
+      </span>
+      <span>
+        <span className="block text-sm font-medium text-ink">{title}</span>
+        <span className="block text-xs text-mute">{sub}</span>
+      </span>
+    </button>
+  );
+  return (
+    <Card title="Apariencia" className="col-span-12 lg:col-span-7">
+      <div className="flex gap-3">
+        {option("dark", "Oscuro", "Menos brillo en talleres y de noche", "#111315", "#a5acb5")}
+        {option("light", "Claro", "Más legible con mucha luz y en oficinas", "#f6f6f4", "#4b5058")}
+      </div>
+    </Card>
   );
 }

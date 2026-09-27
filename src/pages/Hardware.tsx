@@ -44,7 +44,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function Temp({ value, label }: { value: number | null | undefined; label: string }) {
   return (
     <div className="rounded-lg border border-line bg-void/40 px-3 py-2">
-      <div className="truncate text-[10px] tracking-widest text-mute uppercase" title={label}>
+      <div className="truncate text-[11px] text-mute" title={label}>
         {label}
       </div>
       <div className="font-mono text-2xl tabular" style={{ color: tempColor(value) }}>
@@ -286,7 +286,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
             const m = bySlot(i);
             return (
               <div key={i} className={`rounded-lg border px-3 py-2.5 ${m ? "border-neon/30 bg-neon/5" : "border-dashed border-line-2 bg-void/20"}`}>
-                <div className="text-[10px] tracking-widest text-mute uppercase">{m ? m.slot || `Ranura ${i + 1}` : `Ranura ${i + 1}`}</div>
+                <div className="text-[11px] text-mute">{m ? m.slot || `Ranura ${i + 1}` : `Ranura ${i + 1}`}</div>
                 {m ? (
                   <>
                     <div className="font-mono text-xl text-ink">{bytes(m.capacity)}</div>
@@ -334,7 +334,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
+              <tr className="text-left text-[11px] text-mute">
                 <th className="pb-2 font-medium">Disco</th>
                 <th className="pb-2 text-right font-medium">Reasignados</th>
                 <th className="pb-2 text-right font-medium">Pendientes</th>
@@ -355,7 +355,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
                         <span className="inline-flex items-center gap-1.5">
                           <ChevronDown size={12} className={`text-mute transition-transform ${open ? "rotate-180" : ""}`} />
                           {k.model}
-                          {k.predictFailure && <span className="rounded bg-bad/15 px-1.5 text-[10px] text-bad">FALLO PREVISTO</span>}
+                          {k.predictFailure && <span className="rounded bg-bad/15 px-1.5 text-[11px] text-bad">FALLO PREVISTO</span>}
                         </span>
                       </td>
                       <td className={`py-1.5 text-right ${bad(k.reallocated)}`}>{k.reallocated ?? "—"}</td>
@@ -391,7 +391,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
         )}
       </Card>
 
-      <p className="col-span-12 text-center text-[10px] text-mute">
+      <p className="col-span-12 text-center text-[11px] text-mute">
         Sensores: LibreHardwareMonitor (MPL-2.0).{" "}
         <button onClick={() => hwApi.openNotices().catch((e) => toast("error", String(e)))} className="underline hover:text-ink">
           Componentes de terceros

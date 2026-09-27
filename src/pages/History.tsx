@@ -151,7 +151,7 @@ export function History({ isAdmin }: { isAdmin: boolean }) {
                         <XCircle size={12} className="text-bad" />
                       )}
                       {e.reverted && (
-                        <span className="rounded border border-line-2 px-1.5 text-[10px] text-dim">Deshecho</span>
+                        <span className="rounded border border-line-2 px-1.5 text-[11px] text-dim">Deshecho</span>
                       )}
                     </div>
                     {e.message && (

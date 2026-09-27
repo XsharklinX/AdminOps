@@ -564,6 +564,21 @@ pub fn load_snapshot(app: &tauri::AppHandle, ts: u64) -> Option<Diagnostics> {
     serde_json::from_str(&std::fs::read_to_string(p).ok()?).ok()
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LatestFindings {
+    timestamp: u64,
+    findings: Vec<Finding>,
+    security_score: Option<u32>,
+}
+
+/// Hallazgos del último análisis guardado, sin volver a analizar (para el Panel).
+#[tauri::command(async)]
+pub fn latest_findings(app: tauri::AppHandle) -> Option<LatestFindings> {
+    let d = latest_snapshot(&app)?;
+    Some(LatestFindings { timestamp: d.timestamp, security_score: d.security.data.as_ref().map(|a| a.score), findings: d.findings })
+}
+
 pub fn latest_snapshot(app: &tauri::AppHandle) -> Option<Diagnostics> {
     let ts = snapshot_files(&snapshots_dir(app)).into_iter().map(|(t, _)| t).max()?;
     load_snapshot(app, ts)

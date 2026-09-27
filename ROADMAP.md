@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.17.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.18.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.17)
+## Hecho (v0.1 – v0.18)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -27,6 +27,7 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 15. Mantenimiento a fondo | 0.15 | Desinstalador con restos a la papelera, Windows Update (historial explicado, pausar, ocultar), análisis del arranque, restaurar drivers, caché de navegadores, reparaciones de Store, búsqueda, audio y perfil temporal, espacio de puntos de restauración, mantenimiento programado |
 | 16. Seguridad del equipo | 0.16 | Nota 0-100 con arreglos, 8 ajustes de seguridad reversibles, BitLocker y copia de claves, programas de riesgo, elementos sospechosos, extensiones de navegador, nota en diagnóstico e informe |
 | 17. Instalador y atajos | 0.17 | Instalador con interfaz propia (instalar/actualizar/reinstalar, progreso, consejos), instalador clásico para despliegues silenciosos, página de atajos de teclado con modo descubrir y prueba |
+| 18. Rediseño | 0.18 | Lenguaje visual sobrio (IBM Plex, un acento, color solo para estados, sin brillos ni degradados), tema claro, navegación en 7 áreas con pestañas, Panel y Herramientas rehechos, icono nuevo (tuerca con pulso), informe e instalador con el mismo estilo |
 
 ### Fase 6 en detalle
 
@@ -80,7 +81,7 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
   Windows Server. Ejecutarla en Sandbox al menos una vez por versión.
 - **Dependencia de Edge para el PDF.** Si falta, el informe cae a HTML.
 - **Sin firma de código** (decisión: no se contempla por coste). SmartScreen avisará al instalar.
-- **Solo español** (inglés en la Fase 21).
+- **Solo español** (inglés en la Fase 22).
 - **Notificaciones en portable**: sin instalador, Windows puede mostrarlas con otro nombre de app.
 - **Tickets incrustados** usan la API "unstable" de Tauri (vistas hijas); si una versión futura la
   cambia, queda la ventana aparte como alternativa.
@@ -252,7 +253,27 @@ primer informe sin instrucciones.
 - Pendiente de probar en equipos reales: instalar, actualizar y reinstalar con el instalador nuevo, y un
   equipo sin WebView2 (debe abrir el clásico).
 
-### Fase 18 — Informe y cliente (v0.18)
+### Fase 18 — Rediseño (v0.18) ✅
+
+Objetivo: que la app se vea como una herramienta profesional y no como una interfaz «generada».
+Propuesta visual: artifact «AdminOps — Propuesta de rediseño».
+
+- **Sistema visual**: IBM Plex Sans (y Mono solo para rutas y códigos), un solo acento azul para la
+  selección y la acción principal, verde/ámbar/rojo apagados solo para estados, sin brillos, degradados ni
+  desenfoques, títulos en frase (fuera las mayúsculas espaciadas). Tokens en `src/index.css`.
+- **Tema claro** además del oscuro (Ajustes → Apariencia).
+- **Navegación**: 7 áreas en la barra lateral (Panel, Equipo, Optimizar, Programas, Red, Soporte,
+  Administración) y las páginas como pestañas; cada área recuerda su última pestaña. Ajustes en el pie.
+- **Panel** rehecho: banda de cifras clave, «Requiere atención» (hallazgos del último diagnóstico),
+  procesos y almacenamiento sin cajas.
+- **Herramientas** rehecha: filas limpias en lugar de tarjetas, filtros por grupo, ficha compacta.
+- **Icono nuevo**: una tuerca (soporte técnico) con el pulso de diagnóstico dentro, plano y de una
+  tinta; en la app, el ejecutable, el informe PDF y el instalador.
+- Informe PDF e instalador con el mismo lenguaje (el instalador lleva sus fuentes).
+- Pendiente: repasar página a página los detalles que el barrido automático no cubre (espaciados y
+  tarjetas internas de cada sección) y rehacer las capturas del README.
+
+### Fase 19 — Informe y cliente (v0.19)
 
 **Prioridad: media.** Lo que convierte el trabajo técnico en algo que el cliente valora (y paga).
 
@@ -265,7 +286,7 @@ primer informe sin instrucciones.
 
 **Terminado cuando:** una sesión termina con informe, recibo y firma sin salir de la app.
 
-### Fase 19 — La oficina completa (v0.19)
+### Fase 20 — La oficina completa (v0.20)
 
 **Prioridad: media.** Pasar de "un equipo" a "la red del cliente".
 
@@ -279,7 +300,7 @@ primer informe sin instrucciones.
 
 **Terminado cuando:** el técnico puede describir y mantener la red entera de un cliente pequeño.
 
-### Fase 20 — Recetas (v0.20)
+### Fase 21 — Recetas (v0.21)
 
 **Prioridad: media.** Automatizar lo que el técnico repite en cada equipo.
 
@@ -290,7 +311,7 @@ primer informe sin instrucciones.
 
 **Terminado cuando:** preparar un equipo nuevo es elegir una receta y esperar.
 
-### Fase 21 — Versión 1.0 y distribución (v1.0)
+### Fase 22 — Versión 1.0 y distribución (v1.0)
 
 **Prioridad: alta cuando lo anterior esté probado en uso real.**
 
@@ -303,7 +324,7 @@ primer informe sin instrucciones.
 **v1.0 cuando:** actualizaciones automáticas funcionando, inglés completo y dos semanas de uso real sin
 fallos graves.
 
-### Fase 22 — Preparación comercial (v1.1)
+### Fase 23 — Preparación comercial (v1.1)
 
 **Prioridad: a decidir** según cómo se quiera vender.
 

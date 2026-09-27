@@ -26,9 +26,9 @@ export function duration(seconds: number): string {
   return `${m}m`;
 }
 
-/** Color semántico según la carga: normal → neón, alta → ámbar, crítica → rojo. */
+/** Color semántico según la carga: normal → neutro, alta → ámbar, crítica → rojo. */
 export function loadColor(p: number): string {
   if (p >= 90) return "var(--color-bad)";
   if (p >= 70) return "var(--color-warn)";
-  return "var(--color-neon)";
+  return "var(--color-dim)";
 }

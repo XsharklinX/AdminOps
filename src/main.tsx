@@ -3,7 +3,10 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { appApi } from "./lib/api";
+import { applyTheme, getTheme } from "./lib/theme";
 import "./index.css";
+
+applyTheme(getTheme());
 
 // Sin menú contextual del navegador: esto es una app de escritorio, no una web.
 document.addEventListener("contextmenu", (e) => e.preventDefault());

@@ -284,6 +284,7 @@ export interface SnapshotInfo {
 export const diagApi = {
   run: () => invoke<Diagnostics>("run_diagnostics"),
   snapshots: () => invoke<SnapshotInfo[]>("list_snapshots"),
+  latest: () => invoke<{ timestamp: number; findings: Finding[]; securityScore: number | null } | null>("latest_findings"),
   generateReport: (baseline: number | null, technician: string, client: string, notes: string) =>
     invoke<string>("generate_report", { baseline, technician, client, notes }),
   openReport: (path: string) => invoke<void>("open_report", { path }),

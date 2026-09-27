@@ -42,26 +42,26 @@ fn yes_no(b: Option<bool>, yes: &str, no: &str) -> String {
 use crate::paths::reports_dir;
 
 const CSS: &str = r#"
-*{box-sizing:border-box}body{margin:0;background:#f4f6f9;color:#1b2330;font:14px/1.5 "Segoe UI",system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#f4f6f9;color:#1b2330;font:14px/1.55 "IBM Plex Sans","Segoe UI",system-ui,sans-serif}
 main{max-width:900px;margin:0 auto;padding:40px 32px;background:#fff;min-height:100vh}
-header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0bb5d6;padding-bottom:16px;margin-bottom:24px}
-h1{margin:0;font-size:26px}h1 small{display:block;font-size:13px;font-weight:400;color:#5b6778;letter-spacing:.08em;text-transform:uppercase}
-h2{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:#0a7f97;margin:32px 0 10px;border-bottom:1px solid #e3e8ef;padding-bottom:6px}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #2f63d8;padding-bottom:16px;margin-bottom:24px}
+h1{margin:0;font-size:26px}h1 small{display:block;font-size:13px;font-weight:400;color:#5b6778}
+h2{font-size:17px;font-weight:600;color:#1b1d20;margin:32px 0 10px;border-bottom:1px solid #e3e8ef;padding-bottom:6px}
 .meta{text-align:right;color:#5b6778;font-size:13px}.meta b{color:#1b2330}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
-th{color:#5b6778;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+th{color:#5b6778;font-weight:600;font-size:12px}
 td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .chips{display:flex;gap:10px;margin-bottom:12px}.chip{border-radius:8px;padding:8px 14px;font-weight:600}
 .chip span{display:block;font-size:22px}.bad{background:#fdecef;color:#c0223f}.warn{background:#fff5e0;color:#9a6200}.ok{background:#e6f8ef;color:#12784a}.info{background:#e8f4fb;color:#1c6a93}
 .f{display:flex;gap:10px;padding:8px 10px;border-radius:6px;margin-bottom:6px}.f b{display:block}.f small{color:#5b6778}
 .dot{width:8px;height:8px;border-radius:50%;margin-top:7px;flex:none}.dot.bad{background:#e0284a}.dot.warn{background:#e39a00}.dot.info{background:#2a8fc4}
 .better{color:#12784a;font-weight:600}.worse{color:#c0223f;font-weight:600}.muted{color:#8a95a5}
-.notes{white-space:pre-wrap;background:#f7f9fb;border-left:3px solid #0bb5d6;padding:12px 14px;border-radius:4px}
+.notes{white-space:pre-wrap;background:#f7f9fb;border-left:3px solid #2f63d8;padding:12px 14px;border-radius:4px}
 footer{margin-top:40px;color:#8a95a5;font-size:12px;text-align:center}
 header .brand{display:flex;align-items:center;gap:14px}header .brand svg,header .brand img{width:52px;height:52px;flex:none;object-fit:contain}
 .company{font-size:12px;color:#5b6778;margin-top:2px}.check{list-style:none;padding:0;margin:0;columns:2}.check li{padding:3px 0}
 .check .y{color:#12784a;font-weight:700}.check .n{color:#c0223f;font-weight:700}
-.speed{display:flex;gap:10px}.speed div{flex:1;background:#f7f9fb;border-radius:8px;padding:10px 12px}.speed b{display:block;font-size:20px;color:#0a7f97}
+.speed{display:flex;gap:10px}.speed div{flex:1;background:#f7f9fb;border-radius:8px;padding:10px 12px}.speed b{display:block;font-size:20px;color:#2459c9}
 .conditions{font-size:11px;color:#5b6778;white-space:pre-wrap;border-top:1px solid #e3e8ef;margin-top:28px;padding-top:10px}
 @page{size:A4;margin:14mm 12mm}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff}main{padding:0;max-width:none;min-height:0}h2{break-after:avoid}tr,.f{break-inside:avoid}}

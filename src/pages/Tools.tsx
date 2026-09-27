@@ -151,6 +151,7 @@ interface Tile {
 export function Tools({ isAdmin }: { isAdmin: boolean }) {
   const [data, setData] = useState<ToolboxView | null>(null);
   const [query, setQuery] = useState("");
+  const [group, setGroup] = useState<ToolGroup | "all">("all");
   const [editing, setEditing] = useState<CustomTool | "new" | null>(null);
   const [launching, setLaunching] = useState<string | null>(null);
   const toast = useToast();
@@ -238,7 +239,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
 
   const favorites = data.favorites.filter((id) => tiles.has(id));
   const grid = (ids: string[]) => (
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-x-6 md:grid-cols-3">
       {ids.map((id) => {
         const t = tiles.get(id)!;
         return (
@@ -257,55 +258,71 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
     </div>
   );
 
+  const shownGroups = GROUPS.filter((g) => group === "all" || g.id === group);
+
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-6">
+    <div className="mx-auto max-w-6xl space-y-6 px-8 py-6">
       <MachineCard />
 
-      <div className="flex items-center gap-3">
-        <div className="relative w-96">
-          <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar: services, red, bios, impresoras, ncpa.cpl…"
-            className="w-full rounded-md border border-line bg-panel py-1.5 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
-          />
-        </div>
-        <span className="text-xs text-mute">
-          {data.tools.length + data.custom.length} accesos · <ShieldCheck size={11} className="inline text-neon" /> = se abre como administrador
-        </span>
-        <div className="ml-auto">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search size={15} strokeWidth={1.6} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar entre las herramientas: services, red, bios, impresoras, ncpa.cpl…"
+              className="h-9 w-full rounded-lg border border-line bg-panel pr-3 pl-9 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/60"
+            />
+          </div>
           <Button onClick={() => setEditing("new")}>
             <Plus size={14} /> Nuevo acceso
           </Button>
         </div>
+        {!results && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[{ id: "all", title: "Todas" }, ...GROUPS].map((g) => (
+              <button
+                key={g.id}
+                onClick={() => setGroup(g.id as ToolGroup | "all")}
+                className={`h-7 rounded-full border px-3 text-xs transition-colors ${
+                  group === g.id ? "border-ink/40 bg-panel-2 text-ink" : "border-line text-dim hover:text-ink"
+                }`}
+              >
+                {g.title}
+              </button>
+            ))}
+            <span className="ml-auto flex items-center gap-1 text-xs text-mute">
+              <ShieldCheck size={12} /> se abre como administrador
+            </span>
+          </div>
+        )}
       </div>
 
       {results ? (
         <Section title={`Resultados (${results.length})`}>
-          {results.length ? grid(results) : <p className="text-sm text-mute">Nada coincide con «{query}».</p>}
+          {results.length ? grid(results) : <p className="py-3 text-sm text-mute">Nada coincide con «{query}».</p>}
         </Section>
       ) : (
         <>
-          {favorites.length > 0 && <Section title="Favoritos">{grid(favorites)}</Section>}
-          <Section title="Mis accesos">
-            {data.custom.length ? (
-              grid(data.custom.map((c) => c.id))
-            ) : (
-              <button
-                onClick={() => setEditing("new")}
-                className="w-full rounded-lg border border-dashed border-line px-4 py-4 text-left text-sm text-mute transition-colors hover:border-neon/50 hover:text-ink"
-              >
-                <Plus size={14} className="mr-1.5 inline" />
-                Añade tus propios programas, carpetas o páginas web (AnyDesk, tu carpeta de instaladores, el panel de tu router…).
-                Marca con <Star size={11} className="inline" /> los que más uses para tenerlos arriba.
-              </button>
-            )}
-          </Section>
-          {GROUPS.map((g) => {
+          {group === "all" && favorites.length > 0 && <Section title="Favoritos">{grid(favorites)}</Section>}
+          {group === "all" && (
+            <Section title="Mis accesos">
+              {data.custom.length ? (
+                grid(data.custom.map((c) => c.id))
+              ) : (
+                <button onClick={() => setEditing("new")} className="py-2 text-left text-sm text-dim hover:text-ink">
+                  <Plus size={14} className="mr-1.5 inline" />
+                  Añade tus propios programas, carpetas o webs (AnyDesk, tu carpeta de instaladores, el panel del router…). Con la estrella los fijas en
+                  Favoritos.
+                </button>
+              )}
+            </Section>
+          )}
+          {shownGroups.map((g) => {
             const ids = data.tools.filter((t) => t.group === g.id).map((t) => t.id);
             return ids.length ? (
-              <Section key={g.id} title={g.title}>
+              <Section key={g.id} title={g.title} count={ids.length}>
                 {grid(ids)}
               </Section>
             ) : null;
@@ -329,15 +346,19 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
-    <section>
-      <h2 className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-dim uppercase">{title}</h2>
+    <section className="flex flex-col gap-1">
+      <h2 className="flex items-baseline gap-2 border-b border-line pb-2 text-[15px] font-semibold text-ink">
+        {title}
+        {count !== undefined && <span className="text-xs font-normal text-mute">{count}</span>}
+      </h2>
       {children}
     </section>
   );
 }
 
+/** Una herramienta: fila limpia (icono, nombre, una línea de descripción); se marca al pasar el ratón. */
 function ToolTile({
   tile,
   favorite,
@@ -358,42 +379,41 @@ function ToolTile({
   const Icon = ICONS[tile.icon] ?? AppWindow;
   const off = !!tile.disabled;
   return (
-    <div className={`group relative rounded-lg border border-line bg-panel transition-colors ${off ? "opacity-45" : "hover:border-neon/40 hover:bg-panel-2"}`}>
+    <div className={`group relative -mx-2 rounded-lg transition-colors ${off ? "opacity-45" : "hover:bg-panel-2"}`}>
       <button
         onClick={onLaunch}
         disabled={off}
         title={tile.disabled ?? tile.description}
-        className="flex w-full items-start gap-3 px-3 py-2.5 pr-8 text-left disabled:cursor-not-allowed"
+        className="flex w-full items-center gap-3 px-2 py-2 pr-16 text-left disabled:cursor-not-allowed"
       >
-        <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-md border border-line bg-void/60 ${off ? "text-mute" : "text-neon"}`}>
-          {busy ? <Loader2 size={15} className="animate-spin" /> : <Icon size={15} strokeWidth={1.8} />}
-        </span>
+        {busy ? <Loader2 size={17} className="shrink-0 animate-spin text-neon" /> : <Icon size={17} strokeWidth={1.6} className="shrink-0 text-mute group-hover:text-ink" />}
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
+          <span className="flex items-center gap-1.5 text-sm text-ink">
             <span className="truncate">{tile.name}</span>
-            {tile.asAdmin && <ShieldCheck size={11} className="shrink-0 text-neon" aria-label="Se abre como administrador" />}
+            {tile.asAdmin && <ShieldCheck size={12} className="shrink-0 text-mute" aria-label="Se abre como administrador" />}
           </span>
-          <span className="line-clamp-2 text-[11px] leading-snug text-mute [overflow-wrap:anywhere]">{tile.disabled ?? tile.description}</span>
+          <span className="block truncate text-xs text-mute">{tile.disabled ?? tile.description}</span>
         </span>
       </button>
-      <div className="absolute top-1.5 right-1.5 flex flex-col gap-0.5">
-        <button
-          onClick={onFavorite}
-          title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-          className={`rounded p-1 transition-opacity ${favorite ? "text-warn" : "text-mute opacity-0 group-hover:opacity-100 hover:text-ink"}`}
-        >
-          <Star size={12} fill={favorite ? "currentColor" : "none"} />
-        </button>
+      <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-0.5">
         {onEdit && (
-          <button onClick={onEdit} title="Editar" className="rounded p-1 text-mute opacity-0 group-hover:opacity-100 hover:text-ink">
-            <Pencil size={12} />
+          <button onClick={onEdit} title="Editar" aria-label="Editar" className="rounded p-1 text-mute opacity-0 group-hover:opacity-100 hover:text-ink">
+            <Pencil size={13} />
           </button>
         )}
         {onDelete && (
-          <button onClick={onDelete} title="Eliminar" className="rounded p-1 text-mute opacity-0 group-hover:opacity-100 hover:text-bad">
-            <Trash2 size={12} />
+          <button onClick={onDelete} title="Eliminar" aria-label="Eliminar" className="rounded p-1 text-mute opacity-0 group-hover:opacity-100 hover:text-bad">
+            <Trash2 size={13} />
           </button>
         )}
+        <button
+          onClick={onFavorite}
+          title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+          aria-label={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+          className={`rounded p-1 transition-opacity ${favorite ? "text-warn" : "text-mute opacity-0 group-hover:opacity-100 hover:text-ink"}`}
+        >
+          <Star size={13} fill={favorite ? "currentColor" : "none"} />
+        </button>
       </div>
     </div>
   );
@@ -566,7 +586,6 @@ function MachineCard() {
   return (
     <Card
       title="Ficha del equipo"
-      icon={<Monitor size={14} />}
       right={
         inv && (
           <div className="flex items-center gap-3 text-[11px]">
@@ -603,7 +622,7 @@ function MachineCard() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] tracking-widest text-mute uppercase">{label}</div>
+      <div className="text-[11px] text-mute">{label}</div>
       <div className="truncate text-ink">{children}</div>
     </div>
   );

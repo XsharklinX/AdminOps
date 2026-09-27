@@ -110,7 +110,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
                   )}
                   {!i.target && (
                     <span
-                      className="flex items-center gap-1 text-[10px] text-warn"
+                      className="flex items-center gap-1 text-[11px] text-warn"
                       title="El ejecutable ya no existe: probablemente restos de un programa desinstalado"
                     >
                       <FileWarning size={11} /> Archivo no encontrado
@@ -125,7 +125,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
                 {i.publisher ?? <span className="text-mute">Editor desconocido</span>}
               </div>
               <div className="w-48 shrink-0 truncate text-[11px] text-mute" title={i.location}>
-                <span className="mr-1.5 rounded bg-line px-1.5 py-px font-mono text-[9px]">{SOURCE_LABEL[i.source]}</span>
+                <span className="mr-1.5 rounded bg-line px-1.5 py-px font-mono text-[10px]">{SOURCE_LABEL[i.source]}</span>
                 {i.location}
               </div>
               <div title={blocked ? "Requiere administrador" : undefined}>

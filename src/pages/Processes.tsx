@@ -137,7 +137,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-panel">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-panel-2 text-left text-[10px] tracking-widest text-mute uppercase">
+          <thead className="sticky top-0 z-10 bg-panel-2 text-left text-[11px] text-mute">
             <tr>
               {header("name", "Proceso")}
               {header("pid", "PID", true)}

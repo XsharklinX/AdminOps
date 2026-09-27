@@ -86,7 +86,7 @@ export function WifiProfiles({ isAdmin }: { isAdmin: boolean }) {
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
+            <tr className="text-left text-[11px] text-mute">
               <th className="pb-2 font-medium">Red</th>
               <th className="pb-2 font-medium">Seguridad</th>
               <th className="pb-2 font-medium">Contraseña</th>
@@ -100,7 +100,7 @@ export function WifiProfiles({ isAdmin }: { isAdmin: boolean }) {
                 <td className="py-2">
                   <span className="text-ink">{p.name}</span>
                   {p.ssid !== p.name && <span className="ml-1.5 text-xs text-mute">({p.ssid})</span>}
-                  {p.connected && <span className="ml-2 rounded border border-ok/40 px-1.5 py-px text-[10px] text-ok">Conectada</span>}
+                  {p.connected && <span className="ml-2 rounded border border-ok/40 px-1.5 py-px text-[11px] text-ok">Conectada</span>}
                 </td>
                 <td className="py-2 text-xs text-dim">{SECURITY[p.authentication] ?? p.authentication}</td>
                 <td className="py-2">

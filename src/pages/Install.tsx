@@ -136,7 +136,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
       >
         <input type="checkbox" readOnly checked={on} className="pointer-events-none size-3.5 accent-[var(--color-neon)]" />
         <span className="truncate">{a.name}</span>
-        {inst && <span className="ml-auto shrink-0 rounded border border-ok/40 px-1 text-[9px] text-ok">instalado</span>}
+        {inst && <span className="ml-auto shrink-0 rounded border border-ok/40 px-1 text-[10px] text-ok">instalado</span>}
       </button>
     );
   };
@@ -145,7 +145,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
     <div className="mx-auto max-w-6xl p-6 pb-24">
       {/* Listas */}
       <section className="mb-5">
-        <h2 className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-dim uppercase">Listas</h2>
+        <h2 className="mb-2 text-[11px] font-semibold text-dim">Listas</h2>
         <div className="flex flex-wrap gap-2">
           {catalog.presets.map((p) => (
             <button
@@ -246,14 +246,14 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
 
       {extra.length > 0 && (
         <section className="mb-5">
-          <h2 className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-dim uppercase">Encontrado en winget</h2>
+          <h2 className="mb-2 text-[11px] font-semibold text-dim">Encontrado en winget</h2>
           <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-4">{extra.map(chip)}</div>
         </section>
       )}
 
       {groups.map(([c, apps]) => (
         <section key={c} className="mb-5">
-          <h2 className="mb-2 text-[11px] font-semibold tracking-[0.14em] text-dim uppercase">{CATEGORY[c]}</h2>
+          <h2 className="mb-2 text-[11px] font-semibold text-dim">{CATEGORY[c]}</h2>
           <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-4">{apps.map(chip)}</div>
         </section>
       ))}
@@ -264,7 +264,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {selected.length > 0 && (
-        <div className="fixed right-0 bottom-0 left-56 z-30 border-t border-line bg-panel/95 px-6 py-3 backdrop-blur">
+        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
             {running ? (
               <TaskStatus task="install-apps" active={running} fallback="Instalando…" />

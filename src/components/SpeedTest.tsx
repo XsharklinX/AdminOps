@@ -45,13 +45,6 @@ function Gauge({
 
   return (
     <div className="relative mx-auto select-none" style={{ width: size, height: size - 30 }}>
-      {running && (
-        <div
-          className="absolute inset-8 animate-pulse rounded-full opacity-25"
-          style={{ background: `radial-gradient(circle, ${color} 0%, transparent 65%)` }}
-          aria-hidden
-        />
-      )}
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute top-0 left-0">
         <circle cx={c} cy={c} r={r} fill="none" stroke="var(--color-line)" strokeWidth={14} strokeLinecap="round" strokeDasharray={`${arc} ${circ}`} transform={`rotate(135 ${c} ${c})`} />
         <circle
@@ -100,7 +93,7 @@ function Gauge({
       {!running && (
         <button
           onClick={onStart}
-          className="absolute top-1/2 left-1/2 grid size-24 -translate-x-1/2 -translate-y-[50%] place-items-center rounded-full border-2 border-neon bg-neon/10 text-base font-bold tracking-widest text-neon shadow-[0_0_30px_-6px_var(--color-neon)] transition-transform hover:scale-105 hover:bg-neon/20"
+          className="absolute top-1/2 left-1/2 grid size-24 -translate-x-1/2 -translate-y-[50%] place-items-center rounded-full border-2 border-neon bg-neon/10 text-base font-bold text-neon transition-transform hover:scale-105 hover:bg-neon/20"
         >
           INICIAR
         </button>
@@ -270,7 +263,7 @@ export function SpeedTest({ adapter, onResult }: { adapter: Adapter | null; onRe
                   active ? "border-neon/60 bg-neon/10" : done ? "border-line-2 bg-void/40" : "border-line bg-void/20"
                 }`}
               >
-                <div className={`flex items-center justify-center gap-1 text-[10px] tracking-widest uppercase ${active ? "text-neon" : "text-mute"}`}>
+                <div className={`flex items-center justify-center gap-1 text-[11px] ${active ? "text-neon" : "text-mute"}`}>
                   <s.icon size={11} className={active ? "animate-bounce" : ""} /> {s.label}
                 </div>
                 <div className="mt-0.5 font-mono text-sm tabular text-ink">{s.value ?? (active ? "…" : "—")}</div>
@@ -302,32 +295,32 @@ export function SpeedTest({ adapter, onResult }: { adapter: Adapter | null; onRe
         {/* Resultado */}
         <div className="grid grid-cols-2 gap-2.5">
           <div className="rounded-lg border border-line bg-void/40 px-3 py-2.5">
-            <div className="flex items-center gap-1 text-[10px] tracking-widest text-mute uppercase">
+            <div className="flex items-center gap-1 text-[11px] text-mute">
               <ArrowDown size={11} className="text-neon" /> Bajada
             </div>
             <div className="font-mono text-3xl tabular text-neon">{down != null ? down.toFixed(1) : "—"}</div>
             <div className="text-[11px] text-mute">Mbps</div>
           </div>
           <div className="rounded-lg border border-line bg-void/40 px-3 py-2.5">
-            <div className="flex items-center gap-1 text-[10px] tracking-widest text-mute uppercase">
+            <div className="flex items-center gap-1 text-[11px] text-mute">
               <ArrowUp size={11} className="text-neon-2" /> Subida
             </div>
             <div className="font-mono text-3xl tabular text-neon-2">{up != null ? up.toFixed(1) : "—"}</div>
             <div className="text-[11px] text-mute">Mbps</div>
           </div>
           <div className="rounded-lg border border-line bg-void/40 px-3 py-2">
-            <div className="text-[10px] tracking-widest text-mute uppercase">Latencia · jitter</div>
+            <div className="text-[11px] text-mute">Latencia · jitter</div>
             <div className="font-mono text-lg tabular">
               {latency != null ? `${latency.toFixed(0)} ms` : "—"}
               {shown && <span className="text-sm text-dim"> · {shown.jitterMs.toFixed(1)} ms</span>}
             </div>
           </div>
           <div className="rounded-lg border border-line bg-void/40 px-3 py-2">
-            <div className="text-[10px] tracking-widest text-mute uppercase">Latencia con carga</div>
+            <div className="text-[11px] text-mute">Latencia con carga</div>
             <div className={`font-mono text-lg tabular ${bloat !== null && bloat > 100 ? "text-bad" : bloat !== null && bloat > 30 ? "text-warn" : ""}`}>
               {shown?.downloadLatencyMs != null ? `${shown.downloadLatencyMs.toFixed(0)} ms` : "—"}
             </div>
-            <div className="text-[10px] text-mute">
+            <div className="text-[11px] text-mute">
               {bloat === null ? "Durante la bajada" : bloat > 100 ? "Bufferbloat alto" : bloat > 30 ? "Bufferbloat moderado" : "Sin bufferbloat"}
             </div>
           </div>
@@ -335,7 +328,7 @@ export function SpeedTest({ adapter, onResult }: { adapter: Adapter | null; onRe
 
         {suited.length > 0 && (
           <div className="rounded-lg border border-line bg-void/30 px-3 py-2">
-            <div className="mb-1 text-[10px] tracking-widest text-mute uppercase">Apto para</div>
+            <div className="mb-1 text-[11px] text-mute">Apto para</div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
               {suited.map((q) => (
                 <span key={q.label} className={`flex items-center gap-1.5 ${q.ok ? "text-ink" : "text-mute"}`}>
@@ -349,7 +342,7 @@ export function SpeedTest({ adapter, onResult }: { adapter: Adapter | null; onRe
         {/* Conexión */}
         <div className="rounded-lg border border-line bg-void/30 px-3 py-2.5 text-xs">
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[10px] tracking-widest text-mute uppercase">Tu conexión</span>
+            <span className="text-[11px] text-mute">Tu conexión</span>
             <button onClick={toggleHide} className="flex items-center gap-1 text-mute hover:text-ink" title="Ocultar las IP (por ejemplo al compartir pantalla)">
               {hideIp ? <EyeOff size={12} /> : <Eye size={12} />} {hideIp ? "Mostrar IP" : "Ocultar IP"}
             </button>
@@ -388,7 +381,7 @@ export function SpeedTest({ adapter, onResult }: { adapter: Adapter | null; onRe
             )}
           </dl>
         </div>
-        <p className="text-[10px] text-mute">
+        <p className="text-[11px] text-mute">
           Servidores de Cloudflare; proveedor y ubicación según ipinfo.io. {shown && `${shown.transferredMb.toFixed(0)} MB transferidos.`}
         </p>
       </div>

@@ -259,7 +259,7 @@ export function Diagnostics({
             {(disks) => (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
+                  <tr className="text-left text-[11px] text-mute">
                     <th className="pb-2 font-medium">Disco</th>
                     <th className="pb-2 font-medium">Estado</th>
                     <th className="pb-2 text-right font-medium">Temp.</th>
@@ -363,7 +363,7 @@ export function Diagnostics({
                 ))}
                 {s.crashes.length > 0 && (
                   <>
-                    <p className="mt-2 mb-1 text-[10px] tracking-widest text-mute uppercase">Apps que fallan</p>
+                    <p className="mt-2 mb-1 text-[11px] text-mute">Apps que fallan</p>
                     {s.crashes.map((c) => (
                       <div key={c.app} className="flex items-center gap-3 py-1 text-sm">
                         <span className="min-w-0 flex-1 truncate text-ink">{c.app}</span>
@@ -375,7 +375,7 @@ export function Diagnostics({
                 )}
                 {s.minidumps?.some((m) => m.analysis?.culprit) && (
                   <>
-                    <p className="mt-2 mb-1 text-[10px] tracking-widest text-mute uppercase">Volcados analizados</p>
+                    <p className="mt-2 mb-1 text-[11px] text-mute">Volcados analizados</p>
                     {s.minidumps
                       .filter((m) => m.analysis)
                       .map((m) => (

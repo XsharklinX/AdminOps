@@ -160,7 +160,7 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
       <ExtensionsCard />
 
       <div>
-        <h2 className="mb-1 px-1 text-[11px] font-semibold tracking-[0.14em] text-dim uppercase">Ajustes de seguridad</h2>
+        <h2 className="mb-1 px-1 text-[11px] font-semibold text-dim">Ajustes de seguridad</h2>
         <div className="-mx-6 -mt-4">
           <TweaksPage category="security" isAdmin={isAdmin} focus={focus} />
         </div>
@@ -306,7 +306,7 @@ function SuspiciousCard({ isAdmin }: { isAdmin: boolean }) {
           {items.map((i, n) => (
             <div key={n} className="py-2">
               <div className="flex items-center gap-2">
-                <span className="rounded border border-bad/40 px-1.5 py-px text-[10px] text-bad">{KIND[i.kind]}</span>
+                <span className="rounded border border-bad/40 px-1.5 py-px text-[11px] text-bad">{KIND[i.kind]}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-ink">{i.name}</span>
                 {i.kind === "task" && i.id && (
                   <Button kind="ghost" onClick={() => disable(i)} disabled={!isAdmin}>
@@ -365,7 +365,7 @@ function ExtensionsCard() {
         <div className="grid grid-cols-2 gap-4">
           {browsers.map((b) => (
             <div key={b}>
-              <div className="mb-1 text-[10px] tracking-widest text-mute uppercase">{b}</div>
+              <div className="mb-1 text-[11px] text-mute">{b}</div>
               {list
                 .filter((e) => e.browser === b)
                 .map((e) => (

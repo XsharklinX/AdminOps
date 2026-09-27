@@ -164,7 +164,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
         )}
         {!a.description && a.publisher && <p className="text-xs text-dim">{a.publisher}</p>}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1 text-[10px] text-mute">
+      <div className="flex shrink-0 flex-col items-end gap-1 text-[11px] text-mute">
         {a.version && <span className="font-mono">{a.version}</span>}
         {!a.reinstallable && a.advice && <span className="text-warn/80">sin reinstalación</span>}
       </div>
@@ -211,7 +211,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
           g.apps.length > 0 && (
             <section key={g.advice} className="mb-6">
               <h2 className="mb-2 flex items-baseline gap-2">
-                <span className={`text-xs font-semibold tracking-[0.14em] uppercase ${ADVICE[g.advice].cls}`}>
+                <span className={`text-xs font-semibold ${ADVICE[g.advice].cls}`}>
                   {ADVICE[g.advice].title}
                 </span>
                 <span className="text-xs text-mute">{ADVICE[g.advice].hint}</span>
@@ -224,7 +224,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
       {others.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-2 flex items-baseline gap-2">
-            <span className="text-xs font-semibold tracking-[0.14em] text-dim uppercase">Otras apps</span>
+            <span className="text-xs font-semibold text-dim">Otras apps</span>
             <span className="text-xs text-mute">
               No catalogadas: instaladas por el usuario o el fabricante. Revisa antes de quitar.
             </span>
@@ -236,7 +236,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
       {missing.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-2 flex items-baseline gap-2">
-            <span className="text-xs font-semibold tracking-[0.14em] text-mute uppercase">No instaladas</span>
+            <span className="text-xs font-semibold text-mute">No instaladas</span>
             <span className="text-xs text-mute">Se pueden reinstalar desde Microsoft Store.</span>
           </h2>
           <div className="grid grid-cols-2 gap-1.5">
@@ -258,7 +258,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {selected.size > 0 && (
-        <div className="fixed right-0 bottom-0 left-56 z-30 border-t border-line bg-panel/95 px-6 py-3 backdrop-blur">
+        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
           <div className="mx-auto flex max-w-4xl items-center justify-between">
             {removing ? (
               <TaskStatus task="apps" active={removing} fallback="Quitando apps…" />

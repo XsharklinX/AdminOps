@@ -111,6 +111,7 @@ pub fn run() {
             target_user::get_target_user,
             diagnostics::run_diagnostics,
             diagnostics::list_snapshots,
+            diagnostics::latest_findings,
             diagnostics::open_system_tool,
             diagnostics::report::generate_report,
             diagnostics::report::open_report,

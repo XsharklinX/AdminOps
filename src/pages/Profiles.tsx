@@ -249,13 +249,13 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
           return (
             <article key={p.id} className="flex flex-col rounded-xl border border-line bg-panel p-5">
               <div className="mb-3 flex items-start gap-3">
-                <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-neon/10 text-neon glow-neon">
+                <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-panel-2 text-dim">
                   <Icon size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="flex items-center gap-2 text-lg font-semibold">
                     {p.name}
-                    {p.custom && <span className="rounded border border-neon-2/40 px-1.5 text-[10px] font-normal text-neon-2">propio</span>}
+                    {p.custom && <span className="rounded border border-neon-2/40 px-1.5 text-[11px] font-normal text-neon-2">propio</span>}
                     {p.custom && (
                       <span className="ml-auto flex gap-2">
                         <button onClick={() => setEditing(toDef(p))} className="text-mute hover:text-ink" title="Editar">
@@ -280,7 +280,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-line">
                   <div
-                    className="h-full rounded-full bg-neon shadow-[0_0_8px_var(--color-neon)] transition-all"
+                    className="h-full rounded-full bg-neon transition-all"
                     style={{ width: `${toggles.length ? (applied / toggles.length) * 100 : 0}%` }}
                   />
                 </div>
@@ -340,7 +340,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
         />
       )}
       {importing && (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm" onClick={() => setImporting(false)}>
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/55" onClick={() => setImporting(false)}>
           <div className="w-[560px] rounded-xl border border-line-2 bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-2 font-semibold">Importar perfiles</h3>
             <p className="mb-3 text-xs text-dim">Pega el JSON exportado desde otro AdminOps.</p>

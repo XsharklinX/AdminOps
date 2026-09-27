@@ -51,7 +51,7 @@ function Keys({ keys }: { keys: string[] }) {
     <span className="flex shrink-0 flex-wrap items-center gap-1">
       {keys.map((k, i) => (
         <span key={i} className="flex items-center gap-1">
-          {i > 0 && <span className="text-[10px] text-mute">+</span>}
+          {i > 0 && <span className="text-[11px] text-mute">+</span>}
           <kbd className="min-w-7 rounded-md border border-line-2 border-b-2 bg-panel-2 px-1.5 py-0.5 text-center font-mono text-[11px] text-ink">{k}</kbd>
         </span>
       ))}
@@ -121,7 +121,7 @@ export function Shortcuts() {
       <div className="min-w-0 flex-1">
         <div className="text-sm text-ink">
           {s.what}
-          {s.win11 && <span className="ml-2 rounded border border-line px-1 text-[9px] text-mute">Windows 11</span>}
+          {s.win11 && <span className="ml-2 rounded border border-line px-1 text-[10px] text-mute">Windows 11</span>}
           {context && <span className="ml-2 text-[11px] text-mute">· {context}</span>}
         </div>
         {s.tip && <div className="mt-0.5 text-xs text-dim">{s.tip}</div>}
@@ -216,7 +216,7 @@ export function Shortcuts() {
 
           {!group && favItems.length > 0 && (
             <section className="mb-5">
-              <h2 className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.14em] text-warn/80 uppercase">
+              <h2 className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-warn/80">
                 <Star size={10} fill="currentColor" /> Mis atajos
               </h2>
               <div className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line bg-panel">{favItems.map(({ s, group: g }, i) => row(s, `fav${i}`, g.title))}</div>
@@ -225,7 +225,7 @@ export function Shortcuts() {
 
           {groups.map((g) => (
             <section key={g.id} className="mb-5">
-              <h2 className="text-[11px] font-semibold tracking-[0.14em] text-dim uppercase">{g.title}</h2>
+              <h2 className="text-[11px] font-semibold text-dim">{g.title}</h2>
               <p className="mb-2 text-xs text-mute">{g.intro}</p>
               <div className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line bg-panel">{g.items.map((s, i) => row(s, `${g.id}${i}`))}</div>
             </section>

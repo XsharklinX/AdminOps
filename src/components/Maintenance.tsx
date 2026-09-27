@@ -30,7 +30,7 @@ export function BootCard() {
       ) : (
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-12 md:col-span-4">
-            <div className="text-[10px] tracking-widest text-mute uppercase">Último arranque</div>
+            <div className="text-[11px] text-mute">Último arranque</div>
             <div className={`font-mono text-2xl ${last && last.totalMs > 60000 ? "text-warn" : "text-neon"}`}>{last ? secs(last.totalMs) : "—"}</div>
             <div className="text-xs text-dim">Media de los últimos {data.boots.length}: {secs(avg)}</div>
             {last && (
@@ -40,7 +40,7 @@ export function BootCard() {
             )}
           </div>
           <div className="col-span-12 md:col-span-8">
-            <div className="mb-1 text-[10px] tracking-widest text-mute uppercase">Lo que más lo retrasa (últimos 60 días)</div>
+            <div className="mb-1 text-[11px] text-mute">Lo que más lo retrasa (últimos 60 días)</div>
             {data.culprits.length === 0 ? (
               <p className="text-sm text-ok">Windows no ha detectado nada que ralentice el arranque.</p>
             ) : (

@@ -51,7 +51,7 @@ export function Onboarding({ onDone }: { onDone: (goTo: "diagnostics" | "dashboa
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-void/95 backdrop-blur">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-void/95">
       <div className="w-[560px] rounded-2xl border border-line-2 bg-panel p-7 shadow-2xl">
         <div className="mb-6 flex items-center gap-3">
           <img src={logo} alt="" className="size-10" draggable={false} />
@@ -123,7 +123,7 @@ export function Onboarding({ onDone }: { onDone: (goTo: "diagnostics" | "dashboa
                   <kbd className="rounded border border-line px-1 font-mono text-[11px] text-ink">Ctrl K</kbd> busca cualquier página, herramienta, ajuste o
                   reparación.
                 </li>
-                <li>La estrella junto a cada sección de la barra lateral la fija en Favoritos.</li>
+                <li>La barra lateral tiene 7 áreas; dentro de cada una, sus secciones están en pestañas.</li>
                 <li>Todo lo que AdminOps cambia queda en el Historial y se puede deshacer.</li>
               </ul>
               <p>¿Empezamos con un diagnóstico de este equipo?</p>

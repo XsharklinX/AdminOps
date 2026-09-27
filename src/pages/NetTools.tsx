@@ -151,7 +151,7 @@ function ProbePanel() {
             ["Máximo", stats.max !== null ? `${stats.max} ms` : "—"],
           ].map(([l, v]) => (
             <div key={l}>
-              <div className="text-[10px] tracking-widest text-mute uppercase">{l}</div>
+              <div className="text-[11px] text-mute">{l}</div>
               <div className={`font-mono text-sm ${l === "Perdidos" && stats.lost ? "text-warn" : "text-ink"}`}>{v}</div>
             </div>
           ))}
@@ -160,7 +160,7 @@ function ProbePanel() {
       <div className="max-h-[420px] overflow-y-auto rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-panel">
-            <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
+            <tr className="text-left text-[11px] text-mute">
               <th className="px-3 py-2 font-medium">{mode === "ping" ? "#" : "Salto"}</th>
               <th className="px-3 py-2 font-medium">Responde</th>
               <th className="px-3 py-2 text-right font-medium">Tiempo</th>
@@ -384,7 +384,7 @@ function PortsPanel() {
         <div className="max-h-[520px] overflow-y-auto rounded-lg border border-line">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-panel">
-              <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
+              <tr className="text-left text-[11px] text-mute">
                 <th className="px-3 py-2 font-medium">Proto</th>
                 <th className="px-3 py-2 font-medium">Local</th>
                 <th className="px-3 py-2 font-medium">Servicio</th>

@@ -25,12 +25,12 @@ export function Switch({ on, disabled, onClick }: { on: boolean; disabled?: bool
       disabled={disabled}
       onClick={onClick}
       className={`relative h-6 w-11 shrink-0 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
-        on ? "border-neon/60 bg-neon/20 shadow-[0_0_12px_-2px_var(--color-neon)]" : "border-line-2 bg-void"
+        on ? "border-neon/60 bg-neon/20" : "border-line-2 bg-void"
       }`}
     >
       <span
         className={`absolute top-0.5 size-4.5 rounded-full transition-all ${
-          on ? "left-[22px] bg-neon shadow-[0_0_8px_var(--color-neon)]" : "left-0.5 bg-mute"
+          on ? "left-[22px] bg-neon" : "left-0.5 bg-mute"
         }`}
       />
     </button>
@@ -74,14 +74,14 @@ export function TweakCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-medium text-ink">{t.name}</h3>
-            <span className={`rounded border px-1.5 py-px text-[10px] font-medium ${RISK[t.risk].cls}`}>
+            <span className={`rounded border px-1.5 py-px text-[11px] font-medium ${RISK[t.risk].cls}`}>
               {RISK[t.risk].label}
             </span>
             {t.reboot && (
-              <span className="rounded border border-line-2 px-1.5 py-px text-[10px] text-dim">Requiere reinicio</span>
+              <span className="rounded border border-line-2 px-1.5 py-px text-[11px] text-dim">Requiere reinicio</span>
             )}
             {t.needsAdmin && !isAdmin && (
-              <span className="rounded border border-warn/30 px-1.5 py-px text-[10px] text-warn">Requiere admin</span>
+              <span className="rounded border border-warn/30 px-1.5 py-px text-[11px] text-warn">Requiere admin</span>
             )}
           </div>
           <p className="mt-1 text-sm text-dim">{t.description}</p>

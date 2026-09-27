@@ -73,7 +73,7 @@ export function Space() {
               className={`rounded-lg border px-3 py-1.5 text-left text-xs ${path === d.mount ? "border-neon/60 bg-neon/10 text-neon" : "border-line-2 text-dim hover:text-ink"}`}
             >
               <div className="font-mono text-sm">{d.mount}</div>
-              <div className="text-[10px] text-mute">
+              <div className="text-[11px] text-mute">
                 {bytes(d.free)} libres de {bytes(d.total)}
               </div>
             </button>

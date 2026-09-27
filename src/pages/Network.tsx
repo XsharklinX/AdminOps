@@ -46,7 +46,7 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
         ) : (
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
+              <tr className="text-left text-[11px] text-mute">
                 <th className="pb-2 font-medium">Fecha</th>
                 <th className="pb-2 text-right font-medium">Bajada</th>
                 <th className="pb-2 text-right font-medium">Subida</th>
@@ -119,7 +119,7 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
             <div className="col-span-12 lg:col-span-7">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
+                  <tr className="text-left text-[11px] text-mute">
                     <th className="pb-2 font-medium">Destino</th>
                     <th className="pb-2 text-right font-medium">Respuestas</th>
                     <th className="pb-2 text-right font-medium">Media</th>
@@ -133,7 +133,7 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
                       <tr key={p.target} className="border-t border-line/60">
                         <td className="py-1.5 font-sans">
                           <div className="text-ink">{p.label}</div>
-                          <div className="font-mono text-[10px] text-mute">{p.target}</div>
+                          <div className="font-mono text-[11px] text-mute">{p.target}</div>
                         </td>
                         <td className={`py-1.5 text-right ${lost === 0 ? "text-ok" : lost === p.sent ? "text-bad" : "text-warn"}`}>
                           {p.received}/{p.sent}
@@ -147,7 +147,7 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
                     <tr key={d.host} className="border-t border-line/60">
                       <td className="py-1.5 font-sans">
                         <div className="text-ink">DNS · {d.host}</div>
-                        <div className="truncate font-mono text-[10px] text-mute">{d.addresses.slice(0, 2).join(", ")}</div>
+                        <div className="truncate font-mono text-[11px] text-mute">{d.addresses.slice(0, 2).join(", ")}</div>
                       </td>
                       <td className={`py-1.5 text-right ${d.ok ? "text-ok" : "text-bad"}`}>{d.ok ? "Resuelve" : "Falla"}</td>
                       <td className="py-1.5 text-right">{d.ms.toFixed(0)} ms</td>

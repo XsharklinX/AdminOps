@@ -148,7 +148,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {selected.size > 0 && (
-        <div className="fixed right-0 bottom-0 left-56 z-30 border-t border-line bg-panel/95 px-6 py-3 backdrop-blur">
+        <div className="fixed right-0 bottom-0 left-60 z-30 border-t border-line bg-panel px-6 py-3">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
             {running ? (
               <TaskStatus task="software" active={running} fallback="Actualizando…" />

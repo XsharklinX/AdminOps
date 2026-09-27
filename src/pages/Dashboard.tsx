@@ -1,125 +1,199 @@
-import { ArrowDown, ArrowUp, Cpu, HardDrive, ListTree, MemoryStick, Monitor, Network } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Bar, Card, Ring, Sparkline, Stat } from "../components/ui";
+import type { PageId } from "../components/Sidebar";
+import { Bar, Sparkline } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
-import { api, type SystemInfo } from "../lib/api";
-import { bytes, duration, loadColor, pct, rate } from "../lib/format";
+import { api, diagApi, type Finding, type FindingAction, type SystemInfo } from "../lib/api";
+import { bytes, duration, loadColor, rate } from "../lib/format";
 
-export function Dashboard() {
+const SEVERITY_DOT = { bad: "bg-bad", warn: "bg-warn", info: "bg-mute" };
+
+function ago(ts: number) {
+  const m = Math.round((Date.now() / 1000 - ts) / 60);
+  if (m < 60) return `hace ${Math.max(1, m)} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `hace ${h} h`;
+  return `hace ${Math.round(h / 24)} días`;
+}
+
+/** Una cifra clave de la banda superior. */
+function Kpi({ label, value, unit, sub, children }: { label: string; value: string; unit?: string; sub?: React.ReactNode; children?: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2 px-5 py-4">
+      <div className="text-[13px] text-dim">{label}</div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[28px] leading-none font-semibold tracking-tight tabular">{value}</span>
+        {unit && <span className="truncate text-[13px] text-dim">{unit}</span>}
+      </div>
+      {children}
+      {sub && <div className="truncate text-xs text-mute">{sub}</div>}
+    </div>
+  );
+}
+
+export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: string | null) => void }) {
   const { metrics: m, history, error } = useLiveMetrics(2000);
-  const { sensors, error: sensorsError } = useSensors(5000);
-  const gpu = sensors?.gpus.find((g) => g.temperature != null);
+  const { sensors } = useSensors(5000);
   const [info, setInfo] = useState<SystemInfo | null>(null);
+  const [latest, setLatest] = useState<Awaited<ReturnType<typeof diagApi.latest>>>(null);
+  const [latestLoaded, setLatestLoaded] = useState(false);
 
   useEffect(() => {
     api.systemInfo().then(setInfo).catch(() => {});
+    diagApi
+      .latest()
+      .then(setLatest)
+      .catch(() => {})
+      .finally(() => setLatestLoaded(true));
   }, []);
 
   if (error && !m) return <p className="p-8 text-bad">Error leyendo métricas: {error}</p>;
-  if (!m) return <p className="p-8 font-mono text-sm text-mute">Leyendo sistema…</p>;
+  if (!m) return <p className="p-8 text-sm text-mute">Leyendo el equipo…</p>;
 
   const ramPct = (m.memoryUsed / m.memoryTotal) * 100;
-  const swapPct = m.swapTotal ? (m.swapUsed / m.swapTotal) * 100 : 0;
   const disks = m.disks.filter((d) => d.total > 0).sort((a, b) => a.mount.localeCompare(b.mount));
+  const system = disks.find((d) => d.mount.toUpperCase().startsWith("C:")) ?? disks[0];
+  const sysUsed = system ? ((system.total - system.available) / system.total) * 100 : 0;
+  const cpuTemp = sensors?.cpuTemp;
+  const gpu = sensors?.gpus.find((g) => g.temperature != null);
+
+  const act = (a: FindingAction) => {
+    if (a.kind === "tool") diagApi.openTool(a.tool);
+    else onNavigate(a.page as PageId, a.focus);
+  };
+  const attention = (latest?.findings ?? []).filter((f) => f.severity !== "info").slice(0, 6);
 
   return (
-    <div className="grid grid-cols-12 gap-4 p-6">
-      {/* Equipo */}
-      <Card title="Equipo" icon={<Monitor size={14} />} className="col-span-12">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-6">
-          <Stat label="Host" value={info?.hostName ?? "—"} />
-          <Stat label="Sistema" value={info?.osName ?? "—"} sub={info && `Build ${info.kernelVersion}`} />
-          <Stat
-            label="Procesador"
-            value={info?.cpuBrand ?? "—"}
-            sub={info && `${info.physicalCores} núcleos · ${info.logicalCores} hilos`}
-          />
-          <Stat label="Memoria" value={bytes(m.memoryTotal)} sub={m.swapTotal ? `+ ${bytes(m.swapTotal)} de paginación` : undefined} />
-          <Stat label="Encendido" value={duration(m.uptime)} sub={`${m.processCount} procesos`} />
-          <Stat
-            label="Temperatura"
-            value={
-              <span>
-                <span style={{ color: tempColor(sensors?.cpuTemp) }}>CPU {sensors?.cpuTemp != null ? `${sensors.cpuTemp.toFixed(0)}°` : "—"}</span>
-                {gpu && <span style={{ color: tempColor(gpu.temperature) }}> · GPU {gpu.temperature!.toFixed(0)}°</span>}
-              </span>
-            }
-            sub={sensors?.cpuNeedsDriver ? "CPU: requiere admin / PawnIO" : sensors ? "en vivo" : sensorsError ? "no disponible" : "cargando…"}
-          />
-        </div>
-      </Card>
+    <div className="mx-auto flex max-w-6xl flex-col gap-7 px-8 py-6">
+      <div className="flex items-center gap-4">
+        <p className="min-w-0 flex-1 truncate text-[13px] text-dim">
+          {info ? `${info.hostName} · ${info.osName} · encendido hace ${duration(m.uptime)} · ${m.processCount} procesos` : "…"}
+        </p>
+        <button onClick={() => onNavigate("report")} className="h-9 rounded-lg border border-line-2 px-3.5 text-[13px] text-ink transition-colors hover:bg-panel-2">
+          Informe PDF
+        </button>
+        <button onClick={() => onNavigate("diagnostics")} className="h-9 rounded-lg bg-neon px-4 text-[13px] font-medium text-on-neon transition-[filter] hover:brightness-110">
+          Diagnosticar equipo
+        </button>
+      </div>
 
-      {/* CPU */}
-      <Card title="CPU" icon={<Cpu size={14} />} className="col-span-12 lg:col-span-6">
-        <div className="flex items-center gap-5">
-          <Ring value={m.cpuTotal} label="uso" />
-          <div className="min-w-0 flex-1">
-            <Sparkline data={history.cpu} max={100} color={loadColor(m.cpuTotal)} />
-            <div className="mt-3 flex gap-1" title="Uso por hilo">
-              {m.cpuPerCore.map((v, i) => (
-                <div key={i} className="relative h-7 flex-1 overflow-hidden rounded-sm bg-line" title={`Hilo ${i}: ${pct(v)}`}>
-                  <div
-                    className="absolute inset-x-0 bottom-0"
-                    style={{ height: `${v}%`, background: loadColor(v), opacity: 0.85 }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* RAM */}
-      <Card title="Memoria" icon={<MemoryStick size={14} />} className="col-span-12 lg:col-span-6">
-        <div className="flex items-center gap-5">
-          <Ring value={ramPct} label="ram" />
-          <div className="min-w-0 flex-1">
-            <Sparkline data={history.ram} max={100} color="var(--color-neon-2)" />
-            <div className="mt-3 space-y-2.5">
-              <div>
-                <div className="mb-1 flex justify-between font-mono text-xs tabular">
-                  <span className="text-dim">RAM</span>
-                  <span>
-                    {bytes(m.memoryUsed)} / {bytes(m.memoryTotal)}
-                  </span>
-                </div>
-                <Bar value={ramPct} />
-              </div>
-              {m.swapTotal > 0 && (
-                <div>
-                  <div className="mb-1 flex justify-between font-mono text-xs tabular">
-                    <span className="text-dim">Paginación</span>
-                    <span>
-                      {bytes(m.swapUsed)} / {bytes(m.swapTotal)}
-                    </span>
-                  </div>
-                  <Bar value={swapPct} />
-                </div>
+      {/* Cifras clave */}
+      <section className="grid grid-cols-4 divide-x divide-line rounded-xl border border-line bg-panel">
+        <Kpi
+          label="Procesador"
+          value={`${Math.round(m.cpuTotal)}`}
+          unit="%"
+          sub={
+            <>
+              {info?.cpuBrand ?? "…"}
+              {cpuTemp != null && (
+                <span style={{ color: tempColor(cpuTemp) }}> · {cpuTemp.toFixed(0)} °C</span>
               )}
-            </div>
-          </div>
-        </div>
-      </Card>
+              {cpuTemp == null && gpu && <span style={{ color: tempColor(gpu.temperature) }}> · GPU {gpu.temperature!.toFixed(0)} °C</span>}
+            </>
+          }
+        >
+          <Sparkline data={history.cpu} max={100} color={loadColor(m.cpuTotal)} height={28} />
+        </Kpi>
+        <Kpi label="Memoria" value={bytes(m.memoryUsed).replace(/ GB$/, "")} unit={`de ${bytes(m.memoryTotal)}`} sub={`${Math.round(ramPct)} % en uso`}>
+          <Bar value={ramPct} />
+        </Kpi>
+        <Kpi
+          label="Disco del sistema"
+          value={system ? bytes(system.available).replace(/ GB$/, "") : "—"}
+          unit={system ? "GB libres" : undefined}
+          sub={system ? `${system.mount} · ${bytes(system.total)} · ${system.kind === "SSD" ? "SSD" : system.kind === "HDD" ? "HDD" : "disco"}` : undefined}
+        >
+          <Bar value={sysUsed} />
+        </Kpi>
+        <Kpi label="Red" value={rate(m.netRxPerSec)} unit="bajada" sub={`Subida ${rate(m.netTxPerSec)}`}>
+          <Sparkline data={history.rx} max={Math.max(...history.rx, ...history.tx, 1)} color="var(--color-dim)" height={28} />
+        </Kpi>
+      </section>
 
-      {/* Discos */}
-      <Card title="Almacenamiento" icon={<HardDrive size={14} />} className="col-span-12 lg:col-span-7">
-        <div className="space-y-3.5">
+      <div className="grid grid-cols-5 gap-8">
+        {/* Requiere atención */}
+        <section className="col-span-3 flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[15px] font-semibold">Requiere atención</h2>
+            {latest && (
+              <button onClick={() => onNavigate("diagnostics")} className="text-[13px] text-neon hover:underline">
+                Diagnóstico de {ago(latest.timestamp)}
+              </button>
+            )}
+          </div>
+          <div className="border-t border-line">
+            {!latestLoaded ? null : !latest ? (
+              <div className="py-6 text-sm text-dim">
+                Aún no hay ningún diagnóstico de este equipo.{" "}
+                <button onClick={() => onNavigate("diagnostics")} className="text-neon hover:underline">
+                  Hacer el primero
+                </button>
+              </div>
+            ) : attention.length === 0 ? (
+              <div className="flex items-center gap-3 py-5 text-sm text-dim">
+                <span className="size-2 rounded-full bg-ok" /> El último diagnóstico no encontró nada que requiera atención.
+              </div>
+            ) : (
+              attention.map((f: Finding, i) => (
+                <div key={i} className="flex items-center gap-3.5 border-b border-line py-3">
+                  <span className={`size-2 shrink-0 rounded-full ${SEVERITY_DOT[f.severity]}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm text-ink">{f.title}</div>
+                    {f.detail && <div className="truncate text-xs text-mute">{f.detail}</div>}
+                  </div>
+                  {f.actions[0] && (
+                    <button onClick={() => act(f.actions[0])} className="shrink-0 text-[13px] whitespace-nowrap text-neon hover:underline">
+                      {f.actions[0].label}
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Procesos */}
+        <section className="col-span-2 flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[15px] font-semibold">Procesos con más carga</h2>
+            <button onClick={() => onNavigate("processes")} className="text-[13px] text-neon hover:underline">
+              Ver todos
+            </button>
+          </div>
+          <div className="border-t border-line">
+            {m.topProcesses.slice(0, 7).map((p) => (
+              <div key={p.pid} className="flex items-center gap-3 border-b border-line py-2 text-[13px]">
+                <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                <span className="w-14 text-right text-dim tabular" style={p.cpu >= 50 ? { color: loadColor(p.cpu) } : undefined}>
+                  {p.cpu.toFixed(1)} %
+                </span>
+                <span className="w-16 text-right text-dim tabular">{bytes(p.memory)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* Almacenamiento */}
+      <section className="flex flex-col gap-2">
+        <h2 className="text-[15px] font-semibold">Almacenamiento</h2>
+        <div className="grid grid-cols-2 gap-x-10 border-t border-line pt-1">
           {disks.map((d) => {
-            const used = d.total - d.available;
-            const p = (used / d.total) * 100;
+            const p = ((d.total - d.available) / d.total) * 100;
             return (
-              <div key={d.mount}>
-                <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                  <div className="flex min-w-0 items-baseline gap-2">
-                    <span className="font-mono text-sm font-semibold text-ink">{d.mount}</span>
-                    <span className="truncate text-xs text-dim">{d.name || "Disco local"}</span>
-                    <span className="rounded bg-line px-1.5 font-mono text-[10px] text-mute">
-                      {d.kind === "SSD" ? "SSD" : d.kind === "HDD" ? "HDD" : "?"} · {d.fileSystem}
+              <div key={d.mount} className="flex flex-col gap-1.5 border-b border-line py-3">
+                <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium text-ink">{d.mount}</span>
+                    <span className="text-mute">
+                      {" "}
+                      {d.name || "Disco local"} · {d.kind === "SSD" ? "SSD" : d.kind === "HDD" ? "HDD" : "disco"}
                       {d.removable ? " · USB" : ""}
                     </span>
-                  </div>
-                  <span className="shrink-0 font-mono text-xs tabular text-dim">
+                  </span>
+                  <span className="shrink-0 text-dim tabular">
                     <span className={p >= 90 ? "text-bad" : "text-ink"}>{bytes(d.available)}</span> libres de {bytes(d.total)}
                   </span>
                 </div>
@@ -128,62 +202,17 @@ export function Dashboard() {
             );
           })}
         </div>
-      </Card>
+      </section>
 
-      {/* Red */}
-      <Card title="Red" icon={<Network size={14} />} className="col-span-12 lg:col-span-5">
-        <div className="mb-2 grid grid-cols-2 gap-4">
-          <div>
-            <div className="flex items-center gap-1 text-[10px] tracking-widest text-mute uppercase">
-              <ArrowDown size={11} className="text-neon" /> Bajada
-            </div>
-            <div className="font-mono text-lg tabular text-neon">{rate(m.netRxPerSec)}</div>
-          </div>
-          <div>
-            <div className="flex items-center gap-1 text-[10px] tracking-widest text-mute uppercase">
-              <ArrowUp size={11} className="text-neon-2" /> Subida
-            </div>
-            <div className="font-mono text-lg tabular text-neon-2">{rate(m.netTxPerSec)}</div>
-          </div>
-        </div>
-        <div className="relative">
-          <Sparkline data={history.rx} max={Math.max(...history.rx, ...history.tx, 1)} />
-          <div className="absolute inset-0">
-            <Sparkline data={history.tx} max={Math.max(...history.rx, ...history.tx, 1)} color="var(--color-neon-2)" />
-          </div>
-        </div>
-      </Card>
-
-      {/* Procesos */}
-      <Card title="Procesos con más carga" icon={<ListTree size={14} />} className="col-span-12">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-[10px] tracking-widest text-mute uppercase">
-              <th className="pb-2 font-medium">Proceso</th>
-              <th className="pb-2 text-right font-medium">PID</th>
-              <th className="w-40 pb-2 pl-6 font-medium">CPU</th>
-              <th className="pb-2 text-right font-medium">Memoria</th>
-            </tr>
-          </thead>
-          <tbody className="font-mono text-xs tabular">
-            {m.topProcesses.map((p) => (
-              <tr key={p.pid} className="border-t border-line/70 hover:bg-panel-2">
-                <td className="max-w-0 truncate py-1.5 pr-4 font-sans text-[13px] text-ink">{p.name}</td>
-                <td className="py-1.5 text-right text-mute">{p.pid}</td>
-                <td className="py-1.5 pl-6">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Bar value={p.cpu} glow={false} />
-                    </div>
-                    <span className="w-12 text-right">{p.cpu.toFixed(1)}%</span>
-                  </div>
-                </td>
-                <td className="py-1.5 text-right">{bytes(p.memory)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <div className="flex gap-6 text-xs text-mute">
+        <span className="flex items-center gap-1">
+          <ArrowDown size={12} /> {rate(m.netRxPerSec)}
+        </span>
+        <span className="flex items-center gap-1">
+          <ArrowUp size={12} /> {rate(m.netTxPerSec)}
+        </span>
+        <span>Memoria de paginación {m.swapTotal ? `${bytes(m.swapUsed)} de ${bytes(m.swapTotal)}` : "—"}</span>
+      </div>
     </div>
   );
 }

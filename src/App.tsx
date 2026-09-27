@@ -5,7 +5,7 @@ import { CommandPalette, type PaletteAction } from "./components/CommandPalette"
 import { Onboarding } from "./components/Onboarding";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
-import { NAV, Sidebar, type PageId } from "./components/Sidebar";
+import { NAV, Sidebar, areaOf, type Area, type PageId } from "./components/Sidebar";
 import { api, appApi, systemApi, workApi, type AppInfo, type TargetUser } from "./lib/api";
 import { Dashboard } from "./pages/Dashboard";
 
@@ -88,6 +88,13 @@ export default function App() {
     setPage(p);
     setFocus(null);
   }, []);
+  // Última pestaña visitada de cada área: la barra lateral vuelve a ella.
+  const lastByArea = useRef<Record<string, PageId>>({});
+  useEffect(() => {
+    const a = areaOf(page);
+    if (a) lastByArea.current[a.id] = page;
+  }, [page]);
+  const openArea = useCallback((a: Area) => navigate(lastByArea.current[a.id] ?? a.pages[0]), [navigate]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -155,10 +162,11 @@ export default function App() {
   );
 
   const nav = NAV.find((n) => n.id === page)!;
+  const area = areaOf(page);
   const category = TWEAK_PAGES[page];
 
   let content;
-  if (page === "dashboard") content = <Dashboard />;
+  if (page === "dashboard") content = <Dashboard onNavigate={navigate} />;
   else if (page === "history") content = <History isAdmin={!!isAdmin} />;
   else if (page === "bloatware") content = <Bloatware isAdmin={!!isAdmin} />;
   else if (page === "startup") content = <Startup isAdmin={!!isAdmin} />;
@@ -191,7 +199,7 @@ export default function App() {
   return (
     <ToastProvider>
       <div className="flex h-full">
-        <Sidebar active={page} onSelect={(p) => navigate(p)} isAdmin={isAdmin} targetUser={targetUser}
+        <Sidebar active={page} onArea={openArea} onSelect={(p) => navigate(p)} isAdmin={isAdmin} targetUser={targetUser}
           appInfo={appInfo}
           sessionActive={sessionActive}
           onAbout={() => setAboutOpen(true)}
@@ -199,9 +207,31 @@ export default function App() {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {isAdmin === false && <AdminBanner />}
-          <header className="flex items-center justify-between border-b border-line px-6 py-4">
-            <h1 className="text-xl font-semibold tracking-tight">{nav.label}</h1>
-            {page === "dashboard" && <span className="font-mono text-[11px] text-mute">en vivo · 2 s</span>}
+          <header className="border-b border-line px-8 pt-5">
+            <div className={`flex items-center justify-between ${area && area.pages.length > 1 ? "pb-3" : "pb-4"}`}>
+              <h1 className="text-[22px] font-semibold tracking-tight">{area ? area.label : nav.label}</h1>
+              {page === "dashboard" && <span className="text-xs text-mute">En vivo · se actualiza cada 2 s</span>}
+            </div>
+            {area && area.pages.length > 1 && (
+              <div role="tablist" className="-mb-px flex gap-1 overflow-x-auto">
+                {area.pages.map((p) => {
+                  const on = p === page;
+                  return (
+                    <button
+                      key={p}
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => navigate(p)}
+                      className={`h-9 shrink-0 border-b-2 px-3 text-sm transition-colors ${
+                        on ? "border-neon font-medium text-ink" : "border-transparent text-dim hover:text-ink"
+                      }`}
+                    >
+                      {NAV.find((n) => n.id === p)!.tab}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </header>
           <div className="flex-1 overflow-y-auto">
             <ErrorBoundary key={page} onHome={() => navigate("dashboard")}>
