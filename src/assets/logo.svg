@@ -1,6 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- AdminOps: una tuerca (soporte técnico) con el pulso de diagnóstico en su agujero. -->
-  <polygon points="512,112 858.4,312 858.4,712 512,912 165.6,712 165.6,312" fill="#2F63D8" stroke="#2F63D8" stroke-width="90" stroke-linejoin="round"/>
-  <circle cx="512" cy="512" r="222" fill="#FFFFFF"/>
-  <polyline points="346,516 428,516 468,430 534,606 576,492 604,516 678,516" fill="none" stroke="#2F63D8" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- AdminOps: un medidor (diagnóstico) cuya aguja termina en una llave (reparación). -->
+  <rect x="4" y="4" width="92" height="92" rx="22" fill="#2F63D8"/>
+  <path d="M24 70 A30 30 0 1 1 76 70" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <line x1="50" y1="58" x2="64" y2="42" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="68" cy="37" r="9" fill="#FFFFFF"/>
+  <rect x="65" y="24" width="7" height="13" rx="1" fill="#2F63D8" transform="rotate(41 68.5 30.5)"/>
+  <circle cx="50" cy="58" r="5.5" fill="#FFFFFF"/>
 </svg>

@@ -207,31 +207,12 @@ export default function App() {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {isAdmin === false && <AdminBanner />}
-          <header className="border-b border-line px-8 pt-5">
-            <div className={`flex items-center justify-between ${area && area.pages.length > 1 ? "pb-3" : "pb-4"}`}>
-              <h1 className="text-[22px] font-semibold tracking-tight">{area ? area.label : nav.label}</h1>
-              {page === "dashboard" && <span className="text-xs text-mute">En vivo · se actualiza cada 2 s</span>}
+          <header className="flex items-end justify-between border-b border-line px-8 pt-5 pb-4">
+            <div className="min-w-0">
+              {area && area.pages.length > 1 && <div className="mb-0.5 text-xs text-mute">{area.label}</div>}
+              <h1 className="truncate text-[22px] font-semibold tracking-tight">{nav.label}</h1>
             </div>
-            {area && area.pages.length > 1 && (
-              <div role="tablist" className="-mb-px flex gap-1 overflow-x-auto">
-                {area.pages.map((p) => {
-                  const on = p === page;
-                  return (
-                    <button
-                      key={p}
-                      role="tab"
-                      aria-selected={on}
-                      onClick={() => navigate(p)}
-                      className={`h-9 shrink-0 border-b-2 px-3 text-sm transition-colors ${
-                        on ? "border-neon font-medium text-ink" : "border-transparent text-dim hover:text-ink"
-                      }`}
-                    >
-                      {NAV.find((n) => n.id === p)!.tab}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {page === "dashboard" && <span className="text-xs text-mute">En vivo · se actualiza cada 2 s</span>}
           </header>
           <div className="flex-1 overflow-y-auto">
             <ErrorBoundary key={page} onHome={() => navigate("dashboard")}>

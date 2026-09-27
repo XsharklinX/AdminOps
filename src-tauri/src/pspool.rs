@@ -51,6 +51,42 @@ struct Host {
     lines: Receiver<String>,
 }
 
+/// Mete el proceso en un "job" que Windows cierra al terminar AdminOps (por la
+/// razón que sea, también si se mata): ningún PowerShell del pool queda vivo
+/// reteniendo archivos (p. ej. las DLL de sensores durante una actualización).
+#[cfg(windows)]
+fn kill_with_app(child: &std::process::Child) {
+    use std::os::windows::io::AsRawHandle;
+    use std::sync::OnceLock;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    // El handle del job vive lo que vive AdminOps (nunca se cierra a mano).
+    static JOB: OnceLock<usize> = OnceLock::new();
+    let job = *JOB.get_or_init(|| unsafe {
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            return 0;
+        }
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            (&info as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        );
+        job as usize
+    });
+    if job != 0 {
+        unsafe { AssignProcessToJobObject(job as _, child.as_raw_handle() as _) };
+    }
+}
+
+#[cfg(not(windows))]
+fn kill_with_app(_: &std::process::Child) {}
+
 impl Host {
     fn spawn() -> Result<Host, String> {
         let utf16: Vec<u8> = HOST_SCRIPT.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
@@ -63,6 +99,7 @@ impl Host {
             .stderr(Stdio::null())
             .spawn()
             .map_err(|e| format!("No se pudo iniciar PowerShell: {e}"))?;
+        kill_with_app(&child);
         let stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
         let (tx, rx) = mpsc::channel();

@@ -123,7 +123,7 @@ export function Onboarding({ onDone }: { onDone: (goTo: "diagnostics" | "dashboa
                   <kbd className="rounded border border-line px-1 font-mono text-[11px] text-ink">Ctrl K</kbd> busca cualquier página, herramienta, ajuste o
                   reparación.
                 </li>
-                <li>La barra lateral tiene 7 áreas; dentro de cada una, sus secciones están en pestañas.</li>
+                <li>La barra lateral tiene 7 áreas: al entrar en una se despliegan sus secciones debajo.</li>
                 <li>Todo lo que AdminOps cambia queda en el Historial y se puede deshacer.</li>
               </ul>
               <p>¿Empezamos con un diagnóstico de este equipo?</p>

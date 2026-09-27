@@ -1,6 +1,8 @@
+import { useState } from "react";
 import logo from "../assets/logo.svg";
 import type { AppInfo, TargetUser } from "../lib/api";
 import {
+  ChevronRight,
   Gauge,
   Headset,
   Monitor,
@@ -109,6 +111,17 @@ export const AREAS: Area[] = [
 
 export const areaOf = (page: PageId): Area | null => AREAS.find((a) => a.pages.includes(page)) ?? null;
 
+const OPEN_KEY = "adminops.navOpen";
+
+function readOpen(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export function Sidebar({
   active,
   onArea,
@@ -131,6 +144,22 @@ export function Sidebar({
   onSearch: () => void;
 }) {
   const current = areaOf(active);
+  // Áreas que el usuario dejó abiertas con la flecha (además de la actual).
+  const [pinned, setPinned] = useState<string[]>(readOpen);
+  const [closedCurrent, setClosedCurrent] = useState<string | null>(null);
+  const isOpen = (a: Area) => a.pages.length > 1 && (pinned.includes(a.id) || (current?.id === a.id && closedCurrent !== a.id));
+  const toggle = (a: Area) => {
+    const open = isOpen(a);
+    let next = pinned.filter((id) => id !== a.id);
+    if (!open) next = [...next, a.id];
+    setPinned(next);
+    setClosedCurrent(open && current?.id === a.id ? a.id : null);
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-panel">
       <button onClick={onAbout} className="flex items-center gap-2.5 px-5 pt-5 pb-4 text-left" title="Acerca de AdminOps">
@@ -163,19 +192,55 @@ export function Sidebar({
       <nav aria-label="Navegación principal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5">
         {AREAS.map((a) => {
           const on = current?.id === a.id;
+          const open = isOpen(a);
+          const single = a.pages.length === 1;
           const Icon = a.icon;
           return (
-            <button
-              key={a.id}
-              onClick={() => onArea(a)}
-              aria-current={on ? "page" : undefined}
-              className={`flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors ${
-                on ? "bg-panel-2 font-medium text-ink shadow-[inset_2px_0_0_var(--color-neon)]" : "text-dim hover:bg-panel-2/60 hover:text-ink"
-              }`}
-            >
-              <Icon size={18} strokeWidth={1.6} className={on ? "text-ink" : "text-mute"} />
-              <span className="flex-1">{a.label}</span>
-            </button>
+            <div key={a.id}>
+              <div className={`group flex h-9 items-center rounded-lg transition-colors ${on && (single || !open) ? "bg-panel-2" : "hover:bg-panel-2/60"}`}>
+                <button
+                  onClick={() => {
+                    setClosedCurrent(null);
+                    onArea(a);
+                  }}
+                  aria-current={on && single ? "page" : undefined}
+                  className={`flex h-full min-w-0 flex-1 items-center gap-3 pl-3 text-left text-sm ${on ? "font-medium text-ink" : "text-dim group-hover:text-ink"}`}
+                >
+                  <Icon size={18} strokeWidth={1.6} className={on ? "text-ink" : "text-mute"} />
+                  <span className="flex-1 truncate">{a.label}</span>
+                </button>
+                {!single && (
+                  <button
+                    onClick={() => toggle(a)}
+                    aria-expanded={open}
+                    aria-label={open ? `Plegar ${a.label}` : `Desplegar ${a.label}`}
+                    className="grid h-full w-8 shrink-0 place-items-center rounded-r-lg text-mute hover:text-ink"
+                  >
+                    <ChevronRight size={14} className={`transition-transform ${open ? "rotate-90" : ""}`} />
+                  </button>
+                )}
+              </div>
+              {open && (
+                <div className="mt-0.5 mb-1 flex flex-col gap-px">
+                  {a.pages.map((p) => {
+                    const sel = p === active;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => onSelect(p)}
+                        aria-current={sel ? "page" : undefined}
+                        className={`relative flex h-8 items-center rounded-md pr-2 pl-10 text-left text-[13px] transition-colors ${
+                          sel ? "bg-panel-2 font-medium text-ink" : "text-dim hover:bg-panel-2/60 hover:text-ink"
+                        }`}
+                      >
+                        {sel && <span className="absolute top-2 bottom-2 left-[21px] w-0.5 rounded-full bg-neon" />}
+                        <span className="truncate">{NAV.find((n) => n.id === p)!.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>

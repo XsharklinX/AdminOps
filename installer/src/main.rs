@@ -96,6 +96,36 @@ struct Progress {
     step: String,
 }
 
+/// Cierra AdminOps y todo lo que retiene sus archivos: el árbol de procesos
+/// (sus PowerShell en segundo plano) y cualquier PowerShell que tenga cargadas
+/// las DLL de sensores de la carpeta de instalación. Si no, el instalador
+/// silencioso no puede reemplazarlas y aborta sin decir nada.
+fn stop_app(dir: &Path) {
+    use std::os::windows::process::CommandExt;
+    const NO_WINDOW: u32 = 0x0800_0000;
+    let _ = std::process::Command::new("taskkill.exe").args(["/F", "/T", "/IM", "adminops.exe"]).creation_flags(NO_WINDOW).status();
+    let d = dir.display().to_string().replace('\'', "''");
+    let script = format!(
+        r"Get-Process powershell, pwsh -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne $PID -and ($_.Modules.FileName -like '{d}\*') }} | Stop-Process -Force -ErrorAction SilentlyContinue"
+    );
+    let _ = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .creation_flags(NO_WINDOW)
+        .status();
+    let start = Instant::now();
+    while app_running() && start.elapsed() < Duration::from_secs(15) {
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    std::thread::sleep(Duration::from_millis(500));
+}
+
+/// Windows guarda en caché los iconos (barra de tareas, accesos): así muestra el nuevo.
+fn refresh_icon_cache() {
+    use std::os::windows::process::CommandExt;
+    let exe = PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into())).join(r"System32\ie4uinit.exe");
+    let _ = std::process::Command::new(exe).arg("-show").creation_flags(0x0800_0000).status();
+}
+
 fn remove_desktop_shortcuts() {
     let public = std::env::var("PUBLIC").map(|p| PathBuf::from(p).join("Desktop"));
     let user = std::env::var("USERPROFILE").map(|p| PathBuf::from(p).join("Desktop"));
@@ -106,7 +136,6 @@ fn remove_desktop_shortcuts() {
 
 #[tauri::command(async)]
 fn install(app: tauri::AppHandle, dir: String, desktop: bool, close_app: bool) -> Result<String, String> {
-    use std::os::windows::process::CommandExt;
     if PAYLOAD.is_empty() {
         return Err("Este instalador se compiló sin AdminOps dentro.".into());
     }
@@ -115,37 +144,57 @@ fn install(app: tauri::AppHandle, dir: String, desktop: bool, close_app: bool) -
         let _ = app.emit("progress", Progress { percent, step: step.into() });
     };
     emit(2, "Preparando…");
-    if app_running() {
-        if !close_app {
-            return Err("AdminOps está abierto: ciérralo para continuar.".into());
-        }
-        let mut sys = sysinfo::System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-        for p in sys.processes().values().filter(|p| p.name().eq_ignore_ascii_case("adminops.exe")) {
-            p.kill();
-        }
-        std::thread::sleep(Duration::from_millis(800));
+    if app_running() && !close_app {
+        return Err("AdminOps está abierto: ciérralo para continuar.".into());
     }
+    emit(4, "Cerrando AdminOps…");
+    stop_app(&dir);
 
     let tmp = std::env::temp_dir().join(format!("adminops-setup-{}.exe", std::process::id()));
     std::fs::write(&tmp, PAYLOAD).map_err(|e| format!("No se pudo preparar la instalación: {e}"))?;
-    // /D debe ir el último y sin comillas aunque tenga espacios (regla de NSIS).
-    let child = std::process::Command::new(&tmp).arg("/S").raw_arg(format!("/D={}", dir.display())).spawn();
-    let mut child = match child {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = std::fs::remove_file(&tmp);
-            return Err(format!("No se pudo iniciar la instalación: {e}"));
+    let mut code = run_payload(&tmp, &dir, &emit);
+    if code != 0 && code != -2 {
+        // Archivos aún bloqueados (un proceso que tardó en cerrarse): cerrar de nuevo y reintentar.
+        emit(8, "Reintentando…");
+        stop_app(&dir);
+        code = run_payload(&tmp, &dir, &emit);
+    }
+    let _ = std::fs::remove_file(&tmp);
+    if code != 0 {
+        return Err(match code {
+            -1 => "No se pudo iniciar la instalación.".into(),
+            -2 => "La instalación tardó demasiado y se detuvo.".into(),
+            2 => "No se pudieron reemplazar los archivos de AdminOps: algún programa los tiene abiertos. Reinicia el equipo y vuelve a intentarlo, o usa el instalador clásico.".into(),
+            c => format!("La instalación falló (código {c})."),
+        });
+    }
+    if !desktop {
+        remove_desktop_shortcuts();
+    }
+    refresh_icon_cache();
+    emit(97, "Comprobando…");
+    match installed() {
+        Some((v, d)) if v == VERSION => {
+            emit(100, "Listo");
+            Ok(d.display().to_string())
         }
-    };
+        _ => Err("La instalación terminó pero Windows no registra AdminOps. Prueba con el instalador clásico.".into()),
+    }
+}
+
+/// Ejecuta el instalador NSIS en silencio y va informando del avance estimado. Devuelve su código.
+fn run_payload(tmp: &Path, dir: &Path, emit: &dyn Fn(u32, &str)) -> i32 {
+    use std::os::windows::process::CommandExt;
+    // /D debe ir el último y sin comillas aunque tenga espacios (regla de NSIS).
+    let Ok(mut child) = std::process::Command::new(tmp).arg("/S").raw_arg(format!("/D={}", dir.display())).spawn() else { return -1 };
     // NSIS en silencio no informa del progreso: avance estimado hasta que termina.
     let start = Instant::now();
-    let code = loop {
+    loop {
         if let Ok(Some(status)) = child.try_wait() {
-            break status.code().unwrap_or(-1);
+            return status.code().unwrap_or(-1);
         }
         let t = start.elapsed().as_secs_f64();
-        let percent = (8.0 + 84.0 * (1.0 - (-t / 5.0).exp())) as u32;
+        let percent = (10.0 + 82.0 * (1.0 - (-t / 5.0).exp())) as u32;
         let step = match percent {
             0..=30 => "Copiando archivos…",
             31..=65 => "Instalando componentes…",
@@ -155,28 +204,9 @@ fn install(app: tauri::AppHandle, dir: String, desktop: bool, close_app: bool) -
         emit(percent, step);
         if start.elapsed() > Duration::from_secs(600) {
             let _ = child.kill();
-            break -2;
+            return -2;
         }
         std::thread::sleep(Duration::from_millis(150));
-    };
-    let _ = std::fs::remove_file(&tmp);
-    if code != 0 {
-        return Err(match code {
-            -2 => "La instalación tardó demasiado y se detuvo.".into(),
-            2 => "La instalación se canceló (¿hay una versión más nueva instalada o faltan permisos?).".into(),
-            c => format!("La instalación falló (código {c})."),
-        });
-    }
-    if !desktop {
-        remove_desktop_shortcuts();
-    }
-    emit(97, "Comprobando…");
-    match installed() {
-        Some((v, d)) if v == VERSION => {
-            emit(100, "Listo");
-            Ok(d.display().to_string())
-        }
-        _ => Err("La instalación terminó pero Windows no registra AdminOps. Prueba con el instalador clásico.".into()),
     }
 }
 

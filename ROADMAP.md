@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.18.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.19.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.18)
+## Hecho (v0.1 – v0.19)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -27,7 +27,8 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 15. Mantenimiento a fondo | 0.15 | Desinstalador con restos a la papelera, Windows Update (historial explicado, pausar, ocultar), análisis del arranque, restaurar drivers, caché de navegadores, reparaciones de Store, búsqueda, audio y perfil temporal, espacio de puntos de restauración, mantenimiento programado |
 | 16. Seguridad del equipo | 0.16 | Nota 0-100 con arreglos, 8 ajustes de seguridad reversibles, BitLocker y copia de claves, programas de riesgo, elementos sospechosos, extensiones de navegador, nota en diagnóstico e informe |
 | 17. Instalador y atajos | 0.17 | Instalador con interfaz propia (instalar/actualizar/reinstalar, progreso, consejos), instalador clásico para despliegues silenciosos, página de atajos de teclado con modo descubrir y prueba |
-| 18. Rediseño | 0.18 | Lenguaje visual sobrio (IBM Plex, un acento, color solo para estados, sin brillos ni degradados), tema claro, navegación en 7 áreas con pestañas, Panel y Herramientas rehechos, icono nuevo (tuerca con pulso), informe e instalador con el mismo estilo |
+| 18. Rediseño | 0.18 | Lenguaje visual sobrio (IBM Plex, un acento, color solo para estados, sin brillos ni degradados), tema claro, navegación en 7 áreas con pestañas, Panel y Herramientas rehechos, icono nuevo, informe e instalador con el mismo estilo |
+| 19. Informe y cliente | 0.19 | Informe PDF rehecho con dos plantillas (cliente y técnica), presupuesto o recibo con impuestos, firma del cliente y del técnico, envío por correo con adjunto, garantías, recordatorios de mantenimiento, evolución entre visitas, icono del medidor con llave |
 
 ### Fase 6 en detalle
 
@@ -267,24 +268,42 @@ Propuesta visual: artifact «AdminOps — Propuesta de rediseño».
 - **Panel** rehecho: banda de cifras clave, «Requiere atención» (hallazgos del último diagnóstico),
   procesos y almacenamiento sin cajas.
 - **Herramientas** rehecha: filas limpias en lugar de tarjetas, filtros por grupo, ficha compacta.
-- **Icono nuevo**: una tuerca (soporte técnico) con el pulso de diagnóstico dentro, plano y de una
+- **Icono nuevo** (sustituido en la 0.19 por el medidor con llave): una tuerca con el pulso de diagnóstico dentro, plano y de una
   tinta; en la app, el ejecutable, el informe PDF y el instalador.
 - Informe PDF e instalador con el mismo lenguaje (el instalador lleva sus fuentes).
+- **0.18.1**: barra lateral desplegable (las secciones salen debajo de su área; solo abiertas la actual
+  y las que se dejan abiertas), Panel rehecho (veredicto, acciones rápidas, equipo, salud de discos,
+  actividad reciente), instalador que cierra todo lo que retiene archivos y reintenta (antes fallaba al
+  actualizar con la app abierta), procesos de PowerShell ligados a la vida de la app (job object) y
+  caché de iconos de Windows refrescada al instalar. Icono: cinco conceptos en el lienzo de diseño.
 - Pendiente: repasar página a página los detalles que el barrido automático no cubre (espaciados y
   tarjetas internas de cada sección) y rehacer las capturas del README.
 
-### Fase 19 — Informe y cliente (v0.19)
+### Fase 19 — Informe y cliente (v0.19) ✅
 
-**Prioridad: media.** Lo que convierte el trabajo técnico en algo que el cliente valora (y paga).
+Lo que convierte el trabajo técnico en algo que el cliente valora (y paga).
 
-- **Dos plantillas de informe**: resumen en lenguaje sencillo para el cliente y detalle técnico.
-- **Presupuesto y recibo** en la sesión: líneas de servicio, precios, impuestos y total en el PDF.
-- **Firma del cliente** en pantalla al cerrar la sesión.
-- **Enviar el informe**: correo con el PDF adjunto y los datos del cliente ya puestos.
-- **Comparar visitas** en la ficha del cliente y **recordatorios** de próximo mantenimiento.
-- **Garantías**: fecha de fin de garantía del trabajo y de las piezas cambiadas.
-
-**Terminado cuando:** una sesión termina con informe, recibo y firma sin salir de la app.
+- **Informe PDF rehecho**: cabecera con la marca y número de documento correlativo por año (2026-0001),
+  fichas de cliente, equipo (con nº de serie) y servicio (fecha y duración), veredicto con cifras clave
+  (seguridad, resueltos, pendientes, acciones), problemas **resueltos** en la visita frente a los
+  **pendientes**, antes/después, recomendaciones, firmas y pie con «Página X de Y».
+- **Dos plantillas**: para el cliente (lenguaje claro, ficha resumida del equipo que también mira SMART)
+  y técnica (todo el detalle: hardware, módulos, discos, SMART, estabilidad, drivers, seguridad, programas).
+- **Presupuesto o recibo**: líneas de servicio y piezas, cantidades, descuento, impuesto configurable
+  (ITBIS 18 % por defecto), total, forma de pago y validez del presupuesto. Catálogo de servicios y
+  piezas en Ajustes para añadirlos con un clic.
+- **Firma del cliente** en pantalla al finalizar la sesión (ratón, lápiz o dedo) y **firma del técnico**
+  guardada en Ajustes. Sin firma, el PDF deja el espacio para firmar en papel.
+- **Enviar por correo**: se abre el programa de correo con el PDF adjunto y el mensaje ya redactado
+  (archivo .eml de borrador); alternativa para correo web que abre el correo y la carpeta del PDF.
+- **Garantías**: mano de obra y cada pieza con su fecha de fin, en el recibo y en la ficha del cliente.
+- **Próximo mantenimiento**: fecha recomendada en el informe y recordatorio en Clientes (vencidos y
+  próximos 30 días, posponer o quitar).
+- **Comparar visitas**: tabla de evolución en la ficha del cliente (críticos, advertencias, seguridad,
+  espacio, inicio, actualizaciones, arranque, batería, memoria).
+- El informe hecho a mano (Soporte → Informe) también puede elegir cliente de la ficha, plantilla,
+  presupuesto o recibo, y guardar la visita en su historial.
+- **Icono definitivo**: un medidor (diagnóstico) cuya aguja termina en una llave (reparación).
 
 ### Fase 20 — La oficina completa (v0.20)
 

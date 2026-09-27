@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.18.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-0.19.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -94,14 +94,14 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | --- | --- |
 | **Tickets** | Abre la web de tickets de tu empresa (intranet, GLPI, osTicket…) dentro de AdminOps, con la sesión recordada. |
 | **Dominio** | Estado del dominio, comprobaciones previas, unir o sacar el equipo, reparar la relación de confianza y cambiar el nombre. |
-| **Sesión de servicio** | Registra el trabajo en un equipo: diagnóstico inicial, cambios, checklist y cierre. |
-| **Clientes** | Fichas de clientes y sus equipos, con historial de cada visita. |
+| **Sesión de servicio** | Registra el trabajo en un equipo: diagnóstico inicial, cambios, checklist, presupuesto o recibo y cierre con la firma del cliente en pantalla. |
+| **Clientes** | Fichas de clientes y sus equipos, historial de visitas, evolución entre visitas, garantías vigentes y recordatorios de mantenimiento. |
 | **Herramientas** | ~90 accesos directos a CMD, services.msc, ncpa.cpl, regedit, visor de eventos, BIOS/UEFI… con buscador, favoritos y tus propios accesos. Incluye la ficha del equipo (serie y clave OEM) para copiar. |
 | **Usuarios locales** | Crea usuarios, cambia contraseñas, hazlos administradores o estándar, desactívalos o elimínalos con su perfil. Funciona también en Windows Home. |
 | **Copia de datos** | Copia Escritorio, Documentos, Imágenes, marcadores y redes Wi-Fi a un USB y restáuralos en el equipo nuevo sin sobrescribir nada. |
 | **Impresoras** | Estado, atascos, vaciar la cola, página de prueba y quitar impresoras fantasma. |
 | **Reparaciones** | SFC, DISM, reinicio de red, Windows Update, cola de impresión, Explorador, hora, caché de iconos y prueba de RAM. |
-| **Informe** | PDF profesional listo para entregar: estado del equipo, hardware, hallazgos, cambios y velocidad. |
+| **Informe** | PDF profesional con dos plantillas (cliente y técnica): estado del equipo, problemas resueltos y pendientes, antes/después, presupuesto o recibo con impuestos, garantías, firmas y envío por correo con el PDF adjunto. |
 | **Atajos de teclado** | Unos 150 atajos por categorías (Windows, ventanas, capturas, navegador, Excel, técnico…), modo «descubrir» que dice qué hace la combinación que pulsas y botón para probarlos. |
 | **Historial** | Todo lo aplicado, con opción de deshacer, y el registro técnico de actividad. |
 

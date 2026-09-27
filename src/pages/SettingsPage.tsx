@@ -1,7 +1,8 @@
-import { ArrowDown, ArrowUp, BadgeCheck, ImagePlus, Plus, Save, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgeCheck, ImagePlus, PenLine, Plus, Receipt, Save, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.svg";
 import { useToast } from "../components/feedback";
+import { SignaturePad } from "../components/service";
 import { Card } from "../components/ui";
 import { appApi, workApi, type AppInfo, type Settings } from "../lib/api";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
@@ -51,6 +52,24 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
     [list[i], list[j]] = [list[j], list[i]];
     set({ checklist: list });
   };
+
+  const numField = (key: "taxRate" | "laborWarrantyDays" | "maintenanceMonths" | "quoteValidityDays", label: string, max: number) => (
+    <label className="block">
+      <span className="mb-1 block truncate text-xs text-dim" title={label}>
+        {label}
+      </span>
+      <input
+        type="number"
+        min={0}
+        max={max}
+        step={key === "taxRate" ? "any" : 1}
+        value={s[key]}
+        onChange={(e) => set({ [key]: Math.min(max, Math.max(0, Number(e.target.value) || 0)) })}
+        className={input}
+      />
+    </label>
+  );
+  const setItem = (i: number, patch: Partial<Settings["catalog"][number]>) => set({ catalog: s.catalog.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
 
   const input = "w-full rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50";
   const field = (key: keyof Settings, label: string, placeholder = "") => (
@@ -142,6 +161,80 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
           </button>
         </form>
         <p className="mt-2 text-[11px] text-mute">Se copia en cada sesión nueva; las sesiones en curso no cambian.</p>
+      </Card>
+
+      <Card title="Presupuestos, recibos y garantías" icon={<Receipt size={14} />} className="col-span-12">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Moneda</span>
+            <input value={s.currency} onChange={(e) => set({ currency: e.target.value })} placeholder="RD$" className={input} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Impuesto</span>
+            <input value={s.taxName} onChange={(e) => set({ taxName: e.target.value })} placeholder="ITBIS" className={input} />
+          </label>
+          {numField("taxRate", "Porcentaje (0: sin impuesto)", 100)}
+          {numField("laborWarrantyDays", "Garantía mano de obra (días)", 3650)}
+          {numField("maintenanceMonths", "Mantenimiento cada (meses)", 60)}
+          {numField("quoteValidityDays", "Validez presupuesto (días)", 365)}
+        </div>
+
+        <h4 className="mt-5 mb-2 text-xs font-medium text-dim">Catálogo de servicios y piezas</h4>
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="text-left text-xs text-mute">
+              <th className="pb-1.5 font-medium">Nombre</th>
+              <th className="w-32 pb-1.5 font-medium">Precio</th>
+              <th className="w-14 pb-1.5 text-center font-medium">Pieza</th>
+              <th className="w-28 pb-1.5 font-medium">Garantía (días)</th>
+              <th className="w-8" />
+            </tr>
+          </thead>
+          <tbody>
+            {s.catalog.map((c, i) => (
+              <tr key={i}>
+                <td className="py-1 pr-2">
+                  <input value={c.name} onChange={(e) => setItem(i, { name: e.target.value })} className={input} />
+                </td>
+                <td className="py-1 pr-2">
+                  <input type="number" min={0} step="any" value={c.price} onChange={(e) => setItem(i, { price: Math.max(0, Number(e.target.value) || 0) })} className={input} />
+                </td>
+                <td className="py-1 text-center">
+                  <input type="checkbox" checked={c.part} onChange={(e) => setItem(i, { part: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+                </td>
+                <td className="py-1 pr-2">
+                  <input
+                    type="number"
+                    min={0}
+                    disabled={!c.part}
+                    value={c.part ? c.warrantyDays : ""}
+                    onChange={(e) => setItem(i, { warrantyDays: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+                    className={`${input} disabled:opacity-40`}
+                  />
+                </td>
+                <td className="py-1 text-right">
+                  <button onClick={() => set({ catalog: s.catalog.filter((_, j) => j !== i) })} className="text-mute hover:text-bad" title="Quitar">
+                    <Trash2 size={13} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button
+          onClick={() => set({ catalog: [...s.catalog, { name: "", price: 0, part: false, warrantyDays: 0 }] })}
+          className="mt-2 flex items-center gap-1 rounded-md border border-line-2 px-2.5 py-1.5 text-xs text-dim hover:text-ink"
+        >
+          <Plus size={12} /> Añadir al catálogo
+        </button>
+        <p className="mt-2 text-[11px] text-mute">
+          En la sesión o el informe se añaden con un clic. Las piezas pueden llevar su propia garantía, que aparece en el recibo y en la ficha del cliente.
+        </p>
+      </Card>
+
+      <Card title="Tu firma" icon={<PenLine size={14} />} className="col-span-12 lg:col-span-5">
+        <SignaturePad value={s.techSignature} onChange={(techSignature) => set({ techSignature })} height={130} />
+        <p className="mt-1 text-[11px] text-mute">Aparece sobre tu nombre en todos los informes. Opcional.</p>
       </Card>
 
       <Appearance />

@@ -284,9 +284,22 @@ export interface SnapshotInfo {
 export const diagApi = {
   run: () => invoke<Diagnostics>("run_diagnostics"),
   snapshots: () => invoke<SnapshotInfo[]>("list_snapshots"),
-  latest: () => invoke<{ timestamp: number; findings: Finding[]; securityScore: number | null } | null>("latest_findings"),
-  generateReport: (baseline: number | null, technician: string, client: string, notes: string) =>
-    invoke<string>("generate_report", { baseline, technician, client, notes }),
+  latest: () =>
+    invoke<{
+      timestamp: number;
+      findings: Finding[];
+      securityScore: number | null;
+      model: string | null;
+      gpus: string[];
+      windows: string | null;
+      activated: boolean | null;
+      firmware: string | null;
+      disks: { name: string; kind: string; size: number; status: "ok" | "warn" | "bad"; detail: string }[];
+    } | null>("latest_findings"),
+  generateReport: (options: ReportOptions) => invoke<string>("generate_report", { options }),
+  emailReport: (path: string, to: string, subject: string, body: string) => invoke<void>("email_report", { path, to, subject, body }),
+  emailReportManual: (path: string, to: string, subject: string, body: string) =>
+    invoke<void>("email_report_manual", { path, to, subject, body }),
   openReport: (path: string) => invoke<void>("open_report", { path }),
   revealReport: (path: string) => invoke<void>("reveal_report", { path }),
   openTool: (tool: Tool) => invoke<void>("open_system_tool", { tool }),
@@ -489,6 +502,72 @@ export interface Settings {
   checklist: string[];
   onboarded: boolean;
   defaultDomain: string;
+  currency: string;
+  taxName: string;
+  taxRate: number;
+  laborWarrantyDays: number;
+  maintenanceMonths: number;
+  quoteValidityDays: number;
+  catalog: CatalogItem[];
+  techSignature: string | null;
+}
+
+export interface CatalogItem {
+  name: string;
+  price: number;
+  part: boolean;
+  warrantyDays: number;
+}
+
+export type Template = "client" | "technical";
+export type DocKind = "none" | "quote" | "receipt";
+
+export interface Line {
+  description: string;
+  part: boolean;
+  qty: number;
+  price: number;
+  warrantyDays: number;
+}
+
+export interface Billing {
+  kind: DocKind;
+  lines: Line[];
+  discount: number;
+  payment: string;
+}
+
+export const EMPTY_BILLING: Billing = { kind: "none", lines: [], discount: 0, payment: "" };
+
+export interface ReportOptions {
+  baseline: number | null;
+  technician: string;
+  clientId: string | null;
+  client: string;
+  notes: string;
+  template: Template;
+  billing: Billing;
+  problem: string;
+  recommendations: string;
+  archive: boolean;
+}
+
+export interface Warranty {
+  item: string;
+  until: number;
+}
+
+export interface VisitMetrics {
+  bad: number;
+  warn: number;
+  security: number | null;
+  sysFree: number | null;
+  sysTotal: number | null;
+  startup: number | null;
+  updates: number | null;
+  bootMs: number | null;
+  ramTotal: number;
+  batteryHealth: number | null;
 }
 
 export interface Machine {
@@ -512,6 +591,14 @@ export interface SessionRecord {
   workItems: number;
   notes: string;
   hardwareChange: string | null;
+  number: string;
+  docKind: DocKind;
+  total: number;
+  currency: string;
+  warranties: Warranty[];
+  nextMaintenance: number | null;
+  signed: boolean;
+  metrics: VisitMetrics | null;
 }
 
 export interface Client {
@@ -541,6 +628,14 @@ export interface ActiveSession {
   baseline: number;
   checklist: ChecklistItem[];
   notes: string;
+  problem: string;
+  recommendations: string;
+  template: Template;
+  billing: Billing;
+  signature: string | null;
+  signer: string;
+  laborWarrantyDays: number;
+  maintenanceMonths: number;
 }
 
 export interface ProfileDef {
@@ -563,7 +658,8 @@ export const workApi = {
   deleteClient: (id: string) => invoke<void>("delete_client", { id }),
   session: () => invoke<ActiveSession | null>("get_session"),
   startSession: (clientId: string) => invoke<ActiveSession>("start_session", { clientId }),
-  updateSession: (checklist: ChecklistItem[], notes: string) => invoke<void>("update_session", { checklist, notes }),
+  updateSession: (session: ActiveSession) => invoke<void>("update_session", { session }),
+  setNextMaintenance: (clientId: string, date: number | null) => invoke<void>("set_next_maintenance", { clientId, date }),
   cancelSession: () => invoke<void>("cancel_session"),
   finishSession: () => invoke<string>("finish_session"),
   saveProfile: (profile: ProfileDef) => invoke<ProfileDef>("save_custom_profile", { profile }),

@@ -32,3 +32,11 @@ export function loadColor(p: number): string {
   if (p >= 70) return "var(--color-warn)";
   return "var(--color-dim)";
 }
+
+/** 1234.5 → "RD$ 1,234.50" (igual que en el informe PDF). */
+export function money(v: number, currency: string): string {
+  const n = Number.isFinite(v) ? v : 0;
+  const s = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const cur = currency.trim();
+  return `${n < 0 ? "-" : ""}${cur}${cur ? " " : ""}${s}`;
+}

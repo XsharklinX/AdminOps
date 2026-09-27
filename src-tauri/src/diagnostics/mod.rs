@@ -566,17 +566,73 @@ pub fn load_snapshot(app: &tauri::AppHandle, ts: u64) -> Option<Diagnostics> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DiskHealth {
+    name: String,
+    kind: String,
+    size: u64,
+    /// ok | warn | bad
+    status: &'static str,
+    detail: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LatestFindings {
     timestamp: u64,
     findings: Vec<Finding>,
     security_score: Option<u32>,
+    /// Fabricante y modelo del equipo.
+    model: Option<String>,
+    gpus: Vec<String>,
+    windows: Option<String>,
+    activated: Option<bool>,
+    firmware: Option<String>,
+    disks: Vec<DiskHealth>,
 }
 
-/// Hallazgos del último análisis guardado, sin volver a analizar (para el Panel).
+/// Resumen del último análisis guardado, sin volver a analizar (para el Panel).
 #[tauri::command(async)]
 pub fn latest_findings(app: tauri::AppHandle) -> Option<LatestFindings> {
     let d = latest_snapshot(&app)?;
-    Some(LatestFindings { timestamp: d.timestamp, security_score: d.security.data.as_ref().map(|a| a.score), findings: d.findings })
+    let inv = d.hardware.data.as_ref();
+    let smart = d.smart.data.clone().unwrap_or_default();
+    let disks = d
+        .disks
+        .data
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|k| {
+            // Los atributos SMART (sectores dañados) mandan sobre el estado que da Windows.
+            let s = smart.iter().find(|s| k.name.contains(s.model.trim()) || s.model.contains(k.name.trim()));
+            let bad_sectors = s.map(|s| s.reallocated.unwrap_or(0) + s.pending.unwrap_or(0) + s.uncorrectable.unwrap_or(0)).unwrap_or(0);
+            let (status, detail) = if s.is_some_and(|s| s.predict_failure) || s.is_some_and(|s| s.pending.unwrap_or(0) > 0 || s.uncorrectable.unwrap_or(0) > 0) {
+                ("bad", format!("{bad_sectors} sectores dañados: haz copia de seguridad"))
+            } else if k.health != "Healthy" && !k.health.is_empty() {
+                ("bad", format!("Windows lo marca como «{}»", k.health))
+            } else if bad_sectors > 0 || k.wear.unwrap_or(0) >= 80 {
+                ("warn", if bad_sectors > 0 { format!("{bad_sectors} sectores reasignados") } else { format!("{} % de vida consumida", k.wear.unwrap_or(0)) })
+            } else {
+                ("ok", match (k.temperature.filter(|t| *t > 0), k.wear) {
+                    (Some(t), Some(w)) => format!("{t} °C · {w} % de vida consumida"),
+                    (Some(t), None) => format!("{t} °C"),
+                    _ => "Sin problemas".to_string(),
+                })
+            };
+            DiskHealth { kind: k.media_type.clone(), size: k.size, status, detail, name: k.name }
+        })
+        .collect();
+    Some(LatestFindings {
+        timestamp: d.timestamp,
+        security_score: d.security.data.as_ref().map(|a| a.score),
+        model: inv.map(|i| format!("{} {}", i.manufacturer, i.model).trim().to_string()).filter(|m| !m.is_empty()),
+        gpus: inv.map(|i| i.gpus.iter().map(|g| g.name.clone()).collect()).unwrap_or_default(),
+        windows: inv.map(|i| format!("{} {}", i.os.trim_start_matches("Microsoft "), i.os_version).trim().to_string()),
+        activated: d.system.data.as_ref().and_then(|s| s.activated),
+        firmware: inv.map(|i| i.firmware.clone()),
+        disks,
+        findings: d.findings,
+    })
 }
 
 pub fn latest_snapshot(app: &tauri::AppHandle) -> Option<Diagnostics> {
