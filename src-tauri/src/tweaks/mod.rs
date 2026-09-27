@@ -170,6 +170,25 @@ fn view(state: &TweakState, t: &Tweak, status: Status) -> TweakView {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TweakIndex {
+    id: String,
+    name: String,
+    description: String,
+    category: String,
+}
+
+/// Nombre y categoría de todo el catálogo, sin detectar el estado (para la búsqueda global).
+#[tauri::command]
+pub fn tweak_index(state: State<'_, TweakState>) -> Vec<TweakIndex> {
+    state
+        .catalog
+        .iter()
+        .map(|t| TweakIndex { id: t.id.clone(), name: t.name.clone(), description: t.description.clone(), category: t.category.clone() })
+        .collect()
+}
+
 #[tauri::command(async)]
 pub fn list_tweaks(category: Option<String>, state: State<'_, TweakState>) -> Result<Vec<TweakView>, String> {
     let selected: Vec<&Tweak> = state
@@ -193,7 +212,7 @@ pub fn apply_tweak(
     state: State<'_, TweakState>,
 ) -> Result<OpResult, String> {
     let t = state.find(&id)?;
-    let task = Task::new(&app, format!("tweak:{id}"));
+    let task = Task::new(&app, format!("tweak:{id}")).named(t.name.clone());
     if t.kind != Kind::Toggle {
         return Err("Esto es una tarea puntual, no un ajuste.".into());
     }
@@ -256,7 +275,7 @@ fn run_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<Stri
 pub fn revert_tweak(app: tauri::AppHandle, id: String, state: State<'_, TweakState>) -> Result<OpResult, String> {
     let t = state.find(&id)?;
     state.check_can_modify(t)?;
-    let task = Task::new(&app, format!("tweak:{id}"));
+    let task = Task::new(&app, format!("tweak:{id}")).named(t.name.clone());
     task.step(format!("Deshaciendo {}…", t.name));
     let pending = state.journal.lock().unwrap().pending_apply(&t.id).map(|e| (e.id, e.backups.clone()));
     let result = match &pending {
@@ -334,7 +353,7 @@ pub fn run_action(app: tauri::AppHandle, id: String, state: State<'_, TweakState
         return Err("Esto es un ajuste, no una tarea.".into());
     }
     state.check_can_modify(t)?;
-    let task = Task::new(&app, format!("tweak:{id}"));
+    let task = Task::new(&app, format!("tweak:{id}")).named(t.name.clone());
     task.step(format!("Ejecutando {}…", t.name));
     run_logged(&state, t, Some(&task)).map(|message| OpResult { status: Status::Action, message, restore_point_created: false })
 }

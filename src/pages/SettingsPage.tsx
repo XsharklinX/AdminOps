@@ -68,6 +68,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
           {field("phone", "Teléfono")}
           {field("email", "Correo")}
           <div className="col-span-2">{field("website", "Web o redes")}</div>
+          <div className="col-span-2">{field("defaultDomain", "Dominio habitual (se propone al unir equipos)", "p. ej. empresa.local")}</div>
           <label className="col-span-2 block">
             <span className="mb-1 block text-xs text-dim">Condiciones / garantía (pie del informe)</span>
             <textarea
@@ -168,6 +169,23 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
               {label} →
             </button>
           ))}
+        </div>
+        <div className="mt-4 border-t border-line/60 pt-3">
+          <button
+            onClick={() =>
+              appApi
+                .supportPackage()
+                .then(() => toast("ok", "Paquete de soporte creado: se abrió su carpeta."))
+                .catch((e) => toast("error", String(e)))
+            }
+            className="rounded-md border border-neon/40 px-3 py-1.5 text-xs text-neon hover:bg-neon/10"
+          >
+            Crear paquete de soporte
+          </button>
+          <p className="mt-1.5 text-[11px] text-mute">
+            Un .zip con el registro de actividad, el último diagnóstico y la versión, para enviarlo si algo falla. Puede contener el nombre del
+            equipo y del usuario: revísalo antes de compartirlo.
+          </p>
         </div>
       </Card>
 

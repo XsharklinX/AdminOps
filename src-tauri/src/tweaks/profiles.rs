@@ -247,7 +247,7 @@ pub fn apply_profile(
     state: State<'_, TweakState>,
 ) -> Result<ProfileResult, String> {
     let p = find_profile(&app, &id)?;
-    let task = Task::new(&app, format!("profile:{id}"));
+    let task = Task::new(&app, format!("profile:{id}")).named(format!("Perfil «{}»", p.name));
     if !crate::elevation::is_elevated() {
         return Err("Los perfiles requieren ejecutar AdminOps como administrador.".into());
     }
@@ -301,7 +301,7 @@ pub fn apply_profile(
 #[tauri::command(async)]
 pub fn revert_profile(app: tauri::AppHandle, id: String, state: State<'_, TweakState>) -> Result<ProfileResult, String> {
     let p = find_profile(&app, &id)?;
-    let task = Task::new(&app, format!("profile:{id}"));
+    let task = Task::new(&app, format!("profile:{id}")).named(format!("Perfil «{}»", p.name));
     if !crate::elevation::is_elevated() {
         return Err("Requiere ejecutar AdminOps como administrador.".into());
     }

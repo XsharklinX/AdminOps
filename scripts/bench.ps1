@@ -18,6 +18,7 @@ param(
   # Guarda una captura de la ventana medida (para comprobar que se pinta bien).
   [string]$Screenshot = '',
   # Página con la que arranca (id de la barra lateral: tools, users, install…), sin hacer clics.
+  # Varias separadas por comas: pasa a la siguiente cada 5 s (p. ej. 'tickets,dashboard').
   [string]$Page = ''
 )
 $ErrorActionPreference = 'Stop'

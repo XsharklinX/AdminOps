@@ -63,7 +63,11 @@ function ProbePanel() {
     };
   }, []);
 
-  useEffect(() => bottom.current?.scrollIntoView({ block: "nearest" }), [rows.length]);
+  // Con llaves: en Chromium reciente scrollIntoView devuelve una Promise, y React
+  // trataría lo que devuelve el efecto como función de limpieza (pantalla en negro).
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: "nearest" });
+  }, [rows.length]);
 
   const start = async () => {
     setError(null);

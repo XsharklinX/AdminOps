@@ -1,6 +1,9 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminBanner } from "./components/AdminBanner";
 import { About } from "./components/About";
+import { CommandPalette, type PaletteAction } from "./components/CommandPalette";
+import { Onboarding } from "./components/Onboarding";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { NAV, Sidebar, type PageId } from "./components/Sidebar";
 import { api, appApi, systemApi, workApi, type AppInfo, type TargetUser } from "./lib/api";
@@ -29,6 +32,8 @@ const Install = lazyPage("Install", () => import("./pages/Install"));
 const NetTools = lazyPage("NetTools", () => import("./pages/NetTools"));
 const Printers = lazyPage("Printers", () => import("./pages/Printers"));
 const Migrate = lazyPage("Migrate", () => import("./pages/Migrate"));
+const Tickets = lazyPage("Tickets", () => import("./pages/Tickets"));
+const Domain = lazyPage("Domain", () => import("./pages/Domain"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
 
 /** Páginas que son una lista de ajustes del catálogo, por categoría. */
@@ -40,19 +45,78 @@ const TWEAK_PAGES: Partial<Record<PageId, string>> = {
   cleanup: "cleanup",
 };
 
+const LAST_PAGE = "adminops.lastPage";
+
+/** Última página visitada. Diagnóstico no: se ejecuta solo al abrirlo. */
+function initialPage(): PageId {
+  try {
+    const p = localStorage.getItem(LAST_PAGE);
+    if (p && p !== "diagnostics" && NAV.some((n) => n.id === p)) return p as PageId;
+  } catch {
+    /* sin almacenamiento */
+  }
+  return "dashboard";
+}
+
 export default function App() {
-  const [page, setPage] = useState<PageId>("dashboard");
-  // Sección o ajuste a resaltar al llegar desde un hallazgo del diagnóstico.
+  const [page, setPage] = useState<PageId>(initialPage);
+  // Sección o ajuste a resaltar al llegar desde un hallazgo del diagnóstico o la búsqueda.
   const [focus, setFocus] = useState<string | null>(null);
-  const navigate = (p: PageId, f: string | null = null) => {
+  // Historial de páginas para Alt+← / Alt+→.
+  const back = useRef<PageId[]>([]);
+  const forward = useRef<PageId[]>([]);
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const navigate = useCallback((p: PageId, f: string | null = null) => {
+    if (p !== pageRef.current) {
+      back.current = [...back.current.slice(-49), pageRef.current];
+      forward.current = [];
+    }
     setPage(p);
     setFocus(f);
-  };
+  }, []);
+  const goHistory = useCallback((dir: "back" | "forward") => {
+    const from = dir === "back" ? back : forward;
+    const to = dir === "back" ? forward : back;
+    const p = from.current.pop();
+    if (!p) return;
+    to.current.push(pageRef.current);
+    setPage(p);
+    setFocus(null);
+  }, []);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [targetUser, setTargetUser] = useState<TargetUser | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAST_PAGE, page);
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, [page]);
+
+  // Atajos: Ctrl+K buscar, Ctrl+, ajustes, Alt+←/→ historial.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      } else if (e.ctrlKey && e.key === ",") {
+        e.preventDefault();
+        navigate("settings");
+      } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        goHistory(e.key === "ArrowLeft" ? "back" : "forward");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate, goHistory]);
 
   useEffect(() => {
     api.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
@@ -61,11 +125,30 @@ export default function App() {
       .info()
       .then((info) => {
         setAppInfo(info);
-        if (info.startPage && NAV.some((n) => n.id === info.startPage)) setPage(info.startPage as PageId);
+        // Solo para capturas y mediciones (scripts/bench.ps1 -Page): "tickets,dashboard"
+        // abre la primera página y pasa a la siguiente cada 5 s.
+        const seq = (info.startPage ?? "").split(",").filter((p) => NAV.some((n) => n.id === p)) as PageId[];
+        seq.forEach((p, i) => window.setTimeout(() => setPage(p), i * 5000));
+        // Primer arranque: asistente (no en las capturas automáticas).
+        if (!info.startPage) workApi.settings().then((s) => setOnboarding(!s.onboarded)).catch(() => {});
       })
       .catch(() => {});
     workApi.session().then((s) => setSessionActive(!!s)).catch(() => {});
   }, []);
+
+  const actions = useMemo<PaletteAction[]>(
+    () => [
+      ...(isAdmin === false ? [{ id: "admin", title: "Reiniciar AdminOps como administrador", run: () => void api.relaunchAsAdmin() }] : []),
+      { id: "support", title: "Crear paquete de soporte", subtitle: "Registro y último diagnóstico en un .zip", run: () => void appApi.supportPackage() },
+      { id: "diag", title: "Ejecutar un diagnóstico", run: () => navigate("diagnostics") },
+      { id: "report", title: "Generar informe PDF", run: () => navigate("report") },
+      { id: "shortcut", title: "Añadir un acceso directo propio", run: () => navigate("tools") },
+      { id: "join", title: "Unir el equipo a un dominio", run: () => navigate("domain") },
+      { id: "newuser", title: "Crear un usuario local", run: () => navigate("users") },
+      { id: "setup", title: "Volver a abrir el asistente de inicio", run: () => setOnboarding(true) },
+    ],
+    [isAdmin, navigate],
+  );
 
   const nav = NAV.find((n) => n.id === page)!;
   const category = TWEAK_PAGES[page];
@@ -91,6 +174,8 @@ export default function App() {
   else if (page === "nettools") content = <NetTools isAdmin={!!isAdmin} />;
   else if (page === "printers") content = <Printers isAdmin={!!isAdmin} />;
   else if (page === "migrate") content = <Migrate />;
+  else if (page === "tickets") content = <Tickets covered={aboutOpen || paletteOpen || onboarding} />;
+  else if (page === "domain") content = <Domain isAdmin={!!isAdmin} />;
   else if (page === "settings") content = <SettingsPage appInfo={appInfo} />;
   else if (category) content = <TweaksPage key={category} category={category} isAdmin={!!isAdmin} focus={focus} />;
   else content = null;
@@ -102,6 +187,7 @@ export default function App() {
           appInfo={appInfo}
           sessionActive={sessionActive}
           onAbout={() => setAboutOpen(true)}
+          onSearch={() => setPaletteOpen(true)}
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {isAdmin === false && <AdminBanner />}
@@ -110,11 +196,22 @@ export default function App() {
             {page === "dashboard" && <span className="font-mono text-[11px] text-mute">en vivo · 2 s</span>}
           </header>
           <div className="flex-1 overflow-y-auto">
-            <Suspense fallback={<p className="p-8 font-mono text-sm text-mute">Cargando…</p>}>{content}</Suspense>
+            <ErrorBoundary key={page} onHome={() => navigate("dashboard")}>
+              <Suspense fallback={<p className="p-8 font-mono text-sm text-mute">Cargando…</p>}>{content}</Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>
       <About open={aboutOpen} onClose={() => setAboutOpen(false)} appInfo={appInfo} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onNavigate={navigate} actions={actions} />
+      {onboarding && (
+        <Onboarding
+          onDone={(goTo) => {
+            setOnboarding(false);
+            navigate(goTo);
+          }}
+        />
+      )}
     </ToastProvider>
   );
 }

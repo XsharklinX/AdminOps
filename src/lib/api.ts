@@ -107,6 +107,7 @@ export const tweaksApi = {
   revert: (id: string) => invoke<OpResult>("revert_tweak", { id }),
   run: (id: string) => invoke<OpResult>("run_action", { id }),
   journal: () => invoke<JournalEntry[]>("get_journal"),
+  index: () => invoke<{ id: string; name: string; description: string; category: string }[]>("tweak_index"),
   revertEntry: (entryId: number) => invoke<OpResult>("revert_entry", { entryId }),
   createRestorePoint: () => invoke<void>("create_restore_point"),
   listRestorePoints: () => invoke<RestorePoint[]>("list_restore_points"),
@@ -341,6 +342,8 @@ export const appApi = {
   info: () => invoke<AppInfo>("get_app_info"),
   cancelTask: (task: string) => invoke<boolean>("cancel_task", { task }),
   readLog: (lines = 400) => invoke<string>("read_log", { lines }),
+  supportPackage: () => invoke<string>("support_package"),
+  logError: (message: string) => invoke<void>("log_frontend_error", { message }).catch(() => {}),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
   openFolder: (kind: "data" | "reports" | "logs") => invoke<void>("open_app_folder", { kind }),
 };
@@ -483,6 +486,8 @@ export interface Settings {
   logo: string | null;
   conditions: string;
   checklist: string[];
+  onboarded: boolean;
+  defaultDomain: string;
 }
 
 export interface Machine {
@@ -880,4 +885,56 @@ export const migrateApi = {
   backup: (sid: string, items: string[], dest: string) => invoke<MigrateSummary>("migrate_backup", { sid, items, dest }),
   readBackup: (folder: string) => invoke<BackupManifest>("migrate_read_backup", { folder }),
   restore: (folder: string, items: string[]) => invoke<MigrateSummary>("migrate_restore", { folder, items }),
+};
+
+// ---------- Tickets y dominio (v0.13) ----------
+
+export interface Portal {
+  id: string;
+  name: string;
+  url: string;
+  extraDomains: string[];
+}
+
+export const portalsApi = {
+  list: () => invoke<Portal[]>("list_portals"),
+  save: (portal: Portal) => invoke<Portal>("save_portal", { portal }),
+  remove: (id: string) => invoke<void>("delete_portal", { id }),
+  show: (id: string, r: { x: number; y: number; width: number; height: number }) => invoke<void>("portal_show", { id, ...r }),
+  bounds: (id: string, r: { x: number; y: number; width: number; height: number }) => invoke<void>("portal_bounds", { id, ...r }),
+  hideAll: () => invoke<void>("portal_hide_all"),
+  nav: (id: string, action: "back" | "forward" | "reload" | "home") => invoke<void>("portal_nav", { id, action }),
+  openWindow: (id: string) => invoke<void>("portal_open_window", { id }),
+  openExternal: (id: string) => invoke<void>("portal_open_external", { id }),
+};
+
+export interface DomainStatus {
+  computerName: string;
+  partOfDomain: boolean;
+  domain: string | null;
+  workgroup: string | null;
+  edition: string;
+  caption: string;
+  canJoin: boolean;
+  azureAdJoined: boolean;
+  tenant: string | null;
+  dc: string | null;
+  secureChannel: boolean | null;
+  timeOffset: number | null;
+  userIsDomain: boolean | null;
+}
+
+export interface DomainCheck {
+  label: string;
+  status: "ok" | "warn" | "fail";
+  detail: string;
+}
+
+export const domainApi = {
+  status: () => invoke<DomainStatus>("domain_status"),
+  check: (domain: string) => invoke<DomainCheck[]>("domain_check", { domain }),
+  join: (req: { domain: string; user: string; password: string; ou: string; newName: string }) => invoke<void>("domain_join", { req }),
+  leave: (req: { user: string; password: string; workgroup: string }) => invoke<void>("domain_leave", { req }),
+  repair: (req: { user: string; password: string }) => invoke<void>("domain_repair", { req }),
+  rename: (req: { newName: string; user: string; password: string }) => invoke<void>("rename_computer", { req }),
 };

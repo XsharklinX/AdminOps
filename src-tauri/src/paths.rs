@@ -31,6 +31,12 @@ pub fn is_portable() -> bool {
     portable_root().is_some()
 }
 
+/// En portable, la caché de WebView2 (cookies, sesiones de Tickets…) también va
+/// al USB para no dejar rastro en el equipo del cliente.
+pub fn portable_webview_dir() -> Option<PathBuf> {
+    portable_root().map(|root| root.join("webview"))
+}
+
 fn host() -> String {
     sysinfo::System::host_name()
         .unwrap_or_else(|| "equipo".into())
@@ -113,6 +119,12 @@ pub fn logs_dir(app: &tauri::AppHandle) -> PathBuf {
     }
 }
 
+/// Errores de la interfaz (página que falla, promesas sin capturar) al registro técnico.
+#[tauri::command]
+pub fn log_frontend_error(message: String) {
+    log::error!("Interfaz: {}", message.chars().take(4000).collect::<String>());
+}
+
 /// Últimas `lines` líneas del registro de actividad.
 #[tauri::command(async)]
 pub fn read_log(app: tauri::AppHandle, lines: usize) -> String {
@@ -161,6 +173,6 @@ pub fn get_app_info(app: tauri::AppHandle) -> AppInfo {
         portable: is_portable(),
         data_dir: machine_data_dir(&app).display().to_string(),
         reports_dir: reports_dir(&app).display().to_string(),
-        start_page: std::env::var("ADMINOPS_START_PAGE").ok().filter(|p| p.len() < 32),
+        start_page: std::env::var("ADMINOPS_START_PAGE").ok().filter(|p| p.len() < 200),
     }
 }

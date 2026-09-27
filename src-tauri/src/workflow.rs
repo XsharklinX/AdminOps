@@ -30,6 +30,10 @@ pub struct Settings {
     /// Condiciones o garantía que aparecen al pie del informe.
     pub conditions: String,
     pub checklist: Vec<String>,
+    /// Ya pasó por el asistente de primer arranque.
+    pub onboarded: bool,
+    /// Dominio que se propone al unir equipos (p. ej. pgr.gob.do).
+    pub default_domain: String,
 }
 
 impl Default for Settings {
@@ -53,6 +57,8 @@ impl Default for Settings {
             ]
             .map(String::from)
             .to_vec(),
+            onboarded: false,
+            default_domain: String::new(),
         }
     }
 }

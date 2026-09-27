@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.12.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-0.14.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -29,7 +29,8 @@ al cliente un **informe PDF** profesional del trabajo realizado.
 - ⚡ **Ligera y rápida**: hecha en Rust + WebView2, arranca en segundos y consume poca memoria.
 - 🛟 **Segura**: cada cambio guarda el valor anterior exacto y se puede deshacer; los cambios de riesgo crean un punto de restauración.
 - 🔒 **Privada**: sin cuentas, sin telemetría. Todos los datos se quedan en el equipo.
-- 🧳 **Portable**: llévala en un USB y úsala en cada cliente sin instalar nada.
+- 🧳 **Portable**: llévala en un USB y úsala en cada cliente sin instalar nada (sin dejar rastro).
+- ⌨️ **Rápida de usar**: `Ctrl+K` busca cualquier página, herramienta, ajuste o reparación; fija tus secciones favoritas.
 
 ## Funciones
 
@@ -86,6 +87,8 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 ### 🧰 Servicio técnico
 | Sección | Qué hace |
 | --- | --- |
+| **Tickets** | Abre la web de tickets de tu empresa (intranet, GLPI, osTicket…) dentro de AdminOps, con la sesión recordada. |
+| **Dominio** | Estado del dominio, comprobaciones previas, unir o sacar el equipo, reparar la relación de confianza y cambiar el nombre. |
 | **Sesión de servicio** | Registra el trabajo en un equipo: diagnóstico inicial, cambios, checklist y cierre. |
 | **Clientes** | Fichas de clientes y sus equipos, con historial de cada visita. |
 | **Herramientas** | ~90 accesos directos a CMD, services.msc, ncpa.cpl, regedit, visor de eventos, BIOS/UEFI… con buscador, favoritos y tus propios accesos. Incluye la ficha del equipo (serie y clave OEM) para copiar. |

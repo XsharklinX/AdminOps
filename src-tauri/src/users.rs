@@ -60,6 +60,17 @@ pub struct LocalUser {
     is_self: bool,
 }
 
+impl LocalUser {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Administrador local activo con el que se podría entrar sin dominio.
+    pub fn is_active_local_admin(&self) -> bool {
+        self.admin && self.enabled && !matches!(self.builtin, Some("default" | "wdag" | "guest"))
+    }
+}
+
 fn builtin_kind(sid: &str) -> Option<&'static str> {
     match sid.rsplit('-').next()? {
         "500" => Some("administrator"),

@@ -266,7 +266,9 @@ mod tests {
         let start = Instant::now();
         let r = powershell_opts("Start-Sleep -Seconds 30", Opts { timeout: Some(Duration::from_secs(2)), task: None });
         assert!(r.unwrap_err().contains("tardó más de 2 s"));
-        assert!(start.elapsed() < Duration::from_secs(10));
+        // Corta mucho antes de los 30 s del script. Margen amplio: con los tests en
+        // paralelo puede esperar turno en el pool de PowerShell antes de empezar.
+        assert!(start.elapsed() < Duration::from_secs(25));
     }
 
     #[test]

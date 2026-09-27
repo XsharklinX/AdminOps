@@ -1,5 +1,6 @@
 mod apps;
 mod diagnostics;
+mod domain;
 mod drivers;
 mod elevation;
 mod hardware;
@@ -7,9 +8,11 @@ mod metrics;
 mod migrate;
 mod network;
 mod paths;
+mod portals;
 mod printers;
 mod processes;
 mod software;
+mod support;
 mod space;
 mod bench;
 mod ps;
@@ -19,6 +22,7 @@ mod target_user;
 mod toolbox;
 mod tweaks;
 mod users;
+mod window_state;
 mod workflow;
 
 use tauri::Manager;
@@ -32,6 +36,11 @@ pub fn run() {
         let out = args.get(i + 1).map_or("roundtrip.json", String::as_str);
         let only = args.iter().position(|a| a == "--only").and_then(|j| args.get(j + 1)).map(String::as_str);
         std::process::exit(tweaks::roundtrip::run(out, only));
+    }
+
+    // Portable: la caché de WebView2 al USB (WebView2 respeta esta variable).
+    if let Some(dir) = paths::portable_webview_dir() {
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", dir);
     }
 
     tauri::Builder::default()
@@ -48,6 +57,14 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if window.label() == "main" {
+                    window_state::save(window);
+                }
+            }
+        })
         .manage(metrics::MetricsState::new())
         .manage(processes::ProcessState::new())
         .setup(|app| {
@@ -59,6 +76,7 @@ pub fn run() {
                 paths::is_portable()
             );
             app.manage(tweaks::TweakState::new(app.handle()));
+            window_state::restore(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -67,6 +85,7 @@ pub fn run() {
             metrics::get_system_info,
             metrics::get_live_metrics,
             tweaks::list_tweaks,
+            tweaks::tweak_index,
             tweaks::apply_tweak,
             tweaks::revert_tweak,
             tweaks::revert_entry,
@@ -88,7 +107,24 @@ pub fn run() {
             diagnostics::report::open_report,
             diagnostics::report::reveal_report,
             paths::get_app_info,
+            domain::domain_status,
+            domain::domain_check,
+            domain::domain_join,
+            domain::domain_leave,
+            domain::domain_repair,
+            domain::rename_computer,
+            portals::list_portals,
+            portals::save_portal,
+            portals::delete_portal,
+            portals::portal_show,
+            portals::portal_bounds,
+            portals::portal_hide_all,
+            portals::portal_nav,
+            portals::portal_open_window,
+            portals::portal_open_external,
             paths::read_log,
+            support::support_package,
+            paths::log_frontend_error,
             paths::open_logs_folder,
             paths::open_app_folder,
             task::cancel_task,

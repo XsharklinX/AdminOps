@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.12.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.14.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.12)
+## Hecho (v0.1 – v0.14)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -22,6 +22,8 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 10. Hardware | 0.10 | Inventario (placa, BIOS, RAM por ranura, GPU, monitores, clave OEM), temperaturas (LibreHardwareMonitor), SMART, prueba de RAM, speedtest con medidor animado e IP/proveedor |
 | 11. Caja de herramientas | 0.11 | ~90 accesos rápidos a utilidades de Windows (favoritos y accesos propios), usuarios locales (crear, contraseña, admin/estándar, activar, eliminar con perfil), ficha rápida del equipo, redes Wi-Fi guardadas con contraseña |
 | 12. Después de formatear | 0.12 | Instalar programas en lote (winget, listas propias), copia y restauración de datos del usuario, herramientas de red (ping/traza, DNS, puertos, hosts), impresoras, driver probable de los pantallazos azules |
+| 13. Entorno corporativo | 0.13 | Tickets (portales web dentro de la app, incrustados o en ventana, con sesión y contraseña recordadas), dominio (estado, comprobaciones previas, unir, salir, reparar relación de confianza, renombrar), paracaídas de errores de la interfaz |
+| 14. Orden y pulido | 0.14 | Búsqueda global Ctrl+K, barra lateral plegable con favoritos y grupos reordenados, asistente de primer arranque, ventana y última página recordadas, historial Alt+←/→, notificaciones al terminar tareas largas, portable sin rastro de WebView2, paquete de soporte |
 
 ### Fase 6 en detalle
 
@@ -71,15 +73,14 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
 
 ## Deuda técnica conocida
 
-- **Portable deja rastro de WebView2.** La caché del webview va a `%LOCALAPPDATA%\com.adminops.app`
-  aunque el resto de datos esté en el USB.
-- **SMART limitado.** `Get-StorageReliabilityCounter` no reporta temperatura/desgaste en muchos
-  discos SATA; faltan los atributos SMART crudos (sectores reasignados, pendientes).
 - **La prueba de ida y vuelta aún no se ha ejecutado** en un Windows 11 cliente limpio: la CI usa
   Windows Server. Ejecutarla en Sandbox al menos una vez por versión.
 - **Dependencia de Edge para el PDF.** Si falta, el informe cae a HTML.
 - **Sin firma de código** (decisión: no se contempla por coste). SmartScreen avisará al instalar.
-- **Solo español.**
+- **Solo español** (inglés en la Fase 20).
+- **Notificaciones en portable**: sin instalador, Windows puede mostrarlas con otro nombre de app.
+- **Tickets incrustados** usan la API "unstable" de Tauri (vistas hijas); si una versión futura la
+  cambia, queda la ventana aparte como alternativa.
 
 ---
 
@@ -105,7 +106,7 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
 
 ---
 
-## Plan siguiente (v0.10 – v1.0)
+## Plan (v0.10 – v1.1)
 
 Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo**, sin costes
 (nada de certificados de pago ni servicios de suscripción). Cada fase es una versión.
@@ -136,8 +137,7 @@ Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo
 - **Ficha del equipo** en Herramientas: modelo, serie, Windows y clave OEM, con "Copiar ficha".
 - **Redes Wi-Fi guardadas** en Red: contraseña (con administrador), seguridad, conexión automática y
   olvidar red. Usa la API nativa de WLAN: las claves nunca se escriben en disco.
-- Pendiente de verificar a mano: crear, modificar y borrar usuarios reales y olvidar una red Wi-Fi
-  (se hará en la VM de la Fase 13).
+- Pendiente de probar en equipos reales: crear, modificar y borrar usuarios y olvidar una red Wi-Fi.
 
 ### Fase 12 — Después de formatear (v0.12) ✅
 
@@ -155,77 +155,138 @@ Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo
 - **Pantallazos azules**: el diagnóstico lee los minivolcados (formato de triaje de 64 bits) y señala el
   driver probable a partir de la pila del fallo, con una pista de qué hacer.
 - El informe de batería ya existía en Diagnóstico (capacidad real frente a la de fábrica).
-- Pendiente de verificar a mano (VM de la Fase 13): instalar en lote, restaurar una copia real, cambiar DNS,
-  guardar hosts, quitar una impresora y analizar un volcado real (provocado con NotMyFault de Sysinternals,
-  que debe señalar `myfault.sys`).
+- Pendiente de probar en equipos reales: instalar en lote, restaurar una copia real, cambiar DNS, guardar
+  hosts, quitar una impresora y analizar un volcado real (NotMyFault de Sysinternals debe señalar `myfault.sys`).
 
-### Fase 13 — Base sólida antes de crecer (v0.13)
+### Fase 13 — Entorno corporativo (v0.13) ✅
 
-**Prioridad: alta.** Cerrar lo que quedó sin comprobar y los detalles que se notan en el uso diario.
+- **Tickets**: portales web del técnico (intranet de la empresa, GLPI, osTicket…) dentro de AdminOps, en
+  la ventana principal o en una ventana aparte. La sesión y las contraseñas se recuerdan (autoguardado de
+  WebView2 activado). Aislados: sin acceso a las funciones de AdminOps y solo navegan dentro de sus
+  dominios; el resto de enlaces se abre en el navegador.
+- **Dominio**: dominio / grupo de trabajo / Entra ID, controlador, relación de confianza, diferencia de
+  hora y si la sesión es de dominio. Comprobaciones previas (edición, DNS del dominio, controlador
+  accesible por LDAP, hora), unir (con OU y nuevo nombre opcionales), salir (exige un administrador local
+  activo), reparar la relación de confianza y cambiar el nombre del equipo. Las credenciales no se guardan.
+- **Paracaídas de errores**: si una página falla muestra el error en vez de dejar la ventana en negro, y
+  lo guarda en el registro técnico. Corregido el fallo que ponía la app en negro al salir de Herramientas
+  de red (`scrollIntoView` devuelve una Promise en Chromium reciente).
+- Pendiente de probar en equipos reales: unir, salir y reparar en el dominio de la empresa.
 
-- **Verificación en limpio**: ejecutar la prueba de ida y vuelta en una VM de Windows 11
-  (VirtualBox ya está instalado en el equipo de desarrollo) y una sesión de servicio completa con
-  administrador: finalizar procesos, actualizar software, copia de drivers, perfiles.
-- **Primer arranque guiado**: asistente de 3 pasos (tu nombre y logo, modo instalado/portable,
-  diagnóstico inicial) para que la app no empiece "vacía".
-- **Portable sin rastro**: llevar también la caché de WebView2 a `AdminOps-data` (hoy queda en
-  `%LOCALAPPDATA%` del cliente).
-- **Paquete de soporte**: un botón que junta registro, último diagnóstico y versión en un .zip para
-  cuando algo falle.
-- **Medición de CPU en reposo** con el equipo sin carga y fijar la cifra definitiva.
+### Fase 14 — Orden y pulido (v0.14) ✅
 
-**Terminado cuando:** todo lo marcado como "pendiente de verificar" esté probado y un usuario nuevo
-llegue a su primer informe sin instrucciones.
+**Prioridad: alta.** Con 32 secciones, lo urgente es que todo se encuentre rápido y se sienta terminado.
 
-### Fase 14 — Más mantenimiento y reparación (v0.14)
+- **Barra lateral plegable** por grupos (se recuerda qué está abierto) y **favoritos** fijados arriba.
+- **Búsqueda global (Ctrl+K)**: saltar a cualquier página, ajuste, herramienta, reparación, programa o
+  proceso escribiendo. Es el atajo que más tiempo ahorra al técnico.
+- **Primer arranque guiado**: nombre y logo del técnico, portal de Tickets, dominio habitual y primer
+  diagnóstico, para que la app no empiece vacía.
+- **La ventana recuerda** tamaño, posición y última página; **atajos de teclado** básicos.
+- **Notificaciones de Windows** al terminar tareas largas (SFC, DISM, instalaciones, copias).
+- **Portable sin rastro**: la caché de WebView2 también en `AdminOps-data` (hoy queda en el equipo).
+- **Paquete de soporte**: un botón junta registro, último diagnóstico y versión en un .zip.
+- **Revisión de textos y estados vacíos** en todas las páginas (qué hacer cuando no hay datos).
+- Hecho además: grupos reordenados (Sistema, Optimizar, Soporte, Administración) y Ajustes en el pie.
+- Pendiente: revisión completa de estados vacíos página por página (se irá haciendo en cada fase).
 
-**Prioridad: media.**
+**Terminado cuando:** cualquier función se alcanza en dos pulsaciones y un usuario nuevo llega a su
+primer informe sin instrucciones.
+
+### Fase 15 — Mantenimiento a fondo (v0.15)
+
+**Prioridad: alta.** Resolver el "PC lento" completo sin salir de AdminOps.
 
 - **Desinstalador de programas** (Win32 y Store) con desinstalación silenciosa y limpieza de restos
-  (carpetas y claves huérfanas), mostrando el tamaño que libera cada uno.
-- **Limpieza de navegadores** (Chrome, Edge, Firefox, Opera) por perfil del usuario destino: caché,
-  sin tocar contraseñas ni historial salvo que se elija.
-- **Restaurar drivers** desde una copia hecha con AdminOps (`pnputil /add-driver`).
-- **Más reparaciones**: restablecer Microsoft Store (`wsreset`), reparar la búsqueda de Windows,
-  reiniciar el audio, reparar asociaciones de archivos.
-- **Mantenimiento programado**: limpieza semanal o mensual como tarea programada del sistema,
-  opcional y reversible desde la app.
-- **Gestión de puntos de restauración**: ver el espacio que ocupan y borrar los antiguos.
+  (carpetas y claves huérfanas), mostrando lo que libera cada uno.
+- **Limpieza de navegadores** por perfil (Chrome, Edge, Firefox, Brave, Opera): caché y descargas
+  temporales; contraseñas e historial solo si se elige.
+- **Windows Update**: historial, actualizaciones fallidas con su error explicado, pausar/reanudar y
+  ocultar una actualización problemática.
+- **Análisis del arranque**: qué programas y servicios retrasan el inicio.
+- **Restaurar drivers** desde una copia de AdminOps (`pnputil /add-driver`).
+- **Más reparaciones**: Microsoft Store (`wsreset`), búsqueda de Windows, audio, asociaciones de
+  archivos, perfil de usuario dañado (el que inicia con perfil temporal).
+- **Puntos de restauración**: ver cuánto ocupan y borrar los antiguos.
+- **Mantenimiento programado** opcional (limpieza semanal/mensual como tarea del sistema).
 
-**Terminado cuando:** las tareas habituales de "PC lento" se resuelven sin salir de AdminOps.
+**Terminado cuando:** las tareas habituales de mantenimiento no requieren ninguna otra herramienta.
 
-### Fase 15 — Experiencia profesional (v0.15)
+### Fase 16 — Seguridad del equipo (v0.16)
 
-**Prioridad: media.** Que se sienta como un producto terminado.
+**Prioridad: alta.** Muy valorado por clientes y empresas, y fácil de explicar en el informe.
 
-- **Búsqueda global (Ctrl+K)**: saltar a cualquier página, ajuste, reparación o proceso escribiendo.
-- **Notificaciones de Windows** al terminar tareas largas (SFC, DISM, speedtest, sesión).
-- **Tema claro** opcional y tamaño de texto ajustable; la ventana recuerda tamaño y posición.
-- **Atajos de teclado** y navegación completa sin ratón.
-- **Panel más útil**: tendencia de temperaturas y alertas en vivo (RAM llena, disco al 100 %).
-- **Comparar visitas** en la ficha del cliente: cómo evolucionó el equipo entre sesiones.
+- **Auditoría de seguridad con nota** (0-100) y cómo subirla: Defender y firmas, firewall, UAC,
+  BitLocker, SMB1, escritorio remoto expuesto, número de administradores, cuentas sin contraseña,
+  actualizaciones pendientes, arranque seguro y TPM.
+- **BitLocker**: estado por unidad y **copia de la clave de recuperación** (al USB o al informe
+  técnico), la causa típica de equipos bloqueados.
+- **Programas vulnerables**: versiones antiguas de navegadores, Java, Adobe Reader… con actualizar en
+  un clic (winget).
+- **Elementos sospechosos**: tareas programadas, servicios e inicio sin firma o en carpetas temporales;
+  extensiones de navegador instaladas; archivo hosts modificado.
+- **Sección de seguridad en el informe** con la nota antes y después.
 
-### Fase 16 — Informe y relación con el cliente (v0.16)
+**Terminado cuando:** el técnico entrega una nota de seguridad comprensible y mejorada en cada visita.
 
-**Prioridad: media.**
+### Fase 17 — Informe y cliente (v0.17)
 
-- **Dos plantillas de informe**: resumido para el cliente (lenguaje sencillo) y técnico detallado.
-- **Presupuesto o recibo** opcional en la sesión: líneas de servicio, precios y total en el PDF.
-- **Conformidad del cliente**: firma a mano en pantalla al cerrar la sesión.
-- **Enviar el informe**: abrir el correo con el PDF adjunto y los datos del cliente ya puestos.
-- **Recordatorios**: "próximo mantenimiento" por cliente, visibles en Clientes.
+**Prioridad: media.** Lo que convierte el trabajo técnico en algo que el cliente valora (y paga).
 
-### Fase 17 — Distribución gratuita (v1.0)
+- **Dos plantillas de informe**: resumen en lenguaje sencillo para el cliente y detalle técnico.
+- **Presupuesto y recibo** en la sesión: líneas de servicio, precios, impuestos y total en el PDF.
+- **Firma del cliente** en pantalla al cerrar la sesión.
+- **Enviar el informe**: correo con el PDF adjunto y los datos del cliente ya puestos.
+- **Comparar visitas** en la ficha del cliente y **recordatorios** de próximo mantenimiento.
+- **Garantías**: fecha de fin de garantía del trabajo y de las piezas cambiadas.
 
-**Prioridad: media.**
+**Terminado cuando:** una sesión termina con informe, recibo y firma sin salir de la app.
 
-- **Actualización automática** con `tauri-plugin-updater` y GitHub Releases. Usa una clave propia
-  gratuita (no un certificado): la app solo instala actualizaciones firmadas por ti.
+### Fase 18 — La oficina completa (v0.18)
+
+**Prioridad: media.** Pasar de "un equipo" a "la red del cliente".
+
+- **Escáner de red local**: equipos, impresoras y dispositivos con IP, MAC, fabricante y nombre;
+  detectar IP duplicadas y dispositivos desconocidos.
+- **Wake-on-LAN** y **conexión remota** (escritorio remoto, Asistencia rápida) desde la ficha del
+  equipo o del cliente.
+- **Carpetas compartidas y permisos** del equipo: qué se comparte y con quién.
+- **Inventario de la oficina**: cada equipo diagnosticado queda en la ficha del cliente con su
+  hardware, para ver el parque completo y qué equipos conviene renovar.
+
+**Terminado cuando:** el técnico puede describir y mantener la red entera de un cliente pequeño.
+
+### Fase 19 — Recetas (v0.19)
+
+**Prioridad: media.** Automatizar lo que el técnico repite en cada equipo.
+
+- **Recetas**: secuencias guardadas de pasos (diagnóstico → limpieza → perfil → programas → copia de
+  drivers → informe) que se ejecutan con un clic y muestran el progreso de cada paso.
+- Recetas incluidas: "Equipo nuevo", "PC lento", "Después de un virus", "Antes de formatear".
+- **Exportar e importar recetas** para compartirlas con otros técnicos.
+
+**Terminado cuando:** preparar un equipo nuevo es elegir una receta y esperar.
+
+### Fase 20 — Versión 1.0 y distribución (v1.0)
+
+**Prioridad: alta cuando lo anterior esté probado en uso real.**
+
+- **Actualización automática** con `tauri-plugin-updater` y GitHub Releases (clave de firma propia y
+  gratuita: la app solo instala actualizaciones publicadas por ti).
 - **Releases automáticas** desde la CI al crear una etiqueta `vX.Y.Z` (instalador + portable).
-- **Inglés** como segundo idioma (interfaz, catálogo e informe).
-- **Página de descarga** en GitHub Pages con capturas y novedades.
-- **Nota sobre SmartScreen**: sin certificado, Windows avisará al abrir el instalador las primeras
-  veces; el aviso se reduce solo a medida que el archivo acumula descargas. Documentarlo en la página.
+- **Inglés** completo (interfaz, catálogos e informe) y selector de idioma.
+- **Página de descarga** en GitHub Pages con capturas, novedades y la nota sobre SmartScreen.
 
-**v1.0 cuando:** actualizaciones automáticas funcionando, inglés completo y dos semanas de uso real
-en clientes sin fallos graves.
+**v1.0 cuando:** actualizaciones automáticas funcionando, inglés completo y dos semanas de uso real sin
+fallos graves.
+
+### Fase 21 — Preparación comercial (v1.1)
+
+**Prioridad: a decidir** según cómo se quiera vender.
+
+- **Modelo gratis + Pro**: lo esencial gratis; informes con marca propia, recetas, clientes ilimitados
+  y la oficina completa en Pro.
+- **Licencias sin servidor**: clave firmada (Ed25519) que la app verifica sin conexión, asociada al
+  técnico y no al equipo, para que funcione en modo portable.
+- **Términos de uso y privacidad** (EULA) en el instalador y en Acerca de.
+- **Canal de soporte**: el paquete de soporte (Fase 14) se envía por correo con un clic.

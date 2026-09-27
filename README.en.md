@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-0.12.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-0.14.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Download](https://img.shields.io/badge/download-installer%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -32,7 +32,8 @@ a professional **PDF report** of the work done.
 - ⚡ **Light and fast**: built with Rust + WebView2, starts in seconds and uses little memory.
 - 🛟 **Safe**: every change stores the exact previous value and can be undone; risky changes create a restore point first.
 - 🔒 **Private**: no accounts, no telemetry. All data stays on the machine.
-- 🧳 **Portable**: carry it on a USB stick and use it on every customer's PC without installing anything.
+- 🧳 **Portable**: carry it on a USB stick and use it on every customer's PC without installing anything (no traces left).
+- ⌨️ **Fast to use**: `Ctrl+K` finds any page, tool, tweak or repair; pin your favorite sections.
 
 ## Features
 
@@ -89,6 +90,8 @@ or build your own. One restore point per profile, and it can be undone as a whol
 ### 🧰 Tech support
 | Section | What it does |
 | --- | --- |
+| **Tickets** | Opens your company's ticketing site (intranet, GLPI, osTicket…) inside AdminOps, with the session remembered. |
+| **Domain** | Domain status, pre-checks, join or leave, repair the trust relationship and rename the PC. |
 | **Service session** | Logs the work on a PC: initial diagnostics, changes, checklist and wrap-up. |
 | **Customers** | Customer records and their PCs, with the history of every visit. |
 | **Tools** | ~90 shortcuts to CMD, services.msc, ncpa.cpl, regedit, Event Viewer, BIOS/UEFI… with search, favorites and your own shortcuts. Includes a copyable PC sheet (serial number and OEM key). |
