@@ -13,7 +13,9 @@ mod ps;
 mod pspool;
 mod task;
 mod target_user;
+mod toolbox;
 mod tweaks;
+mod users;
 mod workflow;
 
 use tauri::Manager;
@@ -42,6 +44,7 @@ pub fn run() {
                 .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseLocal)
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .manage(metrics::MetricsState::new())
         .manage(processes::ProcessState::new())
         .setup(|app| {
@@ -116,6 +119,21 @@ pub fn run() {
             network::speedtest::run_speedtest,
             network::speedtest::cancel_speedtest,
             network::speedtest::list_speedtests,
+            network::wifi::list_wifi_profiles,
+            network::wifi::forget_wifi_profile,
+            toolbox::list_tools,
+            toolbox::launch_tool,
+            toolbox::set_tool_favorite,
+            toolbox::save_custom_tool,
+            toolbox::delete_custom_tool,
+            toolbox::pick_tool_target,
+            users::list_users,
+            users::create_user,
+            users::set_user_password,
+            users::set_user_enabled,
+            users::set_user_admin,
+            users::user_profile_size,
+            users::delete_user,
             tweaks::profiles::list_profiles,
             tweaks::profiles::apply_profile,
             tweaks::profiles::revert_profile,

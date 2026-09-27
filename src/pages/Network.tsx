@@ -2,12 +2,13 @@ import { CircleCheck, Gauge, Loader2, RefreshCw, Router, Wifi, XCircle } from "l
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { SpeedTest } from "../components/SpeedTest";
+import { WifiProfiles } from "../components/WifiProfiles";
 import { Card } from "../components/ui";
 import { toolsApi, type NetworkReport, type SpeedResult } from "../lib/api";
 
 const when = (ts: number) => new Date(ts * 1000).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
 
-export function Network() {
+export function Network({ isAdmin }: { isAdmin: boolean }) {
   const [report, setReport] = useState<NetworkReport | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
   const [history, setHistory] = useState<SpeedResult[]>([]);
@@ -162,6 +163,8 @@ export function Network() {
           </div>
         )}
       </Card>
+
+      <WifiProfiles isAdmin={isAdmin} />
     </div>
   );
 }

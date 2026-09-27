@@ -23,6 +23,8 @@ const Software = lazyPage("Software", () => import("./pages/Software"));
 const Space = lazyPage("Space", () => import("./pages/Space"));
 const Session = lazyPage("Session", () => import("./pages/Session"));
 const Clients = lazyPage("Clients", () => import("./pages/Clients"));
+const Tools = lazyPage("Tools", () => import("./pages/Tools"));
+const Users = lazyPage("Users", () => import("./pages/Users"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
 
 /** Páginas que son una lista de ajustes del catálogo, por categoría. */
@@ -68,11 +70,13 @@ export default function App() {
   else if (page === "profiles") content = <Profiles isAdmin={!!isAdmin} />;
   else if (page === "processes") content = <Processes isAdmin={!!isAdmin} />;
   else if (page === "hardware") content = <Hardware isAdmin={!!isAdmin} focus={focus} onNavigate={navigate} />;
-  else if (page === "network") content = <Network />;
+  else if (page === "network") content = <Network isAdmin={!!isAdmin} />;
   else if (page === "software") content = <Software isAdmin={!!isAdmin} />;
   else if (page === "space") content = <Space />;
   else if (page === "session") content = <Session onSessionChange={setSessionActive} />;
   else if (page === "clients") content = <Clients />;
+  else if (page === "tools") content = <Tools isAdmin={!!isAdmin} />;
+  else if (page === "users") content = <Users isAdmin={!!isAdmin} />;
   else if (page === "settings") content = <SettingsPage appInfo={appInfo} />;
   else if (category) content = <TweaksPage key={category} category={category} isAdmin={!!isAdmin} focus={focus} />;
   else content = null;

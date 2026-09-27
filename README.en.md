@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-0.10.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-0.11.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Download](https://img.shields.io/badge/download-installer%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -54,7 +54,7 @@ Full inventory (motherboard, BIOS, CPU, RAM per module, GPU, disks, monitors), *
 
 ### 🌐 Network & speed test
 Professional speed test (download, upload, latency and jitter over several parallel connections),
-connection details (ISP, public IP with a hide option, server) and network diagnostics: adapters, gateway, DNS and connectivity.
+connection details (ISP, public IP with a hide option, server), network diagnostics (adapters, gateway, DNS and connectivity) and **saved Wi-Fi networks with their passwords**.
 
 <img src="docs/screenshots/network.png" alt="Network and speed test" width="860" />
 
@@ -87,6 +87,8 @@ or build your own. One restore point per profile, and it can be undone as a whol
 | --- | --- |
 | **Service session** | Logs the work on a PC: initial diagnostics, changes, checklist and wrap-up. |
 | **Customers** | Customer records and their PCs, with the history of every visit. |
+| **Tools** | ~90 shortcuts to CMD, services.msc, ncpa.cpl, regedit, Event Viewer, BIOS/UEFI… with search, favorites and your own shortcuts. Includes a copyable PC sheet (serial number and OEM key). |
+| **Local users** | Create users, change passwords, make them admin or standard, disable them or delete them along with their profile. Works on Windows Home too. |
 | **Repairs** | SFC, DISM, network reset, Windows Update, print spooler, Explorer, time sync, icon cache and RAM test. |
 | **Report** | Professional PDF ready to hand over: PC status, hardware, findings, changes and speed. |
 | **History** | Everything that was applied, with undo, plus the technical activity log. |

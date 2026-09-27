@@ -34,6 +34,8 @@ struct Counters {
     files: AtomicU64,
     bytes: AtomicU64,
     denied: AtomicU64,
+    /// No lo detiene el botón Cancelar del análisis (p. ej. tamaño de un perfil).
+    independent: bool,
 }
 
 struct RawEntry {
@@ -106,7 +108,7 @@ fn walk(path: &Path, c: &Counters) -> (Node, Vec<(u64, PathBuf)>) {
     let name = path.file_name().map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned());
     let mut node = Node { name, size: 0, files: 0, children: vec![] };
     let mut top = Vec::new();
-    if CANCEL.load(Ordering::Relaxed) {
+    if !c.independent && CANCEL.load(Ordering::Relaxed) {
         return (node, top);
     }
     let Some(entries) = list_dir(path) else {
@@ -144,6 +146,13 @@ fn walk(path: &Path, c: &Counters) -> (Node, Vec<(u64, PathBuf)>) {
     }
     node.children.sort_unstable_by(|a, b| b.size.cmp(&a.size));
     (node, top)
+}
+
+/// Tamaño total y número de archivos de una carpeta (sin seguir enlaces).
+pub fn folder_size(path: &Path) -> (u64, u64) {
+    let c = Counters { independent: true, ..Default::default() };
+    let (node, _) = walk(path, &c);
+    (node.size, node.files)
 }
 
 #[derive(Serialize)]

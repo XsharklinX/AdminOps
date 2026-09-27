@@ -65,6 +65,55 @@ pub fn get_target_user() -> Option<TargetUser> {
     get().cloned()
 }
 
+/// SID de la cuenta que ejecuta AdminOps (puede no ser el usuario destino).
+pub fn own_sid() -> Option<&'static str> {
+    static OWN: OnceLock<Option<String>> = OnceLock::new();
+    OWN.get_or_init(|| {
+        let mut sys = System::new();
+        let pid = sysinfo::get_current_pid().ok()?;
+        sys.refresh_processes_specifics(
+            ProcessesToUpdate::Some(&[pid]),
+            true,
+            ProcessRefreshKind::nothing().with_user(UpdateKind::Always),
+        );
+        sys.process(pid)?.user_id().map(|u| u.to_string())
+    })
+    .as_deref()
+}
+
+/// Carpetas del usuario destino (las del perfil del cliente aunque AdminOps
+/// se haya elevado con otra cuenta).
+pub struct UserDirs {
+    pub profile: std::path::PathBuf,
+    pub app_data: std::path::PathBuf,
+    pub local_app_data: std::path::PathBuf,
+    pub temp: std::path::PathBuf,
+}
+
+pub fn user_dirs() -> Option<UserDirs> {
+    use std::path::PathBuf;
+    let env = |k: &str| std::env::var_os(k).map(PathBuf::from);
+    match hkcu_redirect() {
+        Some(sid) => {
+            let raw = crate::tweaks::registry::read_string(
+                &format!(r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}"),
+                "ProfileImagePath",
+            )?;
+            // Suele ser %SystemDrive%\Users\<nombre>.
+            let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+            let profile = PathBuf::from(raw.replace("%SystemDrive%", &drive));
+            let local = profile.join(r"AppData\Local");
+            Some(UserDirs { app_data: profile.join(r"AppData\Roaming"), temp: local.join("Temp"), local_app_data: local, profile })
+        }
+        None => Some(UserDirs {
+            profile: env("USERPROFILE")?,
+            app_data: env("APPDATA")?,
+            local_app_data: env("LOCALAPPDATA")?,
+            temp: std::env::temp_dir(),
+        }),
+    }
+}
+
 fn ps_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "''"))
 }

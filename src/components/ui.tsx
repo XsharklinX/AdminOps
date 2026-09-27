@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { loadColor } from "../lib/format";
 
@@ -130,5 +131,72 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
       <div className="truncate font-mono text-sm tabular text-ink">{value}</div>
       {sub && <div className="truncate text-xs text-dim">{sub}</div>}
     </div>
+  );
+}
+
+/** Ventana modal con cabecera y botón de cerrar. Clic fuera o Escape la cierran. */
+export function Modal({
+  title,
+  onClose,
+  children,
+  footer,
+  width = "w-[480px]",
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  width?: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
+    >
+      <div className={`flex max-h-[88vh] ${width} flex-col rounded-xl border border-line-2 bg-panel shadow-2xl`} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-line px-5 py-3">
+          <h3 className="font-semibold">{title}</h3>
+          <button onClick={onClose} className="text-mute hover:text-ink" title="Cerrar">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+export const inputClass =
+  "w-full rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50 disabled:opacity-50";
+
+export function Button({
+  children,
+  onClick,
+  disabled,
+  kind = "primary",
+  title,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  kind?: "primary" | "danger" | "ghost";
+  title?: string;
+}) {
+  const style = {
+    primary: "border-neon/50 text-neon hover:bg-neon/10",
+    danger: "border-bad/50 text-bad hover:bg-bad/10",
+    ghost: "border-transparent text-dim hover:bg-panel-2 hover:text-ink",
+  }[kind];
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex items-center gap-1.5 rounded-md border px-3.5 py-1.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${style}`}
+    >
+      {children}
+    </button>
   );
 }

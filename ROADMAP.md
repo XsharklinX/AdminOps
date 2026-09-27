@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.10.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.11.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.10)
+## Hecho (v0.1 – v0.11)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -20,6 +20,7 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 8. Herramientas | 0.9 | Procesos (finalizar proceso/árbol), red y speedtest, actualizar software (winget), analizador de espacio, copia de drivers, análisis de Defender |
 | 9. Flujo del técnico | 0.9 | Sesión de servicio, clientes, perfiles propios (importar/exportar), marca en el informe, checklist, "by David Bonilla" |
 | 10. Hardware | 0.10 | Inventario (placa, BIOS, RAM por ranura, GPU, monitores, clave OEM), temperaturas (LibreHardwareMonitor), SMART, prueba de RAM, speedtest con medidor animado e IP/proveedor |
+| 11. Caja de herramientas | 0.11 | ~90 accesos rápidos a utilidades de Windows (favoritos y accesos propios), usuarios locales (crear, contraseña, admin/estándar, activar, eliminar con perfil), ficha rápida del equipo, redes Wi-Fi guardadas con contraseña |
 
 ### Fase 6 en detalle
 
@@ -119,7 +120,42 @@ Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo
 - **Speedtest** con medidor animado, fases, gráfica en vivo, "apto para", IPv4/IPv6, proveedor y ubicación.
 - Pendiente de esta área: identificar el **driver culpable** de cada pantallazo azul (análisis de minidumps).
 
-### Fase 11 — Base sólida antes de crecer (v0.11)
+### Fase 11 — Caja de herramientas del técnico (v0.11) ✅
+
+- **Herramientas**: unos 90 accesos rápidos en 8 grupos (consolas, administración, diagnóstico, Panel de
+  control, Configuración, carpetas, arranque y asistencia remota), con buscador, favoritos y accesos
+  propios (programa, carpeta o web). Catálogo en `src-tauri/tools/shortcuts.toml`. Se ocultan los que no
+  existen en esa edición de Windows (gpedit en Home). Carpetas y Configuración se abren como el usuario
+  del equipo; consolas y .msc, como administrador. Reiniciar a la BIOS/UEFI y al inicio avanzado.
+- **Usuarios locales** (también en Windows Home, que no tiene lusrmgr): crear (estándar o administrador,
+  contraseña opcional, no caduca / cambiarla al entrar), cambiar o quitar la contraseña, activar,
+  desactivar, hacer administrador o estándar, eliminar con o sin su perfil (muestra cuánto ocupa).
+  Nunca deja el equipo sin administrador activo ni toca la cuenta con la sesión abierta o la que ejecuta
+  AdminOps. Las contraseñas no se registran.
+- **Ficha del equipo** en Herramientas: modelo, serie, Windows y clave OEM, con "Copiar ficha".
+- **Redes Wi-Fi guardadas** en Red: contraseña (con administrador), seguridad, conexión automática y
+  olvidar red. Usa la API nativa de WLAN: las claves nunca se escriben en disco.
+- Pendiente de verificar a mano: crear, modificar y borrar usuarios reales y olvidar una red Wi-Fi
+  (se hará en la VM de la Fase 13).
+
+### Fase 12 — Después de formatear (v0.12)
+
+**Prioridad: alta.** Lo que el técnico hace en cada equipo recién instalado o migrado.
+
+- **Instalación de programas en lote** con winget: listas propias (navegador, 7-Zip, VLC, AnyDesk,
+  Office…) que se instalan de una vez, con progreso y resultado por programa.
+- **Copia de datos del usuario** a un USB o disco (Escritorio, Documentos, Imágenes, favoritos de los
+  navegadores, perfiles Wi-Fi) y restauración en el equipo nuevo.
+- **Red avanzada**: cambiar DNS con un clic (Cloudflare, Google, automático) por adaptador, editor del
+  archivo hosts, ping y tracert integrados, puertos en uso por programa.
+- **Impresoras**: lista, limpiar la cola atascada, página de prueba, quitar impresoras fantasma.
+- **Pantallazos azules**: driver culpable a partir de los minidumps.
+- **Informe de batería** en portátiles: capacidad real frente a la de fábrica.
+
+**Terminado cuando:** dejar listo un equipo recién formateado (programas, datos y red) no requiere
+salir de AdminOps.
+
+### Fase 13 — Base sólida antes de crecer (v0.13)
 
 **Prioridad: alta.** Cerrar lo que quedó sin comprobar y los detalles que se notan en el uso diario.
 
@@ -137,7 +173,7 @@ Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo
 **Terminado cuando:** todo lo marcado como "pendiente de verificar" esté probado y un usuario nuevo
 llegue a su primer informe sin instrucciones.
 
-### Fase 12 — Más mantenimiento y reparación (v0.12)
+### Fase 14 — Más mantenimiento y reparación (v0.14)
 
 **Prioridad: media.**
 
@@ -154,7 +190,7 @@ llegue a su primer informe sin instrucciones.
 
 **Terminado cuando:** las tareas habituales de "PC lento" se resuelven sin salir de AdminOps.
 
-### Fase 13 — Experiencia profesional (v0.13)
+### Fase 15 — Experiencia profesional (v0.15)
 
 **Prioridad: media.** Que se sienta como un producto terminado.
 
@@ -165,7 +201,7 @@ llegue a su primer informe sin instrucciones.
 - **Panel más útil**: tendencia de temperaturas y alertas en vivo (RAM llena, disco al 100 %).
 - **Comparar visitas** en la ficha del cliente: cómo evolucionó el equipo entre sesiones.
 
-### Fase 14 — Informe y relación con el cliente (v0.14)
+### Fase 16 — Informe y relación con el cliente (v0.16)
 
 **Prioridad: media.**
 
@@ -175,7 +211,7 @@ llegue a su primer informe sin instrucciones.
 - **Enviar el informe**: abrir el correo con el PDF adjunto y los datos del cliente ya puestos.
 - **Recordatorios**: "próximo mantenimiento" por cliente, visibles en Clientes.
 
-### Fase 15 — Distribución gratuita (v1.0)
+### Fase 17 — Distribución gratuita (v1.0)
 
 **Prioridad: media.**
 

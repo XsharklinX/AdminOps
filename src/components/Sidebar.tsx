@@ -18,6 +18,8 @@ import {
   Settings as SettingsIcon,
   ShieldHalf,
   Stethoscope,
+  Toolbox,
+  UserCog,
   Users,
   Wifi,
   Wrench,
@@ -40,6 +42,8 @@ export type PageId =
   | "startup"
   | "software"
   | "session"
+  | "tools"
+  | "users"
   | "clients"
   | "repair"
   | "report"
@@ -82,6 +86,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { id: "session", label: "Sesión de servicio", icon: ClipboardCheck },
       { id: "clients", label: "Clientes", icon: Users },
+      { id: "tools", label: "Herramientas", icon: Toolbox },
+      { id: "users", label: "Usuarios locales", icon: UserCog },
       { id: "repair", label: "Reparaciones", icon: Wrench },
       { id: "report", label: "Informe", icon: FileText },
       { id: "history", label: "Historial", icon: History },

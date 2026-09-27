@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.10.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-0.11.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -51,7 +51,7 @@ Inventario completo (placa base, BIOS, CPU, RAM por módulo, GPU, discos, monito
 
 ### 🌐 Red y velocidad
 Test de velocidad profesional (descarga, subida, latencia y jitter con varias conexiones en paralelo),
-datos de la conexión (proveedor, IP pública con opción de ocultarla, servidor) y diagnóstico de red: adaptadores, puerta de enlace, DNS y conectividad.
+datos de la conexión (proveedor, IP pública con opción de ocultarla, servidor), diagnóstico de red (adaptadores, puerta de enlace, DNS y conectividad) y **redes Wi-Fi guardadas con su contraseña**.
 
 <img src="docs/screenshots/network.png" alt="Red y velocidad" width="860" />
 
@@ -84,6 +84,8 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | --- | --- |
 | **Sesión de servicio** | Registra el trabajo en un equipo: diagnóstico inicial, cambios, checklist y cierre. |
 | **Clientes** | Fichas de clientes y sus equipos, con historial de cada visita. |
+| **Herramientas** | ~90 accesos directos a CMD, services.msc, ncpa.cpl, regedit, visor de eventos, BIOS/UEFI… con buscador, favoritos y tus propios accesos. Incluye la ficha del equipo (serie y clave OEM) para copiar. |
+| **Usuarios locales** | Crea usuarios, cambia contraseñas, hazlos administradores o estándar, desactívalos o elimínalos con su perfil. Funciona también en Windows Home. |
 | **Reparaciones** | SFC, DISM, reinicio de red, Windows Update, cola de impresión, Explorador, hora, caché de iconos y prueba de RAM. |
 | **Informe** | PDF profesional listo para entregar: estado del equipo, hardware, hallazgos, cambios y velocidad. |
 | **Historial** | Todo lo aplicado, con opción de deshacer, y el registro técnico de actividad. |

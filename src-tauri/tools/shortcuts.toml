@@ -1,0 +1,870 @@
+# Accesos rápidos de la página Herramientas. Se incrustan en el binario al compilar.
+#
+# Cómo se abre cada acceso:
+#   open    = ruta, carpeta shell: o URI (ms-settings:…). La abre el Explorador
+#             del usuario con la sesión abierta, sin permisos de administrador.
+#   run     = programa. Se lanza con los permisos de AdminOps (administrador).
+#     args     argumentos fijos.
+#     elevate  pide administrador aunque AdminOps no lo sea (verbo "runas").
+#     as_user  lo lanza el Explorador como el usuario, sin administrador (sin args).
+#     hidden   se ejecuta sin ventana y muestra el error si falla (reinicios).
+#   admin    = true si no sirve de nada sin administrador (la UI lo desactiva).
+#   requires = archivo que debe existir; si no, el acceso aparece como no disponible
+#              (p. ej. gpedit.msc no existe en Windows Home).
+#   confirm  = texto de confirmación antes de ejecutar.
+#
+# Variables: {System32} {Windows} {ProgramData} {ProgramFiles}
+#            {UserProfile} {UserAppData} {UserLocalAppData} {UserTemp}
+# Grupos: console admin diag panel settings folders boot remote
+
+# ---------- Consolas ----------
+
+[[tool]]
+id = "cmd"
+name = "Símbolo del sistema"
+description = "CMD como el usuario del equipo, sin administrador."
+group = "console"
+icon = "terminal"
+run = "{System32}\\cmd.exe"
+as_user = true
+keywords = "cmd consola terminal"
+
+[[tool]]
+id = "cmd-admin"
+name = "CMD (administrador)"
+description = "Símbolo del sistema con permisos de administrador."
+group = "console"
+icon = "terminal-admin"
+run = "{System32}\\cmd.exe"
+elevate = true
+keywords = "cmd consola terminal admin elevado"
+
+[[tool]]
+id = "powershell"
+name = "PowerShell"
+description = "PowerShell como el usuario del equipo, sin administrador."
+group = "console"
+icon = "terminal"
+run = "{System32}\\WindowsPowerShell\\v1.0\\powershell.exe"
+as_user = true
+keywords = "powershell consola terminal ps"
+
+[[tool]]
+id = "powershell-admin"
+name = "PowerShell (administrador)"
+description = "PowerShell con permisos de administrador."
+group = "console"
+icon = "terminal-admin"
+run = "{System32}\\WindowsPowerShell\\v1.0\\powershell.exe"
+elevate = true
+keywords = "powershell consola terminal admin elevado ps"
+
+[[tool]]
+id = "terminal"
+name = "Windows Terminal"
+description = "Terminal de Windows con permisos de administrador."
+group = "console"
+icon = "terminal-admin"
+run = "{UserLocalAppData}\\Microsoft\\WindowsApps\\wt.exe"
+elevate = true
+requires = "{UserLocalAppData}\\Microsoft\\WindowsApps\\wt.exe"
+keywords = "wt terminal consola"
+
+[[tool]]
+id = "regedit"
+name = "Editor del Registro"
+description = "regedit: ver y modificar el registro de Windows."
+group = "console"
+icon = "database"
+run = "{Windows}\\regedit.exe"
+elevate = true
+keywords = "regedit registro"
+
+[[tool]]
+id = "taskmgr"
+name = "Administrador de tareas"
+description = "Procesos, rendimiento y aplicaciones de inicio."
+group = "console"
+icon = "activity"
+run = "{System32}\\Taskmgr.exe"
+keywords = "taskmgr tareas procesos"
+
+[[tool]]
+id = "hosts"
+name = "Archivo hosts"
+description = "Edita el archivo hosts con el Bloc de notas como administrador."
+group = "console"
+icon = "file"
+run = "{System32}\\notepad.exe"
+args = "{System32}\\drivers\\etc\\hosts"
+elevate = true
+keywords = "hosts dns bloqueo notepad"
+
+# ---------- Administración de Windows ----------
+
+[[tool]]
+id = "services"
+name = "Servicios"
+description = "services.msc: iniciar, detener y configurar servicios."
+group = "admin"
+icon = "cog"
+run = "{System32}\\services.msc"
+keywords = "services.msc servicios"
+
+[[tool]]
+id = "devmgmt"
+name = "Administrador de dispositivos"
+description = "devmgmt.msc: drivers, dispositivos con error y hardware."
+group = "admin"
+icon = "cpu"
+run = "{System32}\\devmgmt.msc"
+keywords = "devmgmt.msc dispositivos drivers controladores"
+
+[[tool]]
+id = "diskmgmt"
+name = "Administración de discos"
+description = "diskmgmt.msc: particiones, letras de unidad y formato."
+group = "admin"
+icon = "hard-drive"
+run = "{System32}\\diskmgmt.msc"
+keywords = "diskmgmt.msc discos particiones"
+
+[[tool]]
+id = "compmgmt"
+name = "Administración de equipos"
+description = "compmgmt.msc: consola que reúne discos, servicios, usuarios y eventos."
+group = "admin"
+icon = "monitor"
+run = "{System32}\\compmgmt.msc"
+keywords = "compmgmt.msc administracion equipo"
+
+[[tool]]
+id = "eventvwr"
+name = "Visor de eventos"
+description = "eventvwr.msc: errores y avisos del sistema y de las aplicaciones."
+group = "admin"
+icon = "list"
+run = "{System32}\\eventvwr.msc"
+keywords = "eventvwr.msc eventos registro errores"
+
+[[tool]]
+id = "taskschd"
+name = "Programador de tareas"
+description = "taskschd.msc: tareas programadas del sistema."
+group = "admin"
+icon = "clock"
+run = "{System32}\\taskschd.msc"
+keywords = "taskschd.msc tareas programadas"
+
+[[tool]]
+id = "lusrmgr"
+name = "Usuarios y grupos locales"
+description = "lusrmgr.msc (no existe en Windows Home; usa la página Usuarios de AdminOps)."
+group = "admin"
+icon = "users"
+run = "{System32}\\lusrmgr.msc"
+requires = "{System32}\\lusrmgr.msc"
+keywords = "lusrmgr.msc usuarios grupos cuentas"
+
+[[tool]]
+id = "netplwiz"
+name = "Cuentas de usuario"
+description = "netplwiz: inicio de sesión automático y cuentas del equipo."
+group = "admin"
+icon = "users"
+run = "{System32}\\Netplwiz.exe"
+keywords = "netplwiz userpasswords2 cuentas autologon inicio automatico"
+
+[[tool]]
+id = "gpedit"
+name = "Directivas de grupo"
+description = "gpedit.msc: directivas locales (Windows Pro, Enterprise y Education)."
+group = "admin"
+icon = "sliders"
+run = "{System32}\\gpedit.msc"
+requires = "{System32}\\gpedit.msc"
+keywords = "gpedit.msc directivas politicas grupo"
+
+[[tool]]
+id = "secpol"
+name = "Directiva de seguridad local"
+description = "secpol.msc: contraseñas, auditoría y derechos de usuario (Windows Pro)."
+group = "admin"
+icon = "lock"
+run = "{System32}\\secpol.msc"
+requires = "{System32}\\secpol.msc"
+keywords = "secpol.msc seguridad directiva"
+
+[[tool]]
+id = "wf"
+name = "Firewall avanzado"
+description = "wf.msc: reglas de entrada y salida del Firewall de Windows."
+group = "admin"
+icon = "flame"
+run = "{System32}\\WF.msc"
+keywords = "wf.msc firewall reglas puertos"
+
+[[tool]]
+id = "certmgr"
+name = "Certificados"
+description = "certmgr.msc: certificados del usuario."
+group = "admin"
+icon = "badge"
+run = "{System32}\\certmgr.msc"
+keywords = "certmgr.msc certificados"
+
+[[tool]]
+id = "fsmgmt"
+name = "Carpetas compartidas"
+description = "fsmgmt.msc: recursos compartidos, sesiones y archivos abiertos."
+group = "admin"
+icon = "folder-share"
+run = "{System32}\\fsmgmt.msc"
+keywords = "fsmgmt.msc compartidas recursos red"
+
+[[tool]]
+id = "printmanagement"
+name = "Administración de impresión"
+description = "printmanagement.msc: impresoras, drivers y colas (Windows Pro)."
+group = "admin"
+icon = "printer"
+run = "{System32}\\printmanagement.msc"
+requires = "{System32}\\printmanagement.msc"
+keywords = "printmanagement.msc impresoras drivers cola"
+
+[[tool]]
+id = "optionalfeatures"
+name = "Características de Windows"
+description = "Activar o desactivar .NET 3.5, Hyper-V, SMB 1.0, WSL…"
+group = "admin"
+icon = "package"
+run = "{System32}\\OptionalFeatures.exe"
+keywords = "optionalfeatures caracteristicas net 3.5 hyper-v smb wsl"
+
+[[tool]]
+id = "msconfig"
+name = "Configuración del sistema"
+description = "msconfig: arranque, modo seguro y servicios de inicio."
+group = "admin"
+icon = "settings"
+run = "{System32}\\msconfig.exe"
+keywords = "msconfig arranque modo seguro"
+
+[[tool]]
+id = "sysprotection"
+name = "Protección del sistema"
+description = "Activar la restauración del sistema y configurar su espacio."
+group = "admin"
+icon = "shield"
+run = "{System32}\\SystemPropertiesProtection.exe"
+keywords = "proteccion restauracion puntos"
+
+[[tool]]
+id = "rstrui"
+name = "Restaurar sistema"
+description = "rstrui: volver a un punto de restauración anterior."
+group = "admin"
+icon = "undo"
+run = "{System32}\\rstrui.exe"
+keywords = "rstrui restaurar punto restauracion"
+
+# ---------- Diagnóstico y rendimiento ----------
+
+[[tool]]
+id = "msinfo32"
+name = "Información del sistema"
+description = "msinfo32: resumen completo de hardware, componentes y software."
+group = "diag"
+icon = "info"
+run = "{System32}\\msinfo32.exe"
+keywords = "msinfo32 informacion sistema"
+
+[[tool]]
+id = "resmon"
+name = "Monitor de recursos"
+description = "resmon: CPU, disco, red y memoria por proceso en detalle."
+group = "diag"
+icon = "gauge"
+run = "{System32}\\resmon.exe"
+keywords = "resmon recursos monitor"
+
+[[tool]]
+id = "perfmon"
+name = "Monitor de rendimiento"
+description = "perfmon: contadores de rendimiento e informes."
+group = "diag"
+icon = "chart"
+run = "{System32}\\perfmon.exe"
+keywords = "perfmon rendimiento contadores"
+
+[[tool]]
+id = "reliability"
+name = "Monitor de confiabilidad"
+description = "Historial de fallos, bloqueos y actualizaciones día a día."
+group = "diag"
+icon = "activity"
+run = "{System32}\\perfmon.exe"
+args = "/rel"
+keywords = "confiabilidad fiabilidad bloqueos historial"
+
+[[tool]]
+id = "dxdiag"
+name = "DirectX (dxdiag)"
+description = "Tarjeta gráfica, sonido y versión de DirectX."
+group = "diag"
+icon = "monitor"
+run = "{System32}\\dxdiag.exe"
+keywords = "dxdiag directx grafica video"
+
+[[tool]]
+id = "mdsched"
+name = "Diagnóstico de memoria"
+description = "Programa la prueba de RAM de Windows (requiere reiniciar)."
+group = "diag"
+icon = "memory"
+run = "{System32}\\MdSched.exe"
+keywords = "mdsched memoria ram prueba"
+
+[[tool]]
+id = "dfrgui"
+name = "Optimizar unidades"
+description = "Desfragmentar discos duros y hacer TRIM a los SSD."
+group = "diag"
+icon = "hard-drive"
+run = "{System32}\\dfrgui.exe"
+keywords = "dfrgui desfragmentar trim optimizar"
+
+[[tool]]
+id = "cleanmgr"
+name = "Liberador de espacio"
+description = "cleanmgr: limpieza de disco clásica de Windows."
+group = "diag"
+icon = "trash"
+run = "{System32}\\cleanmgr.exe"
+keywords = "cleanmgr liberar espacio limpieza"
+
+[[tool]]
+id = "mrt"
+name = "Eliminación de malware (MRT)"
+description = "Herramienta de eliminación de software malintencionado de Microsoft."
+group = "diag"
+icon = "bug"
+run = "{System32}\\MRT.exe"
+requires = "{System32}\\MRT.exe"
+keywords = "mrt malware virus"
+
+[[tool]]
+id = "verifier"
+name = "Comprobador de controladores"
+description = "verifier: fuerza fallos en drivers sospechosos (solo técnicos; exige reiniciar)."
+group = "diag"
+icon = "alert"
+run = "{System32}\\verifier.exe"
+keywords = "verifier drivers pantallazo azul bsod"
+
+# ---------- Panel de control ----------
+
+[[tool]]
+id = "control"
+name = "Panel de control"
+description = "El Panel de control clásico."
+group = "panel"
+icon = "layout"
+run = "{System32}\\control.exe"
+keywords = "control panel"
+
+[[tool]]
+id = "ncpa"
+name = "Conexiones de red"
+description = "ncpa.cpl: adaptadores, IP, DNS y activar o desactivar tarjetas."
+group = "panel"
+icon = "network"
+run = "{System32}\\control.exe"
+args = "ncpa.cpl"
+keywords = "ncpa.cpl red adaptadores ip dns"
+
+[[tool]]
+id = "netcenter"
+name = "Centro de redes"
+description = "Centro de redes y recursos compartidos."
+group = "panel"
+icon = "wifi"
+run = "{System32}\\control.exe"
+args = "/name Microsoft.NetworkAndSharingCenter"
+keywords = "centro redes compartidos"
+
+[[tool]]
+id = "appwiz"
+name = "Programas y características"
+description = "appwiz.cpl: desinstalar o reparar programas."
+group = "panel"
+icon = "package"
+run = "{System32}\\control.exe"
+args = "appwiz.cpl"
+keywords = "appwiz.cpl programas desinstalar"
+
+[[tool]]
+id = "sysdm"
+name = "Propiedades del sistema"
+description = "sysdm.cpl: nombre del equipo, dominio, variables de entorno y rendimiento."
+group = "panel"
+icon = "monitor"
+run = "{System32}\\control.exe"
+args = "sysdm.cpl"
+keywords = "sysdm.cpl sistema nombre equipo variables entorno memoria virtual"
+
+[[tool]]
+id = "powercfg"
+name = "Opciones de energía"
+description = "powercfg.cpl: planes de energía y botones de encendido."
+group = "panel"
+icon = "power"
+run = "{System32}\\control.exe"
+args = "powercfg.cpl"
+keywords = "powercfg.cpl energia plan"
+
+[[tool]]
+id = "firewall"
+name = "Firewall de Windows"
+description = "firewall.cpl: activar, desactivar y permitir aplicaciones."
+group = "panel"
+icon = "flame"
+run = "{System32}\\control.exe"
+args = "firewall.cpl"
+keywords = "firewall.cpl cortafuegos"
+
+[[tool]]
+id = "mmsys"
+name = "Sonido"
+description = "mmsys.cpl: dispositivos de reproducción y grabación."
+group = "panel"
+icon = "volume"
+run = "{System32}\\control.exe"
+args = "mmsys.cpl"
+keywords = "mmsys.cpl sonido audio microfono altavoces"
+
+[[tool]]
+id = "inetcpl"
+name = "Opciones de Internet"
+description = "inetcpl.cpl: proxy, certificados y seguridad de conexiones."
+group = "panel"
+icon = "globe"
+run = "{System32}\\control.exe"
+args = "inetcpl.cpl"
+keywords = "inetcpl.cpl internet proxy"
+
+[[tool]]
+id = "timedate"
+name = "Fecha y hora"
+description = "timedate.cpl: zona horaria y sincronización de hora."
+group = "panel"
+icon = "calendar"
+run = "{System32}\\control.exe"
+args = "timedate.cpl"
+keywords = "timedate.cpl fecha hora zona"
+
+[[tool]]
+id = "intl"
+name = "Región"
+description = "intl.cpl: formatos de fecha, números y moneda."
+group = "panel"
+icon = "globe"
+run = "{System32}\\control.exe"
+args = "intl.cpl"
+keywords = "intl.cpl region idioma formato"
+
+[[tool]]
+id = "main"
+name = "Mouse"
+description = "main.cpl: botones, puntero y velocidad del ratón."
+group = "panel"
+icon = "mouse"
+run = "{System32}\\control.exe"
+args = "main.cpl"
+keywords = "main.cpl raton mouse puntero"
+
+[[tool]]
+id = "printers"
+name = "Dispositivos e impresoras"
+description = "Impresoras, escáneres y dispositivos conectados."
+group = "panel"
+icon = "printer"
+run = "{System32}\\control.exe"
+args = "printers"
+keywords = "impresoras printers dispositivos"
+
+[[tool]]
+id = "credentials"
+name = "Administrador de credenciales"
+description = "Contraseñas guardadas de Windows, redes y sitios."
+group = "panel"
+icon = "key"
+run = "{System32}\\control.exe"
+args = "/name Microsoft.CredentialManager"
+keywords = "credenciales contraseñas guardadas"
+
+[[tool]]
+id = "folderoptions"
+name = "Opciones de carpeta"
+description = "Mostrar archivos ocultos y extensiones."
+group = "panel"
+icon = "folder"
+run = "{System32}\\control.exe"
+args = "folders"
+keywords = "opciones carpeta ocultos extensiones"
+
+[[tool]]
+id = "indexing"
+name = "Opciones de indización"
+description = "Qué carpetas indexa la búsqueda de Windows y reconstruir el índice."
+group = "panel"
+icon = "search"
+run = "{System32}\\control.exe"
+args = "srchadmin.dll"
+keywords = "indizacion indexacion busqueda indice"
+
+[[tool]]
+id = "godmode"
+name = "Todas las opciones"
+description = "Lista completa de opciones del Panel de control (\"modo Dios\")."
+group = "panel"
+icon = "grid"
+open = "shell:::{ED7BA470-8E54-465E-825C-99712043E01C}"
+keywords = "modo dios god mode todas"
+
+# ---------- Configuración de Windows ----------
+
+[[tool]]
+id = "set-update"
+name = "Windows Update"
+description = "Buscar e instalar actualizaciones."
+group = "settings"
+icon = "download"
+open = "ms-settings:windowsupdate"
+keywords = "update actualizaciones"
+
+[[tool]]
+id = "set-apps"
+name = "Aplicaciones instaladas"
+description = "Desinstalar apps y programas desde Configuración."
+group = "settings"
+icon = "package"
+open = "ms-settings:appsfeatures"
+keywords = "aplicaciones apps desinstalar"
+
+[[tool]]
+id = "set-defaultapps"
+name = "Aplicaciones predeterminadas"
+description = "Navegador, visor de PDF y programas por defecto."
+group = "settings"
+icon = "star"
+open = "ms-settings:defaultapps"
+keywords = "predeterminadas navegador defecto"
+
+[[tool]]
+id = "set-network"
+name = "Red e Internet"
+description = "Estado de la red, restablecer red y proxy."
+group = "settings"
+icon = "network"
+open = "ms-settings:network-status"
+keywords = "red internet restablecer"
+
+[[tool]]
+id = "set-display"
+name = "Pantalla"
+description = "Resolución, escala y varios monitores."
+group = "settings"
+icon = "monitor"
+open = "ms-settings:display"
+keywords = "pantalla resolucion escala monitor"
+
+[[tool]]
+id = "set-sound"
+name = "Sonido (Configuración)"
+description = "Salida, entrada y volumen por aplicación."
+group = "settings"
+icon = "volume"
+open = "ms-settings:sound"
+keywords = "sonido audio"
+
+[[tool]]
+id = "set-bluetooth"
+name = "Bluetooth y dispositivos"
+description = "Emparejar ratones, auriculares y otros dispositivos."
+group = "settings"
+icon = "bluetooth"
+open = "ms-settings:bluetooth"
+keywords = "bluetooth dispositivos"
+
+[[tool]]
+id = "set-printers"
+name = "Impresoras y escáneres"
+description = "Añadir o quitar impresoras."
+group = "settings"
+icon = "printer"
+open = "ms-settings:printers"
+keywords = "impresoras escaneres"
+
+[[tool]]
+id = "set-power"
+name = "Inicio/apagado y suspensión"
+description = "Cuándo se apaga la pantalla y se suspende el equipo."
+group = "settings"
+icon = "power"
+open = "ms-settings:powersleep"
+keywords = "energia suspension apagado"
+
+[[tool]]
+id = "set-users"
+name = "Otros usuarios"
+description = "Cuentas de familia y otros usuarios del equipo."
+group = "settings"
+icon = "users"
+open = "ms-settings:otherusers"
+keywords = "usuarios cuentas familia"
+
+[[tool]]
+id = "set-security"
+name = "Seguridad de Windows"
+description = "Antivirus, firewall y protección del dispositivo."
+group = "settings"
+icon = "shield"
+open = "windowsdefender:"
+keywords = "defender antivirus seguridad"
+
+[[tool]]
+id = "set-activation"
+name = "Activación"
+description = "Estado de la licencia de Windows y cambio de clave."
+group = "settings"
+icon = "key"
+open = "ms-settings:activation"
+keywords = "activacion licencia clave"
+
+[[tool]]
+id = "set-storage"
+name = "Almacenamiento"
+description = "Espacio usado por categoría y Sensor de almacenamiento."
+group = "settings"
+icon = "hard-drive"
+open = "ms-settings:storagesense"
+keywords = "almacenamiento espacio sensor"
+
+[[tool]]
+id = "set-recovery"
+name = "Recuperación"
+description = "Restablecer este PC e inicio avanzado."
+group = "settings"
+icon = "undo"
+open = "ms-settings:recovery"
+keywords = "recuperacion restablecer formatear"
+
+[[tool]]
+id = "set-about"
+name = "Acerca de"
+description = "Especificaciones del equipo y cambiar el nombre."
+group = "settings"
+icon = "info"
+open = "ms-settings:about"
+keywords = "acerca nombre equipo especificaciones"
+
+# ---------- Carpetas ----------
+
+[[tool]]
+id = "f-temp"
+name = "Temporales del usuario"
+description = "Carpeta %TEMP% del usuario del equipo."
+group = "folders"
+icon = "folder"
+open = "{UserTemp}"
+keywords = "temp temporales"
+
+[[tool]]
+id = "f-wintemp"
+name = "Temporales de Windows"
+description = "C:\\Windows\\Temp."
+group = "folders"
+icon = "folder"
+open = "{Windows}\\Temp"
+keywords = "temp windows temporales"
+
+[[tool]]
+id = "f-appdata"
+name = "AppData (Roaming)"
+description = "Configuración de los programas del usuario."
+group = "folders"
+icon = "folder"
+open = "shell:AppData"
+keywords = "appdata roaming"
+
+[[tool]]
+id = "f-localappdata"
+name = "AppData (Local)"
+description = "Cachés y datos locales de los programas del usuario."
+group = "folders"
+icon = "folder"
+open = "shell:Local AppData"
+keywords = "appdata local cache"
+
+[[tool]]
+id = "f-programdata"
+name = "ProgramData"
+description = "Datos de los programas compartidos por todos los usuarios."
+group = "folders"
+icon = "folder"
+open = "{ProgramData}"
+keywords = "programdata"
+
+[[tool]]
+id = "f-startup"
+name = "Inicio (usuario)"
+description = "Programas que arrancan al iniciar sesión este usuario."
+group = "folders"
+icon = "power"
+open = "shell:startup"
+keywords = "inicio startup arranque"
+
+[[tool]]
+id = "f-common-startup"
+name = "Inicio (todos)"
+description = "Programas que arrancan para todos los usuarios."
+group = "folders"
+icon = "power"
+open = "shell:common startup"
+keywords = "inicio startup todos"
+
+[[tool]]
+id = "f-downloads"
+name = "Descargas"
+description = "Carpeta de descargas del usuario."
+group = "folders"
+icon = "download"
+open = "shell:Downloads"
+keywords = "descargas downloads"
+
+[[tool]]
+id = "f-sendto"
+name = "Enviar a"
+description = "Accesos del menú contextual \"Enviar a\"."
+group = "folders"
+icon = "folder"
+open = "shell:sendto"
+keywords = "enviar a sendto"
+
+[[tool]]
+id = "f-fonts"
+name = "Fuentes"
+description = "Fuentes instaladas en Windows."
+group = "folders"
+icon = "type"
+open = "shell:Fonts"
+keywords = "fuentes fonts tipografias"
+
+[[tool]]
+id = "f-minidump"
+name = "Volcados de pantallazos azules"
+description = "C:\\Windows\\Minidump: archivos de los pantallazos azules."
+group = "folders"
+icon = "alert"
+open = "{Windows}\\Minidump"
+requires = "{Windows}\\Minidump"
+keywords = "minidump bsod pantallazo azul volcado"
+
+[[tool]]
+id = "f-programfiles"
+name = "Archivos de programa"
+description = "Carpeta de instalación de los programas."
+group = "folders"
+icon = "folder"
+open = "{ProgramFiles}"
+keywords = "program files programas"
+
+# ---------- Arranque y recuperación ----------
+
+[[tool]]
+id = "boot-uefi"
+name = "Reiniciar a la BIOS/UEFI"
+description = "Reinicia ahora y entra directamente en la configuración del firmware."
+group = "boot"
+icon = "cpu"
+run = "{System32}\\shutdown.exe"
+args = "/r /fw /t 0"
+hidden = true
+admin = true
+confirm = "El equipo se reiniciará ahora mismo y entrará en la BIOS/UEFI. Guarda antes todo lo abierto. Solo funciona en equipos con UEFI."
+keywords = "bios uefi firmware reiniciar"
+
+[[tool]]
+id = "boot-advanced"
+name = "Inicio avanzado"
+description = "Reinicia en el menú de recuperación: modo seguro, reparar inicio, restaurar…"
+group = "boot"
+icon = "life-buoy"
+run = "{System32}\\shutdown.exe"
+args = "/r /o /t 0"
+hidden = true
+admin = true
+confirm = "El equipo se reiniciará ahora mismo en el menú de recuperación. Desde ahí: Solucionar problemas → Opciones avanzadas → Configuración de inicio → Modo seguro. Guarda antes todo lo abierto."
+keywords = "modo seguro inicio avanzado recuperacion reparar reiniciar"
+
+[[tool]]
+id = "boot-restart"
+name = "Reiniciar ahora"
+description = "Reinicia el equipo inmediatamente."
+group = "boot"
+icon = "refresh"
+run = "{System32}\\shutdown.exe"
+args = "/r /t 0"
+hidden = true
+confirm = "El equipo se reiniciará ahora mismo. Guarda antes todo lo abierto."
+keywords = "reiniciar restart"
+
+[[tool]]
+id = "recoverydrive"
+name = "Crear unidad de recuperación"
+description = "USB de recuperación para reparar o reinstalar Windows."
+group = "boot"
+icon = "usb"
+run = "{System32}\\RecoveryDrive.exe"
+keywords = "unidad recuperacion usb"
+
+# ---------- Asistencia remota ----------
+
+[[tool]]
+id = "quickassist"
+name = "Asistencia rápida"
+description = "Ayuda o recibe ayuda remota con una cuenta de Microsoft."
+group = "remote"
+icon = "handshake"
+run = "{System32}\\quickassist.exe"
+requires = "{System32}\\quickassist.exe"
+keywords = "asistencia rapida remoto quick assist"
+
+[[tool]]
+id = "msra"
+name = "Asistencia remota de Windows"
+description = "msra: invitar a alguien de confianza a conectarse."
+group = "remote"
+icon = "handshake"
+run = "{System32}\\msra.exe"
+requires = "{System32}\\msra.exe"
+keywords = "msra asistencia remota"
+
+[[tool]]
+id = "mstsc"
+name = "Escritorio remoto"
+description = "mstsc: conectarse a otro equipo por RDP."
+group = "remote"
+icon = "monitor"
+run = "{System32}\\mstsc.exe"
+keywords = "mstsc rdp escritorio remoto"
+
+[[tool]]
+id = "set-remotedesktop"
+name = "Permitir escritorio remoto"
+description = "Activar el acceso por RDP a este equipo (Windows Pro)."
+group = "remote"
+icon = "settings"
+open = "ms-settings:remotedesktop"
+keywords = "rdp escritorio remoto permitir"
