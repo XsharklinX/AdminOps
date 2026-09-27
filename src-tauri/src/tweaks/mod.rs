@@ -68,6 +68,35 @@ impl TweakState {
         Ok(())
     }
 
+    /// Tareas que puede ejecutar el mantenimiento programado: solo limpiezas.
+    pub fn maintenance_tasks(&self) -> Vec<(String, String)> {
+        self.catalog
+            .iter()
+            .filter(|t| t.category == "cleanup" && t.kind == Kind::Action && t.supported_on(self.build))
+            .map(|t| (t.id.clone(), t.name.clone()))
+            .collect()
+    }
+
+    /// Ejecuta una limpieza sin interfaz (mantenimiento programado) y la anota en el diario.
+    pub fn run_maintenance_task(&self, id: &str) -> Result<String, String> {
+        let t = self.find(id)?;
+        if t.category != "cleanup" || t.kind != Kind::Action {
+            return Err(format!("{id} no es una tarea de limpieza."));
+        }
+        self.check_can_modify(t)?;
+        let mut e = entry(Op::Run, Some(&t.id), &format!("{} (mantenimiento programado)", t.name));
+        let result = engine::run_action(t, None);
+        match &result {
+            Ok(msg) => e.message = Some(msg.clone()),
+            Err(err) => {
+                e.ok = false;
+                e.message = Some(err.clone());
+            }
+        }
+        self.log(e);
+        result
+    }
+
     fn log(&self, e: Entry) -> u64 {
         self.journal.lock().unwrap().push(e)
     }

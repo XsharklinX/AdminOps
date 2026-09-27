@@ -65,6 +65,15 @@ impl LocalUser {
         &self.name
     }
 
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// administrator | guest | default | wdag
+    pub fn builtin_kind(&self) -> Option<&'static str> {
+        self.builtin
+    }
+
     /// Administrador local activo con el que se podría entrar sin dominio.
     pub fn is_active_local_admin(&self) -> bool {
         self.admin && self.enabled && !matches!(self.builtin, Some("default" | "wdag" | "guest"))
@@ -534,5 +543,11 @@ mod tests {
         assert!(!users.is_empty());
         assert!(users.iter().any(|u| u.builtin == Some("administrator")));
         assert!(users.iter().any(|u| u.admin), "{users:#?}");
+    }
+
+    #[test]
+    fn embedded_scripts_parse() {
+        let errors = crate::ps::parse_errors(LIST_SCRIPT);
+        assert!(errors.is_empty(), "LIST_SCRIPT: {errors}");
     }
 }

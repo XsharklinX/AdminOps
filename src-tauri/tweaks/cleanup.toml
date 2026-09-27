@@ -165,3 +165,51 @@ Start-Service bits -ErrorAction SilentlyContinue
 $freed = [math]::Max(0, $before - (& $size))
 'Liberados {0:N1} MB' -f ($freed / 1MB)
 '''
+
+[[tweak]]
+id = "cleanup.browser-cache"
+name = "Limpiar caché de los navegadores"
+description = "Borra la caché de Chrome, Edge, Brave, Opera y Firefox en todos los perfiles del usuario. No toca contraseñas, historial, cookies ni marcadores."
+category = "cleanup"
+risk = "low"
+kind = "action"
+note = "Los navegadores abiertos se omiten: ciérralos y repite para limpiarlos también."
+
+[tweak.script]
+run = '''
+$sub = 'Cache', 'Code Cache', 'GPUCache', 'Service Worker\CacheStorage', 'Service Worker\ScriptCache'
+$chromium = @(
+  @{ n = 'Chrome'; p = 'chrome'; root = Join-Path $UserLocalAppData 'Google\Chrome\User Data' },
+  @{ n = 'Edge'; p = 'msedge'; root = Join-Path $UserLocalAppData 'Microsoft\Edge\User Data' },
+  @{ n = 'Brave'; p = 'brave'; root = Join-Path $UserLocalAppData 'BraveSoftware\Brave-Browser\User Data' },
+  @{ n = 'Opera'; p = 'opera'; root = Join-Path $UserLocalAppData 'Opera Software' }
+)
+$freed = 0; $done = @(); $skipped = @()
+function Clear-Dir($d) {
+  if (-not (Test-Path -LiteralPath $d)) { return 0 }
+  $size = (Get-ChildItem -LiteralPath $d -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+  Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue
+  [double]$size
+}
+foreach ($b in $chromium) {
+  if (-not (Test-Path -LiteralPath $b.root)) { continue }
+  if (Get-Process $b.p -ErrorAction SilentlyContinue) { $skipped += $b.n; continue }
+  $profiles = @(Get-ChildItem -LiteralPath $b.root -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' -or $_.Name -like 'Opera*' })
+  foreach ($pr in $profiles) { foreach ($s in $sub) { $freed += Clear-Dir (Join-Path $pr.FullName $s) } }
+  $done += $b.n
+}
+$ff = Join-Path $UserLocalAppData 'Mozilla\Firefox\Profiles'
+if (Test-Path -LiteralPath $ff) {
+  if (Get-Process firefox -ErrorAction SilentlyContinue) { $skipped += 'Firefox' }
+  else {
+    Get-ChildItem -LiteralPath $ff -Directory -ErrorAction SilentlyContinue | ForEach-Object { $freed += Clear-Dir (Join-Path $_.FullName 'cache2') }
+    $done += 'Firefox'
+  }
+}
+if (-not $done -and -not $skipped) { 'No se encontró ningún navegador compatible.'; return }
+$msg = 'Liberados {0:N1} MB' -f ($freed / 1MB)
+if ($done) { $msg += " ($($done -join ', '))" }
+if ($skipped) { $msg += ". Abiertos, no se tocaron: $($skipped -join ', ')" }
+$msg
+'''

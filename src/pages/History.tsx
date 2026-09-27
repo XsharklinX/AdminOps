@@ -16,6 +16,7 @@ import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Card } from "../components/ui";
 import { appApi, tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
+import { RestoreStorageCard } from "../components/Maintenance";
 
 const OP = {
   apply: { label: "Aplicado", icon: Wrench },
@@ -106,6 +107,7 @@ export function History({ isAdmin }: { isAdmin: boolean }) {
           {creating ? "Creando punto de restauración…" : "Crear punto ahora"}
         </button>
         <TaskStatus task="restore-point" active={creating} fallback="Creando…" className="-mt-2 mb-4" />
+        <RestoreStorageCard isAdmin={isAdmin} />
         {!isAdmin ? (
           <p className="text-xs text-warn">Requiere ejecutar como administrador.</p>
         ) : pointsError ? (

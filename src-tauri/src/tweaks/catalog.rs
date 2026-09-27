@@ -9,6 +9,7 @@ const FILES: &[(&str, &str)] = &[
     ("cleanup.toml", include_str!("../../tweaks/cleanup.toml")),
     ("performance.toml", include_str!("../../tweaks/performance.toml")),
     ("repair.toml", include_str!("../../tweaks/repair.toml")),
+    ("security.toml", include_str!("../../tweaks/security.toml")),
 ];
 
 pub fn load() -> Vec<Tweak> {
@@ -82,5 +83,32 @@ mod tests {
         assert!(!tweaks.is_empty());
         let errors = super::validate(&tweaks);
         assert!(errors.is_empty(), "{errors:#?}");
+    }
+
+    /// Analiza (sin ejecutar) todos los scripts del catálogo con el parser de
+    /// PowerShell: un error de sintaxis se detecta aquí y no en el equipo de un cliente.
+    #[test]
+    fn scripts_parse() {
+        let parse = |code: &str| {
+            let probe = format!(
+                "{}$e = $null; [void][System.Management.Automation.Language.Parser]::ParseInput($code, [ref]$null, [ref]$e)
+                 ($e | ForEach-Object {{ \"$($_.Extent.StartLineNumber): $($_.Message)\" }}) -join ' | '",
+                crate::ps::text_var("code", code)
+            );
+            crate::pspool::query(&probe, None, "t").unwrap()
+        };
+        // La comprobación de verdad detecta errores.
+        assert!(!parse("if ($x -eq 1 { 'a' }").trim().is_empty());
+        let mut checked = 0;
+        for t in super::load() {
+            let Some(sc) = &t.script else { continue };
+            for (part, code) in [("detect", &sc.detect), ("apply", &sc.apply), ("revert", &sc.revert), ("run", &sc.run)] {
+                let Some(code) = code else { continue };
+                let errors = parse(code);
+                assert!(errors.trim().is_empty(), "{} ({part}): {errors}", t.id);
+                checked += 1;
+            }
+        }
+        assert!(checked >= 25, "solo {checked} scripts");
     }
 }

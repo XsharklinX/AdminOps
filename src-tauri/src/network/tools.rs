@@ -356,4 +356,12 @@ mod tests {
         }
         println!("destino: {:?}", echo(Ipv4Addr::new(1, 1, 1, 1), 128, 1500));
     }
+
+    #[test]
+    fn embedded_scripts_parse() {
+        for (name, script) in [("PORTS_SCRIPT", PORTS_SCRIPT), ("DNS_SCRIPT", DNS_SCRIPT)] {
+            let errors = crate::ps::parse_errors(script);
+            assert!(errors.is_empty(), "{name}: {errors}");
+        }
+    }
 }

@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.14.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-0.16.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -43,6 +43,9 @@ aplicaciones que fallan, drivers con error, batería, Defender, Windows Update, 
 Cada hallazgo viene priorizado y con **un botón para resolverlo**. En los pantallazos azules señala el **driver probable** analizando los volcados de memoria. Los análisis se guardan para comparar el antes y el después.
 
 <img src="docs/screenshots/diagnostics.png" alt="Diagnóstico" width="860" />
+
+### 🛡️ Seguridad
+Una **nota de seguridad de 0 a 100** con cada punto explicado y un botón para arreglarlo: antivirus, firewall, UAC, BitLocker, SMB1, escritorio remoto, cuentas y programas de riesgo desactualizados. Guarda las **claves de recuperación de BitLocker** en un USB, busca elementos sospechosos (tareas, servicios e inicio con malware típico, archivo hosts) y lista las extensiones de los navegadores. La nota aparece en el informe con el antes y el después.
 
 ### 🖥️ Hardware
 Inventario completo (placa base, BIOS, CPU, RAM por módulo, GPU, discos, monitores), **sensores en vivo**
@@ -82,6 +85,8 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | **Inicio** | Controla qué arranca con Windows (igual que el Administrador de tareas, sin borrar nada). |
 | **Actualizar software** | Detecta programas desactualizados y los actualiza con winget. |
 | **Instalar programas** | Tras formatear: marca Chrome, 7-Zip, VLC, AnyDesk… (o una lista guardada) y se instalan todos solos con winget. |
+| **Desinstalar programas** | Desinstala en silencio o con su asistente y envía a la papelera las carpetas que quedan. Limpia entradas huérfanas. |
+| **Windows Update** | Historial con cada error explicado, pausar/reanudar, buscar pendientes y ocultar una actualización problemática. |
 | **Espacio en disco** | Analiza qué carpetas ocupan más, muy rápido incluso en discos grandes. |
 
 ### 🧰 Servicio técnico

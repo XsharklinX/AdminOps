@@ -11,6 +11,7 @@ const CATEGORY_PAGE: Record<string, PageId> = {
   repair: "repair",
   services: "services",
   cleanup: "cleanup",
+  security: "security",
 };
 
 const KIND_LABEL = { page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción" };

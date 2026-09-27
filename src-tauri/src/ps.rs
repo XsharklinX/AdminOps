@@ -208,6 +208,18 @@ pub fn text_var(var: &str, value: &str) -> String {
     )
 }
 
+/// Errores de sintaxis de un script según el parser de PowerShell (vacío = correcto).
+/// No lo ejecuta. Para los tests de los módulos con scripts incrustados.
+#[cfg(test)]
+pub fn parse_errors(script: &str) -> String {
+    let probe = format!(
+        "{}$e = $null; [void][System.Management.Automation.Language.Parser]::ParseInput($code, [ref]$null, [ref]$e)
+         ($e | ForEach-Object {{ \"$($_.Extent.StartLineNumber): $($_.Message)\" }}) -join ' | '",
+        text_var("code", script)
+    );
+    crate::pspool::query(&probe, None, "parse").unwrap().trim().to_string()
+}
+
 /// Ejecuta un programa del sistema (sc.exe, winget…) sin ventana.
 pub fn exec(program: &str, args: &[&str]) -> Result<String, String> {
     exec_opts(program, args, Opts::default())

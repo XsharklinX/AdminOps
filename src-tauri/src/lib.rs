@@ -4,6 +4,7 @@ mod domain;
 mod drivers;
 mod elevation;
 mod hardware;
+mod maintenance;
 mod metrics;
 mod migrate;
 mod network;
@@ -11,6 +12,8 @@ mod paths;
 mod portals;
 mod printers;
 mod processes;
+mod programs;
+mod security;
 mod software;
 mod support;
 mod space;
@@ -23,6 +26,7 @@ mod toolbox;
 mod tweaks;
 mod users;
 mod window_state;
+mod winupdate;
 mod workflow;
 
 use tauri::Manager;
@@ -36,6 +40,10 @@ pub fn run() {
         let out = args.get(i + 1).map_or("roundtrip.json", String::as_str);
         let only = args.iter().position(|a| a == "--only").and_then(|j| args.get(j + 1)).map(String::as_str);
         std::process::exit(tweaks::roundtrip::run(out, only));
+    }
+    // Mantenimiento programado (lo lanza la tarea del sistema, sin ventana).
+    if args.iter().any(|a| a == "--maintenance") {
+        std::process::exit(maintenance::run_cli(&args));
     }
 
     // Portable: la caché de WebView2 al USB (WebView2 respeta esta variable).
@@ -168,6 +176,29 @@ pub fn run() {
             printers::print_test_page,
             printers::set_default_printer,
             printers::remove_printer,
+            maintenance::boot_analysis,
+            maintenance::restore_storage,
+            maintenance::delete_old_restore_points,
+            maintenance::list_driver_backups,
+            maintenance::restore_drivers,
+            maintenance::maintenance_schedule,
+            maintenance::set_maintenance_schedule,
+            security::security_audit,
+            security::bitlocker_status,
+            security::bitlocker_keys,
+            security::bitlocker_export,
+            security::suspicious_items,
+            security::disable_task,
+            security::browser_extensions,
+            winupdate::update_history,
+            winupdate::update_pause_state,
+            winupdate::update_pause,
+            winupdate::pending_updates,
+            winupdate::set_update_hidden,
+            programs::list_programs,
+            programs::uninstall_program,
+            programs::remove_leftovers,
+            programs::remove_orphan_entry,
             processes::list_processes,
             processes::kill_process,
             processes::open_process_location,

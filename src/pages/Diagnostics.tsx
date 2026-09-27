@@ -29,6 +29,7 @@ import {
   type Tool,
 } from "../lib/api";
 import { bytes } from "../lib/format";
+import { DriverRestoreButton } from "../components/Maintenance";
 
 // El análisis tarda unos segundos: se conserva al cambiar de página, y una
 // ejecución en curso se comparte (StrictMode monta los efectos dos veces).
@@ -430,6 +431,7 @@ export function Diagnostics({
                 >
                   Copia de drivers <ArrowRight size={10} />
                 </button>
+                <DriverRestoreButton />
                 <ToolButton tool="deviceManager" label="Dispositivos" onOpen={openTool} />
               </div>
             }

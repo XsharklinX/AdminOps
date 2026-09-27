@@ -128,6 +128,9 @@ pub struct Diagnostics {
     /// Temperaturas en el momento del análisis.
     #[serde(default)]
     pub temperatures: Section<Temperatures>,
+    /// Auditoría de seguridad con nota 0-100. Ausente en análisis antiguos.
+    #[serde(default)]
+    pub security: Section<crate::security::Audit>,
     pub tweaks_applied: usize,
     pub findings: Vec<Finding>,
 }
@@ -249,6 +252,19 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                 f.push(finding(Warn, "Discos", format!("{}: {errors} errores de lectura/escritura", k.name), None).with(vec![disks_detail()]));
             }
         }
+    }
+
+    if let Some(a) = d.security.data.as_ref().filter(|a| a.score < 80) {
+        let weak: Vec<&str> = a.checks.iter().filter(|c| c.status == "bad" || c.status == "warn").map(|c| c.label.as_str()).take(4).collect();
+        f.push(
+            finding(
+                if a.score < 60 { Bad } else { Warn },
+                "Seguridad",
+                format!("Nota de seguridad {}/100", a.score),
+                Some(format!("A mejorar: {}.", weak.join(", "))),
+            )
+            .with(vec![page("Ver seguridad", "security", None)]),
+        );
     }
 
     if let Some(s) = &d.stability.data {
@@ -573,7 +589,7 @@ fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
     volumes.sort_by(|a, b| a.mount.cmp(&b.mount));
 
     // Todos los recolectores en paralelo: el total es el del más lento, no la suma.
-    let (disks, stability, drivers, battery, system, startup, bloat, updates, hw, tweaks_applied) = std::thread::scope(|s| {
+    let (disks, stability, drivers, battery, system, startup, bloat, updates, hw, tweaks_applied, sec) = std::thread::scope(|s| {
         let disks = s.spawn(collect::disks);
         let stability = s.spawn(collect::stability);
         let drivers = s.spawn(collect::drivers);
@@ -591,6 +607,7 @@ fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
             )
         });
         let tweaks = s.spawn(|| state.applied_count());
+        let sec = s.spawn(|| (crate::security::extra(), crate::security::accounts()));
         (
             join(disks.join()),
             join(stability.join()),
@@ -602,7 +619,13 @@ fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
             join(updates.join()),
             hw.join().unwrap_or_else(|_| (failed(), failed(), failed(), failed())),
             tweaks.join().unwrap_or(0),
+            sec.join().unwrap_or_else(|_| (failed(), None)),
         )
+    });
+    // La nota reutiliza lo ya recogido (antivirus, actualizaciones, programas).
+    let security: Result<crate::security::Audit, String> = sec.0.map(|x| {
+        let vulnerable = updates.as_ref().map(|u| u.iter().filter(|p| crate::security::is_risky(&p.id)).cloned().collect()).unwrap_or_default();
+        crate::security::evaluate(system.as_ref().ok(), &x, sec.1.as_ref(), vulnerable)
     });
 
     let mut d = Diagnostics {
@@ -625,6 +648,7 @@ fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
         smart: hw.1.into(),
         memory_test: hw.2.into(),
         temperatures: hw.3.into(),
+        security: security.into(),
         tweaks_applied,
         findings: vec![],
     };

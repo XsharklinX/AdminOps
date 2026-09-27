@@ -431,4 +431,10 @@ mod tests {
         println!("{s:#?}");
         assert!(!s.computer_name.is_empty());
     }
+
+    #[test]
+    fn embedded_scripts_parse() {
+        let errors = crate::ps::parse_errors(STATUS_SCRIPT);
+        assert!(errors.is_empty(), "STATUS_SCRIPT: {errors}");
+    }
 }

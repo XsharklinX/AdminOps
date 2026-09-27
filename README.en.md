@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-0.14.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-0.16.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Download](https://img.shields.io/badge/download-installer%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -46,6 +46,9 @@ faulty drivers, battery, Defender, Windows Update, activation and TPM.
 Every finding is prioritized and comes with **a button to fix it**. For blue screens it points to the **likely driver** by analyzing the memory dumps. Scans are saved so you can compare before and after.
 
 <img src="docs/screenshots/diagnostics.png" alt="Diagnostics" width="860" />
+
+### 🛡️ Security
+A **0-100 security score** with every point explained and a button to fix it: antivirus, firewall, UAC, BitLocker, SMB1, remote desktop, accounts and outdated high-risk software. Saves the **BitLocker recovery keys** to a USB drive, looks for suspicious items (tasks, services and startup entries typical of malware, hosts file) and lists browser extensions. The score is included in the report, before and after.
 
 ### 🖥️ Hardware
 Full inventory (motherboard, BIOS, CPU, RAM per module, GPU, disks, monitors), **live sensors**
@@ -85,6 +88,8 @@ or build your own. One restore point per profile, and it can be undone as a whol
 | **Startup** | Controls what runs at boot (same as Task Manager, nothing gets deleted). |
 | **Software updates** | Finds outdated programs and updates them with winget. |
 | **Install software** | After a clean install: tick Chrome, 7-Zip, VLC, AnyDesk… (or a saved list) and they all install unattended with winget. |
+| **Uninstall software** | Silent or guided uninstall, then sends leftover folders to the Recycle Bin. Cleans orphan entries. |
+| **Windows Update** | History with every error explained, pause/resume, find pending updates and hide a problematic one. |
 | **Disk space** | Shows which folders take the most space, very fast even on large disks. |
 
 ### 🧰 Tech support

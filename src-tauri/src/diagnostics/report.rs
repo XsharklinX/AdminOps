@@ -119,10 +119,11 @@ fn comparison(h: &mut String, cur: &Diagnostics, base: &Diagnostics) {
         }
     }
     let count = |d: &Diagnostics, f: fn(&Diagnostics) -> Option<usize>| f(d);
-    let metrics: [Metric; 6] = [
+    let metrics: [Metric; 7] = [
         ("Programas que arrancan con Windows", |d| d.startup_enabled.data.as_ref().map(Vec::len), false),
         ("Apps promocionales instaladas", |d| d.bloat_installed.data.as_ref().map(Vec::len), false),
         ("Ajustes de optimización aplicados", |d| Some(d.tweaks_applied), true),
+        ("Nota de seguridad (0-100)", |d| d.security.data.as_ref().map(|a| a.score as usize), true),
         ("Programas con actualizaciones pendientes", |d| d.software_updates.data.as_ref().map(Vec::len), false),
         ("Problemas críticos", |d| Some(d.findings.iter().filter(|f| f.severity == Severity::Bad).count()), false),
         ("Advertencias", |d| Some(d.findings.iter().filter(|f| f.severity == Severity::Warn).count()), false),
@@ -468,6 +469,21 @@ fn build(c: &Ctx) -> String {
         let _ = write!(h, "<h2>Software con actualizaciones pendientes ({})</h2><table><tr><th>Programa</th><th>Instalada</th><th>Disponible</th></tr>", updates.len());
         for u in updates.iter().take(40) {
             let _ = write!(h, "<tr><td>{}</td><td class=num>{}</td><td class=num>{}</td></tr>", esc(&u.name), esc(&u.version), esc(&u.available));
+        }
+        h.push_str("</table>");
+    }
+
+    // Nota de seguridad
+    if let Some(a) = &d.security.data {
+        let verdict = if a.score >= 80 { "bien protegido" } else if a.score >= 60 { "mejorable" } else { "en riesgo" };
+        let _ = write!(h, "<h2>Seguridad: {}/100 ({verdict})</h2><table>", a.score);
+        for c in a.checks.iter().filter(|c| c.status != "unknown") {
+            let mark = match c.status.as_str() {
+                "ok" => "<span class=better>Correcto</span>",
+                "warn" => "<span class=warn>Mejorable</span>",
+                _ => "<span class=worse>Riesgo</span>",
+            };
+            let _ = write!(h, "<tr><th>{}</th><td>{mark}</td><td>{}</td></tr>", esc(&c.label), esc(&c.detail));
         }
         h.push_str("</table>");
     }

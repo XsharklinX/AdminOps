@@ -18,11 +18,14 @@ import {
   History,
   Layers,
   Package,
+  PackageMinus,
   PackagePlus,
   Power,
+  RefreshCcw,
   Printer,
   Settings as SettingsIcon,
   Search,
+  ShieldCheck,
   ShieldHalf,
   Star,
   Stethoscope,
@@ -40,6 +43,7 @@ export type PageId =
   | "dashboard"
   | "processes"
   | "diagnostics"
+  | "security"
   | "hardware"
   | "network"
   | "nettools"
@@ -53,6 +57,8 @@ export type PageId =
   | "startup"
   | "software"
   | "install"
+  | "uninstall"
+  | "winupdate"
   | "session"
   | "tickets"
   | "domain"
@@ -79,6 +85,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "dashboard", label: "Panel", icon: Activity },
       { id: "processes", label: "Procesos", icon: Cpu },
       { id: "diagnostics", label: "Diagnóstico", icon: Stethoscope },
+      { id: "security", label: "Seguridad", icon: ShieldCheck },
       { id: "hardware", label: "Hardware", icon: CircuitBoard },
       { id: "network", label: "Red y velocidad", icon: Wifi },
       { id: "nettools", label: "Herramientas de red", icon: Waypoints },
@@ -97,6 +104,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "startup", label: "Inicio", icon: Power },
       { id: "software", label: "Actualizar software", icon: Download },
       { id: "install", label: "Instalar programas", icon: PackagePlus },
+      { id: "uninstall", label: "Desinstalar programas", icon: PackageMinus },
+      { id: "winupdate", label: "Windows Update", icon: RefreshCcw },
     ],
   },
   {

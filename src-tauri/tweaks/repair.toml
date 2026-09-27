@@ -199,3 +199,93 @@ $found = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { 
 if ($found.Count) { "Análisis completado: $($found.Count) amenaza(s) detectada(s). Revísalas en Seguridad de Windows." }
 else { 'Análisis rápido completado: no se encontraron amenazas.' }
 '''
+
+[[tweak]]
+id = "repair.store-reset"
+name = "Restablecer Microsoft Store"
+description = "Vacía la caché de la Store (wsreset). Soluciona descargas atascadas, errores al abrirla y apps que no se actualizan."
+category = "repair"
+risk = "low"
+kind = "action"
+note = "Al terminar se abre la Microsoft Store."
+timeout = 300
+
+[tweak.script]
+run = '''
+$p = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WSReset.exe') -PassThru -WindowStyle Hidden
+if (-not $p.WaitForExit(240000)) { throw 'wsreset no terminó en 4 minutos.' }
+'Caché de Microsoft Store restablecida.'
+'''
+
+[[tweak]]
+id = "repair.search-index"
+name = "Reconstruir la búsqueda de Windows"
+description = "Reinicia el servicio de búsqueda y reconstruye el índice. Para cuando el menú Inicio o el Explorador no encuentran archivos o programas."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+note = "Tras reconstruir, la búsqueda tarda un rato (de minutos a horas según los archivos) en volver a encontrarlo todo."
+
+[tweak.script]
+run = '''
+Stop-Service WSearch -Force -ErrorAction Stop
+Set-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Search' -Name SetupCompletedSuccessfully -Value 0 -Type DWord
+Set-Service WSearch -StartupType Automatic
+Start-Service WSearch
+'Índice de búsqueda en reconstrucción.'
+'''
+
+[[tweak]]
+id = "repair.audio"
+name = "Reiniciar el audio"
+description = "Reinicia los servicios de audio de Windows. Soluciona el sonido que desaparece, el icono de altavoz con una X o dispositivos que no aparecen."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+Restart-Service AudioEndpointBuilder -Force -ErrorAction Stop
+Start-Service Audiosrv -ErrorAction SilentlyContinue
+if ((Get-Service Audiosrv).Status -ne 'Running') { throw 'El servicio de audio no arrancó: revisa el driver de sonido en el Administrador de dispositivos.' }
+'Servicios de audio reiniciados.'
+'''
+
+[[tweak]]
+id = "repair.temp-profile"
+name = "Reparar perfil temporal"
+description = "Arregla el aviso «Se inició sesión con un perfil temporal»: recupera el perfil real del usuario en el registro (claves .bak de ProfileList). No borra archivos."
+category = "repair"
+risk = "high"
+kind = "action"
+admin = true
+note = "Hazlo desde otra cuenta de administrador: el usuario afectado no debe tener la sesión abierta. Después, que entre de nuevo."
+
+[tweak.script]
+run = '''
+$list = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList'
+$fixed = @(); $busy = @()
+foreach ($k in @(Get-ChildItem $list | Where-Object { $_.PSChildName -like 'S-1-5-21-*.bak' })) {
+  $sid = $k.PSChildName -replace '\.bak$', ''
+  $real = [Environment]::ExpandEnvironmentVariables((Get-ItemProperty $k.PSPath).ProfileImagePath)
+  if (-not $real -or -not (Test-Path -LiteralPath $real)) { continue }   # sin carpeta de perfil real
+  $cur = Join-Path $list $sid
+  if (Test-Path $cur) {
+    $curPath = [Environment]::ExpandEnvironmentVariables((Get-ItemProperty $cur).ProfileImagePath)
+    # Las dos claves apuntan a perfiles válidos: no es el fallo conocido, no se toca.
+    if ($curPath -notmatch '\TEMP(\.[^\]*)?$' -and (Test-Path -LiteralPath $curPath)) { continue }
+  }
+  $loaded = (Get-CimInstance Win32_UserProfile -Filter "SID='$sid'" -ErrorAction SilentlyContinue).Loaded
+  if ($loaded) { $busy += Split-Path $real -Leaf; continue }
+  if (Test-Path $cur) { Remove-Item $cur -Recurse -Force }
+  Rename-Item $k.PSPath -NewName $sid
+  Set-ItemProperty (Join-Path $list $sid) -Name State -Value 0 -Type DWord
+  Set-ItemProperty (Join-Path $list $sid) -Name RefCount -Value 0 -Type DWord
+  $fixed += Split-Path $real -Leaf
+}
+if ($busy) { throw "Sesión abierta: $($busy -join ', '). Cierra su sesión y repite desde otra cuenta de administrador." }
+if ($fixed) { "Perfil reparado: $($fixed -join ', '). El usuario ya puede volver a iniciar sesión." }
+else { 'No se encontró ningún perfil dañado.' }
+'''

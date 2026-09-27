@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TweakCard } from "../components/TweakCard";
 import { RP_FAILED, tweaksApi, type OpResult, type TweakView } from "../lib/api";
+import { ScheduleCard } from "../components/Maintenance";
 
 const CANCELLED = "Cancelado por el usuario.";
 
@@ -151,6 +152,7 @@ export function TweaksPage({ category, isAdmin, focus }: { category: string; isA
 
   return (
     <div className="mx-auto max-w-4xl p-6">
+      {category === "cleanup" && <ScheduleCard isAdmin={isAdmin} />}
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-dim">
           {toggles.length > 0 ? (

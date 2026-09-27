@@ -121,4 +121,10 @@ mod tests {
         println!("{v:#?}");
         assert!(v.iter().any(|p| p.is_virtual), "Microsoft Print to PDF suele existir siempre");
     }
+
+    #[test]
+    fn embedded_scripts_parse() {
+        let errors = crate::ps::parse_errors(super::LIST_SCRIPT);
+        assert!(errors.is_empty(), "LIST_SCRIPT: {errors}");
+    }
 }

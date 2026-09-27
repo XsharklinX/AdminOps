@@ -34,6 +34,9 @@ const Printers = lazyPage("Printers", () => import("./pages/Printers"));
 const Migrate = lazyPage("Migrate", () => import("./pages/Migrate"));
 const Tickets = lazyPage("Tickets", () => import("./pages/Tickets"));
 const Domain = lazyPage("Domain", () => import("./pages/Domain"));
+const Uninstall = lazyPage("Uninstall", () => import("./pages/Uninstall"));
+const Security = lazyPage("Security", () => import("./pages/Security"));
+const WindowsUpdate = lazyPage("WindowsUpdate", () => import("./pages/WindowsUpdate"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
 
 /** Páginas que son una lista de ajustes del catálogo, por categoría. */
@@ -176,6 +179,9 @@ export default function App() {
   else if (page === "migrate") content = <Migrate />;
   else if (page === "tickets") content = <Tickets covered={aboutOpen || paletteOpen || onboarding} />;
   else if (page === "domain") content = <Domain isAdmin={!!isAdmin} />;
+  else if (page === "uninstall") content = <Uninstall isAdmin={!!isAdmin} />;
+  else if (page === "security") content = <Security isAdmin={!!isAdmin} focus={focus} onNavigate={navigate} />;
+  else if (page === "winupdate") content = <WindowsUpdate isAdmin={!!isAdmin} />;
   else if (page === "settings") content = <SettingsPage appInfo={appInfo} />;
   else if (category) content = <TweaksPage key={category} category={category} isAdmin={!!isAdmin} focus={focus} />;
   else content = null;

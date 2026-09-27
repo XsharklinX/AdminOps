@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { Switch } from "../components/TweakCard";
 import { systemApi, type StartupItem } from "../lib/api";
+import { BootCard } from "../components/Maintenance";
 
 const SOURCE_LABEL = { registry: "Registro", folder: "Carpeta", task: "Tarea" };
 
@@ -58,6 +59,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="mx-auto max-w-5xl p-6">
+      <BootCard />
       <div className="mb-4 flex items-center gap-3">
         <p className="text-sm text-dim">
           <span className="font-mono text-neon">{enabled}</span> de {items.length} arrancan con Windows

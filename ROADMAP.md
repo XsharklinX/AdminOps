@@ -1,12 +1,12 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v0.14.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v0.16.0**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
 ---
 
-## Hecho (v0.1 – v0.14)
+## Hecho (v0.1 – v0.16)
 
 | Fase | Versión | Contenido |
 |---|---|---|
@@ -24,6 +24,8 @@ conocida y las próximas fases en orden de prioridad. Cada fase tiene un criteri
 | 12. Después de formatear | 0.12 | Instalar programas en lote (winget, listas propias), copia y restauración de datos del usuario, herramientas de red (ping/traza, DNS, puertos, hosts), impresoras, driver probable de los pantallazos azules |
 | 13. Entorno corporativo | 0.13 | Tickets (portales web dentro de la app, incrustados o en ventana, con sesión y contraseña recordadas), dominio (estado, comprobaciones previas, unir, salir, reparar relación de confianza, renombrar), paracaídas de errores de la interfaz |
 | 14. Orden y pulido | 0.14 | Búsqueda global Ctrl+K, barra lateral plegable con favoritos y grupos reordenados, asistente de primer arranque, ventana y última página recordadas, historial Alt+←/→, notificaciones al terminar tareas largas, portable sin rastro de WebView2, paquete de soporte |
+| 15. Mantenimiento a fondo | 0.15 | Desinstalador con restos a la papelera, Windows Update (historial explicado, pausar, ocultar), análisis del arranque, restaurar drivers, caché de navegadores, reparaciones de Store, búsqueda, audio y perfil temporal, espacio de puntos de restauración, mantenimiento programado |
+| 16. Seguridad del equipo | 0.16 | Nota 0-100 con arreglos, 8 ajustes de seguridad reversibles, BitLocker y copia de claves, programas de riesgo, elementos sospechosos, extensiones de navegador, nota en diagnóstico e informe |
 
 ### Fase 6 en detalle
 
@@ -193,7 +195,7 @@ Objetivo: pasar de "herramienta muy completa" a **producto profesional y redondo
 **Terminado cuando:** cualquier función se alcanza en dos pulsaciones y un usuario nuevo llega a su
 primer informe sin instrucciones.
 
-### Fase 15 — Mantenimiento a fondo (v0.15)
+### Fase 15 — Mantenimiento a fondo (v0.15) ✅
 
 **Prioridad: alta.** Resolver el "PC lento" completo sin salir de AdminOps.
 
@@ -209,10 +211,14 @@ primer informe sin instrucciones.
   archivos, perfil de usuario dañado (el que inicia con perfil temporal).
 - **Puntos de restauración**: ver cuánto ocupan y borrar los antiguos.
 - **Mantenimiento programado** opcional (limpieza semanal/mensual como tarea del sistema).
+- Hecho además: prueba que analiza la sintaxis de todos los scripts de PowerShell (catálogo e incrustados)
+  sin ejecutarlos; encontró un fallo real (`Data` es palabra reservada) antes de publicarse.
+- Pendiente de probar en equipos reales: desinstalar, ocultar una actualización, restaurar drivers y la
+  tarea programada (se ejecuta como SYSTEM con `adminops.exe --maintenance`).
 
 **Terminado cuando:** las tareas habituales de mantenimiento no requieren ninguna otra herramienta.
 
-### Fase 16 — Seguridad del equipo (v0.16)
+### Fase 16 — Seguridad del equipo (v0.16) ✅
 
 **Prioridad: alta.** Muy valorado por clientes y empresas, y fácil de explicar en el informe.
 
@@ -226,6 +232,9 @@ primer informe sin instrucciones.
 - **Elementos sospechosos**: tareas programadas, servicios e inicio sin firma o en carpetas temporales;
   extensiones de navegador instaladas; archivo hosts modificado.
 - **Sección de seguridad en el informe** con la nota antes y después.
+- Hecho además: categoría de ajustes `security` (firewall, UAC, SMB1, NLA, RDP, ejecución automática,
+  Invitado, bloqueo de PUA), todos reversibles; hallazgo en el diagnóstico si la nota baja de 80.
+- Pendiente de probar en equipos reales: exportar claves de BitLocker y desactivar una tarea sospechosa.
 
 **Terminado cuando:** el técnico entrega una nota de seguridad comprensible y mejorada en cada visita.
 

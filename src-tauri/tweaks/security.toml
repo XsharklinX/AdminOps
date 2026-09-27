@@ -1,0 +1,167 @@
+# Ajustes de seguridad (página Seguridad). Todos se pueden deshacer desde el Historial.
+# Los enlaza la auditoría de seguridad (src/security.rs) como forma de subir la nota.
+
+[[tweak]]
+id = "security.firewall-on"
+name = "Activar el Firewall de Windows"
+description = "Enciende el firewall en los perfiles de dominio, privado y público. Sin él, cualquier programa con puertos abiertos queda expuesto a la red."
+category = "security"
+risk = "low"
+admin = true
+
+[tweak.script]
+detect = '''
+@(Get-NetFirewallProfile | Where-Object { -not $_.Enabled }).Count -eq 0
+'''
+apply = '''
+$off = @(Get-NetFirewallProfile | Where-Object { -not $_.Enabled } | ForEach-Object Name) -join ','
+Set-NetFirewallProfile -All -Enabled True
+$off
+'''
+revert = '''
+$names = if ($Previous) { $Previous -split ',' | Where-Object { $_ } } else { @() }
+if ($names) { Set-NetFirewallProfile -Name $names -Enabled False }
+'''
+
+[[tweak]]
+id = "security.uac-default"
+name = "Control de cuentas (UAC) en el nivel recomendado"
+description = "Pide confirmación en el escritorio seguro antes de que un programa obtenga permisos de administrador. Desactivar UAC es una de las causas más habituales de infecciones."
+category = "security"
+risk = "medium"
+admin = true
+reboot = true
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+name = "EnableLUA"
+type = "dword"
+value = 1
+default = 1
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+name = "ConsentPromptBehaviorAdmin"
+type = "dword"
+value = 5
+default = 5
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+name = "PromptOnSecureDesktop"
+type = "dword"
+value = 1
+default = 1
+
+[[tweak]]
+id = "security.smb1-off"
+name = "Desactivar SMB1"
+description = "Apaga la versión 1 del protocolo de archivos compartidos, obsoleta y usada por WannaCry. Solo la necesitan NAS y escáneres muy antiguos."
+category = "security"
+risk = "medium"
+admin = true
+note = "Si una impresora-escáner o un NAS muy antiguo deja de guardar en la carpeta compartida, deshazlo."
+
+[tweak.script]
+detect = '''
+-not (Get-SmbServerConfiguration).EnableSMB1Protocol
+'''
+apply = '''
+$was = (Get-SmbServerConfiguration).EnableSMB1Protocol
+Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+"$was"
+'''
+revert = '''
+if ($Previous -eq 'True') { Set-SmbServerConfiguration -EnableSMB1Protocol $true -Force }
+'''
+
+[[tweak]]
+id = "security.rdp-nla"
+name = "Escritorio remoto solo con autenticación previa (NLA)"
+description = "Obliga a identificarse antes de abrir la sesión remota. Protege contra ataques de fuerza bruta y fallos como BlueKeep."
+category = "security"
+risk = "low"
+admin = true
+
+[[tweak.registry]]
+path = 'HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
+name = "UserAuthentication"
+type = "dword"
+value = 1
+default = 1
+
+[[tweak]]
+id = "security.rdp-off"
+name = "Desactivar el escritorio remoto entrante"
+description = "Impide conectarse a este equipo por RDP. Recomendado si nadie lo administra en remoto: es una de las vías de entrada del ransomware."
+category = "security"
+risk = "medium"
+admin = true
+note = "No afecta a conectarte tú desde este equipo a otros ni a AnyDesk, TeamViewer o Asistencia rápida."
+
+[[tweak.registry]]
+path = 'HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server'
+name = "fDenyTSConnections"
+type = "dword"
+value = 1
+default = 1
+
+[[tweak]]
+id = "security.autorun-off"
+name = "Desactivar la ejecución automática de USB y discos"
+description = "Evita que un pendrive o disco ejecute programas al conectarlo, la vía clásica de contagio entre equipos."
+category = "security"
+risk = "low"
+admin = true
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer'
+name = "NoDriveTypeAutoRun"
+type = "dword"
+value = 255
+default = 145
+
+[[tweak]]
+id = "security.guest-off"
+name = "Desactivar la cuenta Invitado"
+description = "La cuenta Invitado permite entrar sin contraseña. Windows la trae desactivada; algunos programas o técnicos la activan."
+category = "security"
+risk = "low"
+admin = true
+
+[tweak.script]
+detect = '''
+-not (Get-LocalUser | Where-Object { $_.SID.Value -like '*-501' }).Enabled
+'''
+apply = '''
+$g = Get-LocalUser | Where-Object { $_.SID.Value -like '*-501' }
+$was = [bool]$g.Enabled
+Disable-LocalUser -SID $g.SID
+"$was"
+'''
+revert = '''
+if ($Previous -eq 'True') { Get-LocalUser | Where-Object { $_.SID.Value -like '*-501' } | Enable-LocalUser }
+'''
+
+[[tweak]]
+id = "security.defender-pua"
+name = "Bloquear aplicaciones no deseadas (PUA) en Defender"
+description = "Microsoft Defender bloquea adware, barras de herramientas y programas que se cuelan en instaladores gratuitos."
+category = "security"
+risk = "low"
+admin = true
+note = "Solo tiene efecto si Microsoft Defender es el antivirus activo."
+
+[tweak.script]
+detect = '''
+(Get-MpPreference).PUAProtection -eq 1
+'''
+apply = '''
+$was = (Get-MpPreference).PUAProtection
+Set-MpPreference -PUAProtection Enabled
+"$was"
+'''
+revert = '''
+$v = if ($Previous -match '^\d+$') { [int]$Previous } else { 0 }
+Set-MpPreference -PUAProtection $v
+'''
