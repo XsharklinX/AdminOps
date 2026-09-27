@@ -6,7 +6,6 @@
 //! superar su límite, o si el usuario pulsa Cancelar, se termina el árbol de
 //! procesos completo (p. ej. PowerShell *y* el sfc.exe que lanzó).
 
-use base64::Engine;
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::process::{Command, Stdio};
@@ -93,13 +92,17 @@ fn summary(s: &str) -> String {
     line.chars().take(90).collect()
 }
 
-fn run(mut cmd: Command, label: &str, detail: &str, opts: Opts) -> Result<String, String> {
+fn run(cmd: Command, label: &str, detail: &str, opts: Opts) -> Result<String, String> {
+    run_with_input(cmd, label, detail, opts, None)
+}
+
+fn run_with_input(mut cmd: Command, label: &str, detail: &str, opts: Opts, input: Option<String>) -> Result<String, String> {
     if let Some(t) = opts.task {
         if is_cancelled(t) {
             return Err(CANCELLED_MSG.into());
         }
     }
-    cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() }).stdout(Stdio::piped()).stderr(Stdio::piped());
     let start = Instant::now();
     let mut child = cmd.spawn().map_err(|e| format!("No se pudo iniciar {label}: {e}"))?;
     let pid = child.id();
@@ -109,6 +112,14 @@ fn run(mut cmd: Command, label: &str, detail: &str, opts: Opts) -> Result<String
 
     // Leer en hilos aparte: si la salida llena el buffer del pipe y nadie la
     // lee, el proceso se bloquea y parecería colgado.
+    // El script por la entrada estándar, en un hilo: si es largo y el proceso no
+    // lo lee a tiempo, escribirlo aquí podría bloquear.
+    if let (Some(text), Some(mut stdin)) = (input, child.stdin.take()) {
+        std::thread::spawn(move || {
+            use std::io::Write;
+            let _ = stdin.write_all(text.as_bytes());
+        });
+    }
     let mut out_pipe = child.stdout.take().unwrap();
     let mut err_pipe = child.stderr.take().unwrap();
     let out_h = std::thread::spawn(move || {
@@ -174,10 +185,13 @@ fn run(mut cmd: Command, label: &str, detail: &str, opts: Opts) -> Result<String
     }
 }
 
+/// Arranque de los PowerShell de un solo uso: lee el script de la entrada estándar
+/// (UTF-8) y lo ejecuta. Sin `-EncodedCommand` ni base64, que los antivirus de
+/// empresa (Sophos, Defender for Endpoint…) tratan como señal de malware.
+pub const STDIN_BOOTSTRAP: &str = "[Console]::InputEncoding = [Text.Encoding]::UTF8; $adminopsScript = [Console]::In.ReadToEnd(); & ([ScriptBlock]::Create($adminopsScript))";
+
 /// Ejecuta un script de PowerShell y devuelve su salida estándar.
-///
-/// El script va como `-EncodedCommand` (UTF-16LE en base64) para no tener que
-/// escapar comillas. Cualquier error no controlado sale con código ≠ 0.
+/// Cualquier error no controlado sale con código ≠ 0.
 pub fn powershell(script: &str) -> Result<String, String> {
     powershell_opts(script, Opts::default())
 }
@@ -192,20 +206,53 @@ pub fn powershell_opts(script: &str, opts: Opts) -> Result<String, String> {
         "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='Stop';\
          [Console]::OutputEncoding=[Text.Encoding]::UTF8;\n{script}"
     );
-    let utf16: Vec<u8> = full.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
-    let encoded = base64::engine::general_purpose::STANDARD.encode(utf16);
     let mut cmd = hidden("powershell.exe");
-    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", &encoded]);
-    run(cmd, "PowerShell", &summary(script), opts)
+    // -ExecutionPolicy Bypass (solo este proceso): con la directiva por defecto de
+    // Windows ni siquiera cargan los módulos del sistema (discos, red…).
+    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", STDIN_BOOTSTRAP]);
+    run_with_input(cmd, "PowerShell", &summary(script), opts, Some(full))
 }
 
-/// Línea de PowerShell que define `$var` con un texto cualquiera. Va en base64,
-/// así que comillas, `$()` o saltos de línea del texto nunca se interpretan.
+/// Texto cualquiera como cadena literal de PowerShell (entre comillas simples):
+/// dentro no se interpreta nada (`$()`, comillas dobles, saltos de línea…). Solo
+/// hay que duplicar las comillas simples, incluidas las tipográficas, que
+/// PowerShell también trata como comillas.
+pub fn ps_literal(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('\'');
+    for c in value.chars().filter(|c| *c != '\0') {
+        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
+            out.push(c);
+        }
+        out.push(c);
+    }
+    out.push('\'');
+    out
+}
+
+/// Línea de PowerShell que define `$var` como SecureString con una contraseña,
+/// sin que aparezca legible en el script ni en el registro: es el formato de
+/// `ConvertFrom-SecureString` (cifrado con DPAPI para este usuario de Windows).
+/// Vacía → `$null`.
+pub fn secret_var(var: &str, secret: &str) -> String {
+    if secret.is_empty() {
+        return format!("${var} = $null\n");
+    }
+    let utf16: Vec<u8> = secret.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+    match crate::network::lan::dpapi(&utf16, true) {
+        Ok(blob) => {
+            let hex: String = blob.iter().map(|b| format!("{b:02x}")).collect();
+            format!("${var} = ConvertTo-SecureString '{hex}'\n")
+        }
+        // Sin DPAPI (no debería pasar en Windows): literal, nunca sin contraseña.
+        Err(_) => format!("${var} = ConvertTo-SecureString {} -AsPlainText -Force\n", ps_literal(secret)),
+    }
+}
+
+/// Línea de PowerShell que define `$var` con un texto cualquiera, sin que nada
+/// del texto se interprete (ver `ps_literal`).
 pub fn text_var(var: &str, value: &str) -> String {
-    format!(
-        "${var} = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{}'))\n",
-        base64::engine::general_purpose::STANDARD.encode(value.as_bytes())
-    )
+    format!("${var} = {}\n", ps_literal(value))
 }
 
 /// Errores de sintaxis de un script según el parser de PowerShell (vacío = correcto).
@@ -233,7 +280,22 @@ pub fn exec_opts(program: &str, args: &[&str], opts: Opts) -> Result<String, Str
 
 /// Deja solo el mensaje útil de un error de PowerShell: sin CLIXML, sin la
 /// posición en el script ("At line:5 char:25 + ... ~~~~") ni CategoryInfo.
+/// Mensajes claros para los bloqueos típicos de un equipo de empresa.
+pub fn blocked_reason(raw: &str) -> Option<&'static str> {
+    let l = raw.to_lowercase();
+    if l.contains("malicious content") || l.contains("scriptcontainedmaliciouscontent") || l.contains("contenido malintencionado") || l.contains("software antivirus") {
+        return Some("El antivirus del equipo bloqueó esta acción de AdminOps. Si confías en ella, pide a TI que añada AdminOps a las exclusiones del antivirus.");
+    }
+    if l.contains("language mode") || l.contains("modo de lenguaje") || l.contains("only on core types") || l.contains("solo en tipos principales") {
+        return Some("PowerShell está restringido en este equipo por una directiva de la empresa (modo de lenguaje restringido): esta función de AdminOps no puede ejecutarse aquí.");
+    }
+    None
+}
+
 pub fn clean_error(s: &str) -> String {
+    if let Some(reason) = blocked_reason(s) {
+        return reason.into();
+    }
     let mut text = if s.contains("#< CLIXML") {
         s.split("<S S=\"Error\">")
             .skip(1)

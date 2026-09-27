@@ -17,6 +17,9 @@ import { TaskStatus } from "../components/TaskStatus";
 import { Card } from "../components/ui";
 import { appApi, tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
 import { RestoreStorageCard } from "../components/Maintenance";
+import { Timeline } from "../components/Timeline";
+import type { PageId } from "../components/Sidebar";
+import { useOnJournalChange } from "../lib/journalEvents";
 
 const OP = {
   apply: { label: "Aplicado", icon: Wrench },
@@ -28,7 +31,7 @@ const OP = {
 const when = (secs: number) =>
   new Date(secs * 1000).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" });
 
-export function History({ isAdmin }: { isAdmin: boolean }) {
+export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?: (p: PageId) => void }) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [points, setPoints] = useState<RestorePoint[] | null>(null);
   const [pointsError, setPointsError] = useState<string | null>(null);
@@ -47,6 +50,7 @@ export function History({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [isAdmin]);
 
+  useOnJournalChange(loadJournal);
   useEffect(() => {
     loadJournal();
     loadPoints();
@@ -81,6 +85,7 @@ export function History({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="mx-auto grid max-w-5xl grid-cols-12 gap-4 p-6">
+      <Timeline onNavigate={onNavigate} />
       <Card
         title="Puntos de restauración"
         icon={<LifeBuoy size={14} />}

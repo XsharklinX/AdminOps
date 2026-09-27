@@ -195,7 +195,7 @@ $part = New-Partition -DiskNumber $disk.Number -UseMaximumSize
 Format-Volume -Partition $part -FileSystem NTFS -NewFileSystemLabel $label -Confirm:$false | Out-Null
 $part | Add-PartitionAccessPath -AssignDriveLetter
 $letter = "$((Get-Partition -DiskNumber $disk.Number -PartitionNumber $part.PartitionNumber).DriveLetter):"
-$sec = ConvertTo-SecureString $pw -AsPlainText -Force
+$sec = $pw
 Enable-BitLocker -MountPoint $letter -EncryptionMethod XtsAes256 -UsedSpaceOnly -PasswordProtector -Password $sec | Out-Null
 Add-BitLockerKeyProtector -MountPoint $letter -RecoveryPasswordProtector | Out-Null
 $t = [Diagnostics.Stopwatch]::StartNew()
@@ -243,7 +243,7 @@ pub fn vault_create(app: tauri::AppHandle, tweaks: State<'_, TweakState>, name: 
         "$ErrorActionPreference = 'Stop'\n{}{}{}{CREATE_SCRIPT}",
         text_var("path", &file.display().to_string()),
         text_var("label", &name),
-        text_var("pw", &password)
+        crate::ps::secret_var("pw", &password)
     );
     let result = crate::ps::powershell_opts(&script, task.opts(Some(Duration::from_secs(420))));
     let out = match result {
@@ -291,7 +291,7 @@ $letter = "$($part.DriveLetter):"
 $bl = Get-BitLockerVolume -MountPoint $letter -ErrorAction SilentlyContinue
 if ($bl -and "$($bl.LockStatus)" -eq 'Locked') {
   try {
-    Unlock-BitLocker -MountPoint $letter -Password (ConvertTo-SecureString $pw -AsPlainText -Force) -ErrorAction Stop | Out-Null
+    Unlock-BitLocker -MountPoint $letter -Password $pw -ErrorAction Stop | Out-Null
   } catch {
     if ($attachedHere) { Dismount-DiskImage -ImagePath $path -ErrorAction SilentlyContinue | Out-Null }
     throw 'Contraseña incorrecta.'
@@ -304,7 +304,7 @@ fn open_inner(v: &Vault, password: &str) -> Result<String, String> {
     if !Path::new(&v.path).is_file() {
         return Err("No se encuentra el archivo de la caja fuerte (¿se movió o está en un USB desconectado?).".into());
     }
-    let script = format!("$ErrorActionPreference = 'Stop'\n{}{}{OPEN_SCRIPT}", text_var("path", &v.path), text_var("pw", password));
+    let script = format!("$ErrorActionPreference = 'Stop'\n{}{}{OPEN_SCRIPT}", text_var("path", &v.path), crate::ps::secret_var("pw", password));
     let out = crate::pspool::query(&script, Some(Duration::from_secs(90)), "Caja fuerte: abrir")?;
     #[derive(Deserialize)]
     struct Out {
@@ -349,7 +349,7 @@ pub fn vault_close(app: tauri::AppHandle, id: String) -> Result<(), String> {
 
 const PASSWORD_SCRIPT: &str = r#"
 $old = @((Get-BitLockerVolume -MountPoint $letter).KeyProtector | Where-Object { "$($_.KeyProtectorType)" -eq 'Password' })
-Add-BitLockerKeyProtector -MountPoint $letter -PasswordProtector -Password (ConvertTo-SecureString $pw -AsPlainText -Force) | Out-Null
+Add-BitLockerKeyProtector -MountPoint $letter -PasswordProtector -Password $pw | Out-Null
 foreach ($k in $old) { Remove-BitLockerKeyProtector -MountPoint $letter -KeyProtectorId $k.KeyProtectorId | Out-Null }
 "#;
 
@@ -359,7 +359,7 @@ pub fn vault_change_password(app: tauri::AppHandle, tweaks: State<'_, TweakState
     let v = find(&app, &id)?;
     // Abrirla con la contraseña actual comprueba que es la buena.
     let letter = open_inner(&v, &old)?;
-    let script = format!("$ErrorActionPreference = 'Stop'\n{}{}{PASSWORD_SCRIPT}", text_var("letter", &letter), text_var("pw", &new));
+    let script = format!("$ErrorActionPreference = 'Stop'\n{}{}{PASSWORD_SCRIPT}", text_var("letter", &letter), crate::ps::secret_var("pw", &new));
     let r = crate::pspool::query(&script, Some(Duration::from_secs(60)), "Caja fuerte: cambiar contraseña").map(|_| ());
     tweaks.record(Op::Run, &format!("Caja fuerte «{}»: contraseña cambiada", v.name), &r);
     r

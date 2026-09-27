@@ -4,6 +4,7 @@ import { useToast } from "../components/feedback";
 import { Switch } from "../components/TweakCard";
 import { systemApi, type StartupItem } from "../lib/api";
 import { BootCard } from "../components/Maintenance";
+import { useOnJournalChange } from "../lib/journalEvents";
 
 const SOURCE_LABEL = { registry: "Registro", folder: "Carpeta", task: "Tarea" };
 
@@ -26,6 +27,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [toast]);
 
+  useOnJournalChange(load);
   useEffect(() => {
     load();
   }, [load]);

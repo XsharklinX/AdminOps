@@ -45,6 +45,7 @@ import {
 export type PageId =
   | "dashboard"
   | "diagnostics"
+  | "troubleshoot"
   | "security"
   | "hardware"
   | "processes"
@@ -67,6 +68,7 @@ export type PageId =
   | "session"
   | "tickets"
   | "clients"
+  | "contacts"
   | "report"
   | "history"
   | "shortcuts"
@@ -95,6 +97,7 @@ interface NavItem {
 export const NAV: NavItem[] = [
   { id: "dashboard", label: "Panel", tab: "Panel" },
   { id: "diagnostics", label: "Diagnóstico", tab: "Diagnóstico" },
+  { id: "troubleshoot", label: "Solucionar problemas", tab: "Solucionar" },
   { id: "security", label: "Seguridad", tab: "Seguridad" },
   { id: "hardware", label: "Hardware", tab: "Hardware" },
   { id: "processes", label: "Procesos", tab: "Procesos" },
@@ -117,6 +120,7 @@ export const NAV: NavItem[] = [
   { id: "session", label: "Sesión de servicio", tab: "Sesión" },
   { id: "tickets", label: "Tickets", tab: "Tickets" },
   { id: "clients", label: "Clientes", tab: "Clientes" },
+  { id: "contacts", label: "Contactos", tab: "Contactos" },
   { id: "report", label: "Informe", tab: "Informe" },
   { id: "history", label: "Historial", tab: "Historial" },
   { id: "shortcuts", label: "Atajos de teclado", tab: "Atajos" },
@@ -184,11 +188,11 @@ export const AREA_ICONS: Record<string, LucideIcon> = {
 /** Las áreas de la barra lateral; sus páginas son pestañas. */
 const DEFAULT_AREAS: Omit<Area, "icon">[] = [
   { id: "panel", label: "Panel", iconName: "Gauge", pages: ["dashboard"] },
-  { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["diagnostics", "security", "hardware", "processes", "space"] },
+  { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["diagnostics", "troubleshoot", "security", "hardware", "processes", "space"] },
   { id: "optimizar", label: "Optimizar", iconName: "SlidersHorizontal", pages: ["profiles", "cleanup", "performance", "privacy", "services", "startup", "bloatware"] },
   { id: "programas", label: "Programas", iconName: "Package", pages: ["software", "install", "uninstall", "winupdate"] },
   { id: "red", label: "Red", iconName: "Network", pages: ["router", "devices", "remote", "network", "nettools"] },
-  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["session", "tickets", "clients", "inventory", "report", "history", "shortcuts"] },
+  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["session", "tickets", "clients", "contacts", "inventory", "report", "history", "shortcuts"] },
   { id: "datos", label: "Datos y familia", iconName: "Lock", pages: ["vault", "wipe", "recover", "family"] },
   { id: "admin", label: "Administración", iconName: "Wrench", pages: ["tools", "users", "shares", "domain", "migrate", "printers", "repair"] },
 ];

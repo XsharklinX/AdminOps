@@ -96,7 +96,14 @@ function WifiCard() {
 
   useEffect(() => {
     (async () => {
-      const [info, profiles] = await Promise.all([lanApi.info().catch(() => null), wifiApi.list().catch(() => [])]);
+      let listError = "";
+      const [info, profiles] = await Promise.all([
+        lanApi.info().catch(() => null),
+        wifiApi.list().catch((e) => {
+          listError = String(e);
+          return [];
+        }),
+      ]);
       const connected = profiles.find((p) => p.connected);
       // Por cable: la Wi-Fi guardada con el nombre de esta red (suele ser la del mismo router).
       const byName = info ? profiles.find((p) => p.ssid === info.network || p.name === info.network) : undefined;
@@ -105,6 +112,14 @@ function WifiCard() {
         setSsid(p.ssid);
         setPassword(p.password);
         setNote(connected ? "" : "Conectado por cable: es la Wi-Fi guardada con el nombre de esta red.");
+      } else if (listError) {
+        // Sin tarjeta Wi-Fi que funcione Windows no deja leer las redes guardadas.
+        const st = await wifiApi.state().catch(() => null);
+        setNote(
+          st && st.level !== "ok"
+            ? `${st.summary} Mientras no funcione, Windows no deja leer las redes guardadas ni su contraseña. Puedes arreglarla en Red → Estado de la Wi-Fi.`
+            : listError,
+        );
       } else {
         setNote(profiles.length ? "Este equipo no tiene guardada la Wi-Fi de esta red." : "Este equipo no tiene redes Wi-Fi guardadas.");
       }

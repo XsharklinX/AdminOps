@@ -2,6 +2,8 @@ import { CircleCheck, Gauge, Loader2, RefreshCw, Router, Wifi, XCircle } from "l
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { SpeedTest } from "../components/SpeedTest";
+import { NetRepairCard } from "../components/NetRepairCard";
+import { WifiControl } from "../components/WifiControl";
 import { WifiProfiles } from "../components/WifiProfiles";
 import { Card } from "../components/ui";
 import { toolsApi, type NetworkReport, type SpeedResult } from "../lib/api";
@@ -164,6 +166,8 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
         )}
       </Card>
 
+      <NetRepairCard isAdmin={isAdmin} />
+      <WifiControl isAdmin={isAdmin} />
       <WifiProfiles isAdmin={isAdmin} />
     </div>
   );

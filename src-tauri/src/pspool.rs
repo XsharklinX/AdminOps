@@ -10,7 +10,6 @@
 //! Cada script corre en su propio ámbito (`& { }`), así que sus variables no
 //! se filtran a la siguiente consulta.
 
-use base64::Engine;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
@@ -29,27 +28,36 @@ fn max_hosts() -> usize {
 }
 const MARKER: &str = "\u{1e}ADMINOPS ";
 
-/// Bucle del proceso anfitrión. Cada línea de entrada es un script en base64
-/// (UTF-8); cada respuesta es `MARKER OK|ERR <base64>`.
+/// Bucle del proceso anfitrión. Cada script llega como una línea con su número de
+/// líneas y luego las líneas (UTF-8); la respuesta es `MARKER OK|ERR <n>` y n
+/// líneas. Sin base64 ni `-EncodedCommand`: los antivirus de empresa lo tratan
+/// como señal de malware.
 const HOST_SCRIPT: &str = r#"
+[Console]::InputEncoding = [Text.Encoding]::UTF8
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ProgressPreference = 'SilentlyContinue'
+$marker = [string][char]0x1e + 'ADMINOPS '
 while ($true) {
-  $line = [Console]::In.ReadLine()
-  if ($null -eq $line) { break }
+  $header = [Console]::In.ReadLine()
+  if ($null -eq $header) { break }
+  $count = [int]$header
+  $lines = New-Object 'System.Collections.Generic.List[string]'
+  for ($i = 0; $i -lt $count; $i++) { $lines.Add([Console]::In.ReadLine()) }
   $ok = $true
   try {
-    $sb = [ScriptBlock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line)))
+    $sb = [ScriptBlock]::Create($lines -join [char]10)
     $out = @(& { $ErrorActionPreference = 'Stop'; & $sb }) | ForEach-Object {
       if ($_ -is [string]) { $_ } else { ($_ | Out-String -Width 4096).TrimEnd() }
     }
-    $text = $out -join "`n"
+    $text = $out -join [char]10
   } catch {
     $ok = $false
     $text = $_.Exception.Message
   }
-  $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$text))
-  [Console]::Out.WriteLine("$([char]0x1e)ADMINOPS $(if ($ok) { 'OK' } else { 'ERR' }) $b64")
+  $outLines = ([string]$text) -split [char]10
+  $status = if ($ok) { 'OK ' } else { 'ERR ' }
+  [Console]::Out.WriteLine($marker + $status + $outLines.Count)
+  foreach ($l in $outLines) { [Console]::Out.WriteLine($l) }
   [Console]::Out.Flush()
 }
 "#;
@@ -98,10 +106,8 @@ fn kill_with_app(_: &std::process::Child) {}
 
 impl Host {
     fn spawn() -> Result<Host, String> {
-        let utf16: Vec<u8> = HOST_SCRIPT.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
-        let encoded = base64::engine::general_purpose::STANDARD.encode(utf16);
         let mut child = crate::ps::hidden("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", &encoded])
+            .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", HOST_SCRIPT])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             // stderr no se lee: si se dejara en pipe podría llenarse y bloquear el proceso.
@@ -126,23 +132,32 @@ impl Host {
 
     /// Ejecuta un script. `Err(None)` = el proceso quedó inservible.
     fn run(&mut self, script: &str, timeout: Option<Duration>) -> Result<Result<String, String>, String> {
-        let b64 = base64::engine::general_purpose::STANDARD.encode(script.as_bytes());
-        writeln!(self.stdin, "{b64}").and_then(|_| self.stdin.flush()).map_err(|e| e.to_string())?;
+        let lines: Vec<&str> = script.split('\n').map(|l| l.trim_end_matches('\r')).collect();
+        let mut payload = format!("{}\n", lines.len());
+        for l in &lines {
+            payload.push_str(l);
+            payload.push('\n');
+        }
+        self.stdin.write_all(payload.as_bytes()).and_then(|_| self.stdin.flush()).map_err(|e| e.to_string())?;
         let deadline = timeout.map(|t| Instant::now() + t);
+        let wait = || deadline.map_or(Duration::from_secs(3600), |d| d.saturating_duration_since(Instant::now()));
+        let next = |rx: &Receiver<String>| match rx.recv_timeout(wait()) {
+            Ok(line) => Ok(line),
+            Err(RecvTimeoutError::Timeout) => Err("timeout".to_string()),
+            Err(RecvTimeoutError::Disconnected) => Err("el proceso terminó".to_string()),
+        };
         loop {
-            let wait = deadline.map_or(Duration::from_secs(3600), |d| d.saturating_duration_since(Instant::now()));
-            match self.lines.recv_timeout(wait) {
-                // Líneas sueltas (p. ej. Write-Host) se ignoran: solo cuenta el marcador.
-                Ok(line) => {
-                    let Some(rest) = line.strip_prefix(MARKER) else { continue };
-                    let (status, payload) = rest.split_once(' ').unwrap_or((rest, ""));
-                    let bytes = base64::engine::general_purpose::STANDARD.decode(payload).unwrap_or_default();
-                    let text = String::from_utf8_lossy(&bytes).trim().to_string();
-                    return Ok(if status == "OK" { Ok(text) } else { Err(text) });
-                }
-                Err(RecvTimeoutError::Timeout) => return Err("timeout".into()),
-                Err(RecvTimeoutError::Disconnected) => return Err("el proceso terminó".into()),
+            // Líneas sueltas (p. ej. Write-Host) se ignoran: solo cuenta el marcador.
+            let line = next(&self.lines)?;
+            let Some(rest) = line.strip_prefix(MARKER) else { continue };
+            let (status, n) = rest.split_once(' ').unwrap_or((rest, "0"));
+            let n: usize = n.trim().parse().unwrap_or(0);
+            let mut body = Vec::with_capacity(n);
+            for _ in 0..n {
+                body.push(next(&self.lines)?.trim_end_matches('\r').to_string());
             }
+            let text = body.join("\n").trim().to_string();
+            return Ok(if status.trim() == "OK" { Ok(text) } else { Err(text) });
         }
     }
 
@@ -241,7 +256,7 @@ pub fn query(script: &str, timeout: Option<Duration>, detail: &str) -> Result<St
                 Err(format!("PowerShell tardó más de {secs} s y se detuvo."))
             } else {
                 log::warn!("PowerShell (pool) se perdió ({why}): {detail}");
-                Err(format!("PowerShell se cerró inesperadamente ({why})."))
+                Err(format!("PowerShell se cerró inesperadamente ({why}). Si se repite, puede que el antivirus lo esté bloqueando: pide a TI que añada AdminOps a sus exclusiones."))
             }
         }
     }

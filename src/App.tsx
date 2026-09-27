@@ -7,10 +7,12 @@ import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { LockScreen } from "./components/LockScreen";
 import { NAV, Sidebar, areaOf, pageLabel, visibleAreas, type Area, type PageId } from "./components/Sidebar";
-import { api, appApi, appcareApi, lockApi, systemApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { api, appApi, appcareApi, lockApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { Dashboard } from "./pages/Dashboard";
+import { SYMPTOMS, Troubleshoot } from "./pages/Troubleshoot";
+import { Contacts } from "./pages/Contacts";
 
 // Solo el Panel se carga al abrir la app; el resto de páginas, al visitarlas.
 const lazyPage = <T extends string>(name: T, load: () => Promise<Record<T, React.ComponentType<any>>>) =>
@@ -259,6 +261,25 @@ export default function App() {
       { id: "join", title: "Unir el equipo a un dominio", run: () => navigate("domain") },
       { id: "newuser", title: "Crear un usuario local", run: () => navigate("users") },
       { id: "setup", title: "Volver a abrir el asistente de inicio", run: () => setOnboarding(true) },
+      // Síntomas: abren «Solucionar problemas» y lo comprueban.
+      ...SYMPTOMS.map((s) => ({ id: `trouble:${s.id}`, title: `Solucionar: ${s.title}`, subtitle: s.hint, keywords: `${s.keywords} problema arreglar no funciona`, run: () => navigate("troubleshoot", s.id) })),
+      { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },
+      { id: "wifistate", title: "Estado de la Wi-Fi", subtitle: "Reiniciar la tarjeta, ahorro de energía, adaptadores fantasma", keywords: "wifi tarjeta adaptador driver codigo 10", run: () => navigate("network") },
+      { id: "timeline", title: "Línea de tiempo del equipo", subtitle: "Qué cambió y qué pasó, por días", keywords: "historial eventos cambios arranques actualizaciones drivers", run: () => navigate("history") },
+      { id: "wifion", title: "Encender la Wi-Fi", keywords: "wifi radio activar", run: () => troubleshootApi.fix("wifi.radio.on") },
+      { id: "wifioff", title: "Apagar la Wi-Fi", keywords: "wifi radio desactivar", run: () => troubleshootApi.fix("wifi.radio.off") },
+      { id: "bton", title: "Encender el Bluetooth", keywords: "bluetooth radio activar", run: () => troubleshootApi.fix("bt.radio.on") },
+      { id: "btoff", title: "Apagar el Bluetooth", keywords: "bluetooth radio desactivar", run: () => troubleshootApi.fix("bt.radio.off") },
+      { id: "gpureset", title: "Reiniciar el driver de la gráfica", subtitle: "Win+Ctrl+Shift+B: la pantalla parpadea un segundo", keywords: "pantalla negra monitor video grafica", run: () => troubleshootApi.fix("display.reset") },
+      { id: "project", title: "Elegir cómo usar las pantallas", subtitle: "Duplicar, extender, solo una (Win+P)", keywords: "monitor proyector duplicar extender", run: () => troubleshootApi.fix("display.project") },
+      ...[
+        ["sound", "Configuración de sonido", "audio altavoces salida"],
+        ["apps-volume", "Mezclador de volumen", "audio volumen aplicaciones"],
+        ["display", "Configuración de pantalla", "monitor resolucion escala"],
+        ["bluetooth", "Configuración de Bluetooth", "emparejar dispositivos"],
+        ["network-wifi", "Redes Wi-Fi de Windows", "wifi conectar"],
+        ["printers", "Impresoras y escáneres", "impresora anadir"],
+      ].map(([uri, title, kw]) => ({ id: `open:${uri}`, title, subtitle: "Abre Configuración de Windows", keywords: kw, run: () => troubleshootApi.fix(`open:ms-settings:${uri}`) })),
     ],
     [isAdmin, navigate],
   );
@@ -274,7 +295,7 @@ export default function App() {
   const renderPage = (p: PageId) => {
     const category = TWEAK_PAGES[p];
     if (p === "dashboard") return <Dashboard onNavigate={navigate} />;
-    if (p === "history") return <History isAdmin={!!isAdmin} />;
+    if (p === "history") return <History isAdmin={!!isAdmin} onNavigate={(x: PageId) => navigate(x)} />;
     if (p === "bloatware") return <Bloatware isAdmin={!!isAdmin} />;
     if (p === "startup") return <Startup isAdmin={!!isAdmin} />;
     if (p === "diagnostics") return <Diagnostics focus={p === page ? focus : null} onNavigate={navigate} />;
@@ -283,10 +304,12 @@ export default function App() {
     if (p === "processes") return <Processes isAdmin={!!isAdmin} />;
     if (p === "hardware") return <Hardware isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "network") return <Network isAdmin={!!isAdmin} />;
+    if (p === "troubleshoot") return <Troubleshoot isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
     if (p === "software") return <Software isAdmin={!!isAdmin} />;
     if (p === "space") return <Space />;
     if (p === "session") return <Session onSessionChange={setSessionActive} />;
     if (p === "clients") return <Clients />;
+    if (p === "contacts") return <Contacts focus={p === page ? focus : null} />;
     if (p === "tools") return <Tools isAdmin={!!isAdmin} />;
     if (p === "users") return <Users isAdmin={!!isAdmin} />;
     if (p === "install") return <Install isAdmin={!!isAdmin} />;

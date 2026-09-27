@@ -4,6 +4,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import { TweakCard } from "../components/TweakCard";
 import { RP_FAILED, tweaksApi, type OpResult, type TweakView } from "../lib/api";
 import { ScheduleCard } from "../components/Maintenance";
+import { useOnJournalChange } from "../lib/journalEvents";
 
 const CANCELLED = "Cancelado por el usuario.";
 
@@ -45,6 +46,7 @@ export function TweaksPage({ category, isAdmin, focus }: { category: string; isA
     }
   }, [category, toast]);
 
+  useOnJournalChange(load);
   useEffect(() => {
     setTweaks(null);
     setMessages({});

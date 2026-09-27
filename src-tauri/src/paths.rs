@@ -27,6 +27,11 @@ fn portable_root() -> Option<&'static PathBuf> {
     .as_ref()
 }
 
+/// Carpeta de datos del USB (solo en portable).
+pub fn portable_data_root() -> Option<&'static PathBuf> {
+    portable_root()
+}
+
 pub fn is_portable() -> bool {
     portable_root().is_some()
 }

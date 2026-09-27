@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, systemApi, type Advice, type AppView } from "../lib/api";
+import { useOnJournalChange } from "../lib/journalEvents";
 
 const ADVICE: Record<Advice, { title: string; hint: string; cls: string }> = {
   remove: { title: "Recomendado quitar", hint: "Promocionales o retiradas por Microsoft.", cls: "text-ok" },
@@ -31,6 +32,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [toast]);
 
+  useOnJournalChange(load);
   useEffect(() => {
     load();
   }, [load]);

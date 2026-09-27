@@ -1,8 +1,8 @@
-import { AppWindow, CornerDownLeft, Search, SlidersHorizontal, Wrench, Zap } from "lucide-react";
+import { AppWindow, CornerDownLeft, Search, SlidersHorizontal, UserRound, Wrench, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, pageLabel, type PageId } from "./Sidebar";
 import { useToast } from "./feedback";
-import { toolboxApi, tweaksApi, type ToolboxView } from "../lib/api";
+import { contactsApi, toolboxApi, tweaksApi, type Contact, type ToolboxView } from "../lib/api";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -14,7 +14,7 @@ const CATEGORY_PAGE: Record<string, PageId> = {
   security: "security",
 };
 
-const KIND_LABEL = { page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción" };
+const KIND_LABEL = { page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto" };
 
 type Kind = keyof typeof KIND_LABEL;
 
@@ -24,7 +24,7 @@ interface Entry {
   title: string;
   subtitle?: string;
   search: string;
-  run: () => void;
+  run: () => void | Promise<unknown>;
 }
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -37,7 +37,10 @@ export interface PaletteAction {
   id: string;
   title: string;
   subtitle?: string;
-  run: () => void;
+  /** Palabras extra para encontrarla (no se muestran). */
+  keywords?: string;
+  /** Si devuelve una promesa, su texto se muestra como aviso (y su error también). */
+  run: () => void | Promise<unknown>;
 }
 
 export function CommandPalette({
@@ -55,6 +58,7 @@ export function CommandPalette({
   const [index, setIndex] = useState(0);
   const [tools, setTools] = useState(toolsCache);
   const [tweaks, setTweaks] = useState(tweaksCache);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -66,11 +70,14 @@ export function CommandPalette({
     window.setTimeout(() => input.current?.focus(), 0);
     if (!toolsCache) toolboxApi.list().then((t) => setTools((toolsCache = t))).catch(() => {});
     if (!tweaksCache) tweaksApi.index().then((t) => setTweaks((tweaksCache = t))).catch(() => {});
+    // Sin caché: la agenda cambia a menudo.
+    contactsApi.list().then(setContacts).catch(() => {});
   }, [open]);
 
   const entries = useMemo<Entry[]>(() => {
     const out: Entry[] = NAV.map((n) => ({ key: `page:${n.id}`, kind: "page", title: pageLabel(n.id), search: norm(`${pageLabel(n.id)} ${n.label}`), run: () => onNavigate(n.id) }));
-    for (const a of actions) out.push({ key: `action:${a.id}`, kind: "action", title: a.title, subtitle: a.subtitle, search: norm(`${a.title} ${a.subtitle ?? ""}`), run: a.run });
+    for (const a of actions)
+      out.push({ key: `action:${a.id}`, kind: "action", title: a.title, subtitle: a.subtitle, search: norm(`${a.title} ${a.subtitle ?? ""} ${a.keywords ?? ""}`), run: a.run });
     for (const t of tweaks ?? []) {
       const page = CATEGORY_PAGE[t.category];
       if (!page) continue;
@@ -97,6 +104,17 @@ export function CommandPalette({
             : toolboxApi.launch(t.id).catch((e) => toast("error", `${t.name}: ${e}`)),
       });
     }
+    for (const c of contacts) {
+      const reach = [c.extension && `Ext. ${c.extension}`, c.phone, c.mobile, c.email].filter(Boolean).join(" · ");
+      out.push({
+        key: `contact:${c.id}`,
+        kind: "contact",
+        title: c.name,
+        subtitle: [reach, c.reason].filter(Boolean).join(" — "),
+        search: norm([c.name, c.role, c.company, c.extension, c.phone, c.mobile, c.email, c.reason, ...c.tags].join(" ")),
+        run: () => onNavigate("contacts", c.id),
+      });
+    }
     for (const c of tools?.custom ?? []) {
       out.push({
         key: `tool:${c.id}`,
@@ -108,7 +126,7 @@ export function CommandPalette({
       });
     }
     return out;
-  }, [tools, tweaks, actions, onNavigate, toast]);
+  }, [tools, tweaks, contacts, actions, onNavigate, toast]);
 
   const results = useMemo(() => {
     const q = norm(query.trim());
@@ -137,11 +155,12 @@ export function CommandPalette({
   const pick = (e: Entry | undefined) => {
     if (!e) return;
     onClose();
-    e.run();
+    const r = e.run();
+    if (r instanceof Promise) r.then((m) => typeof m === "string" && m && toast("ok", m)).catch((err) => toast("error", `${e.title}: ${err}`));
   };
 
   const icon = (k: Kind) => {
-    const I = { page: CornerDownLeft, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap }[k];
+    const I = { page: CornerDownLeft, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound }[k];
     return <I size={14} className="shrink-0 text-neon" />;
   };
 
@@ -168,7 +187,7 @@ export function CommandPalette({
                 onClose();
               }
             }}
-            placeholder="Busca una página, herramienta, ajuste o reparación…"
+            placeholder="Busca una página, acción, problema, herramienta o ajuste…"
             className="flex-1 bg-transparent py-3.5 text-sm text-ink outline-none placeholder:text-mute"
           />
           <kbd className="rounded border border-line px-1.5 font-mono text-[11px] text-mute">Esc</kbd>

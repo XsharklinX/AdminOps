@@ -38,6 +38,11 @@ mod applock;
 mod appcare;
 mod winwatch;
 mod remote;
+mod contacts;
+mod secrets;
+mod smoke;
+mod timeline;
+mod troubleshoot;
 
 use tauri::Manager;
 
@@ -246,6 +251,11 @@ pub fn run() {
             network::speedtest::list_speedtests,
             network::wifi::list_wifi_profiles,
             network::wifi::forget_wifi_profile,
+            network::wifictl::wifi_state,
+            network::wifictl::set_wifi_radio,
+            network::wifictl::restart_wifi_adapter,
+            network::wifictl::remove_ghost_wifi,
+            network::wifictl::wifi_power_saving_off,
             network::lan::lan_info,
             network::lan::public_ip,
             network::lan::router_check,
@@ -312,6 +322,16 @@ pub fn run() {
             appcare::check_update,
             appcare::open_release_page,
             winwatch::list_windows_alerts,
+            troubleshoot::troubleshoot_check,
+            troubleshoot::troubleshoot_fix,
+            troubleshoot::repair_network,
+            troubleshoot::quick_net_check,
+            timeline::machine_timeline,
+            contacts::list_contacts,
+            contacts::save_contact,
+            contacts::delete_contact,
+            contacts::import_contacts,
+            contacts::write_email,
             winwatch::mark_windows_alerts_read,
             winwatch::clear_windows_alerts,
             winwatch::check_windows_now,

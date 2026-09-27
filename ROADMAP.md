@@ -1,6 +1,6 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v1.1.0**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v1.1.1**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
@@ -456,6 +456,34 @@ Pulido para el uso diario.
   Outlook, PowerPoint, reuniones de Teams/Zoom/Meet) y más en Windows, Explorador, navegador, Excel
   y técnico. Una prueba comprueba que todos los que tienen botón «Probar» se pueden simular.
 - Las barras de «Guardar» ya no dependen de la posición ni del ancho de la barra lateral.
+- **1.1.1 — equipos de empresa (Sophos y similares)**: PowerShell sin `-EncodedCommand` ni base64 (el
+  script viaja por la entrada estándar y el canal persistente usa líneas contadas); datos como literales
+  de PowerShell y contraseñas como SecureString cifrada con DPAPI (nunca legibles en el script ni en el
+  registro); el script de elementos sospechosos ya no contiene palabras de malware (se comparan en
+  AdminOps); mensajes claros si el antivirus bloquea una acción o PowerShell está restringido por
+  directiva, y aviso al arrancar si PowerShell no está disponible. Con otro antivirus, las firmas y los
+  análisis de Defender en reposo ya no generan avisos falsos. Prueba de humo con 49 lecturas reales.
+- **1.1.1 — soporte del día a día**:
+  - **Solucionar problemas** (Equipo): eliges el síntoma (no hay Internet, Wi-Fi, no suena,
+    Bluetooth, pantalla, no imprime, va lento, Windows Update) y AdminOps revisa en orden las causas
+    típicas y ofrece la reparación de cada una.
+  - **Reparar la red** en un clic (rápida o a fondo) con la comprobación antes y después.
+  - **Control de la Wi-Fi**: estado real de la tarjeta con el error explicado, encender/apagar,
+    reiniciar la tarjeta, desactivar el ahorro de energía y quitar adaptadores fantasma. Si la tarjeta
+    falla, Dispositivos explica por qué no se ve la red ni la contraseña.
+  - **Aviso automático de dispositivos que dejan de funcionar** (cada 5 min, solo los nuevos), con
+    enlace a su reparación.
+  - **Deshacer desde el aviso**: cada cambio suelto que se puede deshacer lo ofrece en el propio aviso.
+  - **Línea de tiempo del equipo** (Historial): cambios de AdminOps, avisos, diagnósticos,
+    actualizaciones, drivers, programas y apagados bruscos, por días.
+  - La **búsqueda** (Ctrl+K) encuentra acciones y problemas: «no suena», «encender Bluetooth»,
+    «reiniciar el driver de la gráfica», páginas de Configuración de Windows…
+  - **Contactos** (Soporte): agenda del técnico con extensión, teléfonos, correo, para qué llamarle,
+    etiquetas y favoritos; importa y exporta CSV (Excel y Outlook) y se busca desde Ctrl+K. Viaja con
+    AdminOps (en el USB con el portable).
+  - **Portable entre equipos**: las contraseñas de routers se cifran con una clave del USB (AES-256-GCM)
+    en vez de DPAPI, así funcionan en todos los equipos; las antiguas se migran solas. Ajustes explica
+    qué viaja contigo y qué es de cada equipo.
 
 ### Fase 26 — Negocio (más adelante)
 

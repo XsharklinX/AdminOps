@@ -28,6 +28,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import { ProfileEditor } from "../components/ProfileEditor";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, profilesApi, workApi, type ProfileDef, type ProfileResult, type ProfileView } from "../lib/api";
+import { useOnJournalChange } from "../lib/journalEvents";
 
 const ICONS: Record<string, LucideIcon> = {
   briefcase: Briefcase,
@@ -111,6 +112,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [toast]);
 
+  useOnJournalChange(load);
   useEffect(() => {
     load();
   }, [load]);

@@ -84,7 +84,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
         ))}
       </div>
 
-      {tab === "general" && <General s={s} set={set} onImported={() => workApi.settings().then(setS)} />}
+      {tab === "general" && <General s={s} set={set} portable={!!appInfo?.portable} onImported={() => workApi.settings().then(setS)} />}
       {tab === "appearance" && <Appearance />}
       {tab === "navigation" && (
         <div className="space-y-4">
@@ -126,7 +126,7 @@ function Row({ title, sub, children }: { title: string; sub?: string; children: 
 
 const selectClass = "rounded-md border border-line bg-void/60 px-3 py-1.5 text-sm text-ink outline-none focus:border-neon/50";
 
-function General({ s, set, onImported }: SettingsProps & { onImported: () => void }) {
+function General({ s, set, portable, onImported }: SettingsProps & { portable: boolean; onImported: () => void }) {
   const prefs = usePrefs();
   const toast = useToast();
   const pages = NAV.filter((n) => n.id !== "settings");
@@ -191,6 +191,8 @@ function General({ s, set, onImported }: SettingsProps & { onImported: () => voi
         <Autostart />
       </Card>
 
+      <WhereStored portable={portable} />
+
       <DataCare s={s} set={set} />
 
       <Card title="Red y dominio">
@@ -215,6 +217,60 @@ function General({ s, set, onImported }: SettingsProps & { onImported: () => voi
         </div>
       </Card>
     </div>
+  );
+}
+
+/** Qué se guarda una vez para todos los equipos y qué es de cada equipo. */
+function WhereStored({ portable }: { portable: boolean }) {
+  const travels = [
+    "Tus ajustes, marca, precios, checklist y firma",
+    "Portales de Tickets (la dirección; la sesión iniciada puede pedirte entrar otra vez en otro equipo, porque Windows la protege por equipo)",
+    "Accesos a routers, reconocidos por red (con su contraseña cifrada)",
+    "Contactos, clientes, conexiones de acceso remoto y perfiles",
+    "Apariencia, navegación, atajos y favoritos",
+    "Nombres que pongas a dispositivos de la red",
+    "Informes PDF (todos juntos)",
+  ];
+  const perPc = [
+    "Diario de cambios y «Deshacer» (solo sirven en ese equipo)",
+    "Diagnósticos y su comparación",
+    "Avisos de Windows y línea de tiempo",
+    "Sesión de servicio en curso",
+    "Pruebas de velocidad y registro técnico",
+    "Posición y tamaño de la ventana",
+  ];
+  return (
+    <Card title={portable ? "Qué viaja en el USB y qué se queda por equipo" : "Qué se comparte y qué es de cada equipo"}>
+      <p className="mb-3 text-sm text-dim">
+        {portable
+          ? "Con el portable, todo se guarda en la carpeta AdminOps-data del USB, sin dejar nada en el equipo del cliente. Lo tuyo se configura una vez y te acompaña; lo de cada equipo se separa por su nombre para no mezclarse."
+          : "Instalada, los datos están en este equipo. Con la versión portable en un USB, lo de la izquierda te acompaña a todos los equipos."}
+      </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-ok">{portable ? "Viaja contigo (igual en todos)" : "Tuyo (igual en todos, con el portable)"}</p>
+          <ul className="space-y-1 text-xs text-dim">
+            {travels.map((t) => (
+              <li key={t}>· {t}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-neon">Propio de cada equipo</p>
+          <ul className="space-y-1 text-xs text-dim">
+            {perPc.map((t) => (
+              <li key={t}>· {t}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      {portable && (
+        <p className="mt-3 text-xs text-mute">
+          Las contraseñas guardadas van cifradas con una clave del propio USB: funcionan en cualquier equipo, pero no en otro USB. Si pierdes el USB se pierde todo lo
+          anterior: exporta de vez en cuando la configuración y los contactos (CSV), y activa el bloqueo con PIN en Seguridad.
+        </p>
+      )}
+    </Card>
   );
 }
 

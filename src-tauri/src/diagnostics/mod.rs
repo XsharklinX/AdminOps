@@ -390,7 +390,9 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                     .with(vec![tool("Seguridad de Windows", Tool::WindowsSecurity)]),
             );
         }
-        if let Some(age) = s.signature_age_days.filter(|a| *a >= 7) {
+        // Firmas y análisis son datos de Defender: con otro antivirus (Sophos, ESET…)
+        // Defender queda en reposo y esas fechas se quedan viejas sin que sea un problema.
+        if let Some(age) = s.signature_age_days.filter(|a| *a >= 7 && !third_party_av) {
             f.push(
                 finding(Warn, "Seguridad", format!("Firmas del antivirus con {age} días de antigüedad"), None)
                     .with(vec![tool("Seguridad de Windows", Tool::WindowsSecurity)]),
@@ -490,7 +492,8 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
             .with(vec![page("Actualizar software", "software", None)]),
         );
     }
-    if let Some(days) = d.system.data.as_ref().and_then(|s| s.quick_scan_age_days).filter(|d| *d >= 14) {
+    let defender_is_the_av = d.system.data.as_ref().is_none_or(|s| s.antivirus.iter().all(|a| a.to_lowercase().contains("defender")));
+    if let Some(days) = d.system.data.as_ref().and_then(|s| s.quick_scan_age_days).filter(|d| *d >= 14 && defender_is_the_av) {
         f.push(
             finding(Warn, "Seguridad", format!("Sin análisis antivirus desde hace {days} días"), None)
                 .with(vec![page("Analizar ahora", "repair", Some("repair.defender-scan"))]),

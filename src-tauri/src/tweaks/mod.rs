@@ -47,11 +47,13 @@ pub struct TweakState {
     journal: Mutex<journal::Journal>,
     last_restore_point: Mutex<Option<Instant>>,
     build: u32,
+    /// Para avisar a la interfaz de cada cambio que se puede deshacer (botón en el aviso).
+    app: Option<tauri::AppHandle>,
 }
 
 impl TweakState {
     pub fn new(app: &tauri::AppHandle) -> Self {
-        Self::with_data_dir(crate::paths::machine_data_dir(app))
+        Self { app: Some(app.clone()), ..Self::with_data_dir(crate::paths::machine_data_dir(app)) }
     }
 
     /// Estado con el diario en `dir` (modo línea de comandos y pruebas).
@@ -64,6 +66,7 @@ impl TweakState {
             journal: Mutex::new(journal::Journal::load(dir.join("journal.json"))),
             last_restore_point: Mutex::new(None),
             build,
+            app: None,
         }
     }
 
@@ -111,7 +114,23 @@ impl TweakState {
     }
 
     fn log(&self, e: Entry) -> u64 {
-        self.journal.lock().unwrap_or_else(|e| e.into_inner()).push(e)
+        let (id, undoable) = {
+            let mut j = self.journal.lock().unwrap_or_else(|e| e.into_inner());
+            let id = j.push(e);
+            (id, j.get(id).map(|x| (x.undoable, x.title.clone())))
+        };
+        if let (Some(app), Some((true, title))) = (&self.app, undoable) {
+            use tauri::Emitter;
+            let _ = app.emit("undoable-change", serde_json::json!({ "id": id, "title": title }));
+        }
+        id
+    }
+
+    /// Ejecuta una tarea del catálogo (reparación, limpieza) desde otra parte de AdminOps.
+    pub fn run_catalog(&self, id: &str) -> Result<String, String> {
+        let t = self.find(id)?;
+        self.check_can_modify(t)?;
+        run_logged(self, t, None)
     }
 
     /// Registra en el diario una operación ajena al catálogo (finalizar un

@@ -393,7 +393,7 @@ pub async fn router_check(gateway: String, wifi_auth: String) -> Result<RouterCh
 // ---------- Credenciales del router (cifradas con DPAPI) ----------
 
 #[cfg(windows)]
-fn dpapi(data: &[u8], protect: bool) -> Result<Vec<u8>, String> {
+pub(crate) fn dpapi(data: &[u8], protect: bool) -> Result<Vec<u8>, String> {
     use windows_sys::Win32::Foundation::LocalFree;
     use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CryptUnprotectData, CRYPT_INTEGER_BLOB};
     let input = CRYPT_INTEGER_BLOB { cbData: data.len() as u32, pbData: data.as_ptr() as *mut u8 };
@@ -414,25 +414,16 @@ fn dpapi(data: &[u8], protect: bool) -> Result<Vec<u8>, String> {
 }
 
 #[cfg(not(windows))]
-fn dpapi(_: &[u8], _: bool) -> Result<Vec<u8>, String> {
+pub(crate) fn dpapi(_: &[u8], _: bool) -> Result<Vec<u8>, String> {
     Err("Solo disponible en Windows.".into())
 }
 
 fn encrypt(secret: &str) -> Result<String, String> {
-    use base64::Engine;
-    if secret.is_empty() {
-        return Ok(String::new());
-    }
-    Ok(base64::engine::general_purpose::STANDARD.encode(dpapi(secret.as_bytes(), true)?))
+    crate::secrets::seal(secret)
 }
 
 fn decrypt(stored: &str) -> Result<String, String> {
-    use base64::Engine;
-    if stored.is_empty() {
-        return Ok(String::new());
-    }
-    let raw = base64::engine::general_purpose::STANDARD.decode(stored).map_err(|_| "Contraseña guardada dañada.".to_string())?;
-    String::from_utf8(dpapi(&raw, false)?).map_err(|_| "Contraseña guardada dañada.".into())
+    crate::secrets::open(stored)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -477,7 +468,19 @@ fn view(s: StoredRouter) -> RouterProfile {
 
 #[tauri::command]
 pub fn list_routers(app: tauri::AppHandle) -> Vec<RouterProfile> {
-    let list: Vec<StoredRouter> = crate::paths::read_json(&routers_path(&app));
+    let mut list: Vec<StoredRouter> = crate::paths::read_json(&routers_path(&app));
+    // Portable: las guardadas en el equipo (DPAPI) pasan al formato del USB.
+    let mut changed = false;
+    for r in &mut list {
+        if let Some(p) = crate::secrets::upgrade(&r.password) {
+            r.password = p;
+            changed = true;
+        }
+    }
+    if changed {
+        let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _ = crate::paths::write_json(&routers_path(&app), &list);
+    }
     let mut v: Vec<RouterProfile> = list.into_iter().map(view).collect();
     v.sort_by_key(|r| std::cmp::Reverse(r.updated));
     v

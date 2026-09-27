@@ -46,7 +46,7 @@ pub fn parse(keys: &[String]) -> Result<Vec<u16>, String> {
 }
 
 #[cfg(windows)]
-fn send(codes: &[u16]) -> Result<(), String> {
+pub fn send(codes: &[u16]) -> Result<(), String> {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP};
     let key = |vk: u16, up: bool| INPUT {
         r#type: INPUT_KEYBOARD,
@@ -60,7 +60,7 @@ fn send(codes: &[u16]) -> Result<(), String> {
 }
 
 #[cfg(not(windows))]
-fn send(_: &[u16]) -> Result<(), String> {
+pub fn send(_: &[u16]) -> Result<(), String> {
     Err("Solo disponible en Windows.".into())
 }
 

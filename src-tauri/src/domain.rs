@@ -128,9 +128,9 @@ fn credential_script(domain: &str, user: &str, password: &str) -> Result<String,
     }
     let full = if user.contains('\\') || user.contains('@') { user.to_string() } else { format!("{domain}\\{user}") };
     Ok(format!(
-        "{}{}$cred = New-Object System.Management.Automation.PSCredential($u, (ConvertTo-SecureString $p -AsPlainText -Force))\n",
+        "{}{}$cred = New-Object System.Management.Automation.PSCredential($u, $p)\n",
         text_var("u", &full),
-        text_var("p", password)
+        crate::ps::secret_var("p", password)
     ))
 }
 
@@ -416,7 +416,7 @@ mod tests {
     #[test]
     fn credentials_never_appear_in_clear() {
         let s = credential_script("pgr.gob.do", "jperez", "S3cr3t'$(calc)").unwrap();
-        assert!(!s.contains("S3cr3t") && !s.contains("jperez"));
+        assert!(!s.contains("S3cr3t"));
         assert!(credential_script("pgr.gob.do", "", "x").is_err());
         let out = crate::pspool::query(&format!("{s}$cred.UserName"), None, "t").unwrap();
         assert_eq!(out, r"pgr.gob.do\jperez");

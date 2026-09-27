@@ -89,7 +89,7 @@ ConvertTo-Json -InputObject $r -Depth 3 -Compress
 
 /// Ping ICMP con la API de Windows (no depende del idioma de ping.exe).
 #[cfg(windows)]
-fn ping(label: &str, target: &str, count: u32) -> PingResult {
+pub fn ping(label: &str, target: &str, count: u32) -> PingResult {
     use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
     use windows_sys::Win32::NetworkManagement::IpHelper::{IcmpCloseHandle, IcmpCreateFile, IcmpSendEcho, ICMP_ECHO_REPLY};
 
@@ -134,7 +134,7 @@ fn ping(label: &str, target: &str, count: u32) -> PingResult {
     }
 }
 
-fn resolve(host: &str) -> DnsResult {
+pub fn resolve(host: &str) -> DnsResult {
     let start = Instant::now();
     let r = (host, 443).to_socket_addrs();
     let ms = start.elapsed().as_secs_f64() * 1000.0;

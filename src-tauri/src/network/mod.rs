@@ -2,6 +2,7 @@
 
 pub mod diag;
 pub mod identify;
+pub mod wifictl;
 pub mod lan;
 pub mod speedtest;
 pub mod tools;

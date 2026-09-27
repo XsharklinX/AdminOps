@@ -274,14 +274,14 @@ pub fn create_user(user: NewUser, tweaks: State<'_, TweakState>) -> Result<(), S
         "{}{}{}$admin = ${}\n$never = ${}\n$mustChange = ${}\n{}",
         ps_text("n", &name),
         ps_text("full", &full),
-        ps_text("pw", &user.password),
+        crate::ps::secret_var("pw", &user.password),
         user.admin,
         user.password_never_expires,
         user.must_change,
         r#"
 $params = @{ Name = $n; FullName = $full; AccountNeverExpires = $true }
 if ($pw) {
-  $params.Password = ConvertTo-SecureString $pw -AsPlainText -Force
+  $params.Password = $pw
   if ($never -and -not $mustChange) { $params.PasswordNeverExpires = $true }
 } else {
   $params.NoPassword = $true
@@ -318,11 +318,11 @@ pub fn set_user_password(sid: String, password: String, must_change: bool, tweak
     let name = find(&users, &sid)?.name.clone();
     let script = format!(
         "$sid = '{sid}'\n{}$mustChange = ${must_change}\n{}",
-        ps_text("pw", &password),
+        crate::ps::secret_var("pw", &password),
         r#"
 $u = Get-LocalUser -SID $sid
 if ($pw) {
-  Set-LocalUser -SID $sid -Password (ConvertTo-SecureString $pw -AsPlainText -Force)
+  Set-LocalUser -SID $sid -Password $pw
 } else {
   $a = [ADSI]"WinNT://$env:COMPUTERNAME/$($u.Name),user"
   $a.SetPassword('')
@@ -530,10 +530,19 @@ mod tests {
 
     #[test]
     fn passwords_travel_encoded() {
-        let line = ps_text("pw", "O'Neil \"x\" $(calc)");
+        let line = crate::ps::secret_var("pw", "O'Neil \"x\" $(calc) ñ");
         assert!(!line.contains("O'Neil") && !line.contains("calc"));
-        let out = crate::pspool::query(&format!("{line}$pw"), None, "t").unwrap();
-        assert_eq!(out, "O'Neil \"x\" $(calc)");
+        let out = crate::pspool::query(
+            &format!("{line}[Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))"),
+            None,
+            "t",
+        )
+        .unwrap();
+        assert_eq!(out, "O'Neil \"x\" $(calc) ñ");
+        assert_eq!(crate::ps::secret_var("pw", ""), "$pw = $null\n");
+        // Los textos normales van literales, sin interpretar nada.
+        let t = ps_text("t", "O'Neil ‘x’ $(calc)");
+        assert_eq!(crate::pspool::query(&format!("{t}$t"), None, "t").unwrap(), "O'Neil ‘x’ $(calc)");
     }
 
     /// Solo lectura: lista los usuarios reales de este equipo.

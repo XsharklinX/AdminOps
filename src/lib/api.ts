@@ -889,9 +889,33 @@ export const usersApi = {
   remove: (sid: string, deleteProfile: boolean) => invoke<void>("delete_user", { sid, deleteProfile }),
 };
 
+export interface WifiAdapter {
+  name: string;
+  description: string;
+  instanceId: string;
+  present: boolean;
+  status: string;
+  problem: number;
+  problemText: string;
+  powerSaving: boolean | null;
+}
+
+export interface WifiState {
+  adapters: WifiAdapter[];
+  radioOn: boolean | null;
+  serviceRunning: boolean;
+  summary: string;
+  level: "ok" | "off" | "error" | "none";
+}
+
 export const wifiApi = {
   list: () => invoke<WifiProfile[]>("list_wifi_profiles"),
   forget: (name: string) => invoke<void>("forget_wifi_profile", { name }),
+  state: () => invoke<WifiState>("wifi_state"),
+  setRadio: (on: boolean) => invoke<boolean>("set_wifi_radio", { on }),
+  restartAdapter: (instanceId: string) => invoke<void>("restart_wifi_adapter", { instanceId }),
+  removeGhosts: () => invoke<number>("remove_ghost_wifi"),
+  powerSavingOff: (name: string) => invoke<void>("wifi_power_saving_off", { name }),
 };
 
 // ---------- Instalar programas y red avanzada (v0.12) ----------
@@ -1612,4 +1636,83 @@ export const remoteApi = {
   install: (tool: string) => invoke<void>("install_remote_tool", { tool }),
   server: () => invoke<RdpServer>("rdp_server"),
   setUser: (user: string, allow: boolean) => invoke<void>("set_rdp_user", { user, allow }),
+};
+
+// ---------- Solucionar problemas, reparación de red y línea de tiempo (1.1.1) ----------
+
+export type Symptom = "internet" | "wifi" | "audio" | "bluetooth" | "display" | "printer" | "slow" | "winupdate";
+
+export interface TroubleFix {
+  id: string;
+  label: string;
+  admin: boolean;
+  confirm: string | null;
+}
+
+export interface TroubleFinding {
+  level: "ok" | "info" | "warn" | "bad";
+  title: string;
+  detail: string;
+  fixes: TroubleFix[];
+  page: string | null;
+}
+
+export interface NetCheck {
+  connected: boolean;
+  noDhcpAddress: boolean;
+  adapter: string;
+  gateway: boolean | null;
+  internet: boolean;
+  dns: boolean;
+}
+
+export interface NetRepair {
+  before: NetCheck;
+  after: NetCheck;
+  steps: { title: string; ok: boolean; detail: string }[];
+  reboot: boolean;
+}
+
+export const troubleshootApi = {
+  check: (symptom: Symptom) => invoke<{ symptom: Symptom; findings: TroubleFinding[] }>("troubleshoot_check", { symptom }),
+  fix: (id: string) => invoke<string>("troubleshoot_fix", { id }),
+  repairNetwork: (deep: boolean) => invoke<NetRepair>("repair_network", { deep }),
+  netCheck: () => invoke<NetCheck>("quick_net_check"),
+};
+
+export interface TimelineEvent {
+  time: number;
+  kind: "change" | "alert" | "scan" | "windows";
+  level: "ok" | "info" | "warn" | "bad";
+  title: string;
+  detail: string;
+  page: string | null;
+}
+
+export const timelineApi = {
+  list: (days: number) => invoke<TimelineEvent[]>("machine_timeline", { days }),
+};
+
+export interface Contact {
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  extension: string;
+  phone: string;
+  mobile: string;
+  email: string;
+  reason: string;
+  tags: string[];
+  notes: string;
+  favorite: boolean;
+  updated: number;
+}
+
+export const contactsApi = {
+  list: () => invoke<Contact[]>("list_contacts"),
+  save: (contact: Contact) => invoke<Contact>("save_contact", { contact }),
+  remove: (id: string) => invoke<void>("delete_contact", { id }),
+  importCsv: () => invoke<{ added: number; updated: number } | null>("import_contacts"),
+  email: (email: string) => invoke<void>("write_email", { email }),
 };
