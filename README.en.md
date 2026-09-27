@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-0.16.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-0.17.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Download](https://img.shields.io/badge/download-installer%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -105,6 +105,7 @@ or build your own. One restore point per profile, and it can be undone as a whol
 | **Printers** | Status, paper jams, clear the queue, test page and remove ghost printers. |
 | **Repairs** | SFC, DISM, network reset, Windows Update, print spooler, Explorer, time sync, icon cache and RAM test. |
 | **Report** | Professional PDF ready to hand over: PC status, hardware, findings, changes and speed. |
+| **Keyboard shortcuts** | About 150 shortcuts by category (Windows, windows, screenshots, browser, Excel, tech…), a "discover" mode that tells you what the combination you press does, and a button to try them. |
 | **History** | Everything that was applied, with undo, plus the technical activity log. |
 
 ## Download & install
@@ -113,7 +114,8 @@ Get the latest version from **[Releases](https://github.com/XsharklinX/AdminOps/
 
 | File | Use it for |
 | --- | --- |
-| `AdminOps_x.y.z_x64-setup.exe` | **Installer**: for your own PC. Creates shortcuts and uninstalls from Windows settings. |
+| `AdminOps-x.y.z-Setup.exe` | **Installer**: for your own PC. Detects an existing AdminOps and updates it, keeping your data. |
+| `AdminOps-x.y.z-instalador-clasico.exe` | **Classic installer**: the same, with the usual wizard. Supports `/S` for silent installs on many PCs. |
 | `AdminOps-x.y.z-portable.zip` | **Portable**: unzip it onto a USB stick. Data is stored next to the executable (`AdminOps-data\`), separated per PC. |
 
 > [!NOTE]

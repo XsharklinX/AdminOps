@@ -1,6 +1,6 @@
 [package]
 name = "adminops"
-version = "0.16.0"
+version = "0.17.0"
 description = "AdminOps - optimizacion y diagnostico de Windows"
 authors = ["David Bonilla"]
 edition = "2021"
@@ -46,7 +46,7 @@ panic = "abort"
 strip = true
 
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_WiFi", "Win32_Networking_WinSock", "Win32_Storage_FileSystem", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_WiFi", "Win32_Networking_WinSock", "Win32_Storage_FileSystem", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.56.0"
 # Mismas versiones que usa Tauri: activar "recordar contraseña" en los portales de Tickets.
 webview2-com = "0.38.2"

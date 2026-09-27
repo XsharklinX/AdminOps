@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-0.16.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-0.17.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
@@ -102,6 +102,7 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | **Impresoras** | Estado, atascos, vaciar la cola, página de prueba y quitar impresoras fantasma. |
 | **Reparaciones** | SFC, DISM, reinicio de red, Windows Update, cola de impresión, Explorador, hora, caché de iconos y prueba de RAM. |
 | **Informe** | PDF profesional listo para entregar: estado del equipo, hardware, hallazgos, cambios y velocidad. |
+| **Atajos de teclado** | Unos 150 atajos por categorías (Windows, ventanas, capturas, navegador, Excel, técnico…), modo «descubrir» que dice qué hace la combinación que pulsas y botón para probarlos. |
 | **Historial** | Todo lo aplicado, con opción de deshacer, y el registro técnico de actividad. |
 
 ## Descarga e instalación
@@ -110,7 +111,8 @@ Descarga la última versión desde **[Releases](https://github.com/XsharklinX/Ad
 
 | Archivo | Para qué |
 | --- | --- |
-| `AdminOps_x.y.z_x64-setup.exe` | **Instalador**: para tu propio equipo. Crea accesos directos y se desinstala desde Windows. |
+| `AdminOps-x.y.z-Setup.exe` | **Instalador**: para tu propio equipo. Detecta si ya tienes AdminOps y lo actualiza conservando tus datos. |
+| `AdminOps-x.y.z-instalador-clasico.exe` | **Instalador clásico**: el mismo, con el asistente de siempre. Admite `/S` para instalar en silencio en muchos equipos. |
 | `AdminOps-x.y.z-portable.zip` | **Portable**: descomprímelo en un USB. Guarda los datos al lado del ejecutable (`AdminOps-data\`), separados por equipo. |
 
 > [!NOTE]

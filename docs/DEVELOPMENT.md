@@ -13,6 +13,14 @@ npm run tauri build    # instalador NSIS en src-tauri/target/release/bundle/
 npm run build:release  # instalador + zip portable juntos en release/v<versión>/
 ```
 
+## Instalador personalizado
+
+`installer/` es una app Tauri mínima con interfaz propia (`installer/ui/index.html`) que lleva dentro el
+instalador NSIS de AdminOps (`installer/build.rs` lo incrusta) y lo ejecuta en silencio (`/S /D=carpeta`).
+`npm run build:release` la compila después de AdminOps y deja en `release/v<versión>/` el instalador
+nuevo (`-Setup.exe`), el clásico (`-instalador-clasico.exe`, admite `/S` para despliegues) y el portable.
+Si el equipo no tiene WebView2, el instalador nuevo abre directamente el clásico.
+
 ## Modo portable
 
 Si junto a `AdminOps.exe` hay un archivo `AdminOps.portable`, todos los datos van a
@@ -138,5 +146,5 @@ concreto (y, desde la Fase 2, un `id` de tweak del catálogo embebido en el bina
 
 ## Roadmap
 
-Fases 1–16 completadas (v0.16.0). Lo siguiente, la deuda técnica conocida y los criterios de cada
+Fases 1–17 completadas (v0.17.0). Lo siguiente, la deuda técnica conocida y los criterios de cada
 fase están en [ROADMAP.md](../ROADMAP.md).

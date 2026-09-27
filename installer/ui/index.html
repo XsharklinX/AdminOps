@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Instalar AdminOps</title>
+<style>
+  :root {
+    --void: #07090d; --panel: #0c1016; --panel2: #111722; --line: #1b2331; --line2: #263041;
+    --ink: #e6edf7; --dim: #8b97aa; --mute: #56627a; --neon: #22e1ff; --neon2: #b56cff;
+    --ok: #3dff9a; --warn: #ffc53d; --bad: #ff4d6d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    background: var(--void); color: var(--ink); overflow: hidden; user-select: none;
+    border: 1px solid var(--line2);
+  }
+  /* Fondo: rejilla tenue y halo del color de la marca */
+  .bg {
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(600px 300px at 18% 30%, rgba(34, 225, 255, .10), transparent 70%),
+      radial-gradient(500px 300px at 90% 90%, rgba(181, 108, 255, .10), transparent 70%),
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 28px 28px;
+  }
+  .titlebar { position: relative; height: 38px; display: flex; align-items: center; padding: 0 6px 0 16px; }
+  .titlebar .name { font-size: 12px; color: var(--mute); letter-spacing: .08em; text-transform: uppercase; flex: 1; }
+  .titlebar button { width: 38px; height: 30px; border: 0; background: none; color: var(--dim); border-radius: 6px; cursor: pointer; font-size: 15px; }
+  .titlebar button:hover { background: var(--panel2); color: var(--ink); }
+  .titlebar button.x:hover { background: #c42b1c; color: #fff; }
+  main { position: relative; display: flex; height: calc(100% - 38px); padding: 8px 40px 32px; gap: 40px; }
+  .brand { width: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .logo { width: 132px; height: 132px; filter: drop-shadow(0 0 28px rgba(34, 225, 255, .45)); animation: float 6s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-6px); } }
+  .brand h1 { margin-top: 18px; font-size: 34px; font-weight: 650; letter-spacing: -.02em;
+    background: linear-gradient(90deg, var(--neon), var(--neon2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .brand .ver { margin-top: 4px; font-family: Consolas, monospace; font-size: 12px; color: var(--dim); }
+  .brand .by { margin-top: 18px; font-size: 11px; color: var(--mute); letter-spacing: .05em; }
+  .brand .by b { color: var(--dim); }
+  .content { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .screen { display: none; animation: in .35s ease; }
+  .screen.on { display: block; }
+  @keyframes in { from { opacity: 0; transform: translateY(8px); } }
+  h2 { font-size: 22px; font-weight: 600; }
+  p.lead { margin-top: 8px; color: var(--dim); font-size: 13.5px; line-height: 1.55; }
+  .features { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 12.5px; color: var(--dim); }
+  .features div::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 8px var(--neon); margin-right: 8px; vertical-align: middle; }
+  .path { margin-top: 22px; display: flex; gap: 8px; }
+  .path input { flex: 1; min-width: 0; background: rgba(7,9,13,.7); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 9px 12px; font: 12px Consolas, monospace; outline: none; }
+  .path input:focus { border-color: rgba(34,225,255,.5); }
+  .opts { margin-top: 12px; display: flex; gap: 20px; font-size: 12.5px; color: var(--dim); }
+  .opts label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  .opts input { accent-color: var(--neon); width: 15px; height: 15px; }
+  .actions { margin-top: 24px; display: flex; align-items: center; gap: 12px; }
+  .btn { border: 1px solid var(--line2); background: var(--panel2); color: var(--ink); border-radius: 8px; padding: 9px 16px; font: inherit; font-size: 13px; cursor: pointer; transition: .15s; }
+  .btn:hover { border-color: rgba(34,225,255,.4); }
+  .btn.primary { border: 0; padding: 11px 28px; font-weight: 600; font-size: 14px; color: #041016;
+    background: linear-gradient(90deg, var(--neon), #6fe9ff); box-shadow: 0 0 24px -6px var(--neon); }
+  .btn.primary:hover { box-shadow: 0 0 32px -4px var(--neon); transform: translateY(-1px); }
+  .btn:disabled { opacity: .4; pointer-events: none; }
+  .link { background: none; border: 0; color: var(--mute); font: inherit; font-size: 12px; cursor: pointer; }
+  .link:hover { color: var(--ink); }
+  .note { margin-top: 12px; font-size: 12px; padding: 8px 12px; border-radius: 8px; display: none; }
+  .note.warn { display: block; color: var(--warn); background: rgba(255,197,61,.07); border: 1px solid rgba(255,197,61,.25); }
+  .note.bad { display: block; color: var(--bad); background: rgba(255,77,109,.07); border: 1px solid rgba(255,77,109,.25); }
+  /* Progreso */
+  .bar { margin-top: 26px; height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 99px; transition: width .4s ease;
+    background: linear-gradient(90deg, var(--neon), var(--neon2)); box-shadow: 0 0 14px var(--neon); position: relative; }
+  .bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: shine 1.4s linear infinite; }
+  @keyframes shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .progress-row { margin-top: 10px; display: flex; justify-content: space-between; font-size: 12.5px; color: var(--dim); }
+  .progress-row b { font-family: Consolas, monospace; color: var(--neon); font-weight: 500; }
+  .tip { margin-top: 34px; padding: 14px 16px; border: 1px solid var(--line); background: rgba(12,16,22,.7); border-radius: 10px; min-height: 76px; }
+  .tip small { font-size: 10px; letter-spacing: .14em; color: var(--mute); text-transform: uppercase; }
+  .tip div { margin-top: 5px; font-size: 13px; color: var(--dim); line-height: 1.5; transition: opacity .4s; }
+  .tip kbd { font: 11px Consolas, monospace; border: 1px solid var(--line2); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+  /* Listo */
+  .check { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--ok); box-shadow: 0 0 30px -6px var(--ok); margin-bottom: 18px; }
+  .check svg { width: 30px; height: 30px; stroke: var(--ok); stroke-width: 3; fill: none; stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .6s .15s ease forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .err { font: 12px Consolas, monospace; color: var(--bad); margin-top: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="titlebar" data-tauri-drag-region>
+  <span class="name" data-tauri-drag-region>Instalación</span>
+  <button id="min" title="Minimizar">&#8211;</button>
+  <button id="close" class="x" title="Cerrar">&#10005;</button>
+</div>
+<main>
+  <section class="brand" data-tauri-drag-region>
+    <img class="logo" src="logo.svg" alt="" draggable="false" />
+    <h1>AdminOps</h1>
+    <div class="ver" id="ver">v…</div>
+    <div class="by">por <b>David Bonilla</b></div>
+  </section>
+
+  <section class="content">
+    <!-- Bienvenida -->
+    <div class="screen on" id="s-welcome">
+      <h2 id="w-title">Instalar AdminOps</h2>
+      <p class="lead" id="w-lead">Diagnóstico, optimización y servicio técnico para Windows, en una sola app.</p>
+      <div class="features">
+        <div>Diagnóstico y nota de seguridad</div>
+        <div>Cambios que se pueden deshacer</div>
+        <div>Informes PDF para el cliente</div>
+        <div>Más de 90 herramientas de Windows</div>
+      </div>
+      <div class="path">
+        <input id="dir" spellcheck="false" />
+        <button class="btn" id="browse">Cambiar…</button>
+      </div>
+      <div class="opts">
+        <label><input type="checkbox" id="desktop" checked /> Acceso directo en el escritorio</label>
+        <label><input type="checkbox" id="launch" checked /> Abrir al terminar</label>
+      </div>
+      <div class="note" id="w-note"></div>
+      <div class="actions">
+        <button class="btn primary" id="install">Instalar</button>
+        <button class="link" id="classic">Usar el instalador clásico</button>
+      </div>
+    </div>
+
+    <!-- Instalando -->
+    <div class="screen" id="s-progress">
+      <h2 id="p-title">Instalando AdminOps…</h2>
+      <p class="lead">Solo unos segundos. No hace falta que hagas nada.</p>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="progress-row"><span id="step">Preparando…</span><b id="pct">0%</b></div>
+      <div class="tip"><small>¿Sabías que…?</small><div id="tip"></div></div>
+    </div>
+
+    <!-- Listo -->
+    <div class="screen" id="s-done">
+      <div class="check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h2 id="d-title">AdminOps está listo</h2>
+      <p class="lead">Lo encontrarás en el menú Inicio. Todo lo que cambie en el equipo quedará en el Historial y se podrá deshacer.</p>
+      <div class="actions">
+        <button class="btn primary" id="open">Abrir AdminOps</button>
+        <button class="btn" id="finish">Cerrar</button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="screen" id="s-error">
+      <h2>No se pudo completar la instalación</h2>
+      <div class="err" id="err"></div>
+      <div class="actions">
+        <button class="btn primary" id="retry">Reintentar</button>
+        <button class="btn" id="classic2">Instalador clásico</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === id));
+  let info = null;
+  let installedDir = null;
+
+  const TIPS = [
+    "<kbd>Ctrl</kbd> + <kbd>K</kbd> busca cualquier página, herramienta, ajuste o reparación de AdminOps.",
+    "Todo lo que AdminOps cambia queda en el Historial y se puede deshacer con un clic.",
+    "La página Seguridad te da una nota de 0 a 100 y un botón para arreglar cada punto.",
+    "En modo portable, AdminOps funciona desde un USB sin dejar rastro en el equipo del cliente.",
+    "El informe PDF compara el equipo antes y después de tu trabajo.",
+    "Marca con la estrella tus secciones favoritas para tenerlas siempre arriba.",
+  ];
+  let tipIndex = 0;
+  const nextTip = () => {
+    const el = $("tip");
+    el.style.opacity = 0;
+    setTimeout(() => { el.innerHTML = TIPS[tipIndex++ % TIPS.length]; el.style.opacity = 1; }, 250);
+  };
+
+  function note(kind, text) {
+    const n = $("w-note");
+    n.className = "note " + (kind || "");
+    n.textContent = text || "";
+  }
+
+  async function init() {
+    info = await invoke("setup_info");
+    $("ver").textContent = "v" + info.version;
+    $("dir").value = info.installDir;
+    if (info.installedVersion) {
+      if (info.downgrade) {
+        $("w-title").textContent = "Ya tienes una versión más nueva";
+        $("w-lead").textContent = `Está instalada la ${info.installedVersion} y este instalador es de la ${info.version}.`;
+        $("install").disabled = true;
+      } else if (info.installedVersion === info.version) {
+        $("w-title").textContent = "Reinstalar AdminOps";
+        $("w-lead").textContent = `La versión ${info.version} ya está instalada. Puedes reinstalarla si algo no funciona.`;
+        $("install").textContent = "Reinstalar";
+      } else {
+        $("w-title").textContent = "Actualizar AdminOps";
+        $("w-lead").textContent = `De la versión ${info.installedVersion} a la ${info.version}. Tus datos, clientes y ajustes se conservan.`;
+        $("install").textContent = "Actualizar";
+      }
+      $("desktop").closest("label").style.display = "none"; // al actualizar se respetan los accesos que ya hay
+    }
+    if (info.appRunning) note("warn", "AdminOps está abierto: se cerrará para continuar.");
+  }
+
+  async function doInstall() {
+    show("s-progress");
+    $("p-title").textContent = info && info.installedVersion && !info.downgrade ? "Actualizando AdminOps…" : "Instalando AdminOps…";
+    nextTip();
+    const tipTimer = setInterval(nextTip, 4500);
+    try {
+      installedDir = await invoke("install", { dir: $("dir").value, desktop: info && info.installedVersion ? true : $("desktop").checked, closeApp: true });
+      clearInterval(tipTimer);
+      $("d-title").textContent = info && info.installedVersion ? "AdminOps se actualizó" : "AdminOps está listo";
+      setTimeout(() => {
+        show("s-done");
+        if ($("launch").checked) setTimeout(openApp, 1200);
+      }, 500);
+    } catch (e) {
+      clearInterval(tipTimer);
+      $("err").textContent = String(e);
+      show("s-error");
+    }
+  }
+
+  async function openApp() {
+    try {
+      await invoke("launch", { dir: installedDir });
+      invoke("quit");
+    } catch (e) {
+      $("err").textContent = String(e);
+      show("s-error");
+    }
+  }
+
+  listen("progress", (e) => {
+    $("bar").style.width = e.payload.percent + "%";
+    $("pct").textContent = e.payload.percent + "%";
+    $("step").textContent = e.payload.step;
+  });
+
+  $("install").onclick = doInstall;
+  $("retry").onclick = () => { show("s-welcome"); init(); };
+  $("browse").onclick = async () => { const d = await invoke("pick_dir"); if (d) $("dir").value = d; };
+  $("classic").onclick = $("classic2").onclick = () => invoke("classic").catch((e) => note("bad", String(e)));
+  $("open").onclick = openApp;
+  $("finish").onclick = () => invoke("quit");
+  $("close").onclick = () => invoke("quit");
+  $("min").onclick = () => window.__TAURI__.window.getCurrentWindow().minimize();
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  init().catch((e) => note("bad", String(e)));
+</script>
+</body>
+</html>

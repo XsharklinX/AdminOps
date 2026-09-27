@@ -15,6 +15,7 @@ import {
   Gauge,
   HardDrive,
   HardDriveDownload,
+  Keyboard,
   History,
   Layers,
   Package,
@@ -70,6 +71,7 @@ export type PageId =
   | "repair"
   | "report"
   | "history"
+  | "shortcuts"
   | "settings";
 
 interface NavItem {
@@ -116,6 +118,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "clients", label: "Clientes", icon: Users },
       { id: "report", label: "Informe", icon: FileText },
       { id: "history", label: "Historial", icon: History },
+      { id: "shortcuts", label: "Atajos de teclado", icon: Keyboard },
     ],
   },
   {

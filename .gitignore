@@ -30,3 +30,7 @@ release/
 tests/sandbox/work/
 roundtrip.json
 src-tauri/target-bench/
+
+# Instalador personalizado
+installer/target/
+installer/gen/

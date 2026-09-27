@@ -4,6 +4,7 @@ mod domain;
 mod drivers;
 mod elevation;
 mod hardware;
+mod keys;
 mod maintenance;
 mod metrics;
 mod migrate;
@@ -183,6 +184,7 @@ pub fn run() {
             maintenance::restore_drivers,
             maintenance::maintenance_schedule,
             maintenance::set_maintenance_schedule,
+            keys::try_shortcut,
             security::security_audit,
             security::bitlocker_status,
             security::bitlocker_keys,

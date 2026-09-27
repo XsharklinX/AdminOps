@@ -1,14 +1,16 @@
 ﻿# Reúne en una sola carpeta todo lo que se distribuye de una versión:
 #   release\v<versión>\
-#     AdminOps_<versión>_x64-setup.exe     instalador
-#     AdminOps-<versión>-portable.zip      portable (AdminOps.exe + AdminOps.portable)
+#     AdminOps-<versión>-Setup.exe                 instalador con interfaz propia (el normal)
+#     AdminOps-<versión>-instalador-clasico.exe    instalador NSIS (admite /S para instalar en silencio)
+#     AdminOps-<versión>-portable.zip              portable (AdminOps.exe + AdminOps.portable)
 # Uso: npm run build:release  (compila y empaqueta)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $version = (Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
 $exe = Join-Path $root 'src-tauri\target\release\adminops.exe'
 $setup = Join-Path $root "src-tauri\target\release\bundle\nsis\AdminOps_${version}_x64-setup.exe"
-foreach ($f in $exe, $setup) {
+$custom = Join-Path $root 'src-tauri\target\release\adminops-setup.exe'
+foreach ($f in $exe, $setup, $custom) {
   if (-not (Test-Path $f)) { throw "No existe $f. Compila primero: npm run build:release" }
 }
 
@@ -16,8 +18,9 @@ $out = Join-Path $root "release\v$version"
 Remove-Item $out -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $out | Out-Null
 
-# Instalador
-Copy-Item $setup $out
+# Instaladores
+Copy-Item $custom (Join-Path $out "AdminOps-$version-Setup.exe")
+Copy-Item $setup (Join-Path $out "AdminOps-$version-instalador-clasico.exe")
 
 # Portable: carpeta temporal → zip
 $name = "AdminOps-$version-portable"
