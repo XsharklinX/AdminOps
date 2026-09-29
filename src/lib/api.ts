@@ -1,4 +1,18 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { trackCall } from "./perf";
+import { humanError, onInternalError } from "./errors";
+
+/** Todas las llamadas al sistema pasan por aquí: los errores llegan ya traducidos. */
+async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await trackCall(command, tauriInvoke<T>(command, args));
+  } catch (e) {
+    throw humanError(command, e);
+  }
+}
+
+// Los fallos internos se anotan en el registro técnico (sin pasar por `invoke`, para no repetirse).
+onInternalError((message) => void tauriInvoke("log_frontend_error", { message }).catch(() => {}));
 
 export interface SystemInfo {
   hostName: string;
@@ -106,6 +120,8 @@ export const tweaksApi = {
   apply: (id: string, skipRestorePoint = false) => invoke<OpResult>("apply_tweak", { id, skipRestorePoint }),
   revert: (id: string) => invoke<OpResult>("revert_tweak", { id }),
   run: (id: string) => invoke<OpResult>("run_action", { id }),
+  /** Arreglar un hallazgo del diagnóstico (aplica o ejecuta, según el ajuste). */
+  fixFinding: (id: string) => invoke<string>("fix_finding", { id }),
   journal: () => invoke<JournalEntry[]>("get_journal"),
   index: () => invoke<{ id: string; name: string; description: string; category: string }[]>("tweak_index"),
   revertEntry: (entryId: number) => invoke<OpResult>("revert_entry", { entryId }),
@@ -179,6 +195,8 @@ export type Tool =
   | "storage";
 
 export type FindingAction =
+  /** Se arregla en el sitio: ejecuta ese ajuste del catálogo. `safe`: entra en «Arreglar todo lo seguro». */
+  | { kind: "fix"; label: string; id: string; safe: boolean }
   | { kind: "page"; label: string; page: string; focus: string | null }
   | { kind: "tool"; label: string; tool: Tool };
 
@@ -273,6 +291,15 @@ export interface Diagnostics {
   bloatInstalled: Section<string[]>;
   tweaksApplied: number;
   findings: Finding[];
+  /** Diferencia con el análisis anterior de este equipo. */
+  changes?: DiagChanges;
+}
+
+export interface DiagChanges {
+  since: number;
+  /** Títulos de los problemas que antes no estaban. */
+  new: string[];
+  resolved: Finding[];
 }
 
 export interface SnapshotInfo {
@@ -282,7 +309,8 @@ export interface SnapshotInfo {
 }
 
 export const diagApi = {
-  run: () => invoke<Diagnostics>("run_diagnostics"),
+  /** `force`: vuelve a consultar hardware y winget en vez de reutilizar lo de hace unos minutos. */
+  run: (force = false) => invoke<Diagnostics>("run_diagnostics", { force }),
   snapshots: () => invoke<SnapshotInfo[]>("list_snapshots"),
   latest: () =>
     invoke<{
@@ -352,8 +380,17 @@ export const profilesApi = {
   revert: (id: string) => invoke<ProfileResult>("revert_profile", { id }),
 };
 
+export interface StartupTiming {
+  steps: { name: string; atMs: number; ms: number }[];
+  /** ms desde que arrancó el proceso hasta la llamada. */
+  nowMs: number;
+}
+
 export const appApi = {
   info: () => invoke<AppInfo>("get_app_info"),
+  /** Pasos del arranque del programa (Ajustes → Rendimiento). */
+  startupTiming: () => invoke<StartupTiming>("startup_timing"),
+  logTiming: (summary: string) => invoke<void>("log_timing", { summary }),
   cancelTask: (task: string) => invoke<boolean>("cancel_task", { task }),
   readLog: (lines = 400) => invoke<string>("read_log", { lines }),
   supportPackage: () => invoke<string>("support_package"),
@@ -479,7 +516,10 @@ export const toolsApi = {
   speedtest: () => invoke<SpeedResult>("run_speedtest"),
   cancelSpeedtest: () => invoke<void>("cancel_speedtest"),
   speedHistory: () => invoke<SpeedResult[]>("list_speedtests"),
-  softwareUpdates: () => invoke<SoftwareUpdate[]>("list_software_updates"),
+  softwareUpdates: (refresh = false) => invoke<SoftwareUpdate[]>("list_software_updates", { refresh }),
+  ignoredUpdates: () => invoke<string[]>("ignored_updates"),
+  cachedUpdates: () => invoke<SoftwareUpdate[] | null>("cached_software_updates"),
+  setUpdateIgnored: (id: string, ignored: boolean) => invoke<string[]>("set_update_ignored", { id, ignored }),
   upgradeSoftware: (ids: string[]) =>
     invoke<{ id: string; name: string; ok: boolean; message: string }[]>("upgrade_software", { ids }),
   scanSpace: (path: string) => invoke<SpaceView>("scan_space", { path }),
@@ -507,6 +547,7 @@ export interface Settings {
   autoCleanupMonths: number;
   checkUpdates: boolean;
   watchWindows: boolean;
+  visitTypes: VisitType[];
   currency: string;
   taxName: string;
   taxRate: number;
@@ -643,7 +684,38 @@ export interface SessionRecord {
   nextMaintenance: number | null;
   signed: boolean;
   metrics: VisitMetrics | null;
+  visitType: string;
+  contactId: string;
 }
+
+export interface Visit {
+  id: string;
+  clientId: string;
+  clientName: string;
+  /** Inicio en segundos (UTC). */
+  start: number;
+  minutes: number;
+  machines: number;
+  notes: string;
+  status: "planned" | "done" | "cancelled";
+  reminded: boolean;
+}
+
+export interface DueClient {
+  clientId: string;
+  name: string;
+  date: number;
+  machines: number;
+  phone: string;
+  email: string;
+}
+
+export const agendaApi = {
+  list: () => invoke<{ visits: Visit[]; due: DueClient[] }>("list_agenda"),
+  save: (visit: Visit) => invoke<Visit>("save_visit", { visit }),
+  setStatus: (id: string, status: Visit["status"]) => invoke<void>("set_visit_status", { id, status }),
+  remove: (id: string) => invoke<void>("delete_visit", { id }),
+};
 
 export interface Client {
   id: string;
@@ -657,11 +729,33 @@ export interface Client {
   machines: Machine[];
   sessions: SessionRecord[];
   network: NetworkMap | null;
+  /** Plantilla de informe de este cliente. */
+  report?: ClientReport;
 }
+
+export interface ClientReport {
+  /** null: el formato de siempre (para el cliente). */
+  template: Template | null;
+  /** Texto al principio del informe. */
+  intro: string;
+  /** Otros destinatarios, además del correo del cliente. */
+  to: string;
+  subject: string;
+  body: string;
+}
+
+export const EMPTY_CLIENT_REPORT: ClientReport = { template: null, intro: "", to: "", subject: "", body: "" };
 
 export interface ChecklistItem {
   text: string;
   done: boolean;
+  /** Tarea de AdminOps que lo marca sola (vacío: a mano). */
+  auto: string;
+}
+
+export interface VisitType {
+  name: string;
+  items: { text: string; auto: string }[];
 }
 
 export interface ActiveSession {
@@ -681,6 +775,8 @@ export interface ActiveSession {
   signer: string;
   laborWarrantyDays: number;
   maintenanceMonths: number;
+  visitType: string;
+  contactId: string;
 }
 
 export interface ProfileDef {
@@ -692,7 +788,26 @@ export interface ProfileDef {
   custom: boolean;
 }
 
+export interface VisitChange {
+  label: string;
+  before: string;
+  after: string;
+  /** null: ni mejor ni peor (otra versión de Windows, otro hardware). */
+  better: boolean | null;
+}
+
+export interface MachineChanges {
+  host: string;
+  since: number;
+  until: number;
+  /** true: comparado con cómo está este equipo ahora. */
+  live: boolean;
+  changes: VisitChange[];
+}
+
 export const workApi = {
+  /** Qué cambió en los equipos de un cliente desde la última visita. */
+  visitChanges: (clientId: string) => invoke<MachineChanges[]>("visit_changes", { clientId }),
   settings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
   clients: () => invoke<Client[]>("list_clients"),
@@ -702,7 +817,8 @@ export const workApi = {
     }),
   deleteClient: (id: string) => invoke<void>("delete_client", { id }),
   session: () => invoke<ActiveSession | null>("get_session"),
-  startSession: (clientId: string) => invoke<ActiveSession>("start_session", { clientId }),
+  startSession: (clientId: string, visitType: string | null = null, contactId: string | null = null) =>
+    invoke<ActiveSession>("start_session", { clientId, visitType, contactId }),
   updateSession: (session: ActiveSession) => invoke<void>("update_session", { session }),
   setNextMaintenance: (clientId: string, date: number | null) => invoke<void>("set_next_maintenance", { clientId, date }),
   inventoryAddThis: (clientId: string) => invoke<Client>("inventory_add_this", { clientId }),
@@ -1063,18 +1179,43 @@ export interface Portal {
   name: string;
   url: string;
   extraDomains: string[];
+  /** "" Tickets · "inventory" inventario web · "mail" correo. */
   kind?: string;
+  /** 1 = 100 % (0 o ausente también). */
+  zoom?: number;
+  /** "" en la misma vista · "window" en una ventana aparte. */
+  popups?: string;
+  /** Sesión privada: se cierra al salir de AdminOps y no se guarda nada en el equipo. */
+  private?: boolean;
+  /** Rellenar el inicio de sesión con la cuenta guardada. */
+  autofill?: boolean;
 }
+
+export type PortalAction = "back" | "forward" | "reload" | "stop" | "home" | "print";
 
 export const portalsApi = {
   list: () => invoke<Portal[]>("list_portals"),
   save: (portal: Portal) => invoke<Portal>("save_portal", { portal }),
   remove: (id: string) => invoke<void>("delete_portal", { id }),
   show: (id: string, r: { x: number; y: number; width: number; height: number }) => invoke<void>("portal_show", { id, ...r }),
+  /** Cargarlo en segundo plano para que al entrar ya esté listo. */
+  preload: (id: string, width: number, height: number) => invoke<void>("portal_preload", { id, width, height }),
   bounds: (id: string, r: { x: number; y: number; width: number; height: number }) => invoke<void>("portal_bounds", { id, ...r }),
   hideAll: () => invoke<void>("portal_hide_all"),
   hide: (id: string) => invoke<void>("portal_hide", { id }),
-  nav: (id: string, action: "back" | "forward" | "reload" | "home") => invoke<void>("portal_nav", { id, action }),
+  nav: (id: string, action: PortalAction) => invoke<void>("portal_nav", { id, action }),
+  /** `false`: la dirección está fuera del portal y se abrió en el navegador. */
+  go: (id: string, url: string) => invoke<boolean>("portal_go", { id, url }),
+  zoom: (id: string, zoom: number) => invoke<number>("portal_zoom", { id, zoom }),
+  find: (id: string, text: string, backwards: boolean) => invoke<void>("portal_find", { id, text, backwards }),
+  login: (id: string) => invoke<{ user: string; hasPassword: boolean } | null>("portal_login_get", { id }),
+  /** `password`: undefined deja la guardada; "" la borra. */
+  setLogin: (id: string, user: string, password?: string) => invoke<void>("portal_login_set", { id, user, password: password ?? null }),
+  /** Mensaje nuevo en el Correo de AdminOps; `false` si no hay correo configurado. */
+  compose: (to: string, subject?: string, body?: string) => invoke<boolean>("portal_compose", { to, subject: subject ?? null, body: body ?? null }),
+  signOut: (id: string) => invoke<void>("portal_sign_out", { id }),
+  openDownload: (index: number) => invoke<void>("portal_download_open", { index }),
+  revealDownload: (index: number) => invoke<void>("portal_download_reveal", { index }),
   openWindow: (id: string) => invoke<void>("portal_open_window", { id }),
   openExternal: (id: string) => invoke<void>("portal_open_external", { id }),
 };
@@ -1121,11 +1262,17 @@ export interface InstalledProgram {
   size: number | null;
   installLocation: string | null;
   silent: boolean;
+  /** MSI | Inno Setup | NSIS | Propio (vacío: solo con su asistente). */
+  silentKind: string;
+  repairable: boolean;
+  /** Runtimes, redistribuibles, drivers. */
+  component: boolean;
   orphan: boolean;
   perUser: boolean;
 }
 
 export interface Leftover {
+  kind: "folder" | "shortcut" | "registry";
   path: string;
   size: number;
   files: number;
@@ -1136,6 +1283,8 @@ export const programsApi = {
   uninstall: (id: string, silent: boolean) => invoke<{ removed: boolean; message: string; leftovers: Leftover[] }>("uninstall_program", { id, silent }),
   removeLeftovers: (id: string, paths: string[]) => invoke<number>("remove_leftovers", { id, paths }),
   removeOrphan: (id: string) => invoke<void>("remove_orphan_entry", { id }),
+  scanLeftovers: (id: string) => invoke<Leftover[]>("scan_leftovers", { id }),
+  repair: (id: string) => invoke<string>("repair_program", { id }),
 };
 
 export interface UpdateHistoryEntry {
@@ -1693,6 +1842,12 @@ export const timelineApi = {
   list: (days: number) => invoke<TimelineEvent[]>("machine_timeline", { days }),
 };
 
+export interface ContactChannel {
+  kind: "phone" | "email";
+  label: string;
+  value: string;
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -1702,17 +1857,262 @@ export interface Contact {
   phone: string;
   mobile: string;
   email: string;
+  channels: ContactChannel[];
   reason: string;
+  availability: string;
+  substituteId: string;
+  clientId: string;
   tags: string[];
   notes: string;
   favorite: boolean;
+  uses: number;
+  lastUsed: number;
+  created: number;
   updated: number;
+  deleted: number | null;
 }
+
+export type ContactBulk =
+  | { op: "addTag"; tag: string }
+  | { op: "removeTag"; tag: string }
+  | { op: "favorite"; value: boolean }
+  | { op: "delete" }
+  | { op: "restore" }
+  | { op: "purge" };
 
 export const contactsApi = {
   list: () => invoke<Contact[]>("list_contacts"),
-  save: (contact: Contact) => invoke<Contact>("save_contact", { contact }),
-  remove: (id: string) => invoke<void>("delete_contact", { id }),
-  importCsv: () => invoke<{ added: number; updated: number } | null>("import_contacts"),
+  // Las fechas y contadores van como enteros (u64/u32 en el backend).
+  save: (contact: Contact) =>
+    invoke<Contact>("save_contact", {
+      contact: {
+        ...contact,
+        uses: Math.floor(contact.uses || 0),
+        lastUsed: Math.floor(contact.lastUsed || 0),
+        created: Math.floor(contact.created || 0),
+        updated: Math.floor(contact.updated || 0),
+        deleted: contact.deleted == null ? null : Math.floor(contact.deleted),
+      },
+    }),
+  touch: (id: string) => invoke<void>("touch_contact", { id }),
+  bulk: (ids: string[], action: ContactBulk) => invoke<number>("bulk_contacts", { ids, action }),
+  merge: (keep: string, others: string[]) => invoke<void>("merge_contacts", { keep, others }),
+  tagColors: () => invoke<{ name: string; color: string }[]>("contact_tag_colors"),
+  setTagColor: (name: string, color: string) => invoke<void>("set_contact_tag_color", { name, color }),
+  renameTag: (from: string, to: string) => invoke<number>("rename_contact_tag", { from, to }),
+  deleteTag: (name: string) => invoke<number>("delete_contact_tag", { name }),
+  backups: () => invoke<{ id: number; contacts: number }[]>("list_contact_backups"),
+  backupNow: () => invoke<void>("backup_contacts_now"),
+  restoreBackup: (id: number) => invoke<number>("restore_contact_backup", { id }),
+  importFile: () => invoke<{ added: number; updated: number } | null>("import_contacts"),
   email: (email: string) => invoke<void>("write_email", { email }),
+  teams: (email: string, call: boolean) => invoke<void>("open_teams", { email, call }),
+  call: (number: string) => invoke<void>("call_number", { number }),
+  saveVcard: (name: string, content: string) => invoke<string | null>("save_vcard", { name, content }),
+};
+
+// ---------- 1.1.2: conocimiento, mapa de la oficina, puestos, ficha, copias y auditoría ----------
+
+export interface Solution {
+  id: string;
+  title: string;
+  problem: string;
+  solution: string;
+  tags: string[];
+  uses?: number;
+  lastUsed?: number;
+  created?: number;
+  updated?: number;
+}
+
+export interface TextTemplate {
+  id: string;
+  name: string;
+  category: string;
+  body: string;
+  uses?: number;
+  created?: number;
+  updated?: number;
+}
+
+export interface PlaceNote {
+  id: string;
+  scope: "machine" | "network";
+  key: string;
+  label: string;
+  text: string;
+  pinned?: boolean;
+  created?: number;
+  updated?: number;
+}
+
+export type RecipeStep =
+  | { kind: "restorePoint" }
+  | { kind: "bloatware" }
+  | { kind: "installList"; listId: string; listName: string }
+  | { kind: "profile"; profileId: string; profileName: string }
+  | { kind: "tweaks"; ids: string[] }
+  | { kind: "user"; name: string; fullName: string; admin: boolean }
+  | { kind: "rename"; newName: string }
+  | { kind: "domain"; domain: string; ou: string }
+  | { kind: "diagnostics" };
+
+export interface Recipe {
+  id: string;
+  name: string;
+  description: string;
+  steps: RecipeStep[];
+  created?: number;
+  updated?: number;
+}
+
+export interface StationList {
+  id: string;
+  name: string;
+  hosts: string[];
+  created?: number;
+  updated?: number;
+}
+
+type LibraryKind = "solutions" | "templates" | "notes" | "recipes" | "stations";
+type LibraryItem = { solutions: Solution; templates: TextTemplate; notes: PlaceNote; recipes: Recipe; stations: StationList };
+
+export const libraryApi = {
+  list: <K extends LibraryKind>(kind: K) => invoke<LibraryItem[K][]>("library_list", { kind }),
+  save: <K extends LibraryKind>(kind: K, item: Partial<LibraryItem[K]>) => invoke<LibraryItem[K]>("library_save", { kind, item }),
+  remove: (kind: LibraryKind, id: string) => invoke<void>("library_delete", { kind, id }),
+  touch: (kind: LibraryKind, id: string) => invoke<void>("library_touch", { kind, id }),
+  place: () => invoke<{ machine: string; machineLabel: string; network: string; networkLabel: string }>("this_place"),
+};
+
+export interface DeviceMeta {
+  role: string;
+  contactId: string;
+  notes: string;
+  watch: boolean;
+  ip: string;
+  name: string;
+  updated: number;
+}
+
+export const officeMapApi = {
+  get: (key: string) => invoke<Record<string, DeviceMeta>>("office_map", { key }),
+  save: (key: string, mac: string, meta: Omit<DeviceMeta, "updated">) => invoke<void>("save_device_meta", { key, mac, meta: { ...meta, updated: 0 } }),
+  refreshIps: (key: string, seen: [string, string][]) => invoke<void>("refresh_device_ips", { key, seen }),
+  watchStatus: (key: string) => invoke<Record<string, { up: boolean; since: number; checked: number }>>("watch_status", { key }),
+};
+
+export interface Station {
+  host: string;
+  ip: string;
+  online: boolean;
+  ms: number | null;
+  ports: number[];
+  remote: { os: string; user: string; bootDays: number | null; freeGb: number | null; totalGb: number | null; updateDays: number | null; via: string } | null;
+  remoteError: string;
+  warnings: string[];
+}
+
+export type StationAction = "restart" | "cancelRestart" | "gpupdate" | "message";
+
+export interface StationActionResult {
+  host: string;
+  ok: boolean;
+  detail: string;
+}
+
+export const stationsApi = {
+  check: (hosts: string[], deep: boolean) => invoke<Station[]>("check_stations", { hosts, deep }),
+  /** Reiniciar (con aviso), cancelar el reinicio, actualizar directivas o enviar un mensaje a varios puestos. */
+  act: (hosts: string[], action: StationAction, text?: string) => invoke<StationActionResult[]>("station_action", { hosts, action, text }),
+};
+
+export interface MachineSheet {
+  host: string;
+  user: string;
+  domain: string;
+  partOfDomain: boolean;
+  manufacturer: string;
+  model: string;
+  serial: string;
+  chassis: string;
+  cpu: string;
+  cores: number;
+  ramGb: number;
+  disks: string;
+  gpu: string;
+  os: string;
+  osVersion: string;
+  installed: string;
+  license: string;
+  bios: string;
+  tpm: boolean | null;
+  secureBoot: boolean | null;
+  ip: string;
+  mac: string;
+  warrantyUrl: string | null;
+}
+
+export const sheetApi = {
+  get: () => invoke<MachineSheet>("machine_sheet"),
+  openWarranty: (url: string) => invoke<void>("open_warranty", { url }),
+};
+
+export interface StorageHealth {
+  portable: boolean;
+  drive: string;
+  label: string;
+  fileSystem: string;
+  health: string;
+  removable: boolean;
+  total: number;
+  free: number;
+  dataBytes: number;
+  keyPresent: boolean | null;
+  lastBackup: number | null;
+  lastContactsBackup: number | null;
+  warnings: string[];
+}
+
+export const appBackupApi = {
+  backup: (password: string, prefs: unknown, machines: boolean, reports: boolean) =>
+    invoke<{ path: string; files: number; bytes: number } | null>("backup_app_data", { password, prefs, machines, reports }),
+  restore: (password: string) => invoke<{ files: number; created: number; prefs: unknown } | null>("restore_app_data", { password }),
+  health: () => invoke<StorageHealth>("storage_health"),
+};
+
+export const auditApi = {
+  get: () => invoke<boolean>("audit_mode"),
+  set: (on: boolean) => invoke<void>("set_audit_mode", { on }),
+};
+
+// ---------- Cuentas (Microsoft, trabajo o escuela, Entra ID, Office, credenciales) ----------
+
+export interface AccountsStatus {
+  sessionUser: string;
+  sessionKind: "local" | "microsoft" | "azuread" | "domain";
+  device: {
+    azureAdJoined: boolean;
+    domainJoined: boolean;
+    workplaceJoined: boolean;
+    enterpriseJoined: boolean;
+    tenantName: string;
+    domainName: string;
+    deviceId: string;
+  };
+  workAccounts: { id: string; email: string; tenant: string; scope: "device" | "user" }[];
+  microsoftAccounts: string[];
+  officeAccounts: { id: string; email: string; name: string; kind: string }[];
+  credentials: { target: string; user: string; kind: string }[];
+  hasLocalAdmin: boolean;
+  otherUser: boolean;
+}
+
+export const accountsApi = {
+  status: () => invoke<AccountsStatus>("accounts_status"),
+  leaveAzureAd: () => invoke<string>("leave_azure_ad"),
+  removeWorkAccount: (id: string) => invoke<string>("remove_work_account", { id }),
+  officeSignOut: (id: string) => invoke<string>("office_sign_out", { id }),
+  deleteCredential: (target: string) => invoke<void>("delete_credential", { target }),
+  signOut: () => invoke<void>("sign_out_windows"),
 };

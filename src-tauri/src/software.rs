@@ -4,8 +4,13 @@ use crate::task::Task;
 use crate::tweaks::journal::Op;
 use crate::tweaks::TweakState;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::State;
+
+/// Última lista de winget: consultarla tarda 10-30 s, así que se reutiliza unos minutos.
+static CACHE: Mutex<Option<(Instant, Vec<SoftwareUpdate>)>> = Mutex::new(None);
+const CACHE_FOR: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -91,11 +96,12 @@ pub fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() < 128 && id.chars().all(|c| c.is_ascii_alphanumeric() || "._+-".contains(c))
 }
 
-/// Programas con actualización disponible.
+/// Programas con actualización disponible (y los guarda en la caché).
 pub fn list() -> Result<Vec<SoftwareUpdate>, String> {
+    // Proceso propio: winget tarda y no debe ocupar el PowerShell compartido de la app.
     let out = crate::ps::powershell_opts(
         "winget upgrade --include-unknown --accept-source-agreements --disable-interactivity | Out-String",
-        crate::ps::Opts { timeout: Some(Duration::from_secs(120)), task: None },
+        crate::ps::Opts { timeout: Some(Duration::from_secs(120)), task: Some("software-list") },
     )
     .map_err(|e| {
         if e.contains("not recognized") || e.contains("no se reconoce") {
@@ -104,12 +110,67 @@ pub fn list() -> Result<Vec<SoftwareUpdate>, String> {
             e
         }
     })?;
-    Ok(parse_upgrades(&out))
+    let v = parse_upgrades(&out);
+    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((Instant::now(), v.clone()));
+    Ok(v)
 }
 
-#[tauri::command(async)]
-pub fn list_software_updates() -> Result<Vec<SoftwareUpdate>, String> {
+/// La lista reciente si la hay; si no, se consulta.
+pub fn cached_or_list(max_age: Duration) -> Result<Vec<SoftwareUpdate>, String> {
+    if let Some((t, v)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if t.elapsed() < max_age {
+            return Ok(v.clone());
+        }
+    }
     list()
+}
+
+fn forget(id: &str) {
+    if let Some((_, v)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
+        v.retain(|u| u.id != id);
+    }
+}
+
+/// `refresh`: consultar winget aunque haya una lista reciente.
+#[tauri::command(async)]
+pub fn list_software_updates(refresh: Option<bool>) -> Result<Vec<SoftwareUpdate>, String> {
+    if refresh.unwrap_or(false) {
+        list()
+    } else {
+        cached_or_list(CACHE_FOR)
+    }
+}
+
+/// La última lista conocida, sin consultar winget (para el Panel). None si no hay.
+#[tauri::command]
+pub fn cached_software_updates() -> Option<Vec<SoftwareUpdate>> {
+    CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().filter(|(t, _)| t.elapsed() < Duration::from_secs(6 * 3600)).map(|(_, v)| v.clone())
+}
+
+// ---------- Actualizaciones que no se quieren (viajan con AdminOps) ----------
+
+fn ignored_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::shared_data_dir(app).join("actualizaciones-ignoradas.json")
+}
+
+#[tauri::command]
+pub fn ignored_updates(app: tauri::AppHandle) -> Vec<String> {
+    crate::paths::read_json(&ignored_path(&app))
+}
+
+#[tauri::command]
+pub fn set_update_ignored(app: tauri::AppHandle, id: String, ignored: bool) -> Result<Vec<String>, String> {
+    if !valid_id(&id) {
+        return Err("Identificador no válido.".into());
+    }
+    let mut v: Vec<String> = crate::paths::read_json(&ignored_path(&app));
+    v.retain(|x| x != &id);
+    if ignored {
+        v.push(id);
+        v.sort();
+    }
+    crate::paths::write_json(&ignored_path(&app), &v)?;
+    Ok(v)
 }
 
 #[derive(Serialize)]
@@ -125,7 +186,8 @@ pub struct UpgradeResult {
 pub fn upgrade_software(app: tauri::AppHandle, ids: Vec<String>, state: State<'_, TweakState>) -> Result<Vec<UpgradeResult>, String> {
     let task = Task::new(&app, "software");
     task.step("Comprobando actualizaciones disponibles…");
-    let available = list()?;
+    // La lista que se acaba de ver en pantalla: no hace falta volver a preguntar a winget.
+    let available = cached_or_list(Duration::from_secs(15 * 60))?;
     let total = ids.len();
     let mut results = Vec::new();
     for (i, id) in ids.into_iter().enumerate() {
@@ -138,8 +200,10 @@ pub fn upgrade_software(app: tauri::AppHandle, ids: Vec<String>, state: State<'_
             continue;
         }
         task.step(format!("{}/{total} · Actualizando {} a {}…", i + 1, u.name, u.available));
+        // Con su origen (winget o msstore) winget no consulta los demás: más rápido.
+        let source = if matches!(u.source.as_str(), "winget" | "msstore") { format!(" --source {}", u.source) } else { String::new() };
         let script = format!(
-            "$o = winget upgrade --id '{id}' --exact --silent --include-unknown --accept-package-agreements \
+            "$o = winget upgrade --id '{id}' --exact --silent --include-unknown{source} --accept-package-agreements \
              --accept-source-agreements --disable-interactivity | Out-String\n$o\n\"EXIT:$LASTEXITCODE\""
         );
         let r = crate::ps::powershell_opts(&script, task.opts(Some(Duration::from_secs(30 * 60)))).and_then(|out| {
@@ -151,6 +215,10 @@ pub fn upgrade_software(app: tauri::AppHandle, ids: Vec<String>, state: State<'_
         });
         let title = format!("Actualizar {} ({} → {})", u.name, u.version, u.available);
         state.record(Op::Run, &title, &r);
+        if r.is_ok() {
+            forget(&id);
+            crate::apps::invalidate_installed();
+        }
         results.push(UpgradeResult {
             id,
             name: u.name.clone(),

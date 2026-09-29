@@ -18,6 +18,7 @@ import { useToast } from "../components/feedback";
 import { Button, Modal, inputClass } from "../components/ui";
 import { bytes } from "../lib/format";
 import { usersApi, type LocalUser, type NewUser } from "../lib/api";
+import { WindowsTools } from "../components/WindowsTools";
 
 type Action = "delete" | "disable" | "enable" | "demote" | "promote" | "password";
 
@@ -205,6 +206,18 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
         AdminOps nunca deja el equipo sin un administrador activo ni permite borrar la cuenta con la sesión abierta. Las contraseñas no
         se guardan en el historial ni en el registro de actividad.
       </p>
+
+      <WindowsTools
+        className="mt-4"
+        links={[
+          { id: "lusrmgr", what: "Cambiar el nombre, nombre completo y descripción; opciones de contraseña; grupos; desbloquear una cuenta." },
+          { id: "netplwiz", what: "Inicio de sesión automático y grupo de cada cuenta." },
+          { id: "user-profiles", what: "Perfiles guardados en el equipo: tamaño, tipo y borrar los que sobran." },
+          { id: "secpol", what: "Longitud y caducidad de las contraseñas, bloqueo tras varios intentos." },
+          { id: "taskmgr", what: "Pestaña Usuarios: quién tiene la sesión abierta, cerrarla o enviarle un mensaje." },
+          { id: "compmgmt", what: "Administración del equipo: usuarios, carpetas compartidas y sesiones abiertas." },
+        ]}
+      />
 
       {creating && (
         <CreateUser

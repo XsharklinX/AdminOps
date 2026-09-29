@@ -19,6 +19,7 @@ import { Fragment, useCallback, useEffect, useState, type ReactNode } from "reac
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
+import { MachineSheetCard } from "../components/MachineSheetCard";
 import { Card } from "../components/ui";
 import { tempColor, useSensors } from "../hooks/useSensors";
 import { hwApi, type Inventory, type MemoryTest, type SmartDisk } from "../lib/api";
@@ -119,6 +120,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
 
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+      <MachineSheetCard autoLoad={focus === "sheet"} />
       {/* Resumen */}
       <Card
         title={`${inv.manufacturer} ${inv.model}`.trim() || "Equipo"}

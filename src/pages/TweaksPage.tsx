@@ -8,7 +8,37 @@ import { useOnJournalChange } from "../lib/journalEvents";
 
 const CANCELLED = "Cancelado por el usuario.";
 
-export function TweaksPage({ category, isAdmin, focus }: { category: string; isAdmin: boolean; focus?: string | null }) {
+/** Nombre de cada categoría (encabezados al buscar en varias a la vez). */
+export const TWEAK_CATEGORY_LABEL: Record<string, string> = {
+  cleanup: "Limpieza",
+  performance: "Rendimiento",
+  privacy: "Privacidad",
+  services: "Servicios",
+  repair: "Reparaciones",
+};
+
+/** Sin tildes ni mayúsculas, para buscar «telemetria» y encontrar «Telemetría». */
+const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+export function matchesTweak(t: TweakView, query: string): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  const hay = fold([t.name, t.description, t.note ?? "", ...t.changes].join(" "));
+  return words.every((w) => hay.includes(w));
+}
+
+export function TweaksPage({
+  category,
+  isAdmin,
+  focus,
+  query = "",
+}: {
+  /** Una categoría, o varias (se muestran agrupadas). */
+  category: string | string[];
+  isAdmin: boolean;
+  focus?: string | null;
+  /** Filtra por nombre, descripción o lo que cambia. */
+  query?: string;
+}) {
   const [tweaks, setTweaks] = useState<TweakView[] | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<Record<string, string>>({});
@@ -35,16 +65,18 @@ export function TweaksPage({ category, isAdmin, focus }: { category: string; isA
     return () => window.clearTimeout(t);
   }, [focus, loaded]);
 
+  const catKey = Array.isArray(category) ? category.join(",") : category;
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setTweaks(await tweaksApi.list(category));
+      const cats = catKey.split(",");
+      setTweaks(cats.length > 1 ? (await tweaksApi.list()).filter((t) => cats.includes(t.category)) : await tweaksApi.list(catKey));
     } catch (e) {
       toast("error", String(e));
     } finally {
       setLoading(false);
     }
-  }, [category, toast]);
+  }, [catKey, toast]);
 
   useOnJournalChange(load);
   useEffect(() => {
@@ -149,12 +181,34 @@ export function TweaksPage({ category, isAdmin, focus }: { category: string; isA
 
   if (!tweaks) return <p className="p-8 font-mono text-sm text-mute">Detectando estado actual…</p>;
 
-  const toggles = tweaks.filter((t) => t.kind === "toggle");
+  const shown = query.trim() ? tweaks.filter((t) => matchesTweak(t, query)) : tweaks;
+  const toggles = shown.filter((t) => t.kind === "toggle");
   const applied = toggles.filter((t) => t.status === "applied").length;
+  const grouped = catKey.includes(",");
+  const groups = grouped
+    ? catKey
+        .split(",")
+        .map((c) => ({ c, items: shown.filter((t) => t.category === c) }))
+        .filter((g) => g.items.length)
+    : [{ c: catKey, items: shown }];
+
+  const card = (t: TweakView) => (
+    <TweakCard
+      key={t.id}
+      tweak={t}
+      isAdmin={isAdmin}
+      busy={!!busy[t.id]}
+      busyLabel={busy[t.id]}
+      lastMessage={messages[t.id]}
+      highlighted={highlight === t.id}
+      onToggle={() => toggle(t)}
+      onRun={() => run(t)}
+    />
+  );
 
   return (
     <div className="mx-auto max-w-4xl p-6">
-      {category === "cleanup" && <ScheduleCard isAdmin={isAdmin} />}
+      {catKey === "cleanup" && !query && <ScheduleCard isAdmin={isAdmin} />}
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-dim">
           {toggles.length > 0 ? (
@@ -162,7 +216,7 @@ export function TweaksPage({ category, isAdmin, focus }: { category: string; isA
               <span className="font-mono text-neon">{applied}</span> de {toggles.length} ajustes aplicados
             </>
           ) : (
-            `${tweaks.length} tareas disponibles`
+            `${shown.length} tareas disponibles`
           )}
         </p>
         <button
@@ -173,21 +227,13 @@ export function TweaksPage({ category, isAdmin, focus }: { category: string; isA
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Volver a detectar
         </button>
       </div>
-      <div className="space-y-3">
-        {tweaks.map((t) => (
-          <TweakCard
-            key={t.id}
-            tweak={t}
-            isAdmin={isAdmin}
-            busy={!!busy[t.id]}
-            busyLabel={busy[t.id]}
-            lastMessage={messages[t.id]}
-            highlighted={highlight === t.id}
-            onToggle={() => toggle(t)}
-            onRun={() => run(t)}
-          />
-        ))}
-      </div>
+      {shown.length === 0 && <p className="py-10 text-center text-sm text-mute">Ningún ajuste coincide con «{query}».</p>}
+      {groups.map((g) => (
+        <section key={g.c} className="mb-6">
+          {grouped && <h3 className="mb-2 text-xs font-medium tracking-wide text-mute uppercase">{TWEAK_CATEGORY_LABEL[g.c] ?? g.c}</h3>}
+          <div className="space-y-3">{g.items.map(card)}</div>
+        </section>
+      ))}
       {dialog}
     </div>
   );

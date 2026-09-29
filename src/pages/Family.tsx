@@ -1,7 +1,7 @@
 import { Ban, Clock, Plus, Save, ShieldCheck, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, inputClass } from "../components/ui";
+import { Button, Card, inputClass, Loading } from "../components/ui";
 import { familyApi, type UserHours } from "../lib/api";
 
 const FILTERS: [string, string, string][] = [
@@ -248,7 +248,7 @@ function Schedule() {
         la cierre o se bloquee la pantalla.
       </p>
       {users === null ? (
-        <p className="font-mono text-xs text-mute">Cargando…</p>
+        <Loading />
       ) : (
         <>
           <div className="mb-3 flex flex-wrap items-center gap-3">

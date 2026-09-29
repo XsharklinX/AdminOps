@@ -1,94 +1,247 @@
-import { Building2, Copy, Download, Mail, Pencil, Phone, Plus, Search, Smartphone, Star, Trash2, Upload, UserRound, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  BookUser,
+  ChevronDown,
+  ChevronRight,
+  Columns3,
+  Download,
+  HelpCircle,
+  LayoutGrid,
+  List,
+  Plus,
+  Save,
+  Search,
+  Settings2,
+  Star,
+  Table2,
+  Tag,
+  Trash2,
+  Upload,
+  UserRound,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { ContactDetail, type ContactActions } from "../components/contacts/ContactDetail";
+import { ContactEditor } from "../components/contacts/ContactEditor";
+import { ContactTools, type ToolTab } from "../components/contacts/ContactTools";
+import { CardsView, DirectoryView, TableView, type ViewProps } from "../components/contacts/ContactViews";
+import { colorOf, TagChip, TagInput, type TagColors } from "../components/contacts/Tags";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, inputClass } from "../components/ui";
-import { contactsApi, officeApi, type Contact } from "../lib/api";
+import { Button, EmptyState, inputClass, Loading } from "../components/ui";
+import { contactsApi, officeApi, portalsApi, workApi, type Client, type Contact } from "../lib/api";
+import type { PageId } from "../components/Sidebar";
+import {
+  applyFilters,
+  cardText,
+  COLUMNS,
+  EMPTY_CONTACT,
+  EMPTY_FILTERS,
+  findDuplicates,
+  GROUPS,
+  groupContacts,
+  hasFilters,
+  loadView,
+  norm,
+  PREFIX_HELP,
+  QUICK,
+  saveView,
+  SORTS,
+  sortContacts,
+  toCsv,
+  toVcard,
+  type ContactsView,
+  type Filters,
+  type ViewMode,
+} from "../lib/contacts";
 
-const EMPTY: Contact = { id: "", name: "", role: "", company: "", extension: "", phone: "", mobile: "", email: "", reason: "", tags: [], notes: "", favorite: false, updated: 0 };
+const VIEWS: { id: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
+  { id: "cards", label: "Tarjetas", icon: LayoutGrid },
+  { id: "table", label: "Tabla", icon: Table2 },
+  { id: "directory", label: "Directorio", icon: List },
+];
 
-const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-const haystack = (c: Contact) => norm([c.name, c.role, c.company, c.extension, c.phone, c.mobile, c.email, c.reason, c.notes, ...c.tags].join(" "));
-
-const csvCell = (s: string) => (/[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+const selectClass = "h-8 rounded-md border border-line bg-void/60 px-2 text-xs text-ink outline-none focus:border-neon/50";
 
 /** Agenda del técnico: a quién llamar y para qué. Es la misma en todos los equipos. */
-export function Contacts({ focus }: { focus: string | null }) {
-  const [list, setList] = useState<Contact[] | null>(null);
-  const [query, setQuery] = useState("");
-  const [tag, setTag] = useState<string | null>(null);
+export function Contacts({ focus, onNavigate }: { focus: string | null; onNavigate?: (page: PageId) => void }) {
+  const [all, setAll] = useState<Contact[] | null>(null);
+  const [colors, setColors] = useState<TagColors>({});
+  const [clients, setClients] = useState<Client[]>([]);
+  const [view, setViewState] = useState<ContactsView>(loadView);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
   const [editing, setEditing] = useState<Contact | null>(null);
-  const [tagsText, setTagsText] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const [tools, setTools] = useState<ToolTab | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<"export" | "columns" | "help" | "bulkTag" | "save" | null>(null);
+  const [bulkTags, setBulkTags] = useState<string[]>([]);
+  const [saveName, setSaveName] = useState("");
+  const search = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
-  const load = useCallback(() => contactsApi.list().then(setList).catch((e) => toast("error", String(e))), [toast]);
+  const setView = (patch: Partial<ContactsView>) =>
+    setViewState((v) => {
+      const next = { ...v, ...patch };
+      saveView(next);
+      return next;
+    });
+  const setFilters = (patch: Partial<Filters>) => setView({ filters: { ...view.filters, ...patch } });
+
+  const load = useCallback(async () => {
+    try {
+      const [list, meta] = await Promise.all([contactsApi.list(), contactsApi.tagColors().catch(() => [])]);
+      setAll(list);
+      setColors(Object.fromEntries(meta.map((m) => [norm(m.name), m.color])));
+    } catch (e) {
+      toast("error", String(e));
+    }
+  }, [toast]);
 
   useEffect(() => {
     load();
+    workApi.clients().then(setClients).catch(() => {});
   }, [load]);
 
-  // Desde la búsqueda global: resaltar el contacto elegido.
-  useEffect(() => {
-    if (!focus || !list) return;
-    setQuery("");
-    setTag(null);
-    setFlash(focus);
-    window.setTimeout(() => document.getElementById(`contact-${focus}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 50);
-    const t = window.setTimeout(() => setFlash(null), 2500);
-    return () => window.clearTimeout(t);
-  }, [focus, list]);
+  const live = useMemo(() => (all ?? []).filter((c) => !c.deleted), [all]);
+  const byId = useMemo(() => new Map((all ?? []).map((c) => [c.id, c])), [all]);
+  const filtered = useMemo(() => sortContacts(applyFilters(live, view.filters), view.sort), [live, view.filters, view.sort]);
+  const groups = useMemo(() => groupContacts(filtered, view.group), [filtered, view.group]);
+  const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+  const trashCount = (all ?? []).length - live.length;
+  const dupCount = useMemo(() => findDuplicates(live).length, [live]);
 
-  const tags = useMemo(() => {
+  const tagCounts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const c of list ?? []) for (const t of c.tags) m.set(t, (m.get(t) ?? 0) + 1);
+    for (const c of live) for (const t of c.tags) m.set(t, (m.get(t) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
-  }, [list]);
+  }, [live]);
+  const tagNames = useMemo(() => tagCounts.map(([t]) => t), [tagCounts]);
+  const companies = useMemo(() => [...new Set(live.map((c) => c.company).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")), [live]);
+  const frequent = useMemo(() => [...live].filter((c) => c.uses > 0).sort((a, b) => b.uses - a.uses || b.lastUsed - a.lastUsed).slice(0, 6), [live]);
 
-  const shown = useMemo(() => {
-    const words = norm(query.trim()).split(/\s+/).filter(Boolean);
-    return (list ?? [])
-      .filter((c) => (!tag || c.tags.includes(tag)) && words.every((w) => haystack(c).includes(w)))
-      .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name, "es"));
-  }, [list, query, tag]);
+  // Desde la búsqueda global (Ctrl+K): abrir la ficha del contacto.
+  useEffect(() => {
+    if (!focus || !all) return;
+    if (byId.has(focus)) {
+      setDetail(focus);
+      window.setTimeout(() => document.getElementById(`contact-${focus}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 80);
+    }
+  }, [focus, all, byId]);
 
-  const edit = (c: Contact) => {
-    setEditing({ ...c });
-    setTagsText(c.tags.join(", "));
+  // Los menús se cierran al hacer clic fuera de ellos.
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: globalThis.MouseEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest("[data-menu]")) setMenu(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [menu]);
+
+  // Esc cierra la ficha; «/» o Ctrl+F van a la búsqueda.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+      if (e.key === "Escape" && detail && !editing && !tools) setDetail(null);
+      if (!typing && (e.key === "/" || (e.ctrlKey && e.key.toLowerCase() === "f"))) {
+        e.preventDefault();
+        search.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [detail, editing, tools]);
+
+  // ---------- Acciones (cuentan como uso para «Más usados») ----------
+
+  const touch = (c: Contact) => {
+    contactsApi.touch(c.id).catch(() => {});
+    setAll((l) => l?.map((x) => (x.id === c.id ? { ...x, uses: x.uses + 1, lastUsed: Math.floor(Date.now() / 1000) } : x)) ?? l);
+  };
+  const run = (c: Contact, p: Promise<unknown>) => {
+    touch(c);
+    p.catch((e) => toast("error", String(e)));
   };
 
-  const save = async () => {
-    if (!editing) return;
-    setSaving(true);
-    try {
-      await contactsApi.save({ ...editing, tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean) });
-      toast("ok", editing.id ? "Contacto guardado." : "Contacto añadido.");
-      setEditing(null);
+  const actions: ContactActions = {
+    copy: (c, text, what) => run(c, navigator.clipboard.writeText(text).then(() => toast("ok", `${what} copiado.`))),
+    call: (c, n) => run(c, contactsApi.call(n)),
+    // Con el Correo de AdminOps configurado, el mensaje se escribe ahí; si no, en el programa de correo de Windows.
+    email: (c, addr) =>
+      run(
+        c,
+        portalsApi.compose(addr).then((inApp) => (inApp ? onNavigate?.("mail") : contactsApi.email(addr))),
+      ),
+    teams: (c, addr, call) => run(c, contactsApi.teams(addr, call)),
+    copyCard: (c) => run(c, navigator.clipboard.writeText(cardText(c, c.substituteId ? byId.get(c.substituteId) : null)).then(() => toast("ok", "Tarjeta copiada."))),
+    edit: (c) => setEditing({ ...c }),
+    trash: async (c) => {
+      await contactsApi.bulk([c.id], { op: "delete" }).catch((e) => toast("error", String(e)));
+      if (detail === c.id) setDetail(null);
+      toast("ok", `«${c.name}» está en la papelera (se puede recuperar 30 días).`);
       load();
+    },
+    star: async (c) => {
+      setAll((l) => l?.map((x) => (x.id === c.id ? { ...x, favorite: !x.favorite } : x)) ?? l);
+      await contactsApi.bulk([c.id], { op: "favorite", value: !c.favorite }).catch((e) => toast("error", String(e)));
+    },
+    open: (c) => setDetail(c.id),
+  };
+
+  const save = async (c: Contact) => {
+    try {
+      const saved = await contactsApi.save(c);
+      toast("ok", c.id ? "Contacto guardado." : "Contacto añadido.");
+      await load();
+      setDetail(saved.id);
+      return true;
     } catch (e) {
       toast("error", String(e));
-    } finally {
-      setSaving(false);
+      return false;
     }
   };
 
-  const remove = async (c: Contact) => {
-    if (!(await confirm({ title: "Borrar contacto", body: `Se borrará «${c.name}» de la agenda.`, confirmLabel: "Borrar", danger: true }))) return;
-    await contactsApi.remove(c.id).catch((e) => toast("error", String(e)));
-    load();
+  // ---------- Selección ----------
+
+  const onSelect = (c: Contact, e: MouseEvent) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (e.shiftKey && anchor) {
+        const a = flat.findIndex((x) => x.id === anchor);
+        const b = flat.findIndex((x) => x.id === c.id);
+        if (a >= 0 && b >= 0) flat.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((x) => n.add(x.id));
+      } else if (n.has(c.id)) n.delete(c.id);
+      else n.add(c.id);
+      return n;
+    });
+    setAnchor(c.id);
   };
+  const selectAll = (on: boolean) => setSelected(on ? new Set(flat.map((c) => c.id)) : new Set());
+  const selectedList = flat.filter((c) => selected.has(c.id));
 
-  const star = async (c: Contact) => {
-    await contactsApi.save({ ...c, favorite: !c.favorite }).catch((e) => toast("error", String(e)));
-    load();
-  };
-
-  const copy = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast("ok", `${what} copiado.`));
-
-  const importCsv = async () => {
+  const bulk = async (action: Parameters<typeof contactsApi.bulk>[1], done: string) => {
+    const ids = [...selected];
     try {
-      const r = await contactsApi.importCsv();
+      const n = await contactsApi.bulk(ids, action);
+      toast("ok", `${done} (${n}).`);
+      if (action.op === "delete") setSelected(new Set());
+      load();
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+
+  const bulkTrash = async () => {
+    if (!(await confirm({ title: "Enviar a la papelera", body: `${selected.size} contacto(s) irán a la papelera. Se pueden recuperar durante 30 días.`, confirmLabel: "A la papelera", danger: true }))) return;
+    bulk({ op: "delete" }, "En la papelera");
+  };
+
+  // ---------- Importar y exportar ----------
+
+  const importFile = async () => {
+    try {
+      const r = await contactsApi.importFile();
       if (!r) return;
       toast("ok", `${r.added} contacto(s) añadidos${r.updated ? `, ${r.updated} ya existían y se completaron` : ""}.`);
       load();
@@ -97,202 +250,414 @@ export function Contacts({ focus }: { focus: string | null }) {
     }
   };
 
-  const exportCsv = async () => {
-    const head = ["Nombre", "Cargo", "Empresa", "Extensión", "Teléfono", "Móvil", "Correo", "Motivo", "Etiquetas", "Notas"];
-    const rows = (list ?? []).map((c) => [c.name, c.role, c.company, c.extension, c.phone, c.mobile, c.email, c.reason, c.tags.join(", "), c.notes].map(csvCell).join(";"));
+  const exportAs = async (kind: "csv" | "vcf", list: Contact[]) => {
+    setMenu(null);
     try {
-      const file = await officeApi.exportCsv("Contactos", [head.join(";"), ...rows].join("\r\n"));
-      if (file) toast("ok", "Contactos exportados.");
+      const file = kind === "csv" ? await officeApi.exportCsv("Contactos", toCsv(list)) : await contactsApi.saveVcard("Contactos", toVcard(list));
+      if (file) toast("ok", `${list.length} contacto(s) exportados.`);
     } catch (e) {
       toast("error", String(e));
     }
   };
 
-  const field = (key: keyof Contact, label: string, placeholder = "", wide = false) => (
-    <label className={`block ${wide ? "col-span-2" : ""}`}>
-      <span className="mb-1 block text-[11px] text-mute">{label}</span>
-      <input
-        value={editing?.[key] as string}
-        onChange={(e) => setEditing((c) => (c ? { ...c, [key]: e.target.value } : c))}
-        placeholder={placeholder}
-        className={inputClass}
-      />
-    </label>
-  );
+  // ---------- Búsquedas guardadas ----------
+
+  const saveSearch = () => {
+    const name = saveName.trim();
+    if (!name) return;
+    setView({ saved: [...view.saved.filter((s) => s.name !== name), { ...view.filters, name }] });
+    setSaveName("");
+    setMenu(null);
+    toast("ok", `Búsqueda «${name}» guardada.`);
+  };
+
+  const f = view.filters;
+  const filtering = hasFilters(f);
+  const toggleQuick = (q: (typeof QUICK)[number]["id"]) => setFilters({ quick: f.quick.includes(q) ? f.quick.filter((x) => x !== q) : [...f.quick, q] });
+  const toggleTag = (t: string) => setFilters({ tags: f.tags.some((x) => norm(x) === norm(t)) ? f.tags.filter((x) => norm(x) !== norm(t)) : [...f.tags, t] });
+
+  const viewProps: ViewProps = { items: [], selected, selecting: selected.size > 0, onSelect, onOpen: actions.open, actions, colors };
+  const renderItems = (items: Contact[]) =>
+    view.view === "table" ? (
+      <TableView {...viewProps} items={items} columns={view.columns} sort={view.sort} onSort={(sort) => setView({ sort })} onSelectAll={selectAll} />
+    ) : view.view === "directory" ? (
+      <DirectoryView {...viewProps} items={items} />
+    ) : (
+      <CardsView {...viewProps} items={items} />
+    );
+
+  const detailContact = detail ? byId.get(detail) : undefined;
 
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-12 gap-4 p-6">
-      <Card
-        title="Contactos"
-        icon={<UserRound size={14} />}
-        className="col-span-12"
-        right={
-          <div className="flex gap-3 text-[11px]">
-            <button onClick={importCsv} className="flex items-center gap-1 text-mute hover:text-ink" title="CSV de Excel u Outlook">
-              <Upload size={11} /> Importar CSV
+    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+      {/* Sin Card: su «contain: paint» recortaría los menús desplegables. */}
+      <section className="col-span-12 rounded-xl border border-line bg-panel p-4">
+        <header className="mb-3 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <UserRound size={14} className="text-neon" /> Contactos
+          </h2>
+          <div className="flex items-center gap-3 text-[11px]">
+            <button onClick={importFile} className="flex items-center gap-1 text-mute hover:text-ink" title="CSV de Excel u Outlook, o vCard (.vcf)">
+              <Upload size={11} /> Importar
             </button>
-            <button onClick={exportCsv} disabled={!list?.length} className="flex items-center gap-1 text-mute hover:text-ink disabled:opacity-40">
-              <Download size={11} /> Exportar CSV
+            <div className="relative" data-menu>
+              <button onClick={() => setMenu(menu === "export" ? null : "export")} disabled={!live.length} className="flex items-center gap-1 text-mute hover:text-ink disabled:opacity-40">
+                <Download size={11} /> Exportar <ChevronDown size={10} />
+              </button>
+              {menu === "export" && (
+                <div className="absolute top-full right-0 z-20 mt-1 w-64 rounded-md border border-line-2 bg-panel py-1 text-xs shadow-xl">
+                  {[
+                    ["csv", "CSV (Excel)"],
+                    ["vcf", "vCard (.vcf) para el móvil u Outlook"],
+                  ].map(([k, label]) => (
+                    <div key={k}>
+                      <button onClick={() => exportAs(k as "csv" | "vcf", filtering ? filtered : live)} className="block w-full px-3 py-1.5 text-left text-dim hover:bg-panel-2 hover:text-ink">
+                        {label} · {filtering ? `los ${filtered.length} filtrados` : `todos (${live.length})`}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={() => setTools("tags")} className="flex items-center gap-1 text-mute hover:text-ink">
+              <Settings2 size={11} /> Gestionar
+              {(dupCount > 0 || trashCount > 0) && <span className="rounded-full bg-warn/20 px-1.5 text-[10px] text-warn">{dupCount + trashCount}</span>}
             </button>
           </div>
-        }
-      >
-        <p className="mb-3 text-xs text-dim">
-          A quién llamar o escribir y para qué. La agenda viaja con AdminOps (en el portable, dentro del USB): es la misma en todos los equipos. También se encuentra desde la
-          búsqueda (Ctrl+K).
-        </p>
+        </header>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-60 flex-1">
+          <div className="relative min-w-72 flex-1" data-menu>
             <Search size={14} className="absolute top-2.5 left-3 text-mute" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nombre, extensión, empresa, motivo…" className={`${inputClass} pl-9`} />
+            <input
+              ref={search}
+              value={f.query}
+              onChange={(e) => setFilters({ query: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setFilters({ query: "" });
+                if (e.key === "Enter" && filtered.length === 1) setDetail(filtered[0].id);
+              }}
+              placeholder="Buscar… (ext:21, empresa:x, #etiqueta, -excluir)   Atajo: /"
+              className={`${inputClass} pr-9 pl-9`}
+            />
+            <button onClick={() => setMenu(menu === "help" ? null : "help")} className="absolute top-2 right-2.5 text-mute hover:text-ink" title="Cómo buscar">
+              <HelpCircle size={15} />
+            </button>
+            {menu === "help" && (
+              <div className="absolute top-full right-0 z-20 mt-1 w-80 rounded-md border border-line-2 bg-panel p-3 text-xs shadow-xl">
+                <p className="mb-2 text-dim">Combina palabras y prefijos. Todo sin tildes ni mayúsculas.</p>
+                {PREFIX_HELP.map(([ex, what]) => (
+                  <button
+                    key={ex}
+                    onClick={() => {
+                      setFilters({ query: `${f.query} ${ex}`.trim() });
+                      setMenu(null);
+                      search.current?.focus();
+                    }}
+                    className="flex w-full items-center justify-between rounded px-1.5 py-1 hover:bg-panel-2"
+                  >
+                    <code className="text-neon">{ex}</code> <span className="text-mute">{what}</span>
+                  </button>
+                ))}
+                <p className="mt-2 text-mute">Con un solo resultado, Enter abre su ficha.</p>
+              </div>
+            )}
           </div>
-          <Button onClick={() => edit(EMPTY)}>
+          <Button onClick={() => setEditing({ ...EMPTY_CONTACT })}>
             <Plus size={14} /> Nuevo contacto
           </Button>
         </div>
-        {tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {tags.map(([t, n]) => (
+
+        {/* Vista, agrupación y orden */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="flex overflow-hidden rounded-md border border-line">
+            {VIEWS.map((v) => (
               <button
-                key={t}
-                onClick={() => setTag(tag === t ? null : t)}
-                className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${tag === t ? "border-neon/60 bg-neon/10 text-ink" : "border-line text-mute hover:text-ink"}`}
+                key={v.id}
+                onClick={() => setView({ view: v.id })}
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs ${view.view === v.id ? "bg-neon/15 text-neon" : "text-mute hover:text-ink"}`}
               >
-                {t} <span className="text-mute">{n}</span>
+                <v.icon size={12} /> {v.label}
+              </button>
+            ))}
+          </span>
+          <label className="flex items-center gap-1.5 text-xs text-mute">
+            Agrupar
+            <select value={view.group} onChange={(e) => setView({ group: e.target.value as ContactsView["group"] })} className={selectClass}>
+              {GROUPS.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-mute">
+            Ordenar
+            <select value={view.sort} onChange={(e) => setView({ sort: e.target.value as ContactsView["sort"] })} className={selectClass}>
+              {SORTS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {companies.length > 1 && (
+            <label className="flex items-center gap-1.5 text-xs text-mute">
+              Empresa
+              <select value={f.company} onChange={(e) => setFilters({ company: e.target.value })} className={`${selectClass} max-w-44`}>
+                <option value="">Todas</option>
+                {companies.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {view.view === "table" && (
+            <div className="relative" data-menu>
+              <button onClick={() => setMenu(menu === "columns" ? null : "columns")} className="flex h-8 items-center gap-1 rounded-md border border-line px-2 text-xs text-mute hover:text-ink">
+                <Columns3 size={12} /> Columnas
+              </button>
+              {menu === "columns" && (
+                <div className="absolute top-full left-0 z-20 mt-1 w-48 rounded-md border border-line-2 bg-panel p-2 shadow-xl">
+                  {COLUMNS.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 px-1 py-0.5 text-xs text-dim">
+                      <input
+                        type="checkbox"
+                        checked={view.columns.includes(c.id)}
+                        onChange={(e) => setView({ columns: e.target.checked ? COLUMNS.map((x) => x.id).filter((id) => id === c.id || view.columns.includes(id)) : view.columns.filter((x) => x !== c.id) })}
+                        className="accent-[var(--color-neon)]"
+                      />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {view.group !== "none" && (
+            <button onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(groups.map((g) => g.key)))} className="text-xs text-mute hover:text-ink">
+              {collapsed.size ? "Desplegar todo" : "Plegar todo"}
+            </button>
+          )}
+        </div>
+
+        {/* Filtros rápidos y etiquetas */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {QUICK.map((q) => (
+            <button
+              key={q.id}
+              onClick={() => toggleQuick(q.id)}
+              title={q.hint}
+              className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${f.quick.includes(q.id) ? "border-neon/60 bg-neon/10 text-ink" : "border-line text-mute hover:text-ink"}`}
+            >
+              {q.id === "favorites" && <Star size={10} className="mr-1 inline" />}
+              {q.label}
+            </button>
+          ))}
+        </div>
+        {tagCounts.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <Tag size={12} className="text-mute" />
+            {tagCounts.map(([t, n]) => (
+              <TagChip key={t} name={t} count={n} color={colorOf(colors, t)} active={f.tags.some((x) => norm(x) === norm(t))} onClick={() => toggleTag(t)} />
+            ))}
+            {f.tags.length > 1 && (
+              <span className="ml-1 flex overflow-hidden rounded-md border border-line text-[11px]">
+                {(["all", "any"] as const).map((m) => (
+                  <button key={m} onClick={() => setFilters({ tagMode: m })} className={`px-2 py-0.5 ${f.tagMode === m ? "bg-neon/15 text-neon" : "text-mute hover:text-ink"}`}>
+                    {m === "all" ? "Todas" : "Alguna"}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Búsquedas guardadas */}
+        {(view.saved.length > 0 || filtering) && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-line pt-3">
+            {view.saved.map((s) => (
+              <span key={s.name} className="inline-flex items-center overflow-hidden rounded-md border border-line text-xs">
+                <button onClick={() => setView({ filters: { ...EMPTY_FILTERS, ...s } })} className="flex items-center gap-1 px-2 py-0.5 text-dim hover:bg-panel-2 hover:text-ink">
+                  <BookUser size={11} /> {s.name}
+                </button>
+                <button onClick={() => setView({ saved: view.saved.filter((x) => x.name !== s.name) })} className="border-l border-line px-1 text-mute hover:text-bad" title="Borrar búsqueda">
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            {filtering && (
+              <>
+                <div className="relative" data-menu>
+                  <button onClick={() => setMenu(menu === "save" ? null : "save")} className="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-neon hover:bg-neon/10">
+                    <Save size={11} /> Guardar esta búsqueda
+                  </button>
+                  {menu === "save" && (
+                    <div className="absolute top-full left-0 z-20 mt-1 flex w-64 gap-1 rounded-md border border-line-2 bg-panel p-2 shadow-xl">
+                      <input
+                        autoFocus
+                        value={saveName}
+                        onChange={(e) => setSaveName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && saveSearch()}
+                        placeholder="Nombre: Proveedores urgentes"
+                        className={`${inputClass} h-8 py-1 text-xs`}
+                      />
+                      <Button onClick={saveSearch}>OK</Button>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setView({ filters: EMPTY_FILTERS })} className="ml-auto flex items-center gap-1 text-xs text-mute hover:text-ink">
+                  <X size={11} /> Quitar filtros
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Acciones con la selección */}
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-20 col-span-12 flex flex-wrap items-center gap-2 rounded-xl border border-neon/40 bg-panel px-4 py-2 shadow-xl">
+          <span className="text-sm text-ink">{selected.size} seleccionado(s)</span>
+          <button onClick={() => selectAll(true)} className="text-xs text-neon hover:underline">
+            Todos los visibles ({flat.length})
+          </button>
+          <span className="mx-1 h-4 w-px bg-line" />
+          <div className="relative" data-menu>
+            <Button kind="ghost" onClick={() => setMenu(menu === "bulkTag" ? null : "bulkTag")}>
+              <Tag size={13} /> Etiquetas
+            </Button>
+            {menu === "bulkTag" && (
+              <div className="absolute top-full left-0 z-30 mt-1 w-80 rounded-md border border-line-2 bg-panel p-3 shadow-xl">
+                <TagInput value={bulkTags} onChange={setBulkTags} suggestions={tagNames} colors={colors} placeholder="Etiquetas a poner o quitar…" autoFocus />
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button
+                    kind="ghost"
+                    onClick={async () => {
+                      for (const t of bulkTags) await bulk({ op: "removeTag", tag: t }, `«${t}» quitada`);
+                      setBulkTags([]);
+                      setMenu(null);
+                    }}
+                    disabled={!bulkTags.length}
+                  >
+                    Quitar
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      for (const t of bulkTags) await bulk({ op: "addTag", tag: t }, `«${t}» puesta`);
+                      setBulkTags([]);
+                      setMenu(null);
+                    }}
+                    disabled={!bulkTags.length}
+                  >
+                    Poner
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <Button kind="ghost" onClick={() => bulk({ op: "favorite", value: !selectedList.every((c) => c.favorite) }, "Favoritos actualizados")}>
+            <Star size={13} /> {selectedList.every((c) => c.favorite) ? "Quitar favorito" : "Favorito"}
+          </Button>
+          <Button kind="ghost" onClick={() => exportAs("csv", selectedList)}>
+            <Download size={13} /> CSV
+          </Button>
+          <Button kind="ghost" onClick={() => exportAs("vcf", selectedList)}>
+            <Download size={13} /> vCard
+          </Button>
+          <Button kind="danger" onClick={bulkTrash}>
+            <Trash2 size={13} /> Papelera
+          </Button>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-mute hover:text-ink">
+            Deseleccionar
+          </button>
+        </div>
+      )}
+
+      {/* Más usados */}
+      {!filtering && frequent.length > 0 && view.view !== "table" && (
+        <div className="col-span-12">
+          <p className="mb-1.5 text-[11px] font-medium tracking-wide text-mute uppercase">Más usados</p>
+          <div className="flex flex-wrap gap-2">
+            {frequent.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setDetail(c.id)}
+                className="flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-1.5 text-left hover:border-neon/50"
+              >
+                <span className="text-sm text-ink">{c.name}</span>
+                {c.extension && <span className="font-mono text-sm text-neon">{c.extension}</span>}
               </button>
             ))}
           </div>
-        )}
-      </Card>
-
-      {editing && (
-        <Card title={editing.id ? "Editar contacto" : "Nuevo contacto"} icon={<Pencil size={14} />} className="col-span-12">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {field("name", "Nombre", "Ana López")}
-            {field("role", "Cargo o área", "Sistemas")}
-            {field("company", "Empresa", "Proveedor, cliente…")}
-            {field("extension", "Extensión", "2104")}
-            {field("phone", "Teléfono")}
-            {field("mobile", "Móvil")}
-            {field("email", "Correo", "", true)}
-            {field("reason", "Para qué llamarle", "Altas de usuarios, impresoras, la fibra…", true)}
-            <label className="col-span-2 block">
-              <span className="mb-1 block text-[11px] text-mute">Etiquetas (separadas por comas)</span>
-              <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="TI, proveedores, urgencias" className={inputClass} />
-            </label>
-            <label className="col-span-2 block md:col-span-4">
-              <span className="mb-1 block text-[11px] text-mute">Notas</span>
-              <textarea
-                value={editing.notes}
-                onChange={(e) => setEditing((c) => (c ? { ...c, notes: e.target.value } : c))}
-                rows={2}
-                className={inputClass}
-              />
-            </label>
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button kind="ghost" onClick={() => setEditing(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={save} disabled={saving}>
-              Guardar
-            </Button>
-          </div>
-        </Card>
+        </div>
       )}
 
-      <div className="col-span-12 space-y-2">
-        {list === null ? (
-          <p className="text-sm text-mute">Cargando…</p>
-        ) : list.length === 0 ? (
-          <p className="py-8 text-center text-sm text-mute">Todavía no hay contactos. Añade el primero o importa un CSV de Excel u Outlook.</p>
-        ) : shown.length === 0 ? (
-          <p className="py-8 text-center text-sm text-mute">Nadie coincide con la búsqueda.</p>
+      {/* Lista */}
+      <div className="col-span-12 space-y-4">
+        {all === null ? (
+          <Loading />
+        ) : live.length === 0 ? (
+          <EmptyState
+            icon={<UserRound size={22} />}
+            title="Todavía no hay contactos"
+            action={
+              <div className="flex gap-2">
+                <Button onClick={() => setEditing({ ...EMPTY_CONTACT })}>
+                  <Plus size={14} /> Nuevo contacto
+                </Button>
+                <Button kind="ghost" onClick={importFile}>
+                  <Upload size={14} /> Importar CSV o vCard
+                </Button>
+              </div>
+            }
+          >
+            A quién llamar y para qué. Viaja contigo en todos los equipos y se encuentra desde Ctrl+K.
+          </EmptyState>
+        ) : filtered.length === 0 ? (
+          <p className="py-10 text-center text-sm text-mute">Nadie coincide con la búsqueda.</p>
         ) : (
-          shown.map((c) => (
-            <div
-              key={c.id}
-              id={`contact-${c.id}`}
-              className={`group flex flex-wrap items-start gap-x-6 gap-y-2 rounded-xl border bg-panel px-4 py-3 transition-colors ${flash === c.id ? "border-neon" : "border-line"}`}
-            >
-              <button onClick={() => star(c)} className={`mt-0.5 ${c.favorite ? "text-warn" : "text-mute hover:text-warn"}`} title={c.favorite ? "Quitar de favoritos" : "Favorito (sale primero)"}>
-                <Star size={15} fill={c.favorite ? "currentColor" : "none"} />
-              </button>
-              <div className="min-w-48 flex-1">
-                <p className="text-sm font-medium text-ink">{c.name}</p>
-                {(c.role || c.company) && (
-                  <p className="flex items-center gap-1 text-xs text-dim">
-                    {c.company && <Building2 size={11} />} {[c.role, c.company].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-                {c.reason && <p className="mt-1 text-xs text-neon">Para: {c.reason}</p>}
-                {c.notes && <p className="mt-1 text-xs whitespace-pre-wrap text-mute select-text">{c.notes}</p>}
-                {c.tags.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {c.tags.map((t) => (
-                      <span key={t} className="rounded border border-line px-1.5 text-[11px] text-mute">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex min-w-56 flex-col gap-1 text-sm">
-                {c.extension && (
-                  <button onClick={() => copy(c.extension, "Extensión")} className="flex items-center gap-2 text-left hover:text-neon" title="Copiar">
-                    <Phone size={13} className="text-mute" /> <span className="text-xs text-mute">Ext.</span> <span className="font-mono text-base text-ink">{c.extension}</span>
-                  </button>
-                )}
-                {c.phone && (
-                  <button onClick={() => copy(c.phone, "Teléfono")} className="flex items-center gap-2 text-left font-mono text-xs text-dim hover:text-neon" title="Copiar">
-                    <Phone size={13} className="text-mute" /> {c.phone}
-                  </button>
-                )}
-                {c.mobile && (
-                  <button onClick={() => copy(c.mobile, "Móvil")} className="flex items-center gap-2 text-left font-mono text-xs text-dim hover:text-neon" title="Copiar">
-                    <Smartphone size={13} className="text-mute" /> {c.mobile}
-                  </button>
-                )}
-                {c.email && (
-                  <span className="flex items-center gap-2 text-xs">
-                    <Mail size={13} className="text-mute" />
-                    <button onClick={() => contactsApi.email(c.email).catch((e) => toast("error", String(e)))} className="truncate text-dim hover:text-neon" title="Escribir un correo">
-                      {c.email}
-                    </button>
-                    <button onClick={() => copy(c.email, "Correo")} className="text-mute hover:text-ink" title="Copiar">
-                      <Copy size={11} />
-                    </button>
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-1 opacity-60 group-hover:opacity-100">
-                <button onClick={() => edit(c)} className="rounded p-1 text-mute hover:text-ink" title="Editar">
-                  <Pencil size={13} />
+          groups.map((g) =>
+            view.group === "none" ? (
+              <div key={g.key}>{renderItems(g.items)}</div>
+            ) : (
+              <section key={g.key}>
+                <button
+                  onClick={() =>
+                    setCollapsed((s) => {
+                      const n = new Set(s);
+                      if (n.has(g.key)) n.delete(g.key);
+                      else n.add(g.key);
+                      return n;
+                    })
+                  }
+                  className="mb-2 flex items-center gap-1.5 text-xs font-medium tracking-wide text-dim uppercase hover:text-ink"
+                >
+                  {collapsed.has(g.key) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                  {view.group === "tag" && colorOf(colors, g.label) ? <TagChip name={g.label} color={colorOf(colors, g.label)} /> : g.label}
+                  <span className="text-mute">{g.items.length}</span>
                 </button>
-                <button onClick={() => remove(c)} className="rounded p-1 text-mute hover:text-bad" title="Borrar">
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-          ))
+                {!collapsed.has(g.key) && renderItems(g.items)}
+              </section>
+            ),
+          )
         )}
-        {list && list.length > 0 && (
-          <p className="pt-1 text-center text-[11px] text-mute">
-            {shown.length} de {list.length} contacto(s)
-            {(query || tag) && (
-              <button
-                onClick={() => {
-                  setQuery("");
-                  setTag(null);
-                }}
-                className="ml-2 inline-flex items-center gap-0.5 text-neon hover:underline"
-              >
-                <X size={10} /> Quitar filtros
-              </button>
-            )}
+        {live.length > 0 && (
+          <p className="text-center text-[11px] text-mute">
+            {filtered.length} de {live.length} contacto(s)
+            {view.group === "tag" && " · un contacto con varias etiquetas sale en cada grupo"}
           </p>
         )}
       </div>
+
+      {detailContact && (
+        <ContactDetail contact={detailContact} byId={byId} clients={clients} colors={colors} actions={actions} onClose={() => setDetail(null)} />
+      )}
+      {editing && (
+        <ContactEditor initial={editing} contacts={live} clients={clients} tagSuggestions={tagNames} colors={colors} onSave={save} onClose={() => setEditing(null)} />
+      )}
+      {tools && <ContactTools tab={tools} contacts={all ?? []} colors={colors} onChanged={load} onClose={() => setTools(null)} />}
       {dialog}
     </div>
   );

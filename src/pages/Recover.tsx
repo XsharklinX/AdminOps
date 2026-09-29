@@ -2,7 +2,7 @@ import { Download, FileSearch, Lightbulb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass } from "../components/ui";
+import { Button, Card, inputClass, Loading } from "../components/ui";
 import { recoverApi, type RecoverDrive } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 
@@ -93,7 +93,7 @@ export function Recover() {
 
       <Card title="Recuperar archivos borrados" icon={<FileSearch size={14} />} className="col-span-12 lg:col-span-7">
         {installed === null ? (
-          <p className="font-mono text-xs text-mute">Cargando…</p>
+          <Loading />
         ) : !installed ? (
           <div>
             <p className="mb-3 text-sm text-dim">

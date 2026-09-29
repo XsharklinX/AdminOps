@@ -4,12 +4,15 @@ import logo from "../assets/logo.svg";
 import { useToast } from "../components/feedback";
 import { SignaturePad } from "../components/service";
 import { NAV } from "../components/Sidebar";
-import { Button, Card, inputClass } from "../components/ui";
+import { Button, Card, inputClass, Loading } from "../components/ui";
+import { PerfPanel } from "../components/PerfPanel";
 import { appApi, appcareApi, configApi, workApi, type AppInfo, type DataUsage, type Settings } from "../lib/api";
 import { bytes } from "../lib/format";
 import { ACCENTS, applyAppearance, exportPrefs, importPrefs, setPrefs, usePrefs, ZOOMS, type Accent } from "../lib/prefs";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
+import { DataSafety } from "./settings/DataSafety";
 import { LockSettings } from "./settings/LockSettings";
+import { VisitTypesEditor } from "./settings/VisitTypesEditor";
 import { NavEditor } from "./settings/NavEditor";
 import { ShortcutEditor } from "./settings/ShortcutEditor";
 
@@ -19,6 +22,7 @@ const TABS = [
   ["navigation", "Navegación"],
   ["security", "Seguridad"],
   ["reports", "Informes y cobros"],
+  ["performance", "Rendimiento"],
   ["about", "Acerca de"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -53,7 +57,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
     }
   };
 
-  if (!s) return <p className="p-8 font-mono text-sm text-mute">Cargando…</p>;
+  if (!s) return <Loading page />;
 
   const set = (patch: Partial<Settings>) => {
     setS({ ...s, ...patch });
@@ -94,6 +98,7 @@ export function SettingsPage({ appInfo }: { appInfo: AppInfo | null }) {
       )}
       {tab === "security" && <LockSettings />}
       {tab === "reports" && <Reports s={s} set={set} />}
+      {tab === "performance" && <PerfPanel />}
       {tab === "about" && <About appInfo={appInfo} />}
 
       {dirty && (
@@ -172,6 +177,12 @@ function General({ s, set, portable, onImported }: SettingsProps & { portable: b
             <option value={5000}>Cada 5 segundos</option>
           </select>
         </Row>
+        <Row title="Precargar los portales" sub="Carga en segundo plano el último portal usado de Tickets, Inventario web y Correo, para que al entrar ya esté listo. Los de sesión privada no se precargan.">
+          <input type="checkbox" checked={prefs.preloadPortals} onChange={(e) => setPrefs({ preloadPortals: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+        </Row>
+        <Row title="Diagnosticar al abrir AdminOps" sub="Analiza el equipo en segundo plano nada más abrir: al entrar en Diagnóstico ya está hecho o a medias.">
+          <input type="checkbox" checked={prefs.diagnoseOnOpen} onChange={(e) => setPrefs({ diagnoseOnOpen: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+        </Row>
         <Row title="Vigilar errores de Windows" sub="Mientras AdminOps está abierta, revisa el Visor de eventos cada minuto y avisa (campana de arriba y notificación) de pantallazos, discos con fallos, programas que se cierran, falta de memoria o espacio…">
           <input type="checkbox" checked={s.watchWindows} onChange={(e) => set({ watchWindows: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
         </Row>
@@ -192,6 +203,8 @@ function General({ s, set, portable, onImported }: SettingsProps & { portable: b
       </Card>
 
       <WhereStored portable={portable} />
+
+      <DataSafety />
 
       <DataCare s={s} set={set} />
 
@@ -607,6 +620,8 @@ function Reports({ s, set }: SettingsProps) {
         <SignaturePad value={s.techSignature} onChange={(techSignature) => set({ techSignature })} height={130} />
         <p className="mt-1 text-[11px] text-mute">Aparece sobre tu nombre en todos los informes. Opcional.</p>
       </Card>
+
+      <VisitTypesEditor s={s} set={set} />
 
       <Card title="Presupuestos, recibos y garantías" icon={<Receipt size={14} />} className="col-span-12">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-6">

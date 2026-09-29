@@ -74,6 +74,11 @@ impl LocalUser {
         self.builtin
     }
 
+    /// Vinculada a una cuenta de Microsoft (la contraseña es la de la cuenta online).
+    pub fn is_microsoft(&self) -> bool {
+        self.microsoft
+    }
+
     /// Administrador local activo con el que se podría entrar sin dominio.
     pub fn is_active_local_admin(&self) -> bool {
         self.admin && self.enabled && !matches!(self.builtin, Some("default" | "wdag" | "guest"))

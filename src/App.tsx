@@ -6,17 +6,36 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { LockScreen } from "./components/LockScreen";
-import { NAV, Sidebar, areaOf, pageLabel, visibleAreas, type Area, type PageId } from "./components/Sidebar";
-import { api, appApi, appcareApi, lockApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { NAV, Sidebar, areaOf, isPageId, pageLabel, resolvePage, visibleAreas, type Area, type PageId } from "./components/Sidebar";
+import { api, appApi, appcareApi, lockApi, portalsApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
+import { analyze } from "./lib/diagRun";
+import { lastPortalKey, watchPortals } from "./lib/portalState";
+import { NAVIGATE_EVENT } from "./lib/navigate";
+import { appStarted, codeLoaded, onPerfChange, pageLoads, pageOpened, pagePainted } from "./lib/perf";
 import { Dashboard } from "./pages/Dashboard";
-import { SYMPTOMS, Troubleshoot } from "./pages/Troubleshoot";
-import { Contacts } from "./pages/Contacts";
+import { AuditBanner, AuditToggle } from "./components/AuditMode";
+import { PageHelp } from "./components/PageHelp";
+import { TasksIndicator } from "./components/TasksIndicator";
+import { SYMPTOMS } from "./lib/symptoms";
+import { Loading } from "./components/ui";
 
 // Solo el Panel se carga al abrir la app; el resto de páginas, al visitarlas.
 const lazyPage = <T extends string>(name: T, load: () => Promise<Record<T, React.ComponentType<any>>>) =>
-  lazy(() => load().then((m) => ({ default: m[name] })));
+  lazy(() => {
+    const t = performance.now();
+    return load().then((m) => {
+      codeLoaded(t);
+      return { default: m[name] };
+    });
+  });
+
+/** Se pinta junto a la página: cuando aparece, la página ya está en pantalla. */
+function PaintMark({ page }: { page: string }) {
+  useEffect(() => pagePainted(page), [page]);
+  return null;
+}
 // Ventanas que se abren poco: se cargan al usarlas.
 const About = lazyPage("About", () => import("./components/About"));
 const CommandPalette = lazyPage("CommandPalette", () => import("./components/CommandPalette"));
@@ -25,13 +44,11 @@ const Bloatware = lazyPage("Bloatware", () => import("./pages/Bloatware"));
 const Diagnostics = lazyPage("Diagnostics", () => import("./pages/Diagnostics"));
 const Report = lazyPage("Report", () => import("./pages/Report"));
 const History = lazyPage("History", () => import("./pages/History"));
-const Profiles = lazyPage("Profiles", () => import("./pages/Profiles"));
 const Startup = lazyPage("Startup", () => import("./pages/Startup"));
 const TweaksPage = lazyPage("TweaksPage", () => import("./pages/TweaksPage"));
 const Processes = lazyPage("Processes", () => import("./pages/Processes"));
 const Hardware = lazyPage("Hardware", () => import("./pages/Hardware"));
 const Network = lazyPage("Network", () => import("./pages/Network"));
-const Software = lazyPage("Software", () => import("./pages/Software"));
 const Space = lazyPage("Space", () => import("./pages/Space"));
 const Session = lazyPage("Session", () => import("./pages/Session"));
 const Clients = lazyPage("Clients", () => import("./pages/Clients"));
@@ -42,29 +59,31 @@ const NetTools = lazyPage("NetTools", () => import("./pages/NetTools"));
 const Printers = lazyPage("Printers", () => import("./pages/Printers"));
 const Migrate = lazyPage("Migrate", () => import("./pages/Migrate"));
 const Tickets = lazyPage("Tickets", () => import("./pages/Tickets"));
-const Router = lazyPage("Router", () => import("./pages/Router"));
-const Devices = lazyPage("Devices", () => import("./pages/Devices"));
 const Vault = lazyPage("Vault", () => import("./pages/Vault"));
 const Wipe = lazyPage("Wipe", () => import("./pages/Wipe"));
 const Recover = lazyPage("Recover", () => import("./pages/Recover"));
 const Family = lazyPage("Family", () => import("./pages/Family"));
-const Inventory = lazyPage("Inventory", () => import("./pages/Inventory"));
 const Shares = lazyPage("Shares", () => import("./pages/Shares"));
 const Remote = lazyPage("Remote", () => import("./pages/Remote"));
 const Domain = lazyPage("Domain", () => import("./pages/Domain"));
 const Uninstall = lazyPage("Uninstall", () => import("./pages/Uninstall"));
 const Security = lazyPage("Security", () => import("./pages/Security"));
 const Shortcuts = lazyPage("Shortcuts", () => import("./pages/Shortcuts"));
-const WindowsUpdate = lazyPage("WindowsUpdate", () => import("./pages/WindowsUpdate"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
+const Troubleshoot = lazyPage("Troubleshoot", () => import("./pages/Troubleshoot"));
+const Contacts = lazyPage("Contacts", () => import("./pages/Contacts"));
+const Knowledge = lazyPage("Knowledge", () => import("./pages/Knowledge"));
+const Updates = lazyPage("Updates", () => import("./pages/Merged"));
+const MyNetwork = lazyPage("MyNetwork", () => import("./pages/Merged"));
+const Workstations = lazyPage("Workstations", () => import("./pages/Merged"));
+const Accounts = lazyPage("Accounts", () => import("./pages/Accounts"));
+const Agenda = lazyPage("Agenda", () => import("./pages/Agenda"));
+const WindowsTweaks = lazyPage("WindowsTweaks", () => import("./pages/Merged"));
+const RecipesAndProfiles = lazyPage("RecipesAndProfiles", () => import("./pages/Merged"));
 
 /** Páginas que son una lista de ajustes del catálogo, por categoría. */
 const TWEAK_PAGES: Partial<Record<PageId, string>> = {
-  privacy: "privacy",
-  performance: "performance",
   repair: "repair",
-  services: "services",
-  cleanup: "cleanup",
 };
 
 const LAST_PAGE = "adminops.lastPage";
@@ -74,10 +93,10 @@ const MAX_ALIVE = 12;
 /** Página de inicio elegida en Ajustes, o la última visitada (Diagnóstico no: se ejecuta solo al abrirlo). */
 function initialPage(): PageId {
   const start = getPrefs().startPage;
-  if (start !== "last" && NAV.some((n) => n.id === start)) return start;
+  if (start !== "last" && isPageId(start)) return resolvePage(start)[0];
   try {
     const p = localStorage.getItem(LAST_PAGE);
-    if (p && p !== "diagnostics" && NAV.some((n) => n.id === p)) return p as PageId;
+    if (p && p !== "diagnostics" && isPageId(p)) return resolvePage(p)[0];
   } catch {
     /* sin almacenamiento */
   }
@@ -85,7 +104,15 @@ function initialPage(): PageId {
 }
 
 export default function App() {
-  const [page, setPage] = useState<PageId>(initialPage);
+  const [page, setPage] = useState<PageId>(() => {
+    // La primera página se mide desde que se abrió la ventana (arranque completo).
+    const p = initialPage();
+    appStarted();
+    pageOpened(p, 0);
+    return p;
+  });
+  // Páginas ya montadas: abrir una nueva se mide (se marca antes de pintarla).
+  const aliveRef = useRef<PageId[]>([]);
   // Sección o ajuste a resaltar al llegar desde un hallazgo del diagnóstico o la búsqueda.
   const [focus, setFocus] = useState<string | null>(null);
   // Historial de páginas para Alt+← / Alt+→.
@@ -93,7 +120,10 @@ export default function App() {
   const forward = useRef<PageId[]>([]);
   const pageRef = useRef(page);
   pageRef.current = page;
-  const navigate = useCallback((p: PageId, f: string | null = null) => {
+  const navigate = useCallback((to: PageId, focusOn: string | null = null) => {
+    // Las páginas que se unieron a otras llevan a la nueva, en su pestaña.
+    const [p, f] = resolvePage(to, focusOn);
+    if (p !== pageRef.current && !aliveRef.current.includes(p)) pageOpened(p);
     if (p !== pageRef.current) {
       back.current = [...back.current.slice(-49), pageRef.current];
       forward.current = [];
@@ -109,6 +139,59 @@ export default function App() {
     to.current.push(pageRef.current);
     setPage(p);
     setFocus(null);
+  }, []);
+  // Cuando la primera página está lista, el resumen del arranque va al registro
+  // técnico: así se comparan versiones con datos (Ajustes → Rendimiento lo detalla).
+  useEffect(() => {
+    let logged = false;
+    const off = onPerfChange(() => {
+      const first = pageLoads().find((l) => l.at === 0);
+      if (logged || !first) return;
+      logged = true;
+      void import("./components/PerfPanel").then(({ fetchTiming, startupSummary }) =>
+        fetchTiming()
+          .then((t) => appApi.logTiming(startupSummary(t, first)))
+          .catch(() => {}),
+      );
+    });
+    return off;
+  }, []);
+  // Diálogos compartidos que llevan a otra página (p. ej. enviar el informe con el Correo).
+  useEffect(() => {
+    const f = (e: Event) => {
+      const { page: p, focus: f } = (e as CustomEvent<{ page: string; focus: string | null }>).detail;
+      if (isPageId(p)) navigate(p, f);
+    };
+    window.addEventListener(NAVIGATE_EVENT, f);
+    return () => window.removeEventListener(NAVIGATE_EVENT, f);
+  }, [navigate]);
+  // Portales: el estado de cada vista web se escucha desde el principio y el
+  // último portal usado de cada tipo se precarga, para que al entrar ya esté listo.
+  useEffect(() => {
+    watchPortals();
+    if (!getPrefs().preloadPortals) return;
+    const t = setTimeout(async () => {
+      const ids = (["", "inventory", "mail"] as const)
+        .map((k) => {
+          try {
+            return localStorage.getItem(lastPortalKey(k));
+          } catch {
+            return null;
+          }
+        })
+        .filter((x): x is string => !!x);
+      const [w, h] = [Math.max(800, window.innerWidth - 260), Math.max(500, window.innerHeight - 140)];
+      // De uno en uno: crear varias vistas a la vez compite con la primera página.
+      for (const id of ids) await portalsApi.preload(id, w, h).catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
+  }, []);
+  // «Diagnosticar al abrir»: se lanza cuando la ventana ya está pintada, sin
+  // competir con la carga de la primera página.
+  useEffect(() => {
+    if (!getPrefs().diagnoseOnOpen) return;
+    const t = setTimeout(() => void analyze().catch(() => {}), 2500);
+    return () => clearTimeout(t);
   }, []);
   // Última pestaña visitada de cada área: la barra lateral vuelve a ella.
   const lastByArea = useRef<Record<string, PageId>>({});
@@ -149,6 +232,7 @@ export default function App() {
   // Páginas vivas (las más recientes primero) y cuántas veces se ha recargado cada una.
   const [alive, setAlive] = useState<PageId[]>([page]);
   const [reloads, setReloads] = useState<Partial<Record<PageId, number>>>({});
+  aliveRef.current = alive;
   useEffect(() => {
     setAlive((a) => (a[0] === page ? a : [page, ...a.filter((x) => x !== page)].slice(0, MAX_ALIVE)));
   }, [page]);
@@ -243,7 +327,7 @@ export default function App() {
         // Solo para capturas y mediciones (scripts/bench.ps1 -Page): "tickets,dashboard"
         // abre la primera página y pasa a la siguiente cada 5 s.
         const seq = (info.startPage ?? "").split(",").filter((p) => NAV.some((n) => n.id === p)) as PageId[];
-        seq.forEach((p, i) => window.setTimeout(() => setPage(p), i * 5000));
+        seq.forEach((p, i) => window.setTimeout(() => setPage(resolvePage(p)[0]), i * 5000));
         // Primer arranque: asistente (no en las capturas automáticas).
         if (!info.startPage) workApi.settings().then((s) => setOnboarding(!s.onboarded)).catch(() => {});
       })
@@ -265,6 +349,19 @@ export default function App() {
       ...SYMPTOMS.map((s) => ({ id: `trouble:${s.id}`, title: `Solucionar: ${s.title}`, subtitle: s.hint, keywords: `${s.keywords} problema arreglar no funciona`, run: () => navigate("troubleshoot", s.id) })),
       { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },
       { id: "wifistate", title: "Estado de la Wi-Fi", subtitle: "Reiniciar la tarjeta, ahorro de energía, adaptadores fantasma", keywords: "wifi tarjeta adaptador driver codigo 10", run: () => navigate("network") },
+      // Páginas que ahora son pestañas de otra: se siguen encontrando por su nombre.
+      { id: "go:webinventory", title: "Inventario web de la empresa", subtitle: "Puestos e inventario → Inventario web", keywords: "inventario web intranet portal pgr", run: () => navigate("stations", "webinventory") },
+      { id: "go:localaccount", title: "Pasar el equipo a una cuenta local", subtitle: "Cuentas → salir de Entra ID o de la cuenta de Microsoft", keywords: "cuenta profesional azure entra desconectar local microsoft", run: () => navigate("accounts") },
+      { id: "go:winupdate", title: "Windows Update", subtitle: "Actualizaciones → Windows Update", keywords: "parches actualizaciones windows", run: () => navigate("winupdate") },
+      { id: "go:devices", title: "Dispositivos en la red", subtitle: "Mi red → Dispositivos", keywords: "escanear red ip mac intrusos", run: () => navigate("devices") },
+      { id: "go:inventory", title: "Inventario de equipos", subtitle: "Puestos e inventario → Inventario", keywords: "equipos clientes renovar", run: () => navigate("inventory") },
+      { id: "go:repair", title: "Reparaciones de Windows", subtitle: "Solucionar problemas → Reparaciones", keywords: "sfc dism reparar winsock", run: () => navigate("repair") },
+      { id: "sheet", title: "Ficha del equipo", subtitle: "Modelo, serie, licencia, red… para el inventario", keywords: "inventario serie numero modelo garantia licencia", run: () => navigate("hardware", "sheet") },
+      { id: "newsolution", title: "Nueva solución", subtitle: "Apuntar lo que funcionó", keywords: "conocimiento base problema", run: () => navigate("knowledge", "solution:") },
+      { id: "notes", title: "Notas de este equipo y de esta red", keywords: "apuntar recordar nota", run: () => navigate("knowledge", "notes") },
+      { id: "recipes", title: "Preparar un equipo nuevo", keywords: "plantilla receta preparar instalar bloatware dominio usuario", run: () => navigate("recipes") },
+      { id: "stations", title: "Comprobar puestos", subtitle: "Qué equipos responden y cuáles necesitan atención", keywords: "equipos oficina ping disco reinicio", run: () => navigate("stations") },
+      { id: "backup", title: "Copia de seguridad cifrada de mis datos", keywords: "backup usb contactos restaurar", run: () => navigate("settings") },
       { id: "timeline", title: "Línea de tiempo del equipo", subtitle: "Qué cambió y qué pasó, por días", keywords: "historial eventos cambios arranques actualizaciones drivers", run: () => navigate("history") },
       { id: "wifion", title: "Encender la Wi-Fi", keywords: "wifi radio activar", run: () => troubleshootApi.fix("wifi.radio.on") },
       { id: "wifioff", title: "Apagar la Wi-Fi", keywords: "wifi radio desactivar", run: () => troubleshootApi.fix("wifi.radio.off") },
@@ -300,37 +397,40 @@ export default function App() {
     if (p === "startup") return <Startup isAdmin={!!isAdmin} />;
     if (p === "diagnostics") return <Diagnostics focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "report") return <Report />;
-    if (p === "profiles") return <Profiles isAdmin={!!isAdmin} />;
     if (p === "processes") return <Processes isAdmin={!!isAdmin} />;
     if (p === "hardware") return <Hardware isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "network") return <Network isAdmin={!!isAdmin} />;
     if (p === "troubleshoot") return <Troubleshoot isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
-    if (p === "software") return <Software isAdmin={!!isAdmin} />;
+    if (p === "tweaks") return <WindowsTweaks isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
+    if (p === "software") return <Updates isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "space") return <Space />;
-    if (p === "session") return <Session onSessionChange={setSessionActive} />;
+    if (p === "session") return <Session onSessionChange={setSessionActive} focus={p === page ? focus : null} />;
+    if (p === "agenda") return <Agenda onNavigate={navigate} />;
     if (p === "clients") return <Clients />;
-    if (p === "contacts") return <Contacts focus={p === page ? focus : null} />;
+    if (p === "contacts") return <Contacts focus={p === page ? focus : null} onNavigate={navigate} />;
+    if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} />;
+    if (p === "recipes") return <RecipesAndProfiles isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
+    if (p === "stations") return <Workstations covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "tools") return <Tools isAdmin={!!isAdmin} />;
     if (p === "users") return <Users isAdmin={!!isAdmin} />;
+    if (p === "accounts") return <Accounts isAdmin={!!isAdmin} />;
     if (p === "install") return <Install isAdmin={!!isAdmin} />;
     if (p === "nettools") return <NetTools isAdmin={!!isAdmin} />;
     if (p === "printers") return <Printers isAdmin={!!isAdmin} />;
     if (p === "migrate") return <Migrate />;
     if (p === "tickets") return <Tickets covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
-    if (p === "router") return <Router covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
-    if (p === "devices") return <Devices />;
+    if (p === "mail") return <Tickets kind="mail" covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
+    if (p === "router") return <MyNetwork covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "vault") return <Vault />;
     if (p === "wipe") return <Wipe onNavigate={(p: PageId) => navigate(p)} />;
     if (p === "recover") return <Recover />;
     if (p === "family") return <Family />;
-    if (p === "inventory") return <Inventory />;
     if (p === "shares") return <Shares isAdmin={!!isAdmin} />;
     if (p === "remote") return <Remote isAdmin={!!isAdmin} />;
     if (p === "domain") return <Domain isAdmin={!!isAdmin} />;
     if (p === "uninstall") return <Uninstall isAdmin={!!isAdmin} />;
     if (p === "shortcuts") return <Shortcuts />;
     if (p === "security") return <Security isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
-    if (p === "winupdate") return <WindowsUpdate isAdmin={!!isAdmin} />;
     if (p === "settings") return <SettingsPage appInfo={appInfo} />;
     if (category) return <TweaksPage category={category} isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     return null;
@@ -354,10 +454,14 @@ export default function App() {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {isAdmin === false && <AdminBanner />}
+          <AuditBanner />
           <header className="flex items-end justify-between border-b border-line px-8 pt-5 pb-4">
             <div className="min-w-0">
               {area && area.pages.length > 1 && !showTabs && <div className="mb-0.5 text-xs text-mute">{area.label}</div>}
-              <h1 className="truncate text-[22px] font-semibold tracking-tight">{pageLabel(nav.id)}</h1>
+              <h1 className="flex items-center gap-2 text-[22px] font-semibold tracking-tight">
+                <span className="truncate">{pageLabel(nav.id)}</span>
+                <PageHelp text={nav.help} />
+              </h1>
               {showTabs && tabs.length > 1 && (
                 <div className="mt-3 -mb-4 flex gap-1 overflow-x-auto">
                   {tabs.map((t) => (
@@ -373,6 +477,8 @@ export default function App() {
               )}
             </div>
             <div className="flex items-center gap-2">
+            <TasksIndicator />
+            <AuditToggle />
             {page === "dashboard" ? (
               <span className="text-xs text-mute">En vivo · se actualiza cada {prefs.refreshMs / 1000} s</span>
             ) : (
@@ -394,7 +500,10 @@ export default function App() {
               <div key={`${p}-${reloads[p] ?? 0}`} hidden={p !== page} className="absolute inset-0 overflow-y-auto">
                 <PageActiveContext.Provider value={p === page}>
                   <ErrorBoundary onHome={() => navigate("dashboard")}>
-                    <Suspense fallback={<p className="p-8 font-mono text-sm text-mute">Cargando…</p>}>{renderPage(p)}</Suspense>
+                    <Suspense fallback={<Loading page />}>
+                      {renderPage(p)}
+                      <PaintMark page={p} />
+                    </Suspense>
                   </ErrorBoundary>
                 </PageActiveContext.Provider>
               </div>

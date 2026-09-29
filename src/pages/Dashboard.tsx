@@ -1,11 +1,13 @@
 import { Brush, ClipboardCheck, FileText, Gauge, HardDrive, LifeBuoy, Loader2, RefreshCw, RotateCcw, Star, Stethoscope, Wifi } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { PlaceNotes } from "../components/PlaceNotes";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ActionPlan } from "../components/ActionPlan";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { Bar, Sparkline } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
-import { api, diagApi, toolboxApi, tweaksApi, type FindingAction, type JournalEntry, type SystemInfo } from "../lib/api";
+import { api, diagApi, toolboxApi, tweaksApi, type JournalEntry, type SystemInfo } from "../lib/api";
 import { getPrefs } from "../lib/prefs";
 import { bytes, duration, loadColor, rate } from "../lib/format";
 
@@ -72,22 +74,48 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   const [loaded, setLoaded] = useState(false);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [refresh, setRefresh] = useState(0);
   const toast = useToast();
+  const navigate = useCallback((p: PageId, f?: string | null) => onNavigate(p, f), [onNavigate]);
+
+  const loadLatest = useCallback(
+    () =>
+      diagApi
+        .latest()
+        .then(setLatest)
+        .catch(() => {})
+        .finally(() => setLoaded(true)),
+    [],
+  );
+
+  // Revisión completa: diagnóstico (discos, estabilidad, drivers, seguridad y
+  // actualizaciones) y la lista de «Qué hacer ahora» al día.
+  const review = async () => {
+    setReviewing(true);
+    try {
+      // Revisión completa: se vuelve a leer todo, sin reutilizar lo de hace unos minutos.
+      const d = await diagApi.run(true);
+      const n = d.findings.filter((f) => f.severity !== "info").length;
+      toast(n ? "info" : "ok", n ? `Revisión terminada: ${n} cosa(s) que atender.` : "Revisión terminada: todo en orden.");
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setReviewing(false);
+      await loadLatest();
+      setRefresh((r) => r + 1);
+    }
+  };
 
   useEffect(() => {
     api.systemInfo().then(setInfo).catch(() => {});
-    diagApi
-      .latest()
-      .then(setLatest)
-      .catch(() => {})
-      .finally(() => setLoaded(true));
+    loadLatest();
     tweaksApi.journal().then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)));
   }, []);
 
   if (error && !m) return <p className="p-8 text-bad">Error leyendo métricas: {error}</p>;
   if (!m) return <p className="p-8 text-sm text-mute">Leyendo el equipo…</p>;
 
-  const act = (a: FindingAction) => (a.kind === "tool" ? diagApi.openTool(a.tool) : onNavigate(a.page as PageId, a.focus));
 
   const quick = async (key: string, label: string, run: () => Promise<string | void>) => {
     setBusy(key);
@@ -106,7 +134,6 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   const findings = latest?.findings ?? [];
   const bad = findings.filter((f) => f.severity === "bad").length;
   const warn = findings.filter((f) => f.severity === "warn").length;
-  const attention = findings.filter((f) => f.severity !== "info").slice(0, 6);
   const ramPct = (m.memoryUsed / m.memoryTotal) * 100;
   const volumes = m.disks.filter((d) => d.total > 0).sort((a, b) => a.mount.localeCompare(b.mount));
   const system = volumes.find((d) => d.mount.toUpperCase().startsWith("C:")) ?? volumes[0];
@@ -135,6 +162,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-7 px-8 py-6">
+      {/* Lo que se apuntó de este equipo o de esta red la última vez */}
+      <PlaceNotes compact />
       {/* Veredicto */}
       <section className="flex items-center gap-5 rounded-xl border border-line bg-panel px-6 py-5">
         <span className={`size-3 shrink-0 rounded-full ${verdict.dot}`} />
@@ -160,8 +189,14 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         <button onClick={() => onNavigate("report")} className="flex h-9 items-center gap-1.5 rounded-lg border border-line-2 px-3.5 text-[13px] text-ink hover:bg-panel-2">
           <FileText size={15} strokeWidth={1.6} /> Informe
         </button>
-        <button onClick={() => onNavigate("diagnostics")} className="flex h-9 items-center gap-1.5 rounded-lg bg-neon px-4 text-[13px] font-medium text-on-neon hover:brightness-110">
-          <Stethoscope size={15} strokeWidth={1.8} /> {latest ? "Volver a diagnosticar" : "Diagnosticar"}
+        <button
+          onClick={review}
+          disabled={reviewing}
+          title="Diagnóstico completo (discos, estabilidad, drivers, seguridad y actualizaciones) y plan de acción. Tarda alrededor de un minuto."
+          className="flex h-9 items-center gap-1.5 rounded-lg bg-neon px-4 text-[13px] font-medium text-on-neon hover:brightness-110 disabled:opacity-60"
+        >
+          {reviewing ? <Loader2 size={15} className="animate-spin" /> : <Stethoscope size={15} strokeWidth={1.8} />}
+          {reviewing ? "Revisando…" : latest ? "Revisión completa" : "Revisar el equipo"}
         </button>
       </section>
 
@@ -201,26 +236,20 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
       <div className="grid grid-cols-3 gap-8">
         <Section
           className="col-span-2"
-          title="Requiere atención"
+          title="Qué hacer ahora"
           action={latest && <LinkButton onClick={() => onNavigate("diagnostics")}>Ver diagnóstico</LinkButton>}
         >
-          {!loaded ? null : !latest ? (
-            <p className="py-5 text-sm text-dim">Haz un diagnóstico para ver aquí lo que hay que resolver en este equipo.</p>
-          ) : attention.length === 0 ? (
-            <p className="flex items-center gap-2.5 py-5 text-sm text-dim">
-              <span className="size-2 rounded-full bg-ok" /> Nada pendiente en el último diagnóstico.
-            </p>
-          ) : (
-            attention.map((f, i) => (
-              <div key={i} className="flex items-center gap-3.5 border-b border-line py-3">
-                <span className={`size-2 shrink-0 rounded-full ${DOT[f.severity]}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{f.title}</div>
-                  {f.detail && <div className="truncate text-xs text-mute">{f.detail}</div>}
-                </div>
-                {f.actions[0] && <LinkButton onClick={() => act(f.actions[0])}>{f.actions[0].label}</LinkButton>}
-              </div>
-            ))
+          {!loaded ? null : (
+            <>
+              {!latest && <p className="border-b border-line py-3 text-sm text-dim">Pulsa «Revisar el equipo» para completar esta lista con discos, drivers, seguridad y estabilidad.</p>}
+              <ActionPlan
+                findings={latest?.findings ?? []}
+                diagnosedAt={latest?.timestamp ?? null}
+                systemDisk={system ? { free: system.available, total: system.total, mount: system.mount } : null}
+                refresh={refresh}
+                onNavigate={navigate}
+              />
+            </>
           )}
         </Section>
 

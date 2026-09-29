@@ -133,6 +133,17 @@ impl TweakState {
         run_logged(self, t, None)
     }
 
+    /// Aplica o ejecuta un elemento del catálogo, según sea un ajuste o una tarea.
+    /// Lo usa el botón «Arreglar» de los hallazgos del diagnóstico.
+    pub fn fix_catalog(&self, id: &str) -> Result<String, String> {
+        let t = self.find(id)?;
+        self.check_can_modify(t)?;
+        match t.kind {
+            Kind::Action => run_logged(self, t, None),
+            _ => apply_logged(self, t, None).map(|()| if t.reboot { "Aplicado. Reinicia para que surta efecto.".into() } else { "Aplicado.".to_string() }),
+        }
+    }
+
     /// Registra en el diario una operación ajena al catálogo (finalizar un
     /// proceso, actualizar software…). No se puede deshacer.
     pub fn record<T>(&self, op: Op, title: &str, result: &Result<T, String>) {
@@ -470,4 +481,10 @@ pub fn list_restore_points() -> Result<Vec<restore::RestorePoint>, String> {
 #[tauri::command]
 pub fn open_system_restore() -> Result<(), String> {
     restore::open_wizard()
+}
+
+/// Ejecuta el arreglo de un hallazgo del diagnóstico (botón «Arreglar»).
+#[tauri::command(async)]
+pub fn fix_finding(id: String, state: State<'_, TweakState>) -> Result<String, String> {
+    state.fix_catalog(&id)
 }

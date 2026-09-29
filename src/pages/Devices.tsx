@@ -32,7 +32,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Modal } from "../components/ui";
-import { lanApi, officeApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
+import { lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
+import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
 
 const ipNum = (ip: string) => ip.split(".").reduce((a, o) => a * 256 + Number(o), 0);
 
@@ -170,6 +171,7 @@ export function Devices() {
   const [clientId, setClientId] = useState("");
   const [kindFilter, setKindFilter] = useState("all");
   const [detail, setDetail] = useState<LanDevice | null>(null);
+  const office = useOfficeMap();
   const toast = useToast();
 
   useEffect(() => {
@@ -188,6 +190,9 @@ export function Devices() {
     try {
       const s = await lanApi.scan();
       setScan(s);
+      // El DHCP cambia las IP: se actualizan las de los dispositivos anotados.
+      if (s.key !== office.key) office.setKey(s.key);
+      officeMapApi.refreshIps(s.key, s.devices.filter((d) => d.mac).map((d) => [d.mac, d.ip] as [string, string])).then(() => office.reload(s.key)).catch(() => {});
       // Segunda fase: qué es cada dispositivo (UPnP, mDNS, NetBIOS, puertos…).
       setBusy("identify");
       setScan({ ...s, devices: await lanApi.identify(s.key, s.devices) });
@@ -308,6 +313,18 @@ export function Devices() {
         <TaskStatus task={busy === "identify" ? "lan-identify" : "lan-scan"} active={busy !== null} fallback={busy === "identify" ? "Identificando…" : "Buscando…"} className="mt-3" />
       </Card>
 
+      <OfficeMapCard
+        meta={office.meta}
+        watch={office.watch}
+        contacts={office.contacts}
+        scanned={scan?.devices ?? null}
+        onOpen={(mac) => {
+          const d = all.find((x) => macKey(x.mac) === mac);
+          const m = office.meta[mac];
+          setDetail(d ?? ({ ip: m?.ip ?? "", mac, name: m?.name ?? "", vendor: "", alias: m?.name ?? "", gateway: false, thisPc: false, privateMac: false, ms: null, new: false, firstSeen: 0, kind: "", manufacturer: "", model: "", friendly: "", os: "", services: [], ports: [], netbios: "" } as LanDevice));
+        }}
+      />
+
       {conflicts.length > 0 && (
         <div className="rounded-xl border border-warn/30 bg-warn/5 px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-medium text-ink">
@@ -386,6 +403,11 @@ export function Devices() {
                             {d.gateway && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">router</span>}
                             {d.thisPc && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">este equipo</span>}
                             {d.new && <span className="rounded bg-warn/15 px-1.5 text-[11px] text-warn">nuevo</span>}
+                            {office.meta[macKey(d.mac)]?.watch && (
+                              <span title="Vigilado">
+                                <Eye size={11} className="text-neon" />
+                              </span>
+                            )}
                             {!d.thisPc && (
                               <button
                                 onClick={(e) => {
@@ -400,6 +422,7 @@ export function Devices() {
                               </button>
                             )}
                           </div>
+                          {office.meta[macKey(d.mac)]?.role && <div className="truncate text-[11px] text-neon">{office.meta[macKey(d.mac)].role}</div>}
                           {sub && <div className="truncate text-[11px] text-mute">{sub}</div>}
                         </>
                       )}
@@ -444,6 +467,18 @@ export function Devices() {
         <Modal title={title(shown)} onClose={() => setDetail(null)} width="w-[560px]">
           <DeviceDetail
             d={shown}
+            office={
+              !shown.thisPc && (
+                <DeviceOfficeForm
+                  key={shown.mac}
+                  netKey={scan?.key ?? office.key}
+                  device={{ mac: shown.mac, ip: shown.ip, name: title(shown) }}
+                  initial={office.meta[macKey(shown.mac)]}
+                  contacts={office.contacts}
+                  onSaved={() => office.reload(scan?.key ?? office.key)}
+                />
+              )
+            }
             actions={actions(shown, true)}
             onRename={() => {
               setDetail(null);
@@ -457,7 +492,7 @@ export function Devices() {
   );
 }
 
-function DeviceDetail({ d, actions, onRename }: { d: LanDevice; actions: React.ReactNode; onRename: () => void }) {
+function DeviceDetail({ d, actions, office, onRename }: { d: LanDevice; actions: React.ReactNode; office?: React.ReactNode; onRename: () => void }) {
   const K = KINDS[kindKey(d)];
   const Icon = K.icon;
   const uniq = (...xs: string[]) => xs.filter((v, i, a) => v && a.indexOf(v) === i).join(" · ");
@@ -513,6 +548,7 @@ function DeviceDetail({ d, actions, onRename }: { d: LanDevice; actions: React.R
         </div>
       )}
       {!d.kind && !d.thisPc && <p className="text-xs text-mute">Aún sin identificar a fondo: vuelve a buscar para completarlo.</p>}
+      {office}
       <div className="flex items-center justify-between border-t border-line/60 pt-3">
         {actions}
         {!d.thisPc && (

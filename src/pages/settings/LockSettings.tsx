@@ -1,7 +1,7 @@
 import { KeyRound, Lock, LockOpen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
-import { Button, Card, inputClass } from "../../components/ui";
+import { Button, Card, inputClass, Loading } from "../../components/ui";
 import { lockApi, type LockStatus } from "../../lib/api";
 
 const IDLE = [
@@ -90,7 +90,7 @@ export function LockSettings() {
     }
   };
 
-  if (!status) return <p className="font-mono text-sm text-mute">Cargando…</p>;
+  if (!status) return <Loading />;
 
   const secretFields = (
     <div className="space-y-3">

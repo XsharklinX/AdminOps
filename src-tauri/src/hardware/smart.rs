@@ -68,7 +68,9 @@ pub fn parse_vendor_specific(bytes: &[u8]) -> Vec<SmartAttribute> {
     bytes
         .get(2..)
         .unwrap_or_default()
-        .chunks_exact(12)
+        .as_chunks::<12>()
+        .0
+        .iter()
         .filter(|e| e[0] != 0)
         .map(|e| {
             let mut raw = [0u8; 8];

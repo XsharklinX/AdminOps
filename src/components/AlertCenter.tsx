@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { Responsible } from "./Responsible";
 import { Bell, RotateCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { alertsApi, type WindowsAlert } from "../lib/api";
@@ -138,6 +139,7 @@ export function AlertCenter({ onNavigate, onOpenChange }: { onNavigate: (p: Page
                           Ir a revisarlo →
                         </button>
                       )}
+                      {a.level !== "info" && a.page && <Responsible topic={a.page} className="mt-1.5" />}
                     </div>
                   </div>
                 </li>

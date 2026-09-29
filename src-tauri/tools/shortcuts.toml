@@ -176,6 +176,16 @@ run = "{System32}\\Netplwiz.exe"
 keywords = "netplwiz userpasswords2 cuentas autologon inicio automatico"
 
 [[tool]]
+id = "user-profiles"
+name = "Perfiles de usuario"
+description = "Perfiles guardados en el equipo: tamaño, tipo y eliminar los que sobran."
+group = "admin"
+icon = "users"
+run = "{System32}\\rundll32.exe"
+args = "sysdm.cpl,EditUserProfiles"
+keywords = "perfiles usuario profile temporal sysdm"
+
+[[tool]]
 id = "gpedit"
 name = "Directivas de grupo"
 description = "gpedit.msc: directivas locales (Windows Pro, Enterprise y Education)."

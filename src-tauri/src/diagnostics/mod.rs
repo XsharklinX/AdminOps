@@ -10,9 +10,10 @@ use crate::tweaks::TweakState;
 use collect::{Battery, DeviceProblem, PhysicalDisk, Stability, SystemHealth};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Mutex;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use sysinfo::Disks;
-use tauri::State;
+use tauri::{Emitter, State};
 
 const MAX_SNAPSHOTS: usize = 40;
 
@@ -37,12 +38,21 @@ pub enum Tool {
     Storage,
 }
 
-/// A dónde lleva un hallazgo: una página/sección de AdminOps o una herramienta de Windows.
+/// Qué se puede hacer con un hallazgo: arreglarlo ahí mismo, ir a su detalle o
+/// abrir la herramienta de Windows correspondiente.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Action {
+    /// Ejecuta un ajuste o reparación del catálogo sin salir de la página.
+    /// `safe`: se puede aplicar en lote («Arreglar todo lo seguro») porque no
+    /// cambia el comportamiento de Windows ni borra nada del usuario.
+    Fix { label: String, id: String, safe: bool },
     Page { label: String, page: String, focus: Option<String> },
     Tool { label: String, tool: Tool },
+}
+
+fn fix(label: &str, id: &str, safe: bool) -> Action {
+    Action::Fix { label: label.into(), id: id.into(), safe }
 }
 
 fn page(label: &str, page: &str, focus: Option<&str>) -> Action {
@@ -96,7 +106,7 @@ impl<T> From<Result<T, String>> for Section<T> {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Diagnostics {
     /// Segundos epoch. También identifica el snapshot.
@@ -133,6 +143,55 @@ pub struct Diagnostics {
     pub security: Section<crate::security::Audit>,
     pub tweaks_applied: usize,
     pub findings: Vec<Finding>,
+    /// Qué cambió respecto al análisis anterior de este equipo (si lo hay).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<Changes>,
+}
+
+/// Diferencia entre dos análisis del mismo equipo.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Changes {
+    /// Fecha del análisis con el que se compara.
+    pub since: u64,
+    /// Títulos de los problemas que antes no estaban.
+    pub new: Vec<String>,
+    /// Problemas que había y ya no aparecen.
+    pub resolved: Vec<Finding>,
+}
+
+/// Clave de un problema sin sus cifras: «C: con poco espacio libre (8%)» y
+/// «(7%)» son el mismo problema, no uno nuevo y otro resuelto.
+fn problem_key(f: &Finding) -> String {
+    let t: String = f.title.chars().filter(|c| !c.is_ascii_digit()).collect();
+    format!("{}|{}", f.area.to_lowercase(), t.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase())
+}
+
+pub fn same_problem(a: &Finding, b: &Finding) -> bool {
+    problem_key(a) == problem_key(b)
+}
+
+/// Problemas nuevos y resueltos entre `base` (antes) y `cur` (ahora). Los
+/// informativos no cuentan: no son problemas.
+pub fn changes(cur: &Diagnostics, base: &Diagnostics) -> Changes {
+    let matters = |f: &&Finding| f.severity != Severity::Info;
+    Changes {
+        since: base.timestamp,
+        new: cur
+            .findings
+            .iter()
+            .filter(matters)
+            .filter(|c| !base.findings.iter().any(|b| same_problem(b, c)))
+            .map(|c| c.title.clone())
+            .collect(),
+        resolved: base
+            .findings
+            .iter()
+            .filter(matters)
+            .filter(|b| !cur.findings.iter().any(|c| same_problem(b, c)))
+            .cloned()
+            .collect(),
+    }
 }
 
 /// Temperaturas resumidas (lo que se guarda en el snapshot).
@@ -220,7 +279,11 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                         if is_sys { " Windows necesita espacio para actualizarse y paginar." } else { "" }
                     )),
                 )
-                .with(vec![page("Liberar espacio", "cleanup", None), tool("Almacenamiento de Windows", Tool::Storage)]),
+                .with(vec![
+                    fix("Limpiar temporales", "cleanup.user-temp", true),
+                    page("Liberar espacio", "cleanup", None),
+                    tool("Almacenamiento de Windows", Tool::Storage),
+                ]),
             );
         }
     }
@@ -294,7 +357,8 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                 )
                 .with(vec![
                     stability_detail(),
-                    page("Comprobar archivos (SFC)", "repair", Some("repair.sfc")),
+                    fix("Comprobar archivos (SFC)", "repair.sfc", false),
+                    page("Ver reparaciones", "troubleshoot", Some("repairs")),
                     tool("Monitor de confiabilidad", Tool::Reliability),
                 ]),
             );
@@ -372,7 +436,7 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
             );
         }
         let update_actions =
-            || vec![tool("Windows Update", Tool::WindowsUpdate), page("Reparar Windows Update", "repair", Some("repair.windows-update"))];
+            || vec![tool("Windows Update", Tool::WindowsUpdate), fix("Reparar Windows Update", "repair.windows-update", false)];
         match s.last_update.as_deref().and_then(days_since) {
             Some(days) if days >= 90 => f.push(
                 finding(Bad, "Seguridad", format!("Última actualización hace {days} días"), Some("Revisar Windows Update.".into()))
@@ -496,7 +560,7 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
     if let Some(days) = d.system.data.as_ref().and_then(|s| s.quick_scan_age_days).filter(|d| *d >= 14 && defender_is_the_av) {
         f.push(
             finding(Warn, "Seguridad", format!("Sin análisis antivirus desde hace {days} días"), None)
-                .with(vec![page("Analizar ahora", "repair", Some("repair.defender-scan"))]),
+                .with(vec![fix("Analizar ahora", "repair.defender-scan", false)]),
         );
     }
     if let Some(b) = &d.bloat_installed.data {
@@ -508,7 +572,7 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
         }
     }
 
-    f.sort_by(|a, b| b.severity.cmp(&a.severity));
+    f.sort_by_key(|x| std::cmp::Reverse(x.severity));
     f
 }
 
@@ -643,15 +707,32 @@ pub fn latest_snapshot(app: &tauri::AppHandle) -> Option<Diagnostics> {
     load_snapshot(app, ts)
 }
 
-fn join<T>(r: std::thread::Result<Result<T, String>>) -> Result<T, String> {
-    r.unwrap_or_else(|_| failed())
-}
-
 fn failed<T>() -> Result<T, String> {
     Err("El recolector falló".to_string())
 }
 
-fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
+type HwBundle = (Result<crate::hardware::Inventory, String>, Result<Vec<crate::hardware::smart::SmartDisk>, String>, Result<Option<crate::hardware::MemoryTest>, String>);
+
+/// Inventario, SMART y prueba de memoria casi no cambian entre un diagnóstico y
+/// el siguiente: se reutilizan unos minutos salvo que se pida "a fondo". Las
+/// temperaturas nunca se cachean (son en vivo).
+static HW_CACHE: Mutex<Option<(Instant, HwBundle)>> = Mutex::new(None);
+const HW_CACHE_FOR: Duration = Duration::from_secs(5 * 60);
+
+fn hardware_bundle(force: bool) -> HwBundle {
+    if !force {
+        if let Some((t, hw)) = HW_CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+            if t.elapsed() < HW_CACHE_FOR {
+                return hw.clone();
+            }
+        }
+    }
+    let hw = (crate::hardware::inventory(), crate::hardware::smart::read(), crate::hardware::memory_test());
+    *HW_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((Instant::now(), hw.clone()));
+    hw
+}
+
+fn collect(app: &tauri::AppHandle, state: &TweakState, force: bool) -> Diagnostics {
     let mut sys = sysinfo::System::new();
     sys.refresh_memory();
     sys.refresh_cpu_all();
@@ -662,47 +743,7 @@ fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
         .collect();
     volumes.sort_by(|a, b| a.mount.cmp(&b.mount));
 
-    // Todos los recolectores en paralelo: el total es el del más lento, no la suma.
-    let (disks, stability, drivers, battery, system, startup, bloat, updates, hw, tweaks_applied, sec) = std::thread::scope(|s| {
-        let disks = s.spawn(collect::disks);
-        let stability = s.spawn(collect::stability);
-        let drivers = s.spawn(collect::drivers);
-        let battery = s.spawn(collect::battery);
-        let system = s.spawn(collect::system);
-        let startup = s.spawn(crate::tweaks::startup::enabled_names);
-        let bloat = s.spawn(crate::tweaks::appx::recommended_installed);
-        let updates = s.spawn(crate::software::list);
-        let hw = s.spawn(|| {
-            (
-                crate::hardware::inventory(),
-                crate::hardware::smart::read(),
-                crate::hardware::memory_test(),
-                crate::hardware::sensors::read(app).map(Temperatures::from),
-            )
-        });
-        let tweaks = s.spawn(|| state.applied_count());
-        let sec = s.spawn(|| (crate::security::extra(), crate::security::accounts()));
-        (
-            join(disks.join()),
-            join(stability.join()),
-            join(drivers.join()),
-            join(battery.join()),
-            join(system.join()),
-            join(startup.join()),
-            join(bloat.join()),
-            join(updates.join()),
-            hw.join().unwrap_or_else(|_| (failed(), failed(), failed(), failed())),
-            tweaks.join().unwrap_or(0),
-            sec.join().unwrap_or_else(|_| (failed(), None)),
-        )
-    });
-    // La nota reutiliza lo ya recogido (antivirus, actualizaciones, programas).
-    let security: Result<crate::security::Audit, String> = sec.0.map(|x| {
-        let vulnerable = updates.as_ref().map(|u| u.iter().filter(|p| crate::security::is_risky(&p.id)).cloned().collect()).unwrap_or_default();
-        crate::security::evaluate(system.as_ref().ok(), &x, sec.1.as_ref(), vulnerable)
-    });
-
-    let mut d = Diagnostics {
+    let base = Diagnostics {
         timestamp: now(),
         host: sysinfo::System::host_name().unwrap_or_default(),
         os: sysinfo::System::long_os_version().unwrap_or_default(),
@@ -710,36 +751,133 @@ fn collect(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
         ram_total: sys.total_memory(),
         admin: crate::elevation::is_elevated(),
         volumes,
-        disks: disks.into(),
-        stability: stability.into(),
-        drivers: drivers.into(),
-        battery: battery.into(),
-        system: system.into(),
-        startup_enabled: startup.into(),
-        bloat_installed: bloat.into(),
-        software_updates: updates.into(),
-        hardware: hw.0.into(),
-        smart: hw.1.into(),
-        memory_test: hw.2.into(),
-        temperatures: hw.3.into(),
-        security: security.into(),
+        ..Default::default()
+    };
+    // Antes de esperar a los recolectores: la interfaz ya puede mostrar el equipo,
+    // el veredicto se rellena con cada sección según va llegando.
+    emit_progress(app, "meta", &base);
+
+    // Todos los recolectores en paralelo: el total es el del más lento, no la
+    // suma. Cada uno avisa a la interfaz en cuanto termina (evento
+    // `diagnostics-progress`): las secciones se ven aparecer una a una en vez
+    // de esperar a que acaben todas para mostrar algo.
+    let updates_max_age = if force { Duration::ZERO } else { Duration::from_secs(10 * 60) };
+    let (disks, stability, drivers, battery, system, startup, bloat, updates, hw, tweaks_applied, sec) = std::thread::scope(|s| {
+        macro_rules! collect_emit {
+            ($key:literal, $f:expr) => {
+                s.spawn(|| {
+                    let section: Section<_> = $f.into();
+                    emit_progress(app, $key, &section);
+                    section
+                })
+            };
+        }
+        let disks = collect_emit!("disks", collect::disks());
+        let stability = collect_emit!("stability", collect::stability());
+        let drivers = collect_emit!("drivers", collect::drivers());
+        let battery = collect_emit!("battery", collect::battery());
+        let system = collect_emit!("system", collect::system());
+        let startup = collect_emit!("startupEnabled", crate::tweaks::startup::enabled_names());
+        let bloat = collect_emit!("bloatInstalled", crate::tweaks::appx::recommended_installed());
+        let updates = collect_emit!("softwareUpdates", crate::software::cached_or_list(updates_max_age));
+        let hw = s.spawn(|| {
+            let hw = hardware_bundle(force);
+            let inventory: Section<_> = hw.0.into();
+            let smart: Section<_> = hw.1.into();
+            let memory_test: Section<_> = hw.2.into();
+            emit_progress(app, "hardware", &inventory);
+            emit_progress(app, "smart", &smart);
+            emit_progress(app, "memoryTest", &memory_test);
+            let temperatures: Section<_> = crate::hardware::sensors::read(app).map(Temperatures::from).into();
+            emit_progress(app, "temperatures", &temperatures);
+            (inventory, smart, memory_test, temperatures)
+        });
+        let tweaks = s.spawn(|| state.applied_count());
+        let sec = s.spawn(|| (crate::security::extra(), crate::security::accounts()));
+        (
+            disks.join().unwrap_or_default(),
+            stability.join().unwrap_or_default(),
+            drivers.join().unwrap_or_default(),
+            battery.join().unwrap_or_default(),
+            system.join().unwrap_or_default(),
+            startup.join().unwrap_or_default(),
+            bloat.join().unwrap_or_default(),
+            updates.join().unwrap_or_default(),
+            hw.join().unwrap_or_default(),
+            tweaks.join().unwrap_or(0),
+            sec.join().unwrap_or_else(|_| (failed(), None)),
+        )
+    });
+    // La nota reutiliza lo ya recogido (antivirus, actualizaciones, programas).
+    let security: Result<crate::security::Audit, String> = sec.0.map(|x| {
+        let vulnerable = updates.data.iter().flatten().filter(|p| crate::security::is_risky(&p.id)).cloned().collect();
+        crate::security::evaluate(system.data.as_ref(), &x, sec.1.as_ref(), vulnerable)
+    });
+    let security: Section<_> = security.into();
+    emit_progress(app, "security", &security);
+
+    let mut d = Diagnostics {
+        disks,
+        stability,
+        drivers,
+        battery,
+        system,
+        startup_enabled: startup,
+        bloat_installed: bloat,
+        software_updates: updates,
+        hardware: hw.0,
+        smart: hw.1,
+        memory_test: hw.2,
+        temperatures: hw.3,
+        security,
         tweaks_applied,
         findings: vec![],
+        ..base
     };
     d.findings = evaluate(&d);
     d
 }
 
+/// Avisa a la interfaz de que una sección del diagnóstico ya está lista, para
+/// que se pinte al momento en vez de esperar a que terminen todas.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Progress<'a, T: Serialize> {
+    key: &'a str,
+    section: &'a T,
+}
+
+// Manual: el derive añadiría `T: Clone` aunque solo se guarda una referencia,
+// que siempre es Clone.
+impl<T: Serialize> Clone for Progress<'_, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<T: Serialize> Copy for Progress<'_, T> {}
+
+fn emit_progress<T: Serialize>(app: &tauri::AppHandle, key: &'static str, section: &T) {
+    let _ = app.emit("diagnostics-progress", Progress { key, section });
+}
+
 /// Analiza el equipo y guarda la foto (snapshot) para comparaciones.
-pub fn run_and_save(app: &tauri::AppHandle, state: &TweakState) -> Diagnostics {
-    let d = collect(app, state);
+/// `force`: ignora la caché de hardware y de actualizaciones (winget) y las
+/// vuelve a consultar; úsalo solo cuando el técnico pide expresamente un
+/// análisis a fondo, no en cada sesión o comparación interna.
+pub fn run_and_save(app: &tauri::AppHandle, state: &TweakState, force: bool) -> Diagnostics {
+    let mut d = collect(app, state, force);
+    if let Some(prev) = latest_snapshot(app).filter(|p| p.timestamp < d.timestamp) {
+        d.changes = Some(changes(&d, &prev));
+    }
     save_snapshot(app, &d);
     d
 }
 
 #[tauri::command(async)]
-pub fn run_diagnostics(app: tauri::AppHandle, state: State<'_, TweakState>) -> Result<Diagnostics, String> {
-    Ok(run_and_save(&app, &state))
+pub fn run_diagnostics(app: tauri::AppHandle, state: State<'_, TweakState>, force: Option<bool>) -> Result<Diagnostics, String> {
+    // Visible en el indicador de tareas mientras dura.
+    let _task = crate::task::Task::new(&app, "diagnostics").named("Diagnóstico del equipo");
+    Ok(run_and_save(&app, &state, force.unwrap_or(false)))
 }
 
 #[derive(Serialize)]
@@ -760,12 +898,41 @@ pub fn list_snapshots(app: tauri::AppHandle) -> Vec<SnapshotInfo> {
             Some(SnapshotInfo { timestamp: ts, bad: count(Severity::Bad), warn: count(Severity::Warn) })
         })
         .collect();
-    v.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    v.sort_by_key(|s| std::cmp::Reverse(s.timestamp));
     v
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    fn f(sev: Severity, area: &str, title: &str) -> Finding {
+        Finding { severity: sev, area: area.into(), title: title.into(), detail: None, actions: vec![] }
+    }
+
+    fn diag(ts: u64, findings: Vec<Finding>) -> Diagnostics {
+        Diagnostics { timestamp: ts, findings, ..Default::default() }
+    }
+
+    #[test]
+    fn changes_ignore_numbers_and_info() {
+        let before = diag(1, vec![
+            f(Severity::Warn, "Almacenamiento", "C:\\ con poco espacio libre (8%)"),
+            f(Severity::Bad, "Seguridad", "Firewall desactivado"),
+            f(Severity::Info, "Sistema", "Hay 3 ajustes aplicados"),
+        ]);
+        let after = diag(2, vec![
+            f(Severity::Warn, "Almacenamiento", "C:\\ con poco espacio libre (7%)"),
+            f(Severity::Bad, "Estabilidad", "2 pantallazos azules"),
+            f(Severity::Info, "Sistema", "Hay 5 ajustes aplicados"),
+        ]);
+        let c = changes(&after, &before);
+        assert_eq!(c.since, 1);
+        assert_eq!(c.new, vec!["2 pantallazos azules".to_string()]);
+        assert_eq!(c.resolved.len(), 1);
+        assert_eq!(c.resolved[0].title, "Firewall desactivado");
+    }
+
     #[test]
     fn parses_powershell_dates_with_and_without_zone() {
         assert!(super::parse_time("2026-09-26T08:56:22.5000000-04:00").is_some());
@@ -776,6 +943,25 @@ mod tests {
 
 #[cfg(test)]
 mod pool_bench {
+    /// Cuánto tarda cada parte del diagnóstico por separado (pool ya caliente):
+    /// `cargo test --release collector_times -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn collector_times() {
+        let _ = crate::pspool::query("1", None, "calentar");
+        let time = |name: &str, f: &dyn Fn() -> bool| {
+            let t = std::time::Instant::now();
+            let ok = f();
+            println!("{:>7} ms  {name}{}", t.elapsed().as_millis(), if ok { "" } else { "  (falló)" });
+        };
+        time("seguridad: extra (nuevo, en paralelo)", &|| crate::security::extra().is_ok());
+        time("seguridad: cuentas", &|| crate::security::accounts().is_some());
+        time("actualizaciones (winget, sin caché)", &|| crate::software::list().is_ok());
+        time("actualizaciones (con caché caliente)", &|| crate::software::cached_or_list(std::time::Duration::from_secs(600)).is_ok());
+        time("hardware: inventario", &|| crate::hardware::inventory().is_ok());
+        time("hardware: SMART", &|| crate::hardware::smart::read().is_ok());
+    }
+
     /// Tiempo de los recolectores con PowerShell en paralelo, como en el diagnóstico:
     /// `ADMINOPS_PS_HOSTS=3 cargo test --release diag_collectors_cost -- --ignored --nocapture`
     #[test]

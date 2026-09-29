@@ -13,6 +13,8 @@ import {
   TriangleAlert,
   Zap,
 } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { analyze, lastDiagnostics } from "../lib/diagRun";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
@@ -20,8 +22,10 @@ import type { PageId } from "../components/Sidebar";
 import { Bar, Card } from "../components/ui";
 import {
   diagApi,
+  tweaksApi,
   toolsApi,
   type Diagnostics as Diag,
+  type DiagChanges,
   type Finding,
   type FindingAction,
   type Section,
@@ -31,14 +35,36 @@ import {
 import { bytes } from "../lib/format";
 import { DriverRestoreButton } from "../components/Maintenance";
 
-// El análisis tarda unos segundos: se conserva al cambiar de página, y una
-// ejecución en curso se comparte (StrictMode monta los efectos dos veces).
-let cached: Diag | null = null;
-let inflight: Promise<Diag> | null = null;
 
-function analyze(): Promise<Diag> {
-  inflight ??= diagApi.run().finally(() => (inflight = null));
-  return inflight;
+/** Mientras se analiza, cada sección se pinta en cuanto el backend la termina. */
+const EMPTY_SECTION = { data: null, error: null } as unknown as Section<never>;
+
+function skeleton(): Diag {
+  const s = EMPTY_SECTION;
+  return {
+    timestamp: 0,
+    host: "",
+    os: "",
+    cpu: "",
+    ramTotal: 0,
+    admin: false,
+    volumes: [],
+    disks: s,
+    stability: s,
+    drivers: s,
+    battery: s,
+    system: s,
+    startupEnabled: s,
+    bloatInstalled: s,
+    softwareUpdates: s,
+    hardware: s,
+    smart: s,
+    memoryTest: s,
+    temperatures: s,
+    security: s,
+    tweaksApplied: 0,
+    findings: [],
+  } as unknown as Diag;
 }
 
 const SEV: Record<Severity, { icon: typeof Info; cls: string; label: string }> = {
@@ -52,9 +78,45 @@ const date = (iso: string) => {
   return isNaN(+d) ? iso : d.toLocaleString("es", { dateStyle: "medium", timeStyle: "short" });
 };
 
+/** Qué cambió desde el análisis anterior: problemas nuevos y resueltos. */
+function ChangesStrip({ c }: { c: DiagChanges }) {
+  const [open, setOpen] = useState(false);
+  const when = new Date(c.since * 1000).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" });
+  if (!c.new.length && !c.resolved.length)
+    return <p className="mb-3 text-xs text-mute">Sin cambios desde el análisis del {when}.</p>;
+  return (
+    <div className="mb-3 rounded-lg border border-line bg-void/40 px-3 py-2 text-xs">
+      <button onClick={() => setOpen(!open)} className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-left">
+        <span className="text-dim">Desde el análisis del {when}:</span>
+        {c.new.length > 0 && <span className="text-warn">{c.new.length} {c.new.length === 1 ? "problema nuevo" : "problemas nuevos"}</span>}
+        {c.resolved.length > 0 && <span className="text-ok">{c.resolved.length} {c.resolved.length === 1 ? "resuelto" : "resueltos"}</span>}
+        {c.resolved.length > 0 && <span className="ml-auto text-neon">{open ? "Ocultar" : "Ver resueltos"}</span>}
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-0.5">
+          {c.resolved.map((f) => (
+            <li key={f.title} className="flex items-center gap-2 text-dim">
+              <CircleCheck size={12} className="shrink-0 text-ok" />
+              <span className="line-through decoration-mute/60">{f.title}</span>
+              <span className="text-mute">· {f.area}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Unavailable<T>({ section, children }: { section: Section<T>; children: (d: T) => ReactNode }) {
   if (section.data !== null && section.data !== undefined) return <>{children(section.data)}</>;
-  return <p className="text-xs break-words text-mute">{section.error ?? "Sin datos."}</p>;
+  // Sin datos y sin error: el backend todavía está con esa sección.
+  if (!section.error)
+    return (
+      <p className="flex items-center gap-2 text-xs text-mute">
+        <Loader2 size={12} className="animate-spin" /> Analizando…
+      </p>
+    );
+  return <p className="text-xs break-words text-mute">{section.error}</p>;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -88,8 +150,10 @@ export function Diagnostics({
   focus?: string | null;
   onNavigate: (page: PageId, focus?: string | null) => void;
 }) {
-  const [d, setD] = useState<Diag | null>(cached);
+  const [d, setD] = useState<Diag | null>(lastDiagnostics);
   const [running, setRunning] = useState(false);
+  // Secciones que ya ha terminado el backend mientras el análisis sigue en curso.
+  const [live, setLive] = useState<Diag | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hl, setHl] = useState<string | null>(null);
   const toast = useToast();
@@ -109,11 +173,48 @@ export function Diagnostics({
 
   const openTool = (tool: Tool) => diagApi.openTool(tool).catch((e) => toast("error", String(e)));
 
+  // `fixing`: id del arreglo en curso (o "all" para el lote).
+  const [fixing, setFixing] = useState<string | null>(null);
+
+  const applyFix = useCallback(
+    async (id: string, label: string) => {
+      setFixing(id);
+      try {
+        toast("ok", `${label}: ${await tweaksApi.fixFinding(id)}`);
+      } catch (e) {
+        toast("error", `${label}: ${e}`);
+      } finally {
+        setFixing(null);
+      }
+    },
+    [toast],
+  );
+
   const act = (a: FindingAction) => {
-    if (a.kind === "tool") openTool(a.tool);
+    if (a.kind === "fix") applyFix(a.id, a.label);
+    else if (a.kind === "tool") openTool(a.tool);
     else if (a.page === "diagnostics") {
       if (a.focus) goTo(a.focus);
     } else onNavigate(a.page as PageId, a.focus);
+  };
+
+  // Todo lo que se puede arreglar sin riesgo, de una vez.
+  const safeFixes = (d?.findings ?? []).flatMap((f) => f.actions.filter((a) => a.kind === "fix" && a.safe));
+  const fixAllSafe = async () => {
+    setFixing("all");
+    let done = 0;
+    const failed: string[] = [];
+    for (const a of safeFixes) {
+      if (a.kind !== "fix") continue;
+      try {
+        await tweaksApi.fixFinding(a.id);
+        done++;
+      } catch {
+        failed.push(a.label);
+      }
+    }
+    setFixing(null);
+    toast(failed.length ? "info" : "ok", failed.length ? `${done} arreglados; fallaron: ${failed.join(", ")}` : `${done} arreglados. Vuelve a analizar para comprobarlo.`);
   };
 
   const ring = (section: string) => (hl === section ? "border-neon! glow-neon" : "");
@@ -130,54 +231,85 @@ export function Diagnostics({
     }
   };
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (force = false) => {
     setRunning(true);
     setError(null);
+    setLive(skeleton());
     try {
-      cached = await analyze();
-      setD(cached);
+      setD(await analyze(force));
     } catch (e) {
       setError(String(e));
     } finally {
       setRunning(false);
+      setLive(null);
     }
   }, []);
 
   useEffect(() => {
-    if (!cached) run();
+    if (!lastDiagnostics()) run();
   }, [run]);
 
-  if (!d)
+  // El backend avisa de cada sección en cuanto la termina: se pintan una a una
+  // en vez de esperar con la pantalla en blanco a que acaben todas.
+  useEffect(() => {
+    const un = listen<{ key: string; section: unknown }>("diagnostics-progress", ({ payload }) => {
+      setLive((prev) => {
+        if (!prev) return prev;
+        if (payload.key === "meta") {
+          const meta = payload.section as Partial<Diag>;
+          return { ...prev, ...meta, findings: prev.findings };
+        }
+        return { ...prev, [payload.key]: payload.section } as Diag;
+      });
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, []);
+
+  if (error && !d)
     return (
       <div className="grid h-full place-items-center p-8 text-center">
-        {error ? (
-          <p className="text-bad">{error}</p>
-        ) : (
-          <div>
-            <Loader2 size={28} className="mx-auto mb-3 animate-spin text-neon" />
-            <p className="text-sm text-dim">Analizando discos, eventos, drivers y seguridad…</p>
-            <p className="mt-1 text-xs text-mute">Suele tardar entre 5 y 15 segundos.</p>
-          </div>
-        )}
+        <p className="text-bad">{error}</p>
       </div>
     );
 
-  const count = (s: Severity) => d.findings.filter((f) => f.severity === s).length;
+  // Sin resultado todavía: se va pintando lo que ya ha llegado.
+  const shown = d ?? live;
+  if (!shown)
+    return (
+      <div className="grid h-full place-items-center p-8 text-center">
+        <div>
+          <Loader2 size={28} className="mx-auto mb-3 animate-spin text-neon" />
+          <p className="text-sm text-dim">Analizando discos, eventos, drivers y seguridad…</p>
+        </div>
+      </div>
+    );
+
+  const count = (s: Severity) => shown.findings.filter((f) => f.severity === s).length;
 
   return (
     <div className="mx-auto max-w-6xl p-6">
       <div className="mb-4 flex items-center gap-3">
         <p className="text-sm text-dim">
-          Análisis del {new Date(d.timestamp * 1000).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })}
-          {!d.admin && <span className="ml-2 text-warn">· sin administrador algunos datos no están disponibles</span>}
+          {shown.timestamp ? `Análisis del ${new Date(shown.timestamp * 1000).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })}` : "Analizando el equipo…"}
+          {!shown.admin && <span className="ml-2 text-warn">· sin administrador algunos datos no están disponibles</span>}
         </p>
         <button
-          onClick={run}
+          onClick={() => run(false)}
           disabled={running}
           className="ml-auto flex items-center gap-1.5 rounded-md border border-neon/40 px-3 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/10 disabled:opacity-50"
         >
           <RefreshCw size={13} className={running ? "animate-spin" : ""} />
           {running ? "Analizando…" : "Volver a analizar"}
+        </button>
+        <button
+          onClick={() => run(true)}
+          disabled={running}
+          title="Vuelve a leer también el hardware y las actualizaciones (winget) en vez de reutilizar lo de hace unos minutos"
+          className="rounded-md px-2 py-1.5 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-50"
+        >
+          A fondo
         </button>
       </div>
 
@@ -195,13 +327,25 @@ export function Diagnostics({
             );
           })}
         </div>
-        {d.findings.length === 0 ? (
+        {shown.changes && <ChangesStrip c={shown.changes} />}
+        {safeFixes.length > 0 && (
+          <button
+            onClick={fixAllSafe}
+            disabled={fixing !== null}
+            className="mb-3 flex items-center gap-1.5 rounded-md border border-neon/50 px-3 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/10 disabled:opacity-50"
+            title="Aplica solo lo que no cambia el comportamiento de Windows ni borra archivos tuyos"
+          >
+            {fixing === "all" ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />}
+            Arreglar todo lo seguro ({safeFixes.length})
+          </button>
+        )}
+        {shown.findings.length === 0 ? (
           <p className="flex items-center gap-2 py-2 text-sm text-ok">
             <CircleCheck size={16} /> No se encontraron problemas.
           </p>
         ) : (
           <ul className="space-y-1">
-            {d.findings.map((f: Finding, i) => {
+            {shown.findings.map((f: Finding, i) => {
               const S = SEV[f.severity];
               return (
                 <li
@@ -212,7 +356,12 @@ export function Diagnostics({
                 >
                   <S.icon size={15} className={`mt-0.5 shrink-0 ${S.cls}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-ink group-hover:text-neon">{f.title}</p>
+                    <p className="text-sm text-ink group-hover:text-neon">
+                      {f.title}
+                      {shown.changes?.new.includes(f.title) && (
+                        <span className="ml-2 rounded bg-warn/15 px-1.5 py-px align-middle text-[10px] font-medium text-warn">Nuevo</span>
+                      )}
+                    </p>
                     <p className="text-xs break-words text-dim">
                       <span className="text-mute">{f.area}</span>
                       {f.detail && <> · {f.detail}</>}
@@ -226,10 +375,14 @@ export function Diagnostics({
                               e.stopPropagation();
                               act(a);
                             }}
-                            className="flex items-center gap-1 rounded-md border border-line-2 px-2 py-0.5 text-[11px] text-dim transition-colors hover:border-neon/50 hover:text-neon"
+                            disabled={a.kind === "fix" && fixing !== null}
+                            className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] transition-colors disabled:opacity-40 ${
+                              a.kind === "fix" ? "border-neon/50 text-neon hover:bg-neon/10" : "border-line-2 text-dim hover:border-neon/50 hover:text-neon"
+                            }`}
                           >
+                            {a.kind === "fix" && fixing === a.id ? <Loader2 size={10} className="animate-spin" /> : null}
                             {a.label}
-                            {a.kind === "tool" ? <ExternalLink size={10} /> : <ArrowRight size={10} />}
+                            {a.kind === "tool" ? <ExternalLink size={10} /> : a.kind === "page" ? <ArrowRight size={10} /> : null}
                           </button>
                         ))}
                       </div>
@@ -255,7 +408,7 @@ export function Diagnostics({
             </button>
           }
         >
-          <Unavailable section={d.disks}>
+          <Unavailable section={shown.disks}>
             {(disks) => (
               <table className="w-full text-sm">
                 <thead>
@@ -286,7 +439,7 @@ export function Diagnostics({
               </table>
             )}
           </Unavailable>
-          {!d.admin && <p className="mt-2 text-xs text-mute">Temperatura y desgaste requieren administrador.</p>}
+          {!shown.admin && <p className="mt-2 text-xs text-mute">Temperatura y desgaste requieren administrador.</p>}
         </Card>
 
         {/* Seguridad */}
@@ -302,7 +455,7 @@ export function Diagnostics({
             </div>
           }
         >
-          <Unavailable section={d.system}>
+          <Unavailable section={shown.system}>
             {(s) => (
               <>
                 <Row label="Antivirus">{s.antivirus.join(", ") || <span className="text-bad">No detectado</span>}</Row>
@@ -333,7 +486,7 @@ export function Diagnostics({
             </div>
           }
         >
-          <Unavailable section={d.stability}>
+          <Unavailable section={shown.stability}>
             {(s) => (
               <>
                 <div className="mb-3 grid grid-cols-3 gap-3">
@@ -437,7 +590,7 @@ export function Diagnostics({
             }
           >
             <TaskStatus task="drivers-backup" active={backingUp} fallback="Copiando drivers…" cancellable={false} className="mb-2" />
-            <Unavailable section={d.drivers}>
+            <Unavailable section={shown.drivers}>
               {(drivers) =>
                 drivers.length === 0 ? (
                   <p className="flex items-center gap-2 text-sm text-ok">
@@ -461,7 +614,7 @@ export function Diagnostics({
 
           {/* Batería */}
           <Card id="focus-battery" title="Batería" icon={<BatteryMedium size={14} />} className={ring("battery")}>
-            <Unavailable section={d.battery}>
+            <Unavailable section={shown.battery}>
               {(b) => {
                 if (!b) return <p className="text-sm text-mute">Equipo de sobremesa: sin batería.</p>;
                 const health = b.design ? (b.full / b.design) * 100 : 0;

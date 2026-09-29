@@ -489,6 +489,23 @@ fn environment_check(app: &tauri::AppHandle) {
     }
 }
 
+/// Avisos de otras partes de AdminOps (dispositivos vigilados…): a la campana
+/// y, si la ventana no está delante, como notificación de Windows.
+pub fn push_alerts(app: &tauri::AppHandle, alerts: Vec<Alert>) {
+    let new = {
+        let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut store: Store = crate::paths::read_json(&store_path(app));
+        let new = merge(&mut store, alerts);
+        let _ = crate::paths::write_json(&store_path(app), &store);
+        new
+    };
+    for a in &new {
+        log::info!("Aviso: {} {}", a.title, a.detail);
+        let _ = app.emit("windows-alert", a);
+        notify(app, a);
+    }
+}
+
 /// Hilo de vigilancia (se inicia al arrancar si está activada en Ajustes).
 pub fn start(app: tauri::AppHandle) {
     std::thread::spawn(move || {

@@ -1,22 +1,36 @@
-import { CheckCircle2, ClipboardCheck, ExternalLink, FileText, FolderOpen, Mail, Play, Receipt, UserPlus, X } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, ExternalLink, FileText, FolderOpen, Lightbulb, Mail, Play, Receipt, UserPlus, UserRound, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast, useConfirm } from "../components/feedback";
 import { BillingEditor, SendReportModal, SignaturePad, TemplatePicker } from "../components/service";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass, Modal } from "../components/ui";
-import { diagApi, tweaksApi, workApi, type ActiveSession, type Client, type JournalEntry, type Settings } from "../lib/api";
+import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
+import { VisitChanges } from "../components/VisitChanges";
+import { contactsApi, diagApi, tweaksApi, workApi, type ActiveSession, type Client, type Contact, type JournalEntry, type Settings, type Solution } from "../lib/api";
+import { usePageActive } from "../lib/pageActive";
+import { autoDone } from "../lib/visits";
+import { SolutionEditor } from "./Knowledge";
 
 const since = (ts: number) => {
   const m = Math.floor((Date.now() / 1000 - ts) / 60);
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 };
 
-export function Session({ onSessionChange }: { onSessionChange: (active: boolean) => void }) {
+export function Session({ onSessionChange, focus }: { onSessionChange: (active: boolean) => void; focus?: string | null }) {
   const [session, setSession] = useState<ActiveSession | null | undefined>(undefined);
   const [clients, setClients] = useState<Client[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(focus ?? "");
+  // «Empezar» desde la agenda: se elige ese cliente.
+  useEffect(() => {
+    if (focus) setClientId(focus);
+  }, [focus]);
   const [newName, setNewName] = useState("");
+  const [visitType, setVisitType] = useState("");
+  const [contactId, setContactId] = useState("");
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [solution, setSolution] = useState<Solution | null>(null);
+  const [finished, setFinished] = useState<{ problem: string; notes: string; work: string[] } | null>(null);
+  const active = usePageActive();
   const [busy, setBusy] = useState<"start" | "finish" | null>(null);
   const [work, setWork] = useState<JournalEntry[]>([]);
   const [report, setReport] = useState<{ path: string; client: Client | null } | null>(null);
@@ -27,23 +41,54 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
   const { confirm, dialog } = useConfirm();
   const saveTimer = useRef<number | undefined>(undefined);
 
+  // Lo que se está editando manda sobre lo guardado (el guardado va con retraso).
+  const sessionRef = useRef<ActiveSession | null | undefined>(undefined);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
   const load = useCallback(async () => {
-    const [s, c] = await Promise.all([workApi.session(), workApi.clients()]);
-    setSession(s);
+    const [saved, c] = await Promise.all([workApi.session(), workApi.clients()]);
     setClients(c);
-    onSessionChange(!!s);
+    onSessionChange(!!saved);
+    const local = sessionRef.current;
+    const s = saved && local && local.id === saved.id ? local : saved;
     if (s) {
-      const j = await tweaksApi.journal();
-      setWork(j.filter((e) => e.timestamp >= s.started && e.ok && e.op !== "restorePoint"));
+      const [j, snaps] = await Promise.all([tweaksApi.journal(), diagApi.snapshots().catch(() => [])]);
+      const mine = j.filter((e) => e.timestamp >= s.started);
+      setWork(mine.filter((e) => e.ok && e.op !== "restorePoint"));
+      // Checklist que se marca sola con lo que se ha hecho en AdminOps.
+      const ts = snaps.map((x) => x.timestamp);
+      const marked = s.checklist.map((c) => (!c.done && c.auto && autoDone(c.auto, mine, ts, s.started, s.baseline) ? { ...c, done: true } : c));
+      if (marked.some((c, i) => c.done !== s.checklist[i].done)) {
+        const next = { ...s, checklist: marked };
+        setSession(next);
+        workApi.updateSession(next).catch(() => {});
+        return;
+      }
     }
+    setSession(s);
   }, [onSessionChange]);
 
   useEffect(() => {
     load();
     workApi.settings().then(setSettings);
-    const t = window.setInterval(() => tick((n) => n + 1), 30000);
-    return () => window.clearInterval(t);
+    contactsApi
+      .list()
+      .then((l) => setContacts(l.filter((c) => !c.deleted)))
+      .catch(() => {});
   }, [load]);
+
+  // Mientras la página está a la vista: reloj y checklist automática al día.
+  useEffect(() => {
+    if (!active) return;
+    load();
+    const t = window.setInterval(() => {
+      tick((n) => n + 1);
+      load();
+    }, 30000);
+    return () => window.clearInterval(t);
+  }, [active, load]);
 
   const start = async () => {
     setBusy("start");
@@ -57,8 +102,9 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
         }
         id = (await workApi.saveClient({ name: newName.trim() })).id;
       }
-      await workApi.startSession(id);
+      await workApi.startSession(id, visitType || null, contactId || null);
       setNewName("");
+      setFinished(null);
       toast("ok", "Sesión iniciada: diagnóstico inicial guardado.");
     } catch (e) {
       toast("error", String(e));
@@ -86,6 +132,7 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
       await workApi.updateSession(final);
       const path = await workApi.finishSession();
       setReport({ path, client });
+      setFinished({ problem: final.problem, notes: final.notes, work: work.map((w) => w.title) });
       toast("ok", "Sesión finalizada. Informe guardado en la ficha del cliente.");
     } catch (e) {
       toast("error", String(e));
@@ -107,7 +154,7 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
     load();
   };
 
-  if (session === undefined) return <p className="p-8 font-mono text-sm text-mute">Cargando…</p>;
+  if (session === undefined) return <Loading page />;
 
   if (!session)
     return (
@@ -125,8 +172,26 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
             <button onClick={() => setSending(true)} className="flex items-center gap-1 text-xs text-dim hover:text-ink">
               <Mail size={12} /> Enviar por correo
             </button>
+            {finished && (finished.problem || finished.notes) && (
+              <button
+                onClick={() =>
+                  setSolution({
+                    id: "",
+                    title: finished.problem.split("\n")[0].slice(0, 100),
+                    problem: finished.problem,
+                    solution: [finished.notes, finished.work.length ? `Hecho con AdminOps:\n${finished.work.map((w) => `- ${w}`).join("\n")}` : ""].filter(Boolean).join("\n\n"),
+                    tags: [],
+                  })
+                }
+                className="flex items-center gap-1 text-xs text-dim hover:text-ink"
+                title="Guardar lo que funcionó en Conocimiento → Soluciones"
+              >
+                <Lightbulb size={12} /> Guardar como solución
+              </button>
+            )}
           </div>
         )}
+        {solution && <SolutionEditor initial={solution} tags={[]} onClose={() => setSolution(null)} onSaved={() => setFinished(null)} />}
         {sending && report && <SendReportModal path={report.path} client={report.client} onClose={() => setSending(false)} />}
         <Card title="Nueva sesión de servicio" icon={<ClipboardCheck size={14} />}>
           <p className="mb-4 text-sm text-dim">
@@ -149,6 +214,33 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
               <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre del cliente o empresa" className={inputClass} />
             </div>
           )}
+          <div className="mb-3 grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1 block text-xs text-dim">Tipo de visita (su checklist)</span>
+              <select value={visitType} onChange={(e) => setVisitType(e.target.value)} className={inputClass}>
+                <option value="">Checklist general</option>
+                {settings?.visitTypes.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {v.name} · {v.items.length} puntos
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-dim">Quién pidió el trabajo (Contactos)</span>
+              <select value={contactId} onChange={(e) => setContactId(e.target.value)} className={inputClass}>
+                <option value="">— Nadie en concreto —</option>
+                {[...contacts]
+                  .sort((a, b) => Number(b.clientId === clientId && !!clientId) - Number(a.clientId === clientId && !!clientId) || a.name.localeCompare(b.name, "es"))
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.company ? ` · ${c.company}` : ""}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
           <div className="flex justify-end">
             <Button onClick={start} disabled={busy !== null}>
               <Play size={14} /> Iniciar sesión
@@ -175,8 +267,20 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
           <div className="font-medium text-ink">{session.clientName}</div>
           <div className="text-xs text-dim">
             Equipo {session.host} · en curso desde hace {since(session.started)}
+            {session.visitType && ` · ${session.visitType}`}
           </div>
         </div>
+        <label className="flex items-center gap-1.5 text-xs text-dim" title="Quién pidió el trabajo">
+          <UserRound size={13} />
+          <select value={session.contactId} onChange={(e) => update({ ...session, contactId: e.target.value })} className="max-w-44 rounded-md border border-line bg-void/60 px-2 py-1 text-xs text-ink">
+            <option value="">Sin contacto</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <button onClick={cancel} disabled={busy !== null} className="flex items-center gap-1 text-xs text-mute hover:text-bad">
           <X size={12} /> Descartar
         </button>
@@ -185,6 +289,11 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
         </Button>
       </div>
       {busy === "finish" && <TaskStatus task="session" active fallback="Finalizando…" cancellable={false} className="col-span-12 justify-center" />}
+      {session.clientId && (
+        <div className="col-span-12 empty:hidden">
+          <VisitChanges clientId={session.clientId} host={session.host} />
+        </div>
+      )}
 
       <Card title={`Checklist · ${done}/${session.checklist.length}`} icon={<ClipboardCheck size={14} />} className="col-span-12 lg:col-span-5">
         <ul className="space-y-1">
@@ -197,12 +306,20 @@ export function Session({ onSessionChange }: { onSessionChange: (active: boolean
                   onChange={() => update({ ...session, checklist: session.checklist.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) })}
                   className="size-4 accent-[var(--color-neon)]"
                 />
-                <span className={`text-sm ${c.done ? "text-dim line-through" : "text-ink"}`}>{c.text}</span>
+                <span className={`flex-1 text-sm ${c.done ? "text-dim line-through" : "text-ink"}`}>{c.text}</span>
+                {c.auto && (
+                  <span title="Se marca sola cuando haces esa tarea con AdminOps">
+                    <Wand2 size={12} className={c.done ? "text-ok" : "text-mute"} />
+                  </span>
+                )}
               </label>
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-[11px] text-mute">Los puntos se configuran en Ajustes.</p>
+        <p className="mt-2 text-[11px] text-mute">
+          <Wand2 size={10} className="mr-1 inline" />
+          se marca sola al hacer esa tarea con AdminOps. Los tipos de visita se configuran en Ajustes → Informes.
+        </p>
       </Card>
 
       <Card title="Para el informe" className="col-span-12 lg:col-span-7">

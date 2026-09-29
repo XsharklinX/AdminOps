@@ -74,6 +74,44 @@ pub fn pawnio_installed() -> bool {
     crate::tweaks::registry::read_u32(r"HKLM\SYSTEM\CurrentControlSet\Services\PawnIO", "Start").is_some()
 }
 
+/// Quita la marca «descargado de Internet» (flujo `Zone.Identifier`) a las DLL
+/// de LibreHardwareMonitor. Al descomprimir el portable con el Explorador, Windows
+/// marca cada archivo y .NET se niega a cargarlos (0x80131515). Es lo mismo que
+/// «Propiedades → Desbloquear», y solo en la carpeta de AdminOps que lo necesita.
+fn unblock(dir: &std::path::Path) {
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            match e.file_type() {
+                Ok(t) if t.is_dir() => stack.push(p),
+                Ok(t) if t.is_file() => {
+                    let mut ads = p.into_os_string();
+                    ads.push(":Zone.Identifier");
+                    let _ = std::fs::remove_file(&ads);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Mensaje claro para los fallos típicos al cargar la biblioteca de sensores.
+fn explain(err: &str) -> String {
+    if err.contains("0x80131515") || err.to_lowercase().contains("operación no admitida") || err.contains("Operation is not supported") {
+        return "Windows bloqueó el lector de temperaturas porque AdminOps se descargó de Internet. Cierra AdminOps, haz clic derecho en el .zip → Propiedades → «Desbloquear», y vuelve a descomprimirlo.".into();
+    }
+    if err.to_lowercase().contains("pawnio") {
+        return err.into();
+    }
+    // Sin rutas (llevan el nombre del usuario): solo el motivo.
+    let first = err.lines().next().unwrap_or(err);
+    match first.find(" '") {
+        Some(i) if first.contains(":\\") => format!("No se pudo iniciar el lector de temperaturas ({}).", first[..i].trim()),
+        _ => first.to_string(),
+    }
+}
+
 /// Tras un fallo, no reintentar durante un minuto (el Panel lee cada 5 s).
 static LAST_FAILURE: std::sync::Mutex<Option<(std::time::Instant, String)>> = std::sync::Mutex::new(None);
 
@@ -84,7 +122,11 @@ fn raw(app: &tauri::AppHandle) -> Result<Vec<Sensor>, String> {
             return Err(err.clone());
         }
     }
-    let r = raw_from_dir(&dir);
+    unblock(&dir);
+    let r = raw_from_dir(&dir).map_err(|e| {
+        log::warn!("Sensores: {e}");
+        explain(&e)
+    });
     *LAST_FAILURE.lock().unwrap_or_else(|e| e.into_inner()) = r.as_ref().err().map(|e| (std::time::Instant::now(), e.clone()));
     r
 }
@@ -233,6 +275,34 @@ pub fn install_pawnio(app: tauri::AppHandle) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explains_blocked_dll_without_paths() {
+        let raw = r"No se puede cargar el archivo o ensamblado 'file:///C:\Users\admin\Downloads\x\lhm\LibreHardwareMonitorLib.dll' ni una de sus dependencias. Operación no admitida. (Excepción de HRESULT: 0x80131515)";
+        let m = explain(raw);
+        assert!(m.contains("Desbloquear"), "{m}");
+        assert!(!m.contains("admin"));
+        let other = explain(r"No se puede cargar 'C:\Users\ana\x.dll' por otra cosa");
+        assert!(!other.contains("ana"), "{other}");
+    }
+
+    #[test]
+    fn unblock_removes_zone_identifier() {
+        let dir = std::env::temp_dir().join(format!("adminops-motw-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        let f = dir.join("sub").join("a.dll");
+        std::fs::write(&f, b"x").unwrap();
+        let mut ads = f.clone().into_os_string();
+        ads.push(":Zone.Identifier");
+        // En unidades sin flujos alternativos (FAT) no hay nada que quitar.
+        if std::fs::write(&ads, b"[ZoneTransfer]\r\nZoneId=3\r\n").is_ok() {
+            assert!(std::fs::metadata(&ads).is_ok());
+            unblock(&dir);
+            assert!(std::fs::metadata(&ads).is_err());
+            assert!(f.exists());
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn s(hw: &str, ty: &str, name: &str, kind: &str, v: f64) -> Sensor {
         Sensor { hardware: hw.into(), hardware_type: ty.into(), name: name.into(), kind: kind.into(), value: v, max: None }

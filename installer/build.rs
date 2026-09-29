@@ -27,6 +27,18 @@ fn main() {
     } else {
         include_str!("../src-tauri/manifests/dev.manifest")
     };
+    // Propiedades del ejecutable (Detalles en Windows): la misma versión, editor y
+    // copyright que AdminOps. TAURI_CONFIG se mezcla con installer/tauri.conf.json.
+    let merge = serde_json::json!({
+        "version": version,
+        "productName": "Instalador de AdminOps",
+        "bundle": {
+            "publisher": conf["bundle"]["publisher"],
+            "copyright": conf["bundle"]["copyright"],
+        },
+    });
+    std::env::set_var("TAURI_CONFIG", merge.to_string());
+
     let attrs = tauri_build::Attributes::new().windows_attributes(tauri_build::WindowsAttributes::new().app_manifest(manifest));
     tauri_build::try_build(attrs).expect("tauri-build falló");
 }

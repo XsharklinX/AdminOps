@@ -17,6 +17,17 @@ struct Progress<'a> {
     message: &'a str,
 }
 
+/// Inicio y fin de una tarea, para el indicador de tareas de la barra superior.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct Lifecycle<'a> {
+    task: &'a str,
+    name: &'a str,
+    /// Solo al terminar.
+    seconds: u64,
+    cancelled: bool,
+}
+
 pub struct Task {
     app: Option<tauri::AppHandle>,
     key: String,
@@ -46,7 +57,15 @@ impl Task {
     pub fn new(app: &tauri::AppHandle, key: impl Into<String>) -> Self {
         let key = key.into();
         ps::finish_task(&key); // por si quedó marcada de una cancelación anterior
-        Task { app: Some(app.clone()), name: default_name(&key).into(), key, started: Instant::now() }
+        let task = Task { app: Some(app.clone()), name: default_name(&key).into(), key, started: Instant::now() };
+        task.announce();
+        task
+    }
+
+    fn announce(&self) {
+        if let Some(app) = &self.app {
+            let _ = app.emit("task-started", Lifecycle { task: &self.key, name: &self.name, seconds: 0, cancelled: false });
+        }
     }
 
     /// Tarea sin interfaz (tests, modo línea de comandos).
@@ -58,6 +77,8 @@ impl Task {
     /// Nombre que verá el usuario en la notificación de "terminado".
     pub fn named(mut self, name: impl Into<String>) -> Self {
         self.name = name.into();
+        // Se vuelve a anunciar con el nombre bueno («Desinstalar VLC» en vez de «Tarea»).
+        self.announce();
         self
     }
 
@@ -85,6 +106,7 @@ impl Drop for Task {
         ps::finish_task(&self.key);
         if let Some(app) = &self.app {
             let elapsed = self.started.elapsed();
+            let _ = app.emit("task-finished", Lifecycle { task: &self.key, name: &self.name, seconds: elapsed.as_secs(), cancelled });
             if elapsed >= NOTIFY_AFTER && crate::workflow::settings(app).notify_tasks {
                 notify_done(app, &self.name, elapsed, cancelled);
             }

@@ -75,10 +75,14 @@ export interface Prefs {
   sidebar: SidebarPrefs;
   /** Nombres propios de las páginas. */
   pageLabels: Partial<Record<PageId, string>>;
+  /** Lanzar el diagnóstico en segundo plano al abrir AdminOps. */
+  diagnoseOnOpen: boolean;
+  /** Cargar en segundo plano el último portal usado (Tickets, inventario, correo). */
+  preloadPortals: boolean;
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { accent: "blue", zoom: 1, reduceMotion: false, startPage: "last", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {} };
+const DEFAULTS: Prefs = { accent: "blue", zoom: 1, reduceMotion: false, startPage: "last", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },

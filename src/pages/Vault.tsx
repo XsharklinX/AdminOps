@@ -2,7 +2,7 @@ import { Copy, Eye, EyeOff, FolderLock, FolderOpen, HardDrive, KeyRound, Lock, L
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass, Modal } from "../components/ui";
+import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
 import { vaultApi, type VaultStatus, type VaultSupport } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 
@@ -151,7 +151,7 @@ export function Vault() {
         )}
 
         {vaults === null ? (
-          <p className="mt-4 font-mono text-xs text-mute">Cargando…</p>
+          <Loading />
         ) : vaults.length > 0 ? (
           <ul className="mt-4 divide-y divide-line/60 border-t border-line/60">
             {vaults.map((v) => (

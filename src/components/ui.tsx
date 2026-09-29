@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { loadColor } from "../lib/format";
 
@@ -188,5 +188,26 @@ export function Button({
     >
       {children}
     </button>
+  );
+}
+
+/** Estado de carga igual en toda la app. `page`: ocupa el sitio de una página entera. */
+export function Loading({ text = "Cargando…", page = false }: { text?: string; page?: boolean }) {
+  return (
+    <p className={`flex items-center gap-2 text-sm text-mute ${page ? "p-8" : "py-2"}`}>
+      <Loader2 size={14} className="animate-spin" /> {text}
+    </p>
+  );
+}
+
+/** Lista vacía igual en toda la app: qué pasa y, si procede, qué hacer. */
+export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line px-6 py-10 text-center">
+      {icon && <span className="text-mute">{icon}</span>}
+      <p className="text-sm text-ink">{title}</p>
+      {children && <p className="max-w-md text-xs text-mute">{children}</p>}
+      {action && <div className="mt-1">{action}</div>}
+    </div>
   );
 }

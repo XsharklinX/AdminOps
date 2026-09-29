@@ -130,7 +130,7 @@ pub fn machine_timeline(app: tauri::AppHandle, tweaks: State<'_, TweakState>, da
         }
         Err(e) => log::debug!("Línea de tiempo: {e}"),
     }
-    out.sort_by(|a, b| b.time.cmp(&a.time));
+    out.sort_by_key(|a| std::cmp::Reverse(a.time));
     out.truncate(1500);
     Ok(out)
 }

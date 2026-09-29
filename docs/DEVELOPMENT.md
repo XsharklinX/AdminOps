@@ -146,5 +146,5 @@ concreto (y, desde la Fase 2, un `id` de tweak del catálogo embebido en el bina
 
 ## Roadmap
 
-Fases 1–24 completadas (v1.1.1). Lo siguiente, la deuda técnica conocida y los criterios de cada
+Fases 1–24 completadas (v1.1.2). Lo siguiente, la deuda técnica conocida y los criterios de cada
 fase están en [ROADMAP.md](../ROADMAP.md).

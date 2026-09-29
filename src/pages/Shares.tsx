@@ -1,7 +1,7 @@
 import { FolderPlus, Folder, RotateCw, Share2, Trash2, TriangleAlert, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, inputClass, Modal } from "../components/ui";
+import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
 import { officeApi, usersApi, vaultApi, type SharingStatus } from "../lib/api";
 import { friendlyPath } from "../lib/format";
 
@@ -86,7 +86,7 @@ export function Shares({ isAdmin }: { isAdmin: boolean }) {
           </Button>
         </div>
         {status === null ? (
-          <p className="font-mono text-xs text-mute">Cargando…</p>
+          <Loading />
         ) : status.shares.length === 0 ? (
           <p className="text-sm text-mute">Este equipo no comparte ninguna carpeta.</p>
         ) : (

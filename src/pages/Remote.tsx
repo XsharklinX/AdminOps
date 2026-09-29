@@ -2,7 +2,7 @@ import { Copy, Download, ExternalLink, Headset, KeyRound, MonitorSmartphone, Pen
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass, Modal } from "../components/ui";
+import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
 import { officeApi, remoteApi, usersApi, workApi, type Connection, type RdpOptions, type RdpServer, type Reach, type RemoteStatus, type RemoteTool } from "../lib/api";
 
 const KIND: Record<string, string> = { rdp: "Escritorio remoto", anydesk: "AnyDesk", rustdesk: "RustDesk", teamviewer: "TeamViewer" };
@@ -290,7 +290,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
 
       <Card title="Este equipo" className="col-span-12">
         {!status ? (
-          <p className="font-mono text-xs text-mute">Cargando…</p>
+          <Loading />
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="space-y-1 text-sm">

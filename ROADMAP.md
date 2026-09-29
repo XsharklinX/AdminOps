@@ -1,6 +1,6 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v1.1.1**. Este documento recoge lo que ya está hecho, la deuda técnica
+Estado actual: **v1.1.2**. Este documento recoge lo que ya está hecho, la deuda técnica
 conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
 "terminado" para saber cuándo cerrarla.
 
@@ -478,12 +478,235 @@ Pulido para el uso diario.
     actualizaciones, drivers, programas y apagados bruscos, por días.
   - La **búsqueda** (Ctrl+K) encuentra acciones y problemas: «no suena», «encender Bluetooth»,
     «reiniciar el driver de la gráfica», páginas de Configuración de Windows…
-  - **Contactos** (Soporte): agenda del técnico con extensión, teléfonos, correo, para qué llamarle,
-    etiquetas y favoritos; importa y exporta CSV (Excel y Outlook) y se busca desde Ctrl+K. Viaja con
-    AdminOps (en el USB con el portable).
+  - **Contactos** (Soporte): agenda del técnico que viaja con AdminOps (en el USB con el portable).
+    - Vistas de tarjetas, tabla (columnas elegibles y ordenables) y directorio de extensiones;
+      agrupar por empresa, área, etiqueta o letra; ordenar por nombre, empresa, extensión, uso o fecha.
+    - Filtros rápidos (favoritos, más usados, con extensión o correo, sin completar, recientes),
+      varias etiquetas con «todas/alguna», empresa, búsqueda con prefijos (`ext:`, `empresa:`, `#tag`,
+      `-excluir`) y búsquedas guardadas. La vista y los filtros se recuerdan.
+    - Etiquetas en chips con autocompletado y colores; renombrar, fusionar y borrar en todos.
+    - Ficha lateral: varios teléfonos y correos, disponibilidad, sustituto («si no está…»), cliente
+      enlazado, llamar, correo, chat o llamada de Teams y «Copiar tarjeta».
+    - «Más usados», selección múltiple (Mayús para rangos) con etiquetas, favoritos, exportar y
+      papelera; duplicados con fusión; papelera de 30 días; copia automática semanal (5 últimas).
+    - Importa CSV (Excel, Outlook) y vCard; exporta CSV y vCard. Se busca desde Ctrl+K.
   - **Portable entre equipos**: las contraseñas de routers se cifran con una clave del USB (AES-256-GCM)
     en vez de DPAPI, así funcionan en todos los equipos; las antiguas se migran solas. Ajustes explica
     qué viaja contigo y qué es de cada equipo.
+
+### v1.1.2 — Herramientas del técnico ✅
+
+- **Trabajo en el equipo del cliente**
+  - **Entrega rápida** (Informes): lo hecho hoy con AdminOps pasa a las observaciones y se genera el
+    informe comparando con el primer diagnóstico del día.
+  - **Tipos de visita** con su checklist (Mantenimiento, Equipo nuevo, Equipo lento, Sin Internet,
+    Copia de datos; editables en Ajustes → Informes). Los puntos marcados como automáticos se tachan
+    solos al hacer esa tarea con AdminOps (limpieza, actualizaciones, diagnóstico, dominio…).
+  - **Recetas** (Administración): punto de restauración, quitar bloatware, instalar una lista de
+    programas, perfil o ajustes sueltos, crear usuario, renombrar (admite `{serie}`), unir al dominio y
+    diagnóstico final, de una vez. Las contraseñas se piden al ejecutar y nunca se guardan.
+  - **Ficha del equipo** (Hardware): modelo, número de serie, hardware, Windows y licencia, TPM, red y
+    usuario; copiar, pegar en Excel, CSV, enlace a la garantía (Dell, Lenovo, HP…) y al inventario
+    de un cliente.
+- **Conocimiento** (Soporte), viaja con AdminOps:
+  - **Soluciones** «problema → lo que funcionó», con etiquetas; se guardan también al terminar una
+    sesión de servicio y se buscan desde Ctrl+K.
+  - **Plantillas de texto** con variables automáticas ({equipo}, {usuario}, {fecha}, {tecnico}…) y
+    preguntas propias ({?Nombre}).
+  - **Notas por equipo y por red**: aparecen solas en el Panel al volver a ese equipo o a esa red.
+- **Red y oficina**
+  - **Mapa de la oficina** (Dispositivos): función, responsable (de Contactos) y notas de cada
+    dispositivo, por red; las IP se actualizan en cada búsqueda.
+  - **Vigilancia de dispositivos clave**: avisa (campana y notificación) si una impresora, servidor o
+    NAS marcado deja de responder, y cuando vuelve. Dos fallos seguidos para evitar falsas alarmas.
+  - **Comprobar puestos** (Red): lista de equipos guardada; cuáles responden y, a fondo (WinRM o DCOM),
+    disco libre, días sin reiniciar, días sin actualizar y usuario conectado. CSV y conexión por
+    Escritorio remoto.
+- **Enlaces entre todo**: el responsable de cada tema (red, impresoras, sistemas…) aparece en los
+  avisos y en Solucionar problemas; los clientes muestran sus contactos; la sesión guarda quién
+  pidió el trabajo y la ficha del contacto lista sus visitas.
+- **Profesionalización**
+  - **Copia de seguridad cifrada** (AES-256) de todo lo que viaja contigo, a otra unidad o a una
+    carpeta en la nube, y restauración (lo sobrescrito se guarda antes).
+  - **Seguridad de tus datos** (Ajustes): estado de la unidad, espacio, clave del USB, copias
+    recientes y avisos (FAT32, sin copia en 30 días…).
+  - **Modo auditoría** («Solo mirar» en la barra superior o `--auditoria`): se bloquean en el
+    despachador de comandos todas las acciones que cambian el equipo; diagnósticos, informes y datos
+    propios siguen funcionando.
+
+- **Programas**
+  - Desinstalación silenciosa para muchos más programas: además de MSI y los que la declaran,
+    Inno Setup y NSIS (detectados por su desinstalador), y MSI mal registrados.
+  - **Desinstalar en lote**: primero los silenciosos, luego los que necesitan su asistente, y una sola
+    revisión de restos al final.
+  - **Restos completos**: carpetas, accesos directos del escritorio y del menú Inicio y claves del
+    registro (con copia .reg). Nunca la carpeta o la clave de otro programa instalado (un plugin que
+    declaraba la carpeta del programa principal la proponía entera). También para entradas huérfanas.
+  - Reparar programas MSI, filtros (con actualización, grandes, recientes, del usuario, necesitan
+    asistente, huérfanas), ocultar componentes y runtimes, orden por editor e inventario en CSV.
+  - Las actualizaciones de winget aparecen en la propia lista, con botón para actualizar.
+  - Más rápido: la lista de winget (actualizaciones e instalados) se reutiliza unos minutos y va en
+    su propio proceso sin frenar al resto de AdminOps; al actualizar no se vuelve a consultar; se
+    indica el origen (winget/msstore). Detección de NSIS con caché (lista en ~40 ms).
+  - **Actualizaciones ignoradas**: «no actualizar este programa», recordado en todos los equipos.
+- **Correcciones**: Teams desde Contactos abre la app de Teams (protocolo msteams:) en vez de una
+  carpeta; guardar un contacto recién usado ya no falla; posponer un mantenimiento vencido tampoco;
+  las pruebas ya no llevan textos que el antivirus confunde con malware.
+
+- **Calidad**
+  - Tests del frontend con Vitest (`npm test`, también en CI): búsqueda y filtros de contactos,
+    duplicados, vCard/CSV, responsable por tema, plantillas, checklist automática, emparejar programas
+    con winget y errores.
+  - Errores comprensibles: todas las llamadas al sistema pasan por un traductor (permisos, archivos en
+    uso, sin espacio, sin red, equipo remoto…); los fallos internos se anotan en el registro técnico.
+  - Checklist de pruebas manuales antes de publicar: `docs/PRUEBAS.md`.
+- **Navegación reorganizada** por lo que hace el técnico: Inicio (Panel, Solucionar problemas,
+  Sesión), Equipo, Mantener, Programas, Red, Oficina, Soporte y Datos. Páginas unidas: Actualizaciones
+  (programas + Windows Update), Mi red (router + dispositivos), Puestos e inventario, y las
+  Reparaciones dentro de Solucionar problemas. Los enlaces antiguos llevan a la pestaña nueva y las
+  navegaciones personalizadas se conservan.
+- **Experiencia**
+  - Panel como centro de mando: «Qué hacer ahora» reúne diagnóstico, avisos, actualizaciones, espacio,
+    datos y sesión en curso, por importancia y con su botón; «Revisión completa» en el propio Panel.
+  - Indicador de tareas en la barra superior: lo que está en marcha (paso actual, tiempo, cancelar) y
+    lo terminado, desde cualquier página.
+  - Ayuda «?» junto al título de cada página.
+  - Estados de carga y listas vacías iguales en toda la app.
+
+- **Inventario web**: pestaña en Puestos e inventario para la web de inventario de la empresa, dentro
+  de AdminOps como Tickets, con el panel «Datos del equipo» (cada dato se copia con un clic para el
+  formulario). El inventario manual sigue igual.
+- **Intranets con dominio** (como *.pgr.gob.do): el navegador interno entra con la cuenta de Windows
+  sin pedir contraseña en los dominios de los portales del técnico y su dominio habitual.
+- **Cuentas** (Oficina): sesión y estado del equipo (local, Microsoft, Entra ID, dominio), cuentas
+  profesionales o educativas, cuentas de Microsoft y de Office, y credenciales guardadas. Asistente
+  «pasar el equipo a una cuenta local»: crear administrador local → sacar el equipo de Entra ID
+  (`dsregcmd /leave`, solo si ya hay un administrador local) → cerrar sesión. Desconectar cuentas
+  profesionales añadidas, cerrar sesión de Office y borrar credenciales, todo en el diario.
+- **Abrir enlaces sin permisos de administrador**: Teams, correo, llamadas, webs y Configuración se
+  abren a través del escritorio de Windows (como el usuario), no con Explorer, que abría Documentos.
+- **Portable descargado de Internet**: el lector de temperaturas ya no falla por la marca «descargado
+  de Internet» de Windows; ningún error muestra la carpeta del usuario.
+
+- **Diagnóstico más rápido y con datos** (medido: la auditoría de seguridad pasó de 7,5 s a 2,3 s):
+  - La auditoría de seguridad se reparte en tres consultas en paralelo (registro, Defender, BitLocker).
+  - BitLocker no se consulta sin administrador, porque Windows tardaba 5 s en no devolver nada. Con
+    administrador se reutiliza durante 10 minutos.
+  - Defender y BitLocker se precargan al abrir AdminOps.
+  - Inventario de hardware, SMART y prueba de memoria se reutilizan 5 minutos; la lista de winget,
+    10 minutos. «A fondo» vuelve a leerlo todo, y la «Revisión completa» del Panel siempre lo hace.
+  - Cada sección se pinta en cuanto termina, sin esperar a las demás.
+  - Opción «Diagnosticar al abrir AdminOps» (Ajustes → General).
+- **Arreglar en el sitio**: los hallazgos llevan su botón «Arreglar», también en el Panel, que
+  ejecuta el ajuste o la reparación sin salir de la página. «Arreglar todo lo seguro» aplica de una
+  vez solo lo que no cambia el comportamiento de Windows ni borra archivos del usuario.
+- **Qué cambió desde el análisis anterior**: problemas nuevos (marcados «Nuevo») y resueltos. Se
+  compara sin tener en cuenta las cifras: «poco espacio (8 %)» y «(7 %)» son el mismo problema. El
+  informe antes/después usa la misma comparación.
+- **Ajustes de Windows**: Limpieza, Rendimiento, Privacidad y Servicios en una página con pestañas y
+  un buscador que mira en las cuatro a la vez (sin tildes: «telemetria» encuentra «Telemetría»).
+- **Preparar equipos** (antes «Recetas»): pestañas Plantillas y Perfiles de ajustes.
+- **Puestos en lote**: marcar varios equipos y hacer lo siguiente sobre todos, con el resultado de
+  cada uno y la acción anotada en el Historial:
+  - reiniciar, con aviso al usuario y 2 minutos de margen;
+  - cancelar ese reinicio;
+  - actualizar directivas;
+  - enviar un mensaje en pantalla;
+  - abrir el Escritorio remoto (hasta 6 a la vez).
+- **Estado entre visitas**: en la ficha del cliente, qué cambió en cada equipo desde la visita
+  anterior: problemas, nota de seguridad, espacio, programas de inicio, actualizaciones, arranque,
+  RAM, batería y hardware. Se descartan las diferencias pequeñas. Al empezar una sesión se compara
+  con cómo está ese equipo ahora. «Evolución entre visitas» ya no compara visitas de equipos
+  distintos entre sí.
+- **Rendimiento de AdminOps** (Ajustes → Rendimiento):
+  - pasos del arranque del programa;
+  - cuándo se abre la ventana, cuándo se pinta la primera página y cuándo está lista;
+  - por cada página, en su primera visita: descarga del código, pintado y tiempo hasta que
+    terminan sus consultas;
+  - las consultas al backend más lentas.
+
+  El resumen del arranque queda en el registro técnico y se puede copiar para compararlo entre
+  versiones.
+
+- **Portales más rápidos y con barra de navegador** (Tickets, Inventario web, Correo):
+  - Se precarga en segundo plano el último portal usado de cada tipo (Ajustes → General → «Precargar
+    los portales»). Las vistas se mantienen vivas y la barra ya no parpadea al volver.
+  - Barra completa: atrás y adelante según el historial real, recargar o detener, página inicial,
+    dirección editable con candado y botón Copiar, zoom recordado por portal, buscar en la página,
+    imprimir o guardar como PDF, y descargas con Abrir y «Mostrar en la carpeta». De cada descarga
+    solo se ve el nombre del archivo, nunca la ruta.
+  - Si la web no carga, en vez de la página en blanco se explica el motivo (sin red o sin VPN,
+    servidor caído, certificado no válido…) con Reintentar, Página inicial y Abrir en el navegador.
+  - Barra de progreso mientras carga. El registro anota cuánto tarda cada vista en crearse y en
+    cargar la primera vez.
+  - Por portal:
+    - inicio de sesión guardado y cifrado (viaja en el USB en portable), que se rellena solo;
+    - sesión privada, que no guarda nada en el equipo y se cierra al salir;
+    - ventanas emergentes en ventana aparte.
+- **Correo** (Soporte): Outlook del trabajo (Microsoft 365) u Outlook.com dentro de AdminOps.
+  - Con la cuenta guardada, AdminOps rellena el inicio de sesión de Microsoft; solo queda la
+    verificación en el móvil.
+  - Sesión privada recomendada y activada por defecto.
+  - Botones Redactar y Cerrar sesión; contador de no leídos si Outlook lo pone en el título.
+  - Redactar al instante: con Outlook abierto pulsa su propio botón «Correo nuevo» en vez de
+    recargar toda la web con el enlace de redactar (solo se usa el enlace si el botón no aparece o
+    si el mensaje va con destinatario, asunto o texto).
+- **Portales: la red, no AdminOps**:
+  - Sin conexión, una franja lo avisa y el portal que falló se recarga solo al volver la red.
+  - Si una página tarda más de 10 segundos, se avisa de que es la conexión o el servidor de la
+    web, con Recargar y Abrir en el navegador.
+  - Al volver a Tickets, Inventario o Correo, la vista aparece al momento: la lista de portales
+    ya leída se guarda en memoria.
+  - Los mensajes y adjuntos se abren en su propia ventana.
+  - «Escribir un correo» en Contactos lo abre en el Correo de AdminOps.
+
+- **Preparar equipos** (antes «Recetas»): cada receta es ahora una plantilla de preparación.
+- **Usuarios y Cuentas**: accesos directos a las herramientas de Windows que completan la página:
+  Usuarios y grupos locales, Cuentas de usuario, Perfiles de usuario, Directiva de seguridad local,
+  Administrador de tareas, Administración de equipos y Administrador de credenciales. Lo que ya
+  había sigue igual.
+- **Agenda** (Soporte): visitas de mantenimiento con día, hora, duración, equipos y notas.
+  - Aviso de Windows 30 minutos antes de cada visita, y un resumen del día al abrir AdminOps.
+  - Lista de clientes a los que ya les toca mantenimiento, con «Agendar».
+  - Desde cada visita: «Empezar» abre la sesión con el cliente ya elegido; recordatorio al cliente
+    por el Correo; marcar como hecha, reprogramar o cancelar.
+  - Las visitas de hoy y los mantenimientos vencidos aparecen en «Qué hacer ahora» del Panel.
+- **Plantilla de informe por cliente** (en su ficha):
+  - formato (cliente o técnico), que la sesión y la página Informe proponen solos;
+  - texto de presentación al principio del informe;
+  - destinatarios extra y asunto y mensaje del correo, con {cliente}, {contacto}, {numero},
+    {fecha}, {equipo}, {empresa} y {tecnico}.
+- **Enviar el informe con el Correo de AdminOps**: deja el mensaje escrito y abre la carpeta del PDF
+  para arrastrarlo (el correo web no permite adjuntar el archivo automáticamente).
+
+### Ideas nuevas (propuestas, sin fecha)
+
+**Taller y órdenes de trabajo**
+- **Órdenes de taller**: al recibir un equipo, una orden con número, estado del equipo, accesorios
+  entregados y lo que dice el cliente. Estados: recibido → en reparación → esperando pieza → listo →
+  entregado. Etiqueta imprimible para pegar en el equipo y aviso al cliente cuando esté listo.
+- **Fotos del equipo**: al recibirlo y al entregarlo (golpes, pantalla, puertos), adjuntas a la orden
+  y al informe, para evitar discusiones.
+- **Repuestos**: tu stock de piezas (discos, RAM, cargadores) con coste y precio. Lo que se usa en
+  una visita se descuenta y pasa al recibo; aviso cuando queda poco.
+
+**Clientes con contrato**
+- **Bolsa de horas**: horas contratadas por cliente, consumo en cada visita (sale del tiempo de la
+  sesión) y aviso cuando se acaban.
+- **Informe mensual del cliente**: todas las visitas del mes, equipos atendidos, horas y problemas
+  que se repiten, en un solo PDF con tu marca.
+- **Incidencias que se repiten**: por cliente y por equipo (la impresora de recepción, el portátil
+  de contabilidad), para proponer una solución de fondo o una renovación.
+
+**Cobros y números del técnico**
+- **Cobros pendientes**: estado de cada recibo (pendiente, pagado, parcial), recordatorio de pago
+  por el Correo y lista de lo que te deben.
+- **Resumen del mes**: visitas, horas, ingresos, clientes nuevos y lo pendiente de cobro. Se exporta
+  a Excel para la contabilidad.
+
+**Entrega al cliente**
+- **Pantalla de entrega**: una vista limpia para enseñar al cliente en su propio equipo el antes y
+  el después (espacio, arranque, seguridad) y que firme ahí mismo.
 
 ### Fase 26 — Negocio (más adelante)
 
@@ -494,16 +717,16 @@ Pulido para el uso diario.
 - **Avisos al abrir la app**: mantenimientos vencidos y garantías que terminan.
 - **Asistencia remota** apuntada en la sesión (código de Asistencia rápida o AnyDesk).
 
-### Fase 27 — Recetas (más adelante)
+### Fase 27 — Plantillas de preparación (más adelante)
 
 **Prioridad: media.** Automatizar lo que el técnico repite en cada equipo.
 
-- **Recetas**: secuencias guardadas de pasos (diagnóstico → limpieza → perfil → programas → copia de
+- **Plantillas**: secuencias guardadas de pasos (diagnóstico → limpieza → perfil → programas → copia de
   drivers → informe) que se ejecutan con un clic y muestran el progreso de cada paso.
-- Recetas incluidas: "Equipo nuevo", "PC lento", "Después de un virus", "Antes de formatear".
-- **Exportar e importar recetas** para compartirlas con otros técnicos.
+- Plantillas incluidas: "Equipo nuevo", "PC lento", "Después de un virus", "Antes de formatear".
+- **Exportar e importar plantillas** para compartirlas con otros técnicos.
 
-**Terminado cuando:** preparar un equipo nuevo es elegir una receta y esperar.
+**Terminado cuando:** preparar un equipo nuevo es elegir una plantilla y esperar.
 
 ### Fase 28 — Distribución (más adelante)
 
@@ -517,7 +740,7 @@ Pulido para el uso diario.
 
 **Prioridad: a decidir** según cómo se quiera vender.
 
-- **Modelo gratis + Pro**: lo esencial gratis; informes con marca propia, recetas, clientes ilimitados
+- **Modelo gratis + Pro**: lo esencial gratis; informes con marca propia, plantillas de preparación, clientes ilimitados
   y la oficina completa en Pro.
 - **Licencias sin servidor**: clave firmada (Ed25519) que la app verifica sin conexión, asociada al
   técnico y no al equipo, para que funcione en modo portable.

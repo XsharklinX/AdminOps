@@ -131,6 +131,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 .totals{width:300px;margin:8px 0 0 auto}.totals td{border:0;padding:3px 8px}
 .totals tr.grand td{font-size:15px;font-weight:700;border-top:2px solid #1b2330;padding-top:7px}
 .note{font-size:11px;color:#5b6778;margin-top:6px}
+.intro{white-space:pre-wrap;margin:4px 0 14px;color:#2b3544}
 .warranty td.num{width:120px}
 .speed{display:flex;gap:10px}.speed div{flex:1;background:#f4f6f9;border-radius:8px;padding:8px 12px;font-size:11px;color:#5b6778}.speed b{display:block;font-size:17px;color:#1b2330;font-weight:600}
 .sign{display:grid;grid-template-columns:1fr 1fr;gap:36px;margin-top:34px;break-inside:avoid}
@@ -223,7 +224,7 @@ fn important(f: &&Finding) -> bool {
 
 /// Problemas del "antes" que ya no aparecen en el "después".
 fn resolved<'a>(cur: &Diagnostics, base: &'a Diagnostics) -> Vec<&'a Finding> {
-    base.findings.iter().filter(important).filter(|b| !cur.findings.iter().any(|c| c.title == b.title)).collect()
+    base.findings.iter().filter(important).filter(|b| !cur.findings.iter().any(|c| super::same_problem(b, c))).collect()
 }
 
 /// Fila de la tabla antes/después.
@@ -843,6 +844,23 @@ fn build(c: &Ctx) -> String {
     );
     header(&mut h, c);
 
+    // Presentación propia de este cliente (plantilla de su ficha).
+    let intro = fill_fields(
+        c.input.client.report.intro.trim(),
+        &[
+            ("cliente", c.input.client.name.as_str()),
+            ("contacto", if c.input.client.contact.trim().is_empty() { c.input.client.name.as_str() } else { c.input.client.contact.as_str() }),
+            ("numero", c.number),
+            ("fecha", &fmt_day(c.cur.timestamp)),
+            ("equipo", c.cur.host.as_str()),
+            ("empresa", c.settings.company.as_str()),
+            ("tecnico", c.technician),
+        ],
+    );
+    if !intro.is_empty() {
+        let _ = write!(h, "<div class=intro>{}</div>", esc(&intro));
+    }
+
     let work: Vec<&Entry> = c.journal.iter().filter(|e| e.ok && e.op != Op::Revert).collect();
     summary(&mut h, c, work.len());
 
@@ -975,6 +993,16 @@ fn build(c: &Ctx) -> String {
     }
     let _ = write!(h, "<footer>Generado el {} con AdminOps</footer></main></body></html>", Local::now().format("%d/%m/%Y %H:%M"));
     h
+}
+
+/// Rellena {cliente}, {fecha}… en los textos de la plantilla del cliente. Los
+/// campos desconocidos se dejan tal cual.
+fn fill_fields(text: &str, values: &[(&str, &str)]) -> String {
+    let mut out = text.to_string();
+    for (k, v) in values {
+        out = out.replace(&format!("{{{k}}}"), v.trim());
+    }
+    out
 }
 
 impl Ctx<'_> {
@@ -1228,6 +1256,15 @@ pub fn email_report_manual(app: tauri::AppHandle, path: String, to: String, subj
 }
 
 #[cfg(test)]
+mod fill_tests {
+    #[test]
+    fn fills_client_template_fields() {
+        let t = super::fill_fields("Visita a {cliente} ({equipo}) el {fecha}. {otro}", &[("cliente", "Sol"), ("equipo", "PC1"), ("fecha", "3/10/2026")]);
+        assert_eq!(t, "Visita a Sol (PC1) el 3/10/2026. {otro}");
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -1297,7 +1334,7 @@ mod tests {
             client: Client { name: "Farmacia Central".into(), contact: "Ana Pérez".into(), phone: "809-555-0199".into(), email: "ana@example.com".into(), address: "Av. Principal 12".into(), ..Default::default() },
             technician: None,
             notes: "El equipo se calentaba y se apagaba solo. Se limpió el ventilador.".into(),
-            checklist: vec![ChecklistItem { text: "Copia de seguridad".into(), done: true }, ChecklistItem { text: "Antivirus actualizado".into(), done: false }],
+            checklist: vec![ChecklistItem { text: "Copia de seguridad".into(), done: true, ..Default::default() }, ChecklistItem { text: "Antivirus actualizado".into(), done: false, ..Default::default() }],
             since: Some(0),
             template,
             billing: Billing {

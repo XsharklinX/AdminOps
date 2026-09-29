@@ -1,6 +1,8 @@
+import { fillTemplate, recipients, reportNumber } from "../lib/reportText";
+import { goToPage } from "../lib/navigate";
 import { Eraser, FileText, Mail, Plus, Trash2, Wrench } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { diagApi, workApi, type Billing, type DocKind, type Line, type Settings, type Template } from "../lib/api";
+import { diagApi, portalsApi, workApi, type Billing, type ClientReport, type DocKind, type Line, type Settings, type Template } from "../lib/api";
 import { money } from "../lib/format";
 import { useToast } from "./feedback";
 import { Button, inputClass, Modal } from "./ui";
@@ -302,30 +304,65 @@ export function SendReportModal({
   onClose,
 }: {
   path: string;
-  client: { name: string; contact?: string; email?: string } | null;
+  client: { name: string; contact?: string; email?: string; report?: ClientReport } | null;
   onClose: () => void;
 }) {
   const toast = useToast();
-  const [to, setTo] = useState(client?.email ?? "");
+  const [to, setTo] = useState(recipients(client?.email, client?.report?.to));
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hasMail, setHasMail] = useState(false);
 
   useEffect(() => {
+    portalsApi
+      .list()
+      .then((l) => setHasMail(l.some((p) => p.kind === "mail")))
+      .catch(() => {});
     workApi.settings().then((s) => {
       const brand = s.company.trim() || s.technician.trim();
-      const number = /Informe_(\d{4}-\d{4})/.exec(path)?.[1];
+      const number = reportNumber(path);
       const who = client?.contact?.trim() || client?.name?.trim();
       const sign = [s.technician, s.company, s.phone].map((x) => x.trim()).filter(Boolean).join("\n");
-      setSubject(`Informe de servicio técnico${number ? ` Nº ${number}` : ""}${brand ? ` · ${brand}` : ""}`);
+      const values = {
+        cliente: client?.name,
+        contacto: client?.contact?.trim() || client?.name,
+        numero: number,
+        fecha: new Date().toLocaleDateString("es", { dateStyle: "long" }),
+        empresa: s.company,
+        tecnico: s.technician,
+      };
+      // La plantilla del cliente, si tiene; si no, la de siempre.
+      const t = client?.report;
+      setSubject(t?.subject ? fillTemplate(t.subject, values) : `Informe de servicio técnico${number ? ` Nº ${number}` : ""}${brand ? ` · ${brand}` : ""}`);
       setBody(
-        `${who ? `Hola, ${who}:` : "Hola:"}\n\nTe envío adjunto el informe del servicio técnico realizado el ${new Date().toLocaleDateString("es", { dateStyle: "long" })}. ` +
-          `En él encontrarás el estado del equipo, el trabajo realizado, lo que queda pendiente y nuestras recomendaciones.\n\n` +
-          `Quedo a tu disposición para cualquier consulta.\n\nUn saludo,${sign ? `\n${sign}` : ""}`,
+        t?.body
+          ? fillTemplate(t.body, values)
+          : `${who ? `Hola, ${who}:` : "Hola:"}\n\nTe envío adjunto el informe del servicio técnico realizado el ${new Date().toLocaleDateString("es", { dateStyle: "long" })}. ` +
+              `En él encontrarás el estado del equipo, el trabajo realizado, lo que queda pendiente y nuestras recomendaciones.\n\n` +
+              `Quedo a tu disposición para cualquier consulta.\n\nUn saludo,${sign ? `\n${sign}` : ""}`,
       );
     });
     // Solo al abrir: después el texto es del usuario.
   }, [path]);
+
+  // Con el Correo de AdminOps: el mensaje queda escrito y se abre la carpeta del
+  // PDF para arrastrarlo (el correo web no deja adjuntar un archivo automáticamente).
+  const sendInApp = async () => {
+    setBusy(true);
+    try {
+      const ok = await portalsApi.compose(to.replace(/\s+/g, ""), subject, body);
+      if (!ok) throw new Error("Configura antes el Correo (Soporte → Correo).");
+      await diagApi.revealReport(path).catch(() => {});
+      toast("ok", "Mensaje listo en el Correo: arrastra el PDF desde la carpeta que se abrió y envíalo.");
+      onClose();
+      goToPage("mail");
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const send = async (manual: boolean) => {
     setBusy(true);
@@ -350,6 +387,11 @@ export function SendReportModal({
           <Button kind="ghost" onClick={() => send(true)} disabled={busy} title="Para Gmail u Outlook en el navegador: abre el correo y la carpeta del PDF">
             Sin adjunto (correo web)
           </Button>
+          {hasMail && (
+            <Button kind="ghost" onClick={sendInApp} disabled={busy} title="Escribe el mensaje en el Correo de AdminOps y abre la carpeta del PDF para arrastrarlo">
+              <Mail size={14} /> Con el Correo de AdminOps
+            </Button>
+          )}
           <Button onClick={() => send(false)} disabled={busy}>
             <Mail size={14} /> Abrir en el correo
           </Button>

@@ -35,7 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const add = useCallback((kind: ToastKind, text: string, undo?: Toast["undo"]) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t.slice(-3), { id, kind, text, undo }]);
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), undo ? 10000 : kind === "error" ? 8000 : 4000);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), undo ? 10000 : kind === "error" ? 8000 : 3000);
   }, []);
 
   // Solo un cambio suelto lleva «Deshacer»: si una acción aplica varios a la vez
@@ -91,26 +91,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed right-5 bottom-5 z-50 flex w-96 flex-col gap-2">
+      {/* Abajo en el centro y «atravesables»: un aviso encima de un botón no lo bloquea (solo responden su X y «Deshacer»). */}
+      <div className="pointer-events-none fixed bottom-5 left-1/2 z-50 flex w-96 max-w-[90vw] -translate-x-1/2 flex-col gap-2">
         {toasts.map((t) => {
           const Icon = icon[t.kind];
           return (
             <div
               key={t.id}
-              className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-line-2 bg-panel-2 px-3.5 py-3 text-sm shadow-2xl"
+              className="flex items-start gap-2.5 rounded-lg border border-line-2 bg-panel-2/95 px-3.5 py-3 text-sm shadow-2xl"
             >
               <Icon size={16} className={`mt-0.5 shrink-0 ${color[t.kind]}`} />
               <p className="max-h-32 min-w-0 flex-1 overflow-y-auto text-ink [overflow-wrap:anywhere]">{t.text}</p>
               {t.undo && (
                 <button
                   onClick={() => undo(t)}
+                  style={{ pointerEvents: "auto" }}
                   disabled={undoing !== null}
                   className="flex shrink-0 items-center gap-1 rounded-md border border-line-2 px-2 py-0.5 text-xs text-dim transition-colors hover:border-neon/40 hover:text-neon disabled:opacity-40"
                 >
                   {undoing === t.id ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />} Deshacer
                 </button>
               )}
-              <button onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))} className="text-mute hover:text-ink">
+              <button onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))} className="pointer-events-auto text-mute hover:text-ink">
                 <X size={14} />
               </button>
             </div>

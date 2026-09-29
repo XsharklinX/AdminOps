@@ -42,6 +42,32 @@ pub fn portable_webview_dir() -> Option<PathBuf> {
     portable_root().map(|root| root.join("webview"))
 }
 
+/// ¿Se puede crear y escribir en esta carpeta? (Una carpeta heredada de otro
+/// usuario, o bajo acceso controlado, da «acceso denegado» y WebView2 no abre.)
+fn is_writable(dir: &std::path::Path) -> bool {
+    if std::fs::create_dir_all(dir).is_err() {
+        return false;
+    }
+    let probe = dir.join(".adminops-write-test");
+    let ok = std::fs::write(&probe, b"ok").is_ok();
+    let _ = std::fs::remove_file(&probe);
+    ok
+}
+
+/// Carpeta de datos de WebView2 en modo instalado. WebView2 no arranca si su
+/// carpeta por defecto quedó de otro usuario (p. ej. de una instalación como
+/// administrador): por eso se fija una propia bajo el perfil de ESTE usuario, y
+/// si no se puede escribir, se cae a la carpeta temporal. Portable la lleva al USB.
+pub fn installed_webview_dir() -> Option<PathBuf> {
+    let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from)?;
+    let preferred = local.join("AdminOps").join("WebView");
+    if is_writable(&preferred) {
+        return Some(preferred);
+    }
+    let fallback = std::env::temp_dir().join("AdminOps").join("WebView");
+    is_writable(&fallback).then_some(fallback)
+}
+
 fn host() -> String {
     sysinfo::System::host_name()
         .unwrap_or_else(|| "equipo".into())
@@ -69,6 +95,15 @@ pub fn shared_data_dir(app: &tauri::AppHandle) -> PathBuf {
     match portable_root() {
         Some(root) => root.to_path_buf(),
         None => app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("AdminOps")),
+    }
+}
+
+/// Lo mismo que `shared_data_dir`, antes de que exista la app (al arrancar).
+/// Instalado: %APPDATA%\<identificador>, igual que la ruta que usa Tauri.
+pub fn shared_data_dir_early() -> Option<PathBuf> {
+    match portable_root() {
+        Some(root) => Some(root.to_path_buf()),
+        None => std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join("com.adminops.app")),
     }
 }
 

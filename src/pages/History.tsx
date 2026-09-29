@@ -14,7 +14,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Card } from "../components/ui";
+import { Card, Loading } from "../components/ui";
 import { appApi, tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
 import { RestoreStorageCard } from "../components/Maintenance";
 import { Timeline } from "../components/Timeline";
@@ -118,7 +118,7 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
         ) : pointsError ? (
           <p className="text-xs break-words text-bad">{pointsError}</p>
         ) : points === null ? (
-          <p className="font-mono text-xs text-mute">Cargando…</p>
+          <Loading />
         ) : points.length === 0 ? (
           <p className="text-xs text-mute">No hay puntos de restauración en este equipo.</p>
         ) : (

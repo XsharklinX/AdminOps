@@ -31,6 +31,9 @@ jobs:
       - name: Tipos y bundle del frontend
         run: npm run build
 
+      - name: Tests del frontend
+        run: npm test
+
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --lib --tests -- -D warnings

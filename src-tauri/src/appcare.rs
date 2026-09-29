@@ -222,7 +222,7 @@ pub fn open_release_page(url: String) -> Result<(), String> {
     if !url.starts_with("https://github.com/XsharklinX/AdminOps") {
         return Err("Dirección no permitida.".into());
     }
-    std::process::Command::new("explorer.exe").arg(url).spawn().map(|_| ()).map_err(|e| e.to_string())
+    crate::shellopen::open(&url)
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-import { CheckCircle2, Download, Loader2, RefreshCw, Search, XCircle } from "lucide-react";
+import { BellOff, CheckCircle2, Download, Eye, Loader2, RefreshCw, Search, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
@@ -14,13 +14,16 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
   const [query, setQuery] = useState("");
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<Result[] | null>(null);
+  const [ignored, setIgnored] = useState<string[]>([]);
+  const [showIgnored, setShowIgnored] = useState(false);
   const toast = useToast();
 
-  const load = useCallback(async () => {
+  // `refresh`: preguntar a winget aunque haya una lista de hace pocos minutos.
+  const load = useCallback(async (refresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      setUpdates(await toolsApi.softwareUpdates());
+      setUpdates(await toolsApi.softwareUpdates(refresh));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -30,12 +33,28 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     load();
+    toolsApi.ignoredUpdates().then(setIgnored).catch(() => {});
   }, [load]);
+
+  const setIgnore = async (id: string, on: boolean) => {
+    try {
+      setIgnored(await toolsApi.setUpdateIgnored(id, on));
+      setSelected((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+      toast("info", on ? "No se volverá a proponer esta actualización (en todos los equipos)." : "Se vuelve a proponer.");
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (updates ?? []).filter((u) => !q || u.name.toLowerCase().includes(q) || u.id.toLowerCase().includes(q));
-  }, [updates, query]);
+    return (updates ?? []).filter((u) => (showIgnored || !ignored.includes(u.id)) && (!q || u.name.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
+  }, [updates, query, ignored, showIgnored]);
+  const ignoredCount = (updates ?? []).filter((u) => ignored.includes(u.id)).length;
 
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -70,7 +89,12 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
             "Buscando actualizaciones con winget…"
           ) : (
             <>
-              <span className="font-mono text-neon">{updates.length}</span> programas con versión nueva disponible
+              <span className="font-mono text-neon">{updates.length - ignoredCount}</span> programas con versión nueva disponible
+              {ignoredCount > 0 && (
+                <button onClick={() => setShowIgnored(!showIgnored)} className="ml-2 text-xs text-mute hover:text-ink">
+                  · {ignoredCount} ignorado(s) {showIgnored ? "(ocultar)" : "(ver)"}
+                </button>
+              )}
             </>
           )}
         </p>
@@ -84,13 +108,13 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
           />
         </div>
         <button
-          onClick={() => setSelected(new Set(visible.map((u) => u.id)))}
+          onClick={() => setSelected(new Set(visible.filter((u) => !ignored.includes(u.id)).map((u) => u.id)))}
           disabled={!updates?.length}
           className="rounded-md border border-line-2 px-3 py-1.5 text-xs text-dim hover:text-ink disabled:opacity-40"
         >
           Seleccionar todo
         </button>
-        <button onClick={load} disabled={loading || running} className="rounded-md p-1.5 text-dim hover:bg-panel-2 hover:text-ink" title="Volver a buscar">
+        <button onClick={() => load(true)} disabled={loading || running} className="rounded-md p-1.5 text-dim hover:bg-panel-2 hover:text-ink" title="Volver a buscar en winget">
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
@@ -141,6 +165,16 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
               <div className="w-56 text-right font-mono text-xs tabular">
                 <span className="text-mute">{u.version}</span> <span className="text-dim">→</span> <span className="text-neon">{u.available}</span>
               </div>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  setIgnore(u.id, !ignored.includes(u.id));
+                }}
+                className="shrink-0 rounded p-1 text-mute hover:text-ink"
+                title={ignored.includes(u.id) ? "Volver a proponer esta actualización" : "No actualizar este programa (se recuerda en todos los equipos)"}
+              >
+                {ignored.includes(u.id) ? <Eye size={13} /> : <BellOff size={13} />}
+              </button>
             </label>
           ))}
           {updates && visible.length === 0 && <p className="px-4 py-8 text-center text-sm text-mute">Todo está al día.</p>}

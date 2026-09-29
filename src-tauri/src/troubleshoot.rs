@@ -881,7 +881,7 @@ Remove-ItemProperty $k -Name AutoConfigURL -ErrorAction SilentlyContinue
             "Elige el modo en el panel de Windows.".into()
         }
         "open" if allowed_uri(arg) => {
-            std::process::Command::new("explorer.exe").arg(arg).spawn().map_err(|e| e.to_string())?;
+            crate::shellopen::open(arg)?;
             return Ok(String::new());
         }
         _ => return Err("Reparación desconocida.".into()),

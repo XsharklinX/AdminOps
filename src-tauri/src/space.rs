@@ -99,7 +99,7 @@ fn list_dir(path: &Path) -> Option<Vec<RawEntry>> {
 fn merge_top(a: &mut Vec<(u64, PathBuf)>, b: Vec<(u64, PathBuf)>) {
     a.extend(b);
     if a.len() > TOP_FILES * 2 {
-        a.sort_unstable_by(|x, y| y.0.cmp(&x.0));
+        a.sort_unstable_by_key(|x| std::cmp::Reverse(x.0));
         a.truncate(TOP_FILES);
     }
 }
@@ -132,7 +132,7 @@ fn walk(path: &Path, c: &Counters) -> (Node, Vec<(u64, PathBuf)>) {
         }
     }
     if top.len() > TOP_FILES {
-        top.sort_unstable_by(|x, y| y.0.cmp(&x.0));
+        top.sort_unstable_by_key(|x| std::cmp::Reverse(x.0));
         top.truncate(TOP_FILES);
     }
     let results: Vec<(Node, Vec<(u64, PathBuf)>)> = subdirs.par_iter().map(|d| walk(d, c)).collect();
@@ -144,7 +144,7 @@ fn walk(path: &Path, c: &Counters) -> (Node, Vec<(u64, PathBuf)>) {
             node.children.push(child);
         }
     }
-    node.children.sort_unstable_by(|a, b| b.size.cmp(&a.size));
+    node.children.sort_unstable_by_key(|a| std::cmp::Reverse(a.size));
     (node, top)
 }
 
@@ -224,7 +224,7 @@ pub fn scan_space(app: tauri::AppHandle, path: String) -> Result<SpaceView, Stri
     if CANCEL.load(Ordering::SeqCst) {
         return Err("Análisis cancelado.".into());
     }
-    top.sort_unstable_by(|x, y| y.0.cmp(&x.0));
+    top.sort_unstable_by_key(|x| std::cmp::Reverse(x.0));
     top.truncate(TOP_FILES);
     let seconds = start.elapsed().as_secs_f64();
     log::info!("Análisis de espacio de {path}: {} archivos, {} bytes en {seconds:.1} s", tree.files, tree.size);
@@ -303,7 +303,7 @@ mod tests {
         std::fs::write(dir.join("a/b/z.bin"), vec![0u8; 300]).unwrap();
         let c = Counters::default();
         let (tree, mut top) = walk(&dir, &c);
-        top.sort_unstable_by(|x, y| y.0.cmp(&x.0));
+        top.sort_unstable_by_key(|x| std::cmp::Reverse(x.0));
         assert_eq!(tree.size, 2_001_300);
         assert_eq!(tree.files, 3);
         assert_eq!(tree.children.len(), 1, "solo 'a' supera 1 MB");

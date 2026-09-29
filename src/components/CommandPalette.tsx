@@ -1,8 +1,8 @@
-import { AppWindow, CornerDownLeft, Search, SlidersHorizontal, UserRound, Wrench, Zap } from "lucide-react";
+import { AppWindow, CornerDownLeft, FileText, Lightbulb, Search, SlidersHorizontal, UserRound, Wrench, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, pageLabel, type PageId } from "./Sidebar";
 import { useToast } from "./feedback";
-import { contactsApi, toolboxApi, tweaksApi, type Contact, type ToolboxView } from "../lib/api";
+import { contactsApi, libraryApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -14,7 +14,7 @@ const CATEGORY_PAGE: Record<string, PageId> = {
   security: "security",
 };
 
-const KIND_LABEL = { page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto" };
+const KIND_LABEL = { page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla" };
 
 type Kind = keyof typeof KIND_LABEL;
 
@@ -59,6 +59,8 @@ export function CommandPalette({
   const [tools, setTools] = useState(toolsCache);
   const [tweaks, setTweaks] = useState(tweaksCache);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [solutions, setSolutions] = useState<Solution[]>([]);
+  const [templates, setTemplates] = useState<TextTemplate[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -71,7 +73,9 @@ export function CommandPalette({
     if (!toolsCache) toolboxApi.list().then((t) => setTools((toolsCache = t))).catch(() => {});
     if (!tweaksCache) tweaksApi.index().then((t) => setTweaks((tweaksCache = t))).catch(() => {});
     // Sin caché: la agenda cambia a menudo.
-    contactsApi.list().then(setContacts).catch(() => {});
+    contactsApi.list().then((l) => setContacts(l.filter((c) => !c.deleted))).catch(() => {});
+    libraryApi.list("solutions").then(setSolutions).catch(() => {});
+    libraryApi.list("templates").then(setTemplates).catch(() => {});
   }, [open]);
 
   const entries = useMemo<Entry[]>(() => {
@@ -115,6 +119,10 @@ export function CommandPalette({
         run: () => onNavigate("contacts", c.id),
       });
     }
+    for (const s of solutions)
+      out.push({ key: `solution:${s.id}`, kind: "solution", title: s.title, subtitle: s.problem, search: norm(`${s.title} ${s.problem} ${s.solution} ${s.tags.join(" ")}`), run: () => onNavigate("knowledge", `solution:${s.id}`) });
+    for (const t of templates)
+      out.push({ key: `template:${t.id}`, kind: "template", title: t.name, subtitle: t.category || "Plantilla de texto", search: norm(`${t.name} ${t.category} ${t.body}`), run: () => onNavigate("knowledge", `template:${t.id}`) });
     for (const c of tools?.custom ?? []) {
       out.push({
         key: `tool:${c.id}`,
@@ -126,7 +134,7 @@ export function CommandPalette({
       });
     }
     return out;
-  }, [tools, tweaks, contacts, actions, onNavigate, toast]);
+  }, [tools, tweaks, contacts, solutions, templates, actions, onNavigate, toast]);
 
   const results = useMemo(() => {
     const q = norm(query.trim());
@@ -160,7 +168,7 @@ export function CommandPalette({
   };
 
   const icon = (k: Kind) => {
-    const I = { page: CornerDownLeft, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound }[k];
+    const I = { page: CornerDownLeft, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText }[k];
     return <I size={14} className="shrink-0 text-neon" />;
   };
 

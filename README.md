@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-1.1.1-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-1.1.2-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 [![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)

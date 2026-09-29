@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowRight, CalendarClock, Loader2, MonitorCog, RefreshCw, Stethoscope, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "./ui";
-import { NAV, pageLabel, type PageId } from "./Sidebar";
+import { isPageId, pageLabel, type PageId } from "./Sidebar";
 import { timelineApi, type TimelineEvent } from "../lib/api";
 
 const KINDS = {
@@ -17,7 +17,7 @@ const COLOR = { ok: "text-ok", info: "text-neon", warn: "text-warn", bad: "text-
 const RANGES = [7, 30, 90];
 const PAGE = 250;
 
-const isPage = (p: string | null): p is PageId => !!p && NAV.some((n) => n.id === p);
+const isPage = isPageId;
 const dayKey = (t: number) => new Date(t * 1000).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 const hour = (t: number) => new Date(t * 1000).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 const isBoot = (e: TimelineEvent) => e.kind === "windows" && (e.title === "Windows arrancó" || e.title === "Windows se apagó");

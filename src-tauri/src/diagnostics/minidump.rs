@@ -55,7 +55,7 @@ fn pool_string(b: &[u8], off: usize, pool: std::ops::Range<usize>) -> Option<Str
         return None;
     }
     let bytes = b.get(off + 4..off + 4 + len * 2)?;
-    let words: Vec<u16> = bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+    let words: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
     let s = String::from_utf16(&words).ok()?;
     let lower = s.to_ascii_lowercase();
     (lower.ends_with(".sys") || lower.ends_with(".dll") || lower.ends_with(".exe")).then_some(s)
@@ -143,8 +143,8 @@ pub fn analyze(b: &[u8]) -> Option<DumpAnalysis> {
     let stack_size = u32_at(b, HEADER_SIZE + 0x2C).map(|s| s as usize);
     if let (Some(off), Some(size)) = (stack, stack_size) {
         if let Some(bytes) = b.get(off..off.saturating_add(size.min(0x10000))) {
-            for chunk in bytes.chunks_exact(8) {
-                let v = u64::from_le_bytes(chunk.try_into().unwrap());
+            for chunk in bytes.as_chunks::<8>().0 {
+                let v = u64::from_le_bytes(*chunk);
                 if let Some(m) = owner(v) {
                     let lower = m.name.to_ascii_lowercase();
                     if !CORE.contains(&lower.as_str()) && !a.stack_drivers.contains(&m.name) {

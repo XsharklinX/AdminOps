@@ -183,7 +183,7 @@ pub fn open_remote_desktop(host: String) -> Result<(), String> {
 #[tauri::command]
 pub fn open_quick_assist() -> Result<(), String> {
     // La versión actual es una app de la Store con su propio protocolo.
-    std::process::Command::new("explorer.exe").arg("ms-quick-assist:").spawn().map(|_| ()).map_err(|e| e.to_string())
+    crate::shellopen::open("ms-quick-assist:")
 }
 
 // ---------- Carpetas compartidas ----------

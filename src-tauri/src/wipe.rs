@@ -192,7 +192,7 @@ pub fn open_ms_settings(uri: String) -> Result<(), String> {
     if !ok {
         return Err("Dirección no permitida.".into());
     }
-    std::process::Command::new("explorer.exe").arg(uri).spawn().map(|_| ()).map_err(|e| e.to_string())
+    crate::shellopen::open(&uri)
 }
 
 #[cfg(test)]

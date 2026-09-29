@@ -787,8 +787,8 @@ pub fn open_device_page(ip: String) -> Result<(), String> {
     if !private_v4(addr) {
         return Err("Solo se abren direcciones de la red local.".into());
     }
-    // A través del Explorador: el navegador no hereda los permisos de administrador.
-    std::process::Command::new("explorer.exe").arg(format!("http://{addr}/")).spawn().map(|_| ()).map_err(|e| e.to_string())
+    // El navegador se abre como el usuario, sin los permisos de administrador.
+    crate::shellopen::open(&format!("http://{addr}/"))
 }
 
 /// Identificación a fondo de los dispositivos encontrados: tipo, fabricante, modelo…

@@ -62,6 +62,89 @@ pub struct Settings {
     pub check_updates: bool,
     /// Vigilar el Visor de eventos y avisar de errores típicos de Windows.
     pub watch_windows: bool,
+    /// Tipos de visita con su checklist (mantenimiento, equipo nuevo…).
+    pub visit_types: Vec<VisitType>,
+}
+
+/// Un tipo de visita y lo que hay que hacer en ella.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct VisitType {
+    pub name: String,
+    pub items: Vec<ChecklistTemplate>,
+}
+
+/// Punto de la checklist. `auto`: tarea de AdminOps que lo marca sola al hacerse
+/// (cleanup, updates, diagnostic…); vacío si se marca a mano.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChecklistTemplate {
+    pub text: String,
+    pub auto: String,
+}
+
+fn visit(name: &str, items: &[(&str, &str)]) -> VisitType {
+    VisitType { name: name.into(), items: items.iter().map(|(t, a)| ChecklistTemplate { text: (*t).into(), auto: (*a).into() }).collect() }
+}
+
+pub fn default_visit_types() -> Vec<VisitType> {
+    vec![
+        visit(
+            "Mantenimiento",
+            &[
+                ("Diagnóstico completo", "diagnostic"),
+                ("Punto de restauración", "restorepoint"),
+                ("Limpieza de temporales", "cleanup"),
+                ("Programas actualizados", "updates"),
+                ("Programas de inicio revisados", "startup"),
+                ("Análisis antivirus", "antivirus"),
+                ("Limpieza de polvo y ventiladores", ""),
+                ("Prueba de funcionamiento con el cliente", ""),
+            ],
+        ),
+        visit(
+            "Equipo nuevo",
+            &[
+                ("Quitar programas preinstalados (bloatware)", "bloatware"),
+                ("Instalar los programas del cliente", "install"),
+                ("Crear el usuario", "users"),
+                ("Unir al dominio", "domain"),
+                ("Ajustes de privacidad", "privacy"),
+                ("Windows y programas actualizados", "updates"),
+                ("Copia de seguridad de drivers", "drivers"),
+                ("Configurar correo e impresora", ""),
+                ("Entregar contraseñas al cliente", ""),
+            ],
+        ),
+        visit(
+            "Equipo lento",
+            &[
+                ("Diagnóstico completo", "diagnostic"),
+                ("Programas de inicio revisados", "startup"),
+                ("Limpieza de temporales", "cleanup"),
+                ("Ajustes de rendimiento", "performance"),
+                ("Programas actualizados", "updates"),
+                ("Análisis antivirus", "antivirus"),
+                ("Revisar temperaturas y disco", ""),
+            ],
+        ),
+        visit(
+            "Sin Internet o red",
+            &[
+                ("Reparar la red", "network"),
+                ("Revisar cable, Wi-Fi y router", ""),
+                ("Comprobar navegación y correo", ""),
+            ],
+        ),
+        visit(
+            "Copia o traspaso de datos",
+            &[
+                ("Copia de los datos del usuario", "backup"),
+                ("Comprobar que la copia se abre", ""),
+                ("Restaurar en el equipo nuevo", ""),
+            ],
+        ),
+    ]
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -119,6 +202,7 @@ impl Default for Settings {
             auto_cleanup_months: 0,
             check_updates: true,
             watch_windows: true,
+            visit_types: default_visit_types(),
         }
     }
 }
@@ -466,6 +550,9 @@ pub struct SessionRecord {
     pub signed: bool,
     /// Cifras del equipo al terminar, para comparar visitas.
     pub metrics: Option<VisitMetrics>,
+    pub visit_type: String,
+    /// Contacto de la agenda que pidió el trabajo.
+    pub contact_id: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -525,6 +612,35 @@ pub struct Client {
     pub machines: Vec<Machine>,
     pub sessions: Vec<SessionRecord>,
     pub network: Option<NetworkMap>,
+    /// Cómo quiere este cliente sus informes.
+    pub report: ClientReport,
+}
+
+/// Plantilla de informe de un cliente: formato, presentación y el correo con el
+/// que se le envía. Los textos admiten {cliente}, {contacto}, {numero}, {fecha},
+/// {equipo}, {empresa} y {tecnico}.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ClientReport {
+    /// Formato por defecto (`None`: el de siempre, para el cliente).
+    pub template: Option<Template>,
+    /// Texto que va al principio del informe.
+    pub intro: String,
+    /// Destinatarios además del correo del cliente (separados por comas).
+    pub to: String,
+    pub subject: String,
+    pub body: String,
+}
+
+impl ClientReport {
+    fn cleaned(mut self) -> Self {
+        let cut = |s: &str, n: usize| s.trim().chars().take(n).collect::<String>();
+        self.intro = cut(&self.intro, 1500);
+        self.to = cut(&self.to, 400);
+        self.subject = cut(&self.subject, 200);
+        self.body = cut(&self.body, 4000);
+        self
+    }
 }
 
 fn clients_path(app: &tauri::AppHandle) -> PathBuf {
@@ -566,10 +682,11 @@ pub fn save_client(app: tauri::AppHandle, client: Client) -> Result<Client, Stri
             existing.email = client.email;
             existing.address = client.address;
             existing.notes = client.notes;
+            existing.report = client.report.cleaned();
             existing.clone()
         }
         None => {
-            let c = Client { id: new_id(), name: client.name.trim().into(), created: now(), machines: vec![], sessions: vec![], network: None, ..client };
+            let c = Client { id: new_id(), name: client.name.trim().into(), created: now(), machines: vec![], sessions: vec![], network: None, report: client.report.clone().cleaned(), ..client };
             all.push(c.clone());
             c
         }
@@ -646,6 +763,127 @@ fn upsert_machine(c: &mut Client, d: &diagnostics::Diagnostics, since: u64) -> O
     }
 }
 
+/// Un dato del equipo que cambió entre dos momentos.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Change {
+    pub label: String,
+    pub before: String,
+    pub after: String,
+    /// ¿Ha ido a mejor? `None` si no es ni mejor ni peor (p. ej. otra versión de Windows).
+    pub better: Option<bool>,
+}
+
+/// Qué cambió en un equipo del cliente desde la visita anterior.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MachineChanges {
+    pub host: String,
+    /// Fecha de la visita con la que se compara.
+    pub since: u64,
+    /// Fecha del estado actual (ahora si `live`, o la última visita).
+    pub until: u64,
+    /// `true`: se compara con cómo está este equipo ahora mismo.
+    pub live: bool,
+    pub changes: Vec<Change>,
+}
+
+/// Compara las cifras de dos momentos. Solo lo que cambia de verdad: medio GB
+/// de disco o un par de segundos de arranque son ruido.
+pub fn metric_changes(a: &VisitMetrics, b: &VisitMetrics) -> Vec<Change> {
+    let mut out = Vec::new();
+    let mut push = |label: &str, before: String, after: String, better: Option<bool>| out.push(Change { label: label.into(), before, after, better });
+    let gb = |x: u64| format!("{:.0} GB", x as f64 / 1024f64.powi(3));
+    if (a.bad, a.warn) != (b.bad, b.warn) {
+        let worse = b.bad > a.bad || (b.bad == a.bad && b.warn > a.warn);
+        push("Problemas", format!("{} graves, {} avisos", a.bad, a.warn), format!("{} graves, {} avisos", b.bad, b.warn), Some(!worse));
+    }
+    if let (Some(x), Some(y)) = (a.security, b.security) {
+        if x.abs_diff(y) >= 5 {
+            push("Nota de seguridad", x.to_string(), y.to_string(), Some(y > x));
+        }
+    }
+    if let (Some(x), Some(y)) = (a.sys_free, b.sys_free) {
+        if x.abs_diff(y) >= 5 * 1024u64.pow(3) {
+            push("Espacio libre en el disco del sistema", gb(x), gb(y), Some(y > x));
+        }
+    }
+    if let (Some(x), Some(y)) = (a.startup, b.startup) {
+        if x.abs_diff(y) >= 2 {
+            push("Programas que arrancan con Windows", x.to_string(), y.to_string(), Some(y < x));
+        }
+    }
+    if let (Some(x), Some(y)) = (a.updates, b.updates) {
+        if x.abs_diff(y) >= 3 {
+            push("Programas con versión nueva", x.to_string(), y.to_string(), Some(y < x));
+        }
+    }
+    if let (Some(x), Some(y)) = (a.boot_ms, b.boot_ms) {
+        // Diferencias de menos de 5 s o del 20 % son normales entre arranques.
+        if x.abs_diff(y) >= 5000 && x.abs_diff(y) * 5 >= x.max(1) {
+            push("Arranque", format!("{:.0} s", x as f64 / 1000.0), format!("{:.0} s", y as f64 / 1000.0), Some(y < x));
+        }
+    }
+    if a.ram_total > 0 && b.ram_total > 0 && a.ram_total.abs_diff(b.ram_total) >= 512 * 1024 * 1024 {
+        push("Memoria RAM", gb(a.ram_total), gb(b.ram_total), Some(b.ram_total > a.ram_total));
+    }
+    if let (Some(x), Some(y)) = (a.battery_health, b.battery_health) {
+        if (x - y).abs() >= 5.0 {
+            push("Salud de la batería", format!("{x:.0} %"), format!("{y:.0} %"), Some(y > x));
+        }
+    }
+    out
+}
+
+/// Visitas de un equipo con cifras guardadas, la más reciente primero.
+fn visits_of<'a>(c: &'a Client, host: &str) -> Vec<&'a SessionRecord> {
+    let mut v: Vec<&SessionRecord> = c.sessions.iter().filter(|s| s.host.eq_ignore_ascii_case(host) && s.metrics.is_some()).collect();
+    v.sort_by_key(|s| std::cmp::Reverse(s.ended));
+    v
+}
+
+/// Qué cambió en cada equipo del cliente. En este equipo se compara la última
+/// visita con cómo está ahora (según el último diagnóstico); en los demás, las
+/// dos últimas visitas entre sí.
+pub fn client_changes(c: &Client, live: Option<&diagnostics::Diagnostics>) -> Vec<MachineChanges> {
+    let mut out = Vec::new();
+    for m in &c.machines {
+        let visits = visits_of(c, &m.host);
+        let Some(last) = visits.first() else { continue };
+        let last_metrics = last.metrics.clone().unwrap_or_default();
+        let here = live.filter(|d| d.host.eq_ignore_ascii_case(&m.host) && d.timestamp > last.ended);
+        let entry = if let Some(d) = here {
+            let mut changes = metric_changes(&last_metrics, &VisitMetrics::from(d));
+            if !m.os.is_empty() && !d.os.is_empty() && m.os != d.os {
+                changes.insert(0, Change { label: "Windows".into(), before: m.os.clone(), after: d.os.clone(), better: None });
+            }
+            let hw = d.hardware.data.as_ref().map(|h| h.summary()).unwrap_or_default();
+            if !m.hardware.is_empty() && !hw.is_empty() && m.hardware != hw {
+                changes.insert(0, Change { label: "Hardware".into(), before: m.hardware.clone(), after: hw, better: None });
+            }
+            MachineChanges { host: m.host.clone(), since: last.ended, until: d.timestamp, live: true, changes }
+        } else if let Some(prev) = visits.get(1) {
+            let mut changes = metric_changes(&prev.metrics.clone().unwrap_or_default(), &last_metrics);
+            if let Some(hc) = &last.hardware_change {
+                let (before, after) = hc.split_once(" → ").unwrap_or(("", hc));
+                changes.insert(0, Change { label: "Hardware".into(), before: before.into(), after: after.into(), better: None });
+            }
+            MachineChanges { host: m.host.clone(), since: prev.ended, until: last.ended, live: false, changes }
+        } else {
+            continue;
+        };
+        out.push(entry);
+    }
+    out
+}
+
+#[tauri::command(async)]
+pub fn visit_changes(app: tauri::AppHandle, client_id: String) -> Result<Vec<MachineChanges>, String> {
+    let c = find_client(&app, &client_id).ok_or("Cliente no encontrado.")?;
+    let live = diagnostics::latest_snapshot(&app);
+    Ok(client_changes(&c, live.as_ref()))
+}
+
 /// Añade (o actualiza) este equipo en el inventario de un cliente, sin sesión de servicio.
 /// Usa el último diagnóstico si es reciente; si no, hace uno.
 #[tauri::command(async)]
@@ -656,7 +894,7 @@ pub fn inventory_add_this(app: tauri::AppHandle, state: State<'_, TweakState>, c
         None => {
             let task = crate::task::Task::new(&app, "inventory");
             task.step("Analizando este equipo…");
-            diagnostics::run_and_save(&app, &state)
+            diagnostics::run_and_save(&app, &state, false)
         }
     };
     let mut all = load_clients(&app);
@@ -692,6 +930,8 @@ pub fn save_network_map(app: tauri::AppHandle, client_id: String, map: NetworkMa
 pub struct ChecklistItem {
     pub text: String,
     pub done: bool,
+    /// Tarea que la marca sola (ver `ChecklistTemplate`).
+    pub auto: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -717,6 +957,10 @@ pub struct ActiveSession {
     pub signer: String,
     pub labor_warranty_days: u32,
     pub maintenance_months: u32,
+    /// Tipo de visita elegido al empezar.
+    pub visit_type: String,
+    /// Contacto de la agenda que pidió el trabajo.
+    pub contact_id: String,
 }
 
 /// Análisis «antes» de la sesión en curso (no se borra al limpiar datos antiguos).
@@ -738,15 +982,26 @@ pub fn get_session(app: tauri::AppHandle) -> Option<ActiveSession> {
 }
 
 #[tauri::command(async)]
-pub fn start_session(app: tauri::AppHandle, state: State<'_, TweakState>, client_id: String) -> Result<ActiveSession, String> {
+pub fn start_session(
+    app: tauri::AppHandle,
+    state: State<'_, TweakState>,
+    client_id: String,
+    visit_type: Option<String>,
+    contact_id: Option<String>,
+) -> Result<ActiveSession, String> {
     if load_session(&app).is_some() {
         return Err("Ya hay una sesión en curso en este equipo.".into());
     }
     let client = find_client(&app, &client_id).ok_or("Cliente no encontrado.")?;
     let task = crate::task::Task::new(&app, "session");
     task.step("Diagnóstico inicial (antes de trabajar)…");
-    let before = diagnostics::run_and_save(&app, &state);
+    let before = diagnostics::run_and_save(&app, &state, false);
     let st = settings(&app);
+    let visit = visit_type.as_deref().and_then(|v| st.visit_types.iter().find(|t| t.name == v));
+    let checklist = match visit {
+        Some(v) => v.items.iter().map(|i| ChecklistItem { text: i.text.clone(), done: false, auto: i.auto.clone() }).collect(),
+        None => st.checklist.iter().map(|text| ChecklistItem { text: text.clone(), done: false, auto: String::new() }).collect(),
+    };
     let session = ActiveSession {
         id: new_id(),
         client_id: client.id,
@@ -754,7 +1009,10 @@ pub fn start_session(app: tauri::AppHandle, state: State<'_, TweakState>, client
         host: before.host.clone(),
         started: now(),
         baseline: before.timestamp,
-        checklist: st.checklist.into_iter().map(|text| ChecklistItem { text, done: false }).collect(),
+        checklist,
+        visit_type: visit.map(|v| v.name.clone()).unwrap_or_default(),
+        contact_id: contact_id.unwrap_or_default(),
+        template: client.report.template.unwrap_or_default(),
         signer: client.contact,
         labor_warranty_days: st.labor_warranty_days,
         maintenance_months: st.maintenance_months,
@@ -782,6 +1040,7 @@ pub fn update_session(app: tauri::AppHandle, session: ActiveSession) -> Result<(
     s.signer = session.signer;
     s.labor_warranty_days = session.labor_warranty_days.min(3650);
     s.maintenance_months = session.maintenance_months.min(60);
+    s.contact_id = session.contact_id;
     crate::paths::write_json(&session_path(&app), &s)
 }
 
@@ -797,7 +1056,7 @@ pub fn finish_session(app: tauri::AppHandle, state: State<'_, TweakState>) -> Re
     let s = load_session(&app).ok_or("No hay ninguna sesión en curso.")?;
     let task = crate::task::Task::new(&app, "session");
     task.step("Diagnóstico final (después del trabajo)…");
-    let after = diagnostics::run_and_save(&app, &state);
+    let after = diagnostics::run_and_save(&app, &state, false);
     let before = diagnostics::load_snapshot(&app, s.baseline);
     let client = find_client(&app, &s.client_id);
     let st = settings(&app);
@@ -848,6 +1107,8 @@ pub fn finish_session(app: tauri::AppHandle, state: State<'_, TweakState>) -> Re
         next_maintenance,
         signed: s.signature.is_some(),
         metrics: Some(VisitMetrics::from(&after)),
+        visit_type: s.visit_type.clone(),
+        contact_id: s.contact_id.clone(),
     };
     archive_visit(&app, &s.client_id, &after, record)?;
     let _ = std::fs::remove_file(session_path(&app));
@@ -920,6 +1181,52 @@ pub fn import_config(app: tauri::AppHandle) -> Result<Option<serde_json::Value>,
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn client_report_is_optional_and_trimmed() {
+        // Fichas antiguas, sin plantilla de informe.
+        let c: Client = serde_json::from_str(r#"{"id":"c1","name":"Ana"}"#).unwrap();
+        assert_eq!(c.report, ClientReport::default());
+        let r = ClientReport { intro: format!("  {}  ", "x".repeat(2000)), subject: " Hola ".into(), template: Some(Template::Technical), ..Default::default() }.cleaned();
+        assert_eq!((r.intro.len(), r.subject.as_str(), r.template), (1500, "Hola", Some(Template::Technical)));
+    }
+
+    #[test]
+    fn metric_changes_skip_noise_and_rate_direction() {
+        let g = 1024u64.pow(3);
+        let a = VisitMetrics { bad: 2, warn: 3, security: Some(60), sys_free: Some(40 * g), startup: Some(12), updates: Some(8), boot_ms: Some(40_000), ram_total: 8 * g, battery_health: Some(90.0), ..Default::default() };
+        let same = VisitMetrics { sys_free: Some(40 * g + g / 2), boot_ms: Some(41_000), ..a.clone() };
+        assert!(metric_changes(&a, &same).is_empty());
+        let b = VisitMetrics { bad: 0, warn: 1, security: Some(80), sys_free: Some(20 * g), startup: Some(6), ram_total: 16 * g, ..a.clone() };
+        let c = metric_changes(&a, &b);
+        let find = |l: &str| c.iter().find(|x| x.label == l).cloned();
+        assert_eq!(find("Problemas").and_then(|x| x.better), Some(true));
+        assert_eq!(find("Nota de seguridad").and_then(|x| x.better), Some(true));
+        assert_eq!(find("Espacio libre en el disco del sistema").and_then(|x| x.better), Some(false));
+        assert_eq!(find("Programas que arrancan con Windows").and_then(|x| x.better), Some(true));
+        assert_eq!(find("Memoria RAM").map(|x| x.after), Some("16 GB".to_string()));
+        assert!(find("Arranque").is_none());
+    }
+
+    #[test]
+    fn client_changes_between_last_two_visits() {
+        let m = |bad| Some(VisitMetrics { bad, ..Default::default() });
+        let c = Client {
+            machines: vec![Machine { host: "PC1".into(), ..Default::default() }, Machine { host: "PC2".into(), ..Default::default() }],
+            sessions: vec![
+                SessionRecord { host: "PC1".into(), ended: 100, metrics: m(1), ..Default::default() },
+                SessionRecord { host: "pc1".into(), ended: 200, metrics: m(3), hardware_change: Some("8 GB → 16 GB".into()), ..Default::default() },
+                SessionRecord { host: "PC2".into(), ended: 150, metrics: m(0), ..Default::default() },
+            ],
+            ..Default::default()
+        };
+        let r = client_changes(&c, None);
+        // PC2 solo tiene una visita: no hay con qué comparar.
+        assert_eq!(r.len(), 1);
+        assert_eq!((r[0].since, r[0].until, r[0].live), (100, 200, false));
+        assert_eq!(r[0].changes[0].label, "Hardware");
+        assert_eq!(r[0].changes[1].better, Some(false));
+    }
 
     #[test]
     fn default_settings_include_a_checklist() {

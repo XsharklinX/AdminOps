@@ -103,25 +103,41 @@ pub fn app_catalog(app: tauri::AppHandle) -> AppCatalogView {
     AppCatalogView { apps: CAT.app.clone(), presets: CAT.list.clone(), lists: crate::paths::read_json(&lists_path(&app)) }
 }
 
+/// `winget export` tarda: el resultado se reutiliza unos minutos y se olvida al
+/// instalar, actualizar o desinstalar algo.
+static INSTALLED: std::sync::Mutex<Option<(std::time::Instant, Vec<String>)>> = std::sync::Mutex::new(None);
+
+pub fn invalidate_installed() {
+    *INSTALLED.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 /// Ids de winget instalados en el equipo (vía `winget export`, independiente del idioma).
 #[tauri::command(async)]
 pub fn installed_apps() -> Result<Vec<String>, String> {
+    if let Some((t, v)) = INSTALLED.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if t.elapsed() < Duration::from_secs(10 * 60) {
+            return Ok(v.clone());
+        }
+    }
     let file = std::env::temp_dir().join(format!("adminops-winget-{}.json", std::process::id()));
     let script = format!(
         "$f = '{}'\nwinget export -o $f --accept-source-agreements --disable-interactivity | Out-Null\n\
          if (Test-Path $f) {{ Get-Content $f -Raw -Encoding UTF8; Remove-Item $f -Force }} else {{ '{{}}' }}",
         file.display()
     );
-    let out = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(180)), task: None })
+    // Proceso propio: winget tarda y no debe ocupar el PowerShell compartido de la app.
+    let out = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(180)), task: Some("apps-installed") })
         .map_err(winget_missing)?;
     let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| format!("Respuesta inesperada de winget: {e}"))?;
-    Ok(v["Sources"]
+    let ids: Vec<String> = v["Sources"]
         .as_array()
         .into_iter()
         .flatten()
         .flat_map(|s| s["Packages"].as_array().cloned().unwrap_or_default())
         .filter_map(|p| p["PackageIdentifier"].as_str().map(String::from))
-        .collect())
+        .collect();
+    *INSTALLED.lock().unwrap_or_else(|e| e.into_inner()) = Some((std::time::Instant::now(), ids.clone()));
+    Ok(ids)
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -156,7 +172,7 @@ pub fn search_apps(query: String) -> Result<Vec<SearchResult>, String> {
         "winget search --query '{}' --count 40 --accept-source-agreements --disable-interactivity | Out-String",
         q.replace('\'', "''")
     );
-    let out = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: None })
+    let out = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: Some("apps-search") })
         .map_err(winget_missing)?;
     Ok(parse_search(&out))
 }
@@ -210,6 +226,7 @@ pub fn install_apps(app: tauri::AppHandle, apps: Vec<CatalogApp>, state: State<'
         state.record(Op::Run, &format!("Instalar {}", a.name), &r);
         results.push(InstallResult { ok: r.is_ok(), message: r.unwrap_or_else(|e| e), id: a.id, name: a.name });
     }
+    invalidate_installed();
     Ok(results)
 }
 

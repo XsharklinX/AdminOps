@@ -109,3 +109,13 @@
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Barra de carga de los portales (indeterminada). */
+@keyframes portalbar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}

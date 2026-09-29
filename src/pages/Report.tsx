@@ -1,9 +1,9 @@
-import { ExternalLink, FileText, FolderOpen, Loader2, Mail, Receipt } from "lucide-react";
+import { ExternalLink, FileText, FolderOpen, Loader2, Mail, Receipt, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { BillingEditor, SendReportModal, TemplatePicker } from "../components/service";
-import { Button, Card, inputClass } from "../components/ui";
-import { diagApi, EMPTY_BILLING, workApi, type Billing, type Client, type Settings, type SnapshotInfo, type Template } from "../lib/api";
+import { Button, Card, inputClass, Loading } from "../components/ui";
+import { diagApi, EMPTY_BILLING, tweaksApi, workApi, type Billing, type Client, type Settings, type SnapshotInfo, type Template } from "../lib/api";
 
 const TECH_KEY = "adminops.technician";
 
@@ -55,8 +55,27 @@ export function Report() {
   }, []);
 
   const picked = clients.find((c) => c.id === clientId) ?? null;
+  // Al elegir un cliente se propone el formato de su plantilla.
+  useEffect(() => {
+    if (picked) setTemplate(picked.report?.template ?? "client");
+  }, [picked?.id]);
 
-  const generate = async () => {
+  // Entrega rápida: lo hecho hoy con AdminOps pasa a las observaciones.
+  const todayWork = async () => {
+    const today = new Date().setHours(0, 0, 0, 0) / 1000;
+    const j = await tweaksApi.journal();
+    const done = j.filter((e) => e.timestamp >= today && e.ok && e.op !== "restorePoint" && e.op !== "revert" && !e.reverted).reverse();
+    return done.length ? `Trabajo realizado hoy:\n${done.map((e) => `- ${e.title}`).join("\n")}` : "";
+  };
+
+  const quickHandover = async () => {
+    const work = await todayWork().catch(() => "");
+    const merged = [notes.trim(), work].filter(Boolean).join("\n\n");
+    setNotes(merged);
+    await generate(merged);
+  };
+
+  const generate = async (notesOverride?: string) => {
     try {
       localStorage.setItem(TECH_KEY, technician);
     } catch {
@@ -72,7 +91,7 @@ export function Report() {
         technician: technician.trim(),
         clientId: picked?.id ?? null,
         client: picked ? picked.name : client.trim(),
-        notes,
+        notes: notesOverride ?? notes,
         template,
         billing,
         problem,
@@ -99,6 +118,16 @@ export function Report() {
 
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+      <div className="col-span-12 flex flex-wrap items-center gap-3 rounded-xl border border-neon/30 bg-neon/5 px-4 py-3">
+        <Zap size={16} className="shrink-0 text-neon" />
+        <p className="min-w-0 flex-1 text-sm text-dim">
+          <span className="font-medium text-ink">Entrega rápida:</span> añade a las observaciones todo lo hecho hoy con AdminOps y genera el informe comparando con el primer
+          diagnóstico de hoy. Rellena antes el cliente si quieres.
+        </p>
+        <Button onClick={quickHandover} disabled={busy !== null}>
+          <Zap size={13} /> Generar entrega de hoy
+        </Button>
+      </div>
       <Card title="Datos del informe" icon={<FileText size={14} />} className="col-span-12 lg:col-span-7">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -142,7 +171,7 @@ export function Report() {
           trabajo realizado desde entonces.
         </p>
         {snapshots === null ? (
-          <p className="font-mono text-xs text-mute">Cargando…</p>
+          <Loading />
         ) : snapshots.length === 0 ? (
           <p className="text-xs text-warn">Aún no hay análisis guardados. Ejecuta un diagnóstico antes de empezar a trabajar para tener el "antes".</p>
         ) : (
@@ -186,7 +215,7 @@ export function Report() {
             </button>
           </div>
         )}
-        <Button onClick={generate} disabled={busy !== null}>
+        <Button onClick={() => generate()} disabled={busy !== null}>
           {busy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
           {busy ?? "Generar informe PDF"}
         </Button>

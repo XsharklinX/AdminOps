@@ -4,13 +4,15 @@ import { useConfirm, useToast } from "../components/feedback";
 import { inventoryLines, MachineActions, VerdictChip } from "../components/inventory";
 import { SendReportModal } from "../components/service";
 import { Button, Card, inputClass } from "../components/ui";
-import { diagApi, workApi, type Client, type SessionRecord, type VisitMetrics } from "../lib/api";
+import { VisitChanges } from "../components/VisitChanges";
+import { contactsApi, diagApi, EMPTY_CLIENT_REPORT, workApi, type Client, type ClientReport, type Contact, type SessionRecord, type VisitMetrics } from "../lib/api";
 import { bytes, money } from "../lib/format";
 
 const DAY = 86400;
 const date = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { dateStyle: "medium" });
-const now = () => Date.now() / 1000;
-const EMPTY = { id: "", name: "", contact: "", phone: "", email: "", address: "", notes: "", created: 0, machines: [], sessions: [], network: null } as Client;
+// Segundos enteros: el backend guarda las fechas como u64.
+const now = () => Math.floor(Date.now() / 1000);
+const EMPTY = { id: "", name: "", contact: "", phone: "", email: "", address: "", notes: "", created: 0, machines: [], sessions: [], network: null, report: EMPTY_CLIENT_REPORT } as Client;
 
 /** Próximo mantenimiento del cliente (el de su última visita). */
 const nextOf = (c: Client) => c.sessions[0]?.nextMaintenance ?? null;
@@ -35,7 +37,14 @@ export function Clients() {
   const [form, setForm] = useState<Client>(EMPTY);
   const [query, setQuery] = useState("");
   const [sending, setSending] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const toast = useToast();
+  useEffect(() => {
+    contactsApi
+      .list()
+      .then((l) => setContacts(l.filter((c) => !c.deleted)))
+      .catch(() => {});
+  }, []);
   const { confirm, dialog } = useConfirm();
 
   const load = useCallback(async () => {
@@ -196,6 +205,7 @@ export function Clients() {
                   <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className={`${inputClass} resize-y`} />
                 </label>
               </div>
+              <ClientReportFields value={form.report ?? EMPTY_CLIENT_REPORT} onChange={(report) => setForm({ ...form, report })} />
               <div className="mt-4 flex items-center justify-between">
                 {form.id ? (
                   <button onClick={remove} className="flex items-center gap-1 text-xs text-mute hover:text-bad">
@@ -212,6 +222,7 @@ export function Clients() {
 
             {form.id && (
               <>
+                <ClientContacts people={contacts.filter((c) => c.clientId === form.id)} />
                 {(nextOf(form) !== null || warranties.length > 0) && (
                   <Card title="Mantenimiento y garantías" icon={<ShieldCheck size={14} />}>
                     {nextOf(form) !== null && (
@@ -264,6 +275,8 @@ export function Clients() {
                     </ul>
                   </Card>
                 )}
+
+                {form.id && <VisitChanges clientId={form.id} refresh={form.sessions.length} />}
 
                 <Card title={`Equipos · ${form.machines.length}`} icon={<Monitor size={14} />}>
                   {form.machines.length === 0 ? (
@@ -319,6 +332,12 @@ export function Clients() {
                             {s.number && <span className="font-mono text-[11px] text-mute">Nº {s.number}</span>}
                             <span className="font-mono text-xs text-dim">{s.host}</span>
                             <span className="text-xs text-dim">{s.workItems} cambios</span>
+                            {s.visitType && <span className="text-xs text-dim">{s.visitType}</span>}
+                            {s.contactId && contacts.find((c) => c.id === s.contactId) && (
+                              <span className="flex items-center gap-1 text-xs text-dim" title="Quién pidió el trabajo">
+                                <UserRound size={11} /> {contacts.find((c) => c.id === s.contactId)!.name}
+                              </span>
+                            )}
                             {s.docKind !== "none" && (
                               <span className="text-xs text-dim">
                                 {DOC[s.docKind]} · {money(s.total, s.currency)}
@@ -385,6 +404,90 @@ const ROWS: Row[] = [
 ];
 
 /** Cómo ha evolucionado el equipo del cliente de una visita a otra. */
+/** Personas de la agenda enlazadas a este cliente (se enlazan desde Contactos). */
+function ClientContacts({ people }: { people: Contact[] }) {
+  const toast = useToast();
+  if (!people.length) return null;
+  return (
+    <Card title={`Contactos · ${people.length}`} icon={<UserRound size={14} />}>
+      <ul className="grid gap-x-6 gap-y-1 md:grid-cols-2">
+        {people.map((c) => {
+          const reach = c.extension ? `ext. ${c.extension}` : c.phone || c.mobile || c.email;
+          return (
+            <li key={c.id} className="flex items-center gap-2 py-1 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="text-ink">{c.name}</span>
+                {(c.role || c.reason) && <span className="block truncate text-[11px] text-mute">{[c.role, c.reason && `para: ${c.reason}`].filter(Boolean).join(" · ")}</span>}
+              </span>
+              {reach && (
+                <button
+                  onClick={() => navigator.clipboard.writeText(c.extension || c.phone || c.mobile || c.email).then(() => toast("ok", "Copiado."))}
+                  className="font-mono text-xs text-dim hover:text-neon"
+                  title="Copiar"
+                >
+                  {reach}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
+/** Plantilla de informe de este cliente: formato, presentación y el correo con el que se le envía. */
+function ClientReportFields({ value, onChange }: { value: ClientReport; onChange: (v: ClientReport) => void }) {
+  const custom = !!(value.template || value.intro || value.to || value.subject || value.body);
+  return (
+    <details className="mt-4 rounded-lg border border-line px-3 py-2" open={custom}>
+      <summary className="cursor-pointer text-xs text-dim select-none">
+        Plantilla de informe de este cliente {custom ? <span className="text-neon">· personalizada</span> : <span className="text-mute">· la de siempre</span>}
+      </summary>
+      <div className="mt-3 space-y-3">
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Formato</span>
+          <select value={value.template ?? ""} onChange={(e) => onChange({ ...value, template: (e.target.value || null) as ClientReport["template"] })} className={inputClass}>
+            <option value="">Para el cliente (resumen claro)</option>
+            <option value="technical">Técnico (todo el detalle)</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Presentación (va al principio del informe)</span>
+          <textarea
+            value={value.intro}
+            onChange={(e) => onChange({ ...value, intro: e.target.value })}
+            rows={3}
+            placeholder="Mantenimiento trimestral según el contrato de soporte. Equipos revisados de la oficina de {cliente}."
+            className={`${inputClass} resize-y`}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Enviar también a</span>
+          <input value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} placeholder="gerencia@cliente.com, contabilidad@cliente.com" className={inputClass} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Asunto del correo</span>
+          <input value={value.subject} onChange={(e) => onChange({ ...value, subject: e.target.value })} placeholder="Informe Nº {numero} · Mantenimiento de {cliente}" className={inputClass} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Mensaje del correo</span>
+          <textarea
+            value={value.body}
+            onChange={(e) => onChange({ ...value, body: e.target.value })}
+            rows={5}
+            placeholder={"Hola {contacto}:\n\nAdjunto el informe del mantenimiento del {fecha}.\n\nUn saludo,\n{tecnico}"}
+            className={`${inputClass} resize-y`}
+          />
+        </label>
+        <p className="text-[11px] text-mute">
+          Campos que se rellenan solos: {"{cliente} {contacto} {numero} {fecha} {empresa} {tecnico}"}. Vacío = el texto de siempre. Se guarda con «Guardar».
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function Evolution({ sessions }: { sessions: SessionRecord[] }) {
   const visits = sessions.filter((s) => s.metrics).slice(0, 5).reverse();
   if (visits.length < 2) return null;
@@ -416,9 +519,11 @@ function Evolution({ sessions }: { sessions: SessionRecord[] }) {
                 <td className="py-1.5 text-dim">{r.label}</td>
                 {visits.map((v, i) => {
                   const cur = r.get(v.metrics!);
-                  const prev = i > 0 ? r.get(visits[i - 1].metrics!) : null;
+                  // Se compara con la visita anterior del mismo equipo, no con la de otro.
+                  const before = visits.slice(0, i).reverse().find((x) => x.host.toLowerCase() === v.host.toLowerCase());
+                  const prev = before ? r.get(before.metrics!) : null;
                   return (
-                    <td key={v.id} className={`py-1.5 pl-3 text-right font-mono text-xs ${i === 0 ? "text-ink" : tone(r, cur, prev)}`}>
+                    <td key={v.id} className={`py-1.5 pl-3 text-right font-mono text-xs ${tone(r, cur, prev)}`}>
                       {cur === null ? "—" : r.fmt(cur)}
                     </td>
                   );
@@ -428,7 +533,7 @@ function Evolution({ sessions }: { sessions: SessionRecord[] }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-mute">Cifras al terminar cada visita. En verde lo que mejoró respecto a la anterior; en rojo lo que empeoró.</p>
+      <p className="mt-2 text-[11px] text-mute">Cifras al terminar cada visita. En verde lo que mejoró respecto a la visita anterior del mismo equipo; en rojo lo que empeoró.</p>
     </Card>
   );
 }

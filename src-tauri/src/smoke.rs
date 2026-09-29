@@ -76,12 +76,19 @@ mod tests {
         check("acceso remoto: estado", &mut f, crate::office::remote_status);
         check("acceso remoto: Escritorio remoto", &mut f, crate::remote::rdp_server);
         check("acceso remoto: herramientas", &mut f, || Ok::<_, String>(crate::remote::remote_tools()));
+        // 1.1.2
+        check("ficha del equipo", &mut f, crate::sheet::machine_sheet);
+        check("este equipo y esta red (notas)", &mut f, || {
+            let p = crate::library::this_place();
+            if p.machine.is_empty() { Err("sin clave de equipo") } else { Ok(p) }
+        });
+        check("comprobar puestos (este equipo)", &mut f, || crate::stations::check_stations(vec!["127.0.0.1".into()], false));
         // Solucionar problemas
         for s in ["internet", "wifi", "audio", "bluetooth", "display", "printer", "slow", "winupdate"] {
             check(&format!("solucionar: {s}"), &mut f, || crate::troubleshoot::troubleshoot_check(s.into()));
         }
 
-        println!("\n{} lecturas en {:.1} s, {} fallos", 49, total.elapsed().as_secs_f64(), f.len());
+        println!("\n{} lecturas en {:.1} s, {} fallos", 52, total.elapsed().as_secs_f64(), f.len());
         for x in &f {
             println!("  - {x}");
         }

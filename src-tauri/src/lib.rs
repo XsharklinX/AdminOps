@@ -1,4 +1,6 @@
+mod agenda;
 mod apps;
+mod boottime;
 mod diagnostics;
 mod domain;
 mod drivers;
@@ -38,7 +40,15 @@ mod applock;
 mod appcare;
 mod winwatch;
 mod remote;
+mod accounts;
+mod appbackup;
+mod audit;
 mod contacts;
+mod library;
+mod officemap;
+mod sheet;
+mod shellopen;
+mod stations;
 mod secrets;
 mod smoke;
 mod timeline;
@@ -48,6 +58,7 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    boottime::mark_start();
     // Un fallo inesperado queda en el registro (con dónde ocurrió) en lugar de perderse.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -67,9 +78,22 @@ pub fn run() {
         std::process::exit(maintenance::run_cli(&args));
     }
 
-    // Portable: la caché de WebView2 al USB (WebView2 respeta esta variable).
-    if let Some(dir) = paths::portable_webview_dir() {
+    // Carpeta de datos de WebView2 (WebView2 respeta esta variable). En portable
+    // va al USB; instalado, una carpeta propia y escribible por este usuario, para
+    // no depender de la de por defecto (que puede quedar de otro usuario y hacer
+    // que WebView2 no abra: «can't read and write to its data directory»).
+    if let Some(dir) = paths::portable_webview_dir().or_else(paths::installed_webview_dir) {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", dir);
+    }
+
+    let context = boottime::step("Configuración de la ventana", || tauri::generate_context!());
+    // Intranets de la empresa (p. ej. *.pgr.gob.do): el navegador interno entra
+    // con la cuenta de Windows sin pedir usuario y contraseña. Solo los dominios
+    // de los portales del técnico. Mismos argumentos para todas las vistas: WebView2
+    // no admite dos configuraciones distintas en la misma carpeta de datos.
+    if let Some(auth) = boottime::step("Portales con la cuenta de Windows", portals::integrated_auth_arg) {
+        let base = context.config().app.windows.first().and_then(|w| w.additional_browser_args.clone()).unwrap_or_default();
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", format!("{base} {auth}").trim());
     }
 
     tauri::Builder::default()
@@ -97,16 +121,17 @@ pub fn run() {
         .manage(metrics::MetricsState::new())
         .manage(processes::ProcessState::new())
         .setup(|app| {
-            pspool::warm_up();
+            boottime::step("Preparar PowerShell", pspool::warm_up);
             log::info!(
                 "AdminOps {} iniciado · admin={} · portable={}",
                 app.package_info().version,
                 elevation::is_elevated(),
                 paths::is_portable()
             );
-            app.manage(tweaks::TweakState::new(app.handle()));
-            window_state::restore(app.handle());
-            let settings = workflow::settings(app.handle());
+            let state = boottime::step("Catálogo de ajustes e historial", || tweaks::TweakState::new(app.handle()));
+            app.manage(state);
+            boottime::step("Tamaño y posición de la ventana", || window_state::restore(app.handle()));
+            let settings = boottime::step("Ajustes", || workflow::settings(app.handle()));
             tweaks::set_restore_point_policy(&settings.restore_points);
             // Arranque con Windows: minimizada en la barra de tareas.
             if std::env::args().any(|a| a == "--minimized") {
@@ -114,8 +139,18 @@ pub fn run() {
                     let _ = w.minimize();
                 }
             }
+            // Carga en segundo plano los módulos de PowerShell más lentos (Defender,
+            // BitLocker), para que el primer diagnóstico del día no pague esa carga.
+            security::warm_up();
             // Vigilancia de errores de Windows (Ajustes → General).
-            winwatch::start(app.handle().clone());
+            boottime::step("Vigilancia de errores de Windows", || winwatch::start(app.handle().clone()));
+            // Vigilancia de dispositivos clave de la red (solo si hay alguno marcado).
+            boottime::step("Vigilancia de la red", || officemap::start(app.handle().clone()));
+            // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
+            agenda::start(app.handle().clone());
+            if std::env::args().any(|a| a == "--auditoria") {
+                audit::set(true);
+            }
             // Limpieza de datos antiguos, si está activada (en segundo plano).
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -123,10 +158,14 @@ pub fn run() {
                 let state = handle.state::<tweaks::TweakState>();
                 appcare::auto_cleanup(&handle, &state);
             });
+            boottime::step("Fin del arranque del programa", || ());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        // Modo auditoría: lo que cambia el equipo se rechaza en un único punto.
+        .invoke_handler(audit::guard(tauri::generate_handler![
             elevation::is_admin,
+            boottime::startup_timing,
+            boottime::log_timing,
             elevation::relaunch_as_admin,
             metrics::get_system_info,
             metrics::get_live_metrics,
@@ -136,6 +175,7 @@ pub fn run() {
             tweaks::revert_tweak,
             tweaks::revert_entry,
             tweaks::run_action,
+            tweaks::fix_finding,
             tweaks::get_journal,
             tweaks::create_restore_point,
             tweaks::list_restore_points,
@@ -171,6 +211,16 @@ pub fn run() {
             portals::portal_nav,
             portals::portal_open_window,
             portals::portal_open_external,
+            portals::portal_preload,
+            portals::portal_go,
+            portals::portal_zoom,
+            portals::portal_find,
+            portals::portal_login_get,
+            portals::portal_login_set,
+            portals::portal_compose,
+            portals::portal_sign_out,
+            portals::portal_download_open,
+            portals::portal_download_reveal,
             paths::read_log,
             support::support_package,
             paths::log_frontend_error,
@@ -187,6 +237,11 @@ pub fn run() {
             workflow::get_settings,
             workflow::save_settings,
             workflow::list_clients,
+            workflow::visit_changes,
+            agenda::list_agenda,
+            agenda::save_visit,
+            agenda::set_visit_status,
+            agenda::delete_visit,
             workflow::save_client,
             workflow::delete_client,
             workflow::get_session,
@@ -201,6 +256,9 @@ pub fn run() {
             space::reveal_in_explorer,
             software::list_software_updates,
             software::upgrade_software,
+            software::ignored_updates,
+            software::cached_software_updates,
+            software::set_update_ignored,
             apps::app_catalog,
             apps::installed_apps,
             apps::search_apps,
@@ -242,6 +300,8 @@ pub fn run() {
             programs::uninstall_program,
             programs::remove_leftovers,
             programs::remove_orphan_entry,
+            programs::scan_leftovers,
+            programs::repair_program,
             processes::list_processes,
             processes::kill_process,
             processes::open_process_location,
@@ -329,7 +389,19 @@ pub fn run() {
             timeline::machine_timeline,
             contacts::list_contacts,
             contacts::save_contact,
-            contacts::delete_contact,
+            contacts::touch_contact,
+            contacts::bulk_contacts,
+            contacts::merge_contacts,
+            contacts::contact_tag_colors,
+            contacts::set_contact_tag_color,
+            contacts::rename_contact_tag,
+            contacts::delete_contact_tag,
+            contacts::list_contact_backups,
+            contacts::backup_contacts_now,
+            contacts::restore_contact_backup,
+            contacts::open_teams,
+            contacts::call_number,
+            contacts::save_vcard,
             contacts::import_contacts,
             contacts::write_email,
             winwatch::mark_windows_alerts_read,
@@ -384,7 +456,31 @@ pub fn run() {
             tweaks::profiles::delete_custom_profile,
             tweaks::profiles::export_custom_profiles,
             tweaks::profiles::import_custom_profiles,
-        ])
-        .run(tauri::generate_context!())
+            library::library_list,
+            library::library_save,
+            library::library_delete,
+            library::library_touch,
+            library::this_place,
+            officemap::office_map,
+            officemap::save_device_meta,
+            officemap::refresh_device_ips,
+            officemap::watch_status,
+            stations::check_stations,
+            stations::station_action,
+            sheet::machine_sheet,
+            sheet::open_warranty,
+            appbackup::backup_app_data,
+            appbackup::restore_app_data,
+            appbackup::storage_health,
+            audit::audit_mode,
+            audit::set_audit_mode,
+            accounts::accounts_status,
+            accounts::leave_azure_ad,
+            accounts::remove_work_account,
+            accounts::office_sign_out,
+            accounts::delete_credential,
+            accounts::sign_out_windows,
+        ]))
+        .run(context)
         .expect("error while running tauri application");
 }

@@ -1,38 +1,15 @@
-import {
-  AlertTriangle,
-  ArrowRight,
-  Bluetooth,
-  CheckCircle2,
-  Gauge,
-  Globe,
-  Info,
-  Loader2,
-  Monitor,
-  Printer,
-  RefreshCw,
-  RefreshCcwDot,
-  Volume2,
-  Wifi,
-  Wrench,
-  XCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Info, Loader2, RefreshCw, Wrench, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { NAV, pageLabel, type PageId } from "../components/Sidebar";
+import { isPageId, pageLabel, type PageId } from "../components/Sidebar";
+import { Responsible } from "../components/Responsible";
 import { Card } from "../components/ui";
-import { troubleshootApi, type Symptom, type TroubleFinding, type TroubleFix } from "../lib/api";
+import { TweaksPage } from "./TweaksPage";
+import { troubleshootApi, type TroubleFinding, type TroubleFix } from "../lib/api";
+import { SYMPTOMS } from "../lib/symptoms";
+import type { Symptom } from "../lib/api";
 
-export const SYMPTOMS: { id: Symptom; title: string; hint: string; icon: LucideIcon; keywords: string }[] = [
-  { id: "internet", title: "No hay Internet", hint: "No cargan las webs, «sin Internet», cortes", icon: Globe, keywords: "red conexion internet navegar dns router proxy" },
-  { id: "wifi", title: "La Wi-Fi no funciona", hint: "No aparece, no conecta o se corta", icon: Wifi, keywords: "wifi wireless inalambrica tarjeta" },
-  { id: "audio", title: "No suena", hint: "Sin sonido, altavoz con una X, micrófono", icon: Volume2, keywords: "audio sonido altavoces auriculares microfono volumen" },
-  { id: "bluetooth", title: "Bluetooth", hint: "No aparece, no empareja o no conecta", icon: Bluetooth, keywords: "bluetooth auriculares raton teclado emparejar" },
-  { id: "display", title: "Pantalla o monitor", hint: "Monitor sin imagen, parpadeos, resolución", icon: Monitor, keywords: "pantalla monitor grafica video hdmi resolucion negra" },
-  { id: "printer", title: "No imprime", hint: "Cola atascada, sin conexión, predeterminada", icon: Printer, keywords: "impresora imprimir cola spooler" },
-  { id: "slow", title: "Va lento", hint: "Tarda en abrir, se congela, arranca lento", icon: Gauge, keywords: "lento lentitud rendimiento memoria cpu disco congelado" },
-  { id: "winupdate", title: "Windows Update falla", hint: "No actualiza, errores al instalar", icon: RefreshCcwDot, keywords: "actualizaciones windows update error parches" },
-];
+
 
 const LEVEL = {
   ok: { icon: CheckCircle2, color: "text-ok", border: "border-ok/30" },
@@ -41,7 +18,7 @@ const LEVEL = {
   bad: { icon: XCircle, color: "text-bad", border: "border-bad/40" },
 };
 
-const isPage = (p: string | null): p is PageId => !!p && NAV.some((n) => n.id === p);
+const isPage = isPageId;
 
 /** «Algo no funciona»: eliges el síntoma y AdminOps comprueba y ofrece las reparaciones. */
 export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean; focus: string | null; onNavigate: (p: PageId) => void }) {
@@ -69,6 +46,14 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
       if (n === seq.current) setChecking(false);
     }
   }, []);
+
+  // Enlaces a las reparaciones: «repairs» (la sección) o un ajuste concreto («repair.sfc»).
+  const repairFocus = focus && focus.startsWith("repair.") ? focus : null;
+  useEffect(() => {
+    if (focus === "repairs" || focus?.startsWith("repair.")) {
+      window.setTimeout(() => document.getElementById("repairs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+  }, [focus]);
 
   // Desde la búsqueda o un aviso: abre el síntoma y lo comprueba.
   useEffect(() => {
@@ -178,9 +163,20 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
               })}
             </ul>
           )}
+          {findings?.some((f) => f.level === "bad" || f.level === "warn") && <Responsible topic={current.id} className="mt-3 border-t border-line pt-3" />}
         </Card>
       )}
       {dialog}
+      {/* Reparaciones de Windows (antes, su propia página) */}
+      <section id="repairs" className="col-span-12 scroll-mt-4">
+        <h2 className="mb-1 flex items-center gap-2 text-[15px] font-semibold">
+          <Wrench size={15} className="text-neon" /> Reparaciones de Windows
+        </h2>
+        <p className="text-xs text-dim">Para cuando ya sabes qué falla: archivos del sistema (SFC, DISM), red, Windows Update, cola de impresión, Explorador, hora…</p>
+        <div className="-mx-6">
+          <TweaksPage category="repair" isAdmin={isAdmin} focus={repairFocus} />
+        </div>
+      </section>
     </div>
   );
 }

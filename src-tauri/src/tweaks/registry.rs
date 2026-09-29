@@ -83,7 +83,7 @@ pub fn raw_to_string(raw: &RawValue) -> Option<String> {
     if raw.vtype != 1 && raw.vtype != 2 {
         return None;
     }
-    let words: Vec<u16> = raw.bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+    let words: Vec<u16> = raw.bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
     let end = words.iter().position(|&w| w == 0).unwrap_or(words.len());
     Some(String::from_utf16_lossy(&words[..end]))
 }
