@@ -39,7 +39,7 @@ import { SheetPanel } from "../components/MachineSheetCard";
 import { Button, inputClass, Loading, Modal } from "../components/ui";
 import { lockApi, portalsApi, type Portal, type PortalAction } from "../lib/api";
 import { clearPortalError, lastPortalKey, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
-import { windowRect } from "../lib/prefs";
+import { getPrefs, windowRect } from "../lib/prefs";
 
 // Con el zoom de la interfaz aplicado: la vista web va en píxeles de la ventana.
 const rectOf = windowRect;
@@ -657,7 +657,7 @@ function Empty({ kind, onAdd }: { kind: PortalKind; onAdd: (preset?: Portal) => 
 
 function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; initial: Portal | null; onClose: () => void; onSaved: (p: Portal) => void }) {
   const mail = kind === "mail";
-  const [p, setP] = useState<Portal>(initial ?? { id: "", name: "", url: "", extraDomains: [], kind });
+  const [p, setP] = useState<Portal>(initial ?? { id: "", name: "", url: "", extraDomains: [], kind, zoom: getPrefs().portalZoom });
   // En el correo los dominios de Microsoft se añaden solos: aquí solo los propios.
   const [extra, setExtra] = useState((initial?.extraDomains ?? []).filter((d) => !mail || !/(microsoft|office|outlook|live|msauth|msftauth|sharepoint)/.test(d)).join(", "));
   const [user, setUser] = useState("");

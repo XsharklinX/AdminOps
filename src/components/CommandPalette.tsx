@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, pageLabel, type PageId } from "./Sidebar";
 import { useToast } from "./feedback";
 import { contactsApi, libraryApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
+import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -74,7 +75,11 @@ export function CommandPalette({
     if (!tweaksCache) tweaksApi.index().then((t) => setTweaks((tweaksCache = t))).catch(() => {});
     // Sin caché: la agenda cambia a menudo.
     contactsApi.list().then((l) => setContacts(l.filter((c) => !c.deleted))).catch(() => {});
-    libraryApi.list("solutions").then(setSolutions).catch(() => {});
+    // Las del técnico y las que trae AdminOps: Ctrl+K encuentra ambas.
+    libraryApi
+      .list("solutions")
+      .then((l) => setSolutions([...l, ...BUILTIN_SOLUTIONS]))
+      .catch(() => setSolutions(BUILTIN_SOLUTIONS));
     libraryApi.list("templates").then(setTemplates).catch(() => {});
   }, [open]);
 

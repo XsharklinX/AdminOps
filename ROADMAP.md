@@ -679,6 +679,35 @@ Pulido para el uso diario.
 - **Enviar el informe con el Correo de AdminOps**: deja el mensaje escrito y abre la carpeta del PDF
   para arrastrarlo (el correo web no permite adjuntar el archivo automáticamente).
 
+- **Barra lateral**: botón para acoplarla (solo iconos) y volver a abrirla, y ancho ajustable
+  arrastrando su borde (doble clic vuelve al ancho de Ajustes). El ancho se guarda.
+- **Menos secciones y menos páginas** (de 8 áreas y 44 páginas a 7 y 30):
+  - **Aplicaciones** (antes «Programas»): Actualizar, Windows Update, Instalar, Desinstalar y
+    Bloatware en pestañas.
+  - **Ajustes de Windows** se lleva «Inicio de Windows» como pestaña; el área «Mantener» desaparece
+    y la página pasa a «Equipo».
+  - **Herramientas y atajos**: las utilidades de Windows y los atajos de teclado, juntos.
+  - **Sesión de servicio** se lleva el «Informe» como pestaña.
+  - **Datos del equipo**: Copia de datos, Caja fuerte, Borrado seguro, Recuperar archivos y Control
+    parental en una sola página.
+  - **Cuentas y dominio**: las cuentas del equipo y el dominio de la empresa, juntos.
+  - **Impresoras y carpetas**: lo que la oficina comparte, en una sola página.
+  - Los enlaces antiguos siguen funcionando: cada uno lleva a su pestaña nueva.
+- **Soluciones** (antes «Conocimiento»): AdminOps trae 24 soluciones probadas paso a paso para los
+  problemas de soporte más habituales (sin Internet, impresora atascada, Windows Update que falla,
+  perfil temporal, pantallazos, Outlook que pide la contraseña, disco al 100 %, relación de
+  confianza del dominio…). Se buscan y se copian igual que las propias, salen en Ctrl+K y, para
+  cambiar una, se duplica.
+- **Ajustes rediseñados**:
+  - buscador que encuentra cualquier ajuste por su nombre o por lo que hace, sin tildes, y lleva a
+    su sección resaltando la fila;
+  - secciones en una columna a la izquierda, cada una con lo que hace;
+  - sección nueva **Portales y correo**: precarga, zoom por defecto, dominio de la empresa y, por
+    cada portal, sesión privada y entrar solo, con aviso si ninguno usa sesión privada.
+- **WebView2**: se quita `--in-process-gpu`. Se puso en la 0.7 para ahorrar un proceso al arrancar,
+  cuando la única vista era la interfaz; con los portales y el Correo dentro, hacía que todo el
+  trabajo gráfico pasara por el proceso principal y provocaba tirones con webs pesadas.
+
 ### Ideas nuevas (propuestas, sin fecha)
 
 **Taller y órdenes de trabajo**

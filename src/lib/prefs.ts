@@ -27,6 +27,8 @@ export interface SidebarPrefs {
   mode: "full" | "mini";
   position: "left" | "right";
   width: "narrow" | "normal" | "wide";
+  /** Ancho exacto en píxeles si se ajustó arrastrando el borde; `null`: el de `width`. */
+  widthPx: number | null;
   density: "compact" | "normal" | "comfortable";
   /** current: solo la sección actual; remember: las que dejes abiertas; all: todas siempre. */
   expand: "current" | "remember" | "all";
@@ -48,6 +50,7 @@ export const DEFAULT_SIDEBAR: SidebarPrefs = {
   mode: "full",
   position: "left",
   width: "normal",
+  widthPx: null,
   density: "normal",
   expand: "remember",
   areaClick: "last",
@@ -79,10 +82,12 @@ export interface Prefs {
   diagnoseOnOpen: boolean;
   /** Cargar en segundo plano el último portal usado (Tickets, inventario, correo). */
   preloadPortals: boolean;
+  /** Zoom con el que se abren los portales nuevos (1 = 100 %). */
+  portalZoom: number;
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { accent: "blue", zoom: 1, reduceMotion: false, startPage: "last", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true };
+const DEFAULTS: Prefs = { accent: "blue", zoom: 1, reduceMotion: false, startPage: "last", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1 };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },

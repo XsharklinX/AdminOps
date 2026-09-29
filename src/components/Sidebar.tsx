@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import logo from "../assets/logo.svg";
 import { appcareApi, type AppInfo, type TargetUser, type UpdateInfo } from "../lib/api";
 import { getPrefs, setSidebar, usePrefs, type NavLayout } from "../lib/prefs";
 import {
   Activity,
   Bookmark,
+  PanelLeftClose,
+  PanelLeftOpen,
   Box,
   Briefcase,
   Bug,
@@ -58,6 +60,7 @@ export type PageId =
   | "services"
   | "startup"
   | "bloatware"
+  | "apps"
   | "software"
   | "install"
   | "uninstall"
@@ -90,6 +93,7 @@ export type PageId =
   | "recover"
   | "family"
   | "inventory"
+  | "data"
   | "shares"
   | "remote"
   | "settings";
@@ -122,12 +126,13 @@ export const NAV: NavItem[] = [
     tab: "Ajustes",
     help: "Limpieza, rendimiento, privacidad y servicios en un solo sitio, con buscador. Cada ajuste explica qué hace y se puede deshacer.",
   },
-  { id: "startup", label: "Inicio de Windows", tab: "Inicio", help: "Programas que arrancan con Windows: desactivar los que sobran acelera el arranque." },
-  { id: "bloatware", label: "Bloatware", tab: "Bloatware", help: "Apps preinstaladas de Microsoft Store que se pueden quitar, con recomendación para cada una." },
-  // Programas
-  { id: "software", label: "Actualizaciones", tab: "Actualizaciones", help: "Programas con versión nueva (winget) y Windows Update, en un solo sitio." },
-  { id: "install", label: "Instalar programas", tab: "Instalar", help: "Instala en lote desde un catálogo verificado o buscando en winget. Guarda tus listas para reutilizarlas." },
-  { id: "uninstall", label: "Desinstalar programas", tab: "Desinstalar", help: "Desinstala uno o varios, en silencio cuando se puede, y limpia los restos (carpetas, accesos, registro)." },
+  // Aplicaciones
+  {
+    id: "apps",
+    label: "Aplicaciones",
+    tab: "Aplicaciones",
+    help: "Todo lo que se hace con los programas del equipo: actualizarlos (winget y Windows Update), instalar en lote, desinstalar limpiando los restos y quitar el bloatware preinstalado.",
+  },
   {
     id: "recipes",
     label: "Preparar equipos",
@@ -141,12 +146,25 @@ export const NAV: NavItem[] = [
   // Oficina
   { id: "stations", label: "Puestos e inventario", tab: "Puestos", help: "Qué equipos de la oficina responden y cuáles necesitan atención (disco, reinicios, actualizaciones), y su inventario." },
   { id: "users", label: "Usuarios locales", tab: "Usuarios", help: "Crear usuarios, cambiar contraseñas, permisos de administrador y quitar cuentas." },
-  { id: "accounts", label: "Cuentas", tab: "Cuentas", help: "Cuentas de Microsoft, profesionales (Entra ID), de Office y credenciales guardadas. Desconectarlas y pasar un equipo a cuenta local sin dar vueltas por Configuración." },
-  { id: "domain", label: "Dominio", tab: "Dominio", help: "Unir el equipo al dominio, sacarlo, repararlo o cambiarle el nombre." },
-  { id: "shares", label: "Carpetas compartidas", tab: "Compartidas", help: "Compartir carpetas en la red de la oficina y ver quién tiene acceso." },
-  { id: "printers", label: "Impresoras", tab: "Impresoras", help: "Impresoras instaladas, cola de impresión, página de prueba y predeterminada." },
+  {
+    id: "accounts",
+    label: "Cuentas y dominio",
+    tab: "Cuentas",
+    help: "Con qué cuenta entra este equipo: cuentas de Microsoft, profesionales (Entra ID), de Office y credenciales guardadas, y el dominio de la empresa (unirlo, sacarlo, repararlo o cambiarle el nombre).",
+  },
+  {
+    id: "printers",
+    label: "Impresoras y carpetas",
+    tab: "Impresoras",
+    help: "Lo que la oficina comparte: impresoras instaladas con su cola y página de prueba, y las carpetas compartidas en la red con quién tiene acceso.",
+  },
   { id: "remote", label: "Acceso remoto", tab: "Acceso remoto", help: "Agenda de conexiones, Escritorio remoto, AnyDesk, RustDesk y TeamViewer." },
-  { id: "tools", label: "Herramientas de Windows", tab: "Herramientas", help: "Las herramientas de Windows de siempre, a un clic, y tus accesos directos propios." },
+  {
+    id: "tools",
+    label: "Herramientas y atajos",
+    tab: "Herramientas",
+    help: "Las herramientas de Windows de siempre a un clic, tus accesos directos propios y los atajos de teclado de Windows y de los programas habituales.",
+  },
   // Soporte
   { id: "tickets", label: "Tickets", tab: "Tickets", help: "Tu sistema de tickets dentro de AdminOps, sin salir de la app." },
   {
@@ -163,15 +181,19 @@ export const NAV: NavItem[] = [
   },
   { id: "clients", label: "Clientes", tab: "Clientes", help: "Fichas de clientes con sus equipos, visitas, garantías, mantenimientos y contactos." },
   { id: "contacts", label: "Contactos", tab: "Contactos", help: "A quién llamar y para qué: extensiones, correos, Teams. Viaja contigo en todos los equipos." },
-  { id: "knowledge", label: "Conocimiento", tab: "Conocimiento", help: "Soluciones que funcionaron, plantillas de texto y notas de cada equipo y red." },
-  { id: "report", label: "Informe", tab: "Informe", help: "Informe PDF profesional con la comparación antes/después; «Entrega rápida» resume lo hecho hoy." },
-  { id: "shortcuts", label: "Atajos de teclado", tab: "Atajos", help: "Atajos de Windows y de programas habituales, con prueba en vivo." },
+  {
+    id: "knowledge",
+    label: "Soluciones",
+    tab: "Soluciones",
+    help: "Qué hacer ante cada problema: soluciones probadas paso a paso (las que trae AdminOps y las tuyas), plantillas de texto para el cliente y notas de cada equipo y red.",
+  },
   // Datos
-  { id: "vault", label: "Caja fuerte y carpetas cifradas", tab: "Caja fuerte", help: "Unidades cifradas con BitLocker y carpetas en .zip con contraseña." },
-  { id: "wipe", label: "Borrado seguro", tab: "Borrado seguro", help: "Borrar archivos o el espacio libre para que no se puedan recuperar." },
-  { id: "recover", label: "Recuperar archivos borrados", tab: "Recuperar archivos", help: "Recupera archivos borrados con Windows File Recovery." },
-  { id: "migrate", label: "Copia de datos", tab: "Copia de datos", help: "Copia los datos de un usuario (escritorio, documentos, navegadores, Wi-Fi) y los restaura en otro equipo." },
-  { id: "family", label: "Control parental", tab: "Control parental", help: "Filtro de webs para adultos, sitios bloqueados y horario de uso." },
+  {
+    id: "data",
+    label: "Datos del equipo",
+    tab: "Datos",
+    help: "Los datos del usuario: llevarlos a otro equipo, guardarlos cifrados, borrarlos sin que se puedan recuperar, recuperar los borrados y el control parental.",
+  },
   { id: "settings", label: "Ajustes", tab: "Ajustes", help: "Tus datos, apariencia, navegación, seguridad, informes y copias de seguridad." },
 ];
 
@@ -181,14 +203,34 @@ export const NAV: NavItem[] = [
  */
 export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   repair: ["troubleshoot", "repairs"],
-  winupdate: ["software", "windows"],
   devices: ["router", "devices"],
   inventory: ["stations", "inventory"],
+  // Ajustes de Windows
   cleanup: ["tweaks", "cleanup"],
   performance: ["tweaks", "performance"],
   privacy: ["tweaks", "privacy"],
   services: ["tweaks", "services"],
+  startup: ["tweaks", "startup"],
   profiles: ["recipes", "profiles"],
+  // Aplicaciones
+  software: ["apps", "update"],
+  winupdate: ["apps", "winupdate"],
+  install: ["apps", "install"],
+  uninstall: ["apps", "uninstall"],
+  bloatware: ["apps", "bloatware"],
+  // Herramientas y atajos
+  shortcuts: ["tools", "shortcuts"],
+  // Oficina
+  domain: ["accounts", "domain"],
+  shares: ["printers", "shares"],
+  // Sesión de servicio
+  report: ["session", "report"],
+  // Datos del equipo
+  migrate: ["data", "migrate"],
+  vault: ["data", "vault"],
+  wipe: ["data", "wipe"],
+  recover: ["data", "recover"],
+  family: ["data", "family"],
 };
 
 /** Página y foco reales (resuelve las páginas unidas). */
@@ -249,13 +291,12 @@ export const AREA_ICONS: Record<string, LucideIcon> = {
 const DEFAULT_AREAS: Omit<Area, "icon">[] = [
   // Los id se conservan: las navegaciones personalizadas siguen funcionando.
   { id: "panel", label: "Inicio", iconName: "Home", pages: ["dashboard", "troubleshoot", "session"] },
-  { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["diagnostics", "hardware", "security", "processes", "space", "history"] },
-  { id: "optimizar", label: "Mantener", iconName: "SlidersHorizontal", pages: ["tweaks", "startup", "bloatware"] },
-  { id: "programas", label: "Programas", iconName: "Package", pages: ["software", "install", "uninstall", "recipes"] },
+  { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["diagnostics", "hardware", "security", "tweaks", "processes", "space", "history"] },
+  { id: "programas", label: "Aplicaciones", iconName: "Package", pages: ["apps", "recipes"] },
   { id: "red", label: "Red", iconName: "Network", pages: ["router", "network", "nettools"] },
-  { id: "admin", label: "Oficina", iconName: "Building2", pages: ["stations", "users", "accounts", "domain", "shares", "printers", "remote", "tools"] },
-  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "mail", "agenda", "clients", "contacts", "knowledge", "report", "shortcuts"] },
-  { id: "datos", label: "Datos", iconName: "Lock", pages: ["vault", "wipe", "recover", "migrate", "family"] },
+  { id: "admin", label: "Oficina", iconName: "Building2", pages: ["stations", "users", "accounts", "printers", "remote", "tools"] },
+  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "mail", "agenda", "clients", "contacts", "knowledge"] },
+  { id: "datos", label: "Datos", iconName: "Lock", pages: ["data"] },
 ];
 
 const withIcon = (a: Omit<Area, "icon">): Area => ({ ...a, icon: AREA_ICONS[a.iconName] ?? Folder });
@@ -317,8 +358,60 @@ function readOpen(): string[] {
 }
 
 const WIDTH = { narrow: "w-52", normal: "w-60", wide: "w-72" } as const;
+/** Ancho en píxeles de cada tamaño, para empezar a arrastrar desde el actual. */
+const WIDTH_PX = { narrow: 208, normal: 240, wide: 288 } as const;
 const ROW = { compact: "h-8", normal: "h-9", comfortable: "h-10" } as const;
 const SUBROW = { compact: "h-7", normal: "h-8", comfortable: "h-9" } as const;
+
+/** Hasta dónde se puede estrechar o ensanchar arrastrando. */
+const MIN_W = 170;
+const MAX_W = 440;
+
+/**
+ * Ajustar el ancho arrastrando el borde. Mientras se arrastra el ancho vive en
+ * memoria (mover el ratón no debe escribir en el almacenamiento); al soltar se
+ * guarda. Doble clic en el borde vuelve al ancho de los Ajustes.
+ */
+function useSidebarResize(position: "left" | "right") {
+  const [dragW, setDragW] = useState<number | null>(null);
+  const latest = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (dragW === null) return;
+    const move = (e: PointerEvent) => {
+      const raw = position === "right" ? window.innerWidth - e.clientX : e.clientX;
+      const w = Math.round(Math.min(MAX_W, Math.max(MIN_W, raw)));
+      latest.current = w;
+      setDragW(w);
+    };
+    const stop = () => {
+      if (latest.current !== null) setSidebar({ widthPx: latest.current });
+      setDragW(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    // Durante el arrastre el cursor no cambia aunque salga de la barra.
+    const prev = [document.body.style.cursor, document.body.style.userSelect];
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      [document.body.style.cursor, document.body.style.userSelect] = prev;
+    };
+  }, [dragW === null, position]);
+
+  return {
+    dragging: dragW !== null,
+    width: dragW,
+    start: (from: number) => {
+      latest.current = from;
+      setDragW(from);
+    },
+  };
+}
 
 export function Sidebar({
   active,
@@ -349,6 +442,7 @@ export function Sidebar({
 }) {
   const prefs = usePrefs();
   const sb = prefs.sidebar;
+  const resize = useSidebarResize(sb.position);
   const areas = visibleAreas(active);
   const current = areas.find((a) => a.pages.includes(active)) ?? null;
   // Áreas que el usuario dejó abiertas con la flecha (además de la actual).
@@ -435,6 +529,13 @@ export function Sidebar({
           </button>
         )}
         <div className="flex flex-col items-center gap-1 border-t border-line py-3">
+          <button
+            onClick={() => setSidebar({ mode: "full" })}
+            className="grid size-9 place-items-center rounded-md text-mute hover:bg-panel-2 hover:text-ink"
+            title="Desacoplar: mostrar los nombres"
+          >
+            <PanelLeftOpen size={17} strokeWidth={1.6} className={sb.position === "right" ? "rotate-180" : ""} />
+          </button>
           {onLock && (
             <button onClick={onLock} className="grid size-9 place-items-center rounded-md text-mute hover:bg-panel-2 hover:text-ink" title="Bloquear (Ctrl+L)">
               <LockIcon size={16} strokeWidth={1.6} />
@@ -483,22 +584,50 @@ export function Sidebar({
   const smallHeader = (text: string) => <div className="px-3 pt-2 pb-1 text-[11px] font-medium text-mute">{text}</div>;
   const recentPages = sb.recents > 0 ? recent.filter((p) => p !== "settings").slice(0, sb.recents) : [];
 
+  const widthPx = resize.width ?? sb.widthPx;
   return (
-    <aside className={`flex ${WIDTH[sb.width]} shrink-0 flex-col border-line bg-panel ${border}`}>
-      <button onClick={onAbout} className="flex items-center gap-2.5 px-5 pt-5 pb-4 text-left" title="Acerca de AdminOps">
-        <img src={logo} alt="" className="size-8" draggable={false} />
-        <div className="min-w-0">
-          <div className="text-[15px] font-semibold tracking-tight text-ink">AdminOps</div>
-          <div className="flex items-center gap-1.5 text-xs text-mute">
-            {appInfo ? `Versión ${appInfo.version}` : "…"}
-            {appInfo?.portable && (
-              <span className="rounded border border-line-2 px-1 text-[11px] text-dim" title="Modo portable: los datos se guardan junto a AdminOps.exe, no en este equipo">
-                portable
-              </span>
-            )}
+    <aside
+      style={widthPx ? { width: `${widthPx}px` } : undefined}
+      className={`relative flex ${widthPx ? "" : WIDTH[sb.width]} shrink-0 flex-col border-line bg-panel ${border}`}
+    >
+      {/* Borde que se arrastra para cambiar el ancho; doble clic vuelve al de Ajustes. */}
+      <div
+        onPointerDown={(e) => {
+          e.preventDefault();
+          resize.start(widthPx ?? WIDTH_PX[sb.width]);
+        }}
+        onDoubleClick={() => setSidebar({ widthPx: null })}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Ajustar el ancho de la barra lateral"
+        title="Arrastra para ajustar el ancho · doble clic para el ancho de siempre"
+        className={`absolute inset-y-0 z-20 w-1.5 cursor-col-resize transition-colors hover:bg-neon/40 ${resize.dragging ? "bg-neon/60" : ""} ${
+          sb.position === "right" ? "left-0" : "right-0"
+        }`}
+      />
+      <div className="group/head flex items-start">
+        <button onClick={onAbout} className="flex min-w-0 flex-1 items-center gap-2.5 py-1 pt-5 pb-4 pl-5 text-left" title="Acerca de AdminOps">
+          <img src={logo} alt="" className="size-8 shrink-0" draggable={false} />
+          <div className="min-w-0">
+            <div className="truncate text-[15px] font-semibold tracking-tight text-ink">AdminOps</div>
+            <div className="flex items-center gap-1.5 text-xs text-mute">
+              {appInfo ? `Versión ${appInfo.version}` : "…"}
+              {appInfo?.portable && (
+                <span className="rounded border border-line-2 px-1 text-[11px] text-dim" title="Modo portable: los datos se guardan junto a AdminOps.exe, no en este equipo">
+                  portable
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+        <button
+          onClick={() => setSidebar({ mode: "mini" })}
+          className="mt-5 mr-2.5 grid size-8 shrink-0 place-items-center rounded-md text-mute opacity-0 transition-opacity group-hover/head:opacity-100 hover:bg-panel-2 hover:text-ink focus-visible:opacity-100"
+          title="Acoplar la barra: solo iconos"
+        >
+          <PanelLeftClose size={16} strokeWidth={1.6} className={sb.position === "right" ? "rotate-180" : ""} />
+        </button>
+      </div>
 
       {sb.showSearch && (
         <div className="px-3.5 pb-3">

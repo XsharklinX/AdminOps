@@ -4,6 +4,7 @@ import { TagChip, TagInput } from "../components/contacts/Tags";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, EmptyState, inputClass, Loading, Modal } from "../components/ui";
 import { libraryApi, type PlaceNote, type Solution, type TextTemplate } from "../lib/api";
+import { BUILTIN_SOLUTIONS, duplicateForEditing, isBuiltin } from "../lib/solutionsCatalog";
 import { norm } from "../lib/contacts";
 import { AUTO_VARS, autoValues, fill, questions } from "../lib/templates";
 import { PlaceNotes } from "../components/PlaceNotes";
@@ -11,7 +12,12 @@ import { PlaceNotes } from "../components/PlaceNotes";
 type Tab = "solutions" | "templates" | "notes";
 
 const TABS: { id: Tab; label: string; icon: typeof Lightbulb; hint: string }[] = [
-  { id: "solutions", label: "Soluciones", icon: Lightbulb, hint: "Problema → lo que funcionó. Tu memoria de técnico, en todos los equipos." },
+  {
+    id: "solutions",
+    label: "Soluciones",
+    icon: Lightbulb,
+    hint: "Problema → lo que funcionó, paso a paso. Las que trae AdminOps y las tuyas, en todos los equipos.",
+  },
   { id: "templates", label: "Plantillas", icon: FileText, hint: "Textos que repites: respuestas, correos, pasos. Con variables que se rellenan solas." },
   { id: "notes", label: "Notas de equipos y redes", icon: StickyNote, hint: "Lo que hay que saber de un equipo o de una red. Aparecen solas al volver." },
 ];
@@ -42,7 +48,10 @@ export function Knowledge({ focus }: { focus: string | null }) {
   // Desde la búsqueda global: «solution:<id>», «template:<id>» o «notes».
   useEffect(() => {
     if (!focus) return;
-    const [kind, id] = focus.split(":");
+    // Solo el primer «:»: los ids de las soluciones de AdminOps llevan otro dentro.
+    const sep = focus.indexOf(":");
+    const kind = sep < 0 ? focus : focus.slice(0, sep);
+    const id = sep < 0 ? "" : focus.slice(sep + 1);
     if (kind === "solution") {
       choose("solutions");
       setOpenId(id || "new");
@@ -134,6 +143,8 @@ function Solutions({ openId }: { openId: string | null }) {
   const [tag, setTag] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(openId);
   const [editing, setEditing] = useState<Solution | null>(null);
+  // "all": todas · "mine": solo las mías · "builtin": solo las de AdminOps.
+  const [source, setSource] = useState<"all" | "mine" | "builtin">("all");
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
@@ -146,17 +157,22 @@ function Solutions({ openId }: { openId: string | null }) {
     else if (openId) setOpen(openId);
   }, [openId]);
 
-  const tags = useMemo(() => [...new Set((list ?? []).flatMap((s) => s.tags))].sort((a, b) => a.localeCompare(b, "es")), [list]);
+  // Las del técnico primero: si guarda su versión de una, es la que quiere ver.
+  const all = useMemo(() => [...(list ?? []), ...BUILTIN_SOLUTIONS], [list]);
+  const tags = useMemo(() => [...new Set(all.flatMap((s) => s.tags))].sort((a, b) => a.localeCompare(b, "es")), [all]);
   const shown = useMemo(() => {
     const words = norm(query).split(/\s+/).filter(Boolean);
-    return (list ?? [])
-      .filter((s) => (!tag || s.tags.includes(tag)) && words.every((w) => norm(`${s.title} ${s.problem} ${s.solution} ${s.tags.join(" ")}`).includes(w)))
-      .sort((a, b) => (b.uses ?? 0) - (a.uses ?? 0) || (b.updated ?? 0) - (a.updated ?? 0));
-  }, [list, query, tag]);
+    return all
+      .filter((s) => (source === "all" || (source === "builtin") === isBuiltin(s.id)) && (!tag || s.tags.includes(tag)))
+      .filter((s) => words.every((w) => norm(`${s.title} ${s.problem} ${s.solution} ${s.tags.join(" ")}`).includes(w)))
+      .sort((a, b) => Number(isBuiltin(a.id)) - Number(isBuiltin(b.id)) || (b.uses ?? 0) - (a.uses ?? 0) || (b.updated ?? 0) - (a.updated ?? 0));
+  }, [all, query, tag, source]);
+  const mine = (list ?? []).length;
 
   const copy = (s: Solution) => {
     navigator.clipboard.writeText(`${s.title}\n\n${s.solution}`).then(() => toast("ok", "Solución copiada."));
-    libraryApi.touch("solutions", s.id).catch(() => {});
+    // Las de AdminOps no están en la biblioteca: no hay nada que marcar.
+    if (!isBuiltin(s.id)) libraryApi.touch("solutions", s.id).catch(() => {});
   };
   const remove = async (s: Solution) => {
     if (!(await confirm({ title: "Borrar solución", body: `Se borrará «${s.title}».`, confirmLabel: "Borrar", danger: true }))) return;
@@ -175,38 +191,45 @@ function Solutions({ openId }: { openId: string | null }) {
           <Plus size={14} /> Nueva solución
         </Button>
       </div>
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {tags.map((t) => (
-            <TagChip key={t} name={t} active={tag === t} onClick={() => setTag(tag === t ? null : t)} />
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(
+          [
+            ["all", `Todas (${all.length})`],
+            ["mine", `Mías (${mine})`],
+            ["builtin", `De AdminOps (${BUILTIN_SOLUTIONS.length})`],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setSource(id)}
+            className={`rounded-md px-2.5 py-1 text-xs transition-colors ${source === id ? "bg-neon/10 text-neon" : "text-mute hover:bg-panel-2 hover:text-ink"}`}
+          >
+            {label}
+          </button>
+        ))}
+        {tags.length > 0 && <span className="mx-1 h-4 w-px bg-line" />}
+        {tags.map((t) => (
+          <TagChip key={t} name={t} active={tag === t} onClick={() => setTag(tag === t ? null : t)} />
+        ))}
+      </div>
       {list === null ? (
         <Loading />
       ) : shown.length === 0 ? (
-        list.length ? (
-          <EmptyState title="Nada coincide con la búsqueda." />
-        ) : (
-          <EmptyState
-            icon={<Lightbulb size={22} />}
-            title="Aún no hay soluciones"
-            action={
-              <Button onClick={() => setEditing({ ...EMPTY_SOLUTION })}>
-                <Plus size={14} /> Primera solución
-              </Button>
-            }
-          >
-            Apunta aquí lo que te funcionó (o guárdalo al terminar una sesión de servicio) y lo encontrarás en cualquier equipo con Ctrl+K.
-          </EmptyState>
-        )
+        <EmptyState title="Nada coincide con la búsqueda." />
       ) : (
         shown.map((s) => (
           <div key={s.id} className={`rounded-xl border bg-panel ${open === s.id ? "border-neon/50" : "border-line"}`}>
             <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-start gap-2.5 px-4 py-3 text-left">
-              <Lightbulb size={15} className="mt-0.5 shrink-0 text-neon" />
+              <Lightbulb size={15} className={`mt-0.5 shrink-0 ${isBuiltin(s.id) ? "text-dim" : "text-neon"}`} />
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-ink">{s.title}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-ink">{s.title}</span>
+                  {isBuiltin(s.id) && (
+                    <span className="shrink-0 rounded border border-line px-1 py-px text-[10px] text-mute" title="Viene con AdminOps: para cambiarla, duplícala">
+                      AdminOps
+                    </span>
+                  )}
+                </span>
                 {s.problem && open !== s.id && <span className="block truncate text-xs text-dim">{s.problem}</span>}
               </span>
               <span className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -229,12 +252,20 @@ function Solutions({ openId }: { openId: string | null }) {
                   <Button onClick={() => copy(s)}>
                     <ClipboardCopy size={13} /> Copiar
                   </Button>
-                  <Button kind="ghost" onClick={() => setEditing({ ...s })}>
-                    <Pencil size={13} /> Editar
-                  </Button>
-                  <button onClick={() => remove(s)} className="ml-auto p-1 text-mute hover:text-bad" title="Borrar">
-                    <Trash2 size={14} />
-                  </button>
+                  {isBuiltin(s.id) ? (
+                    <Button kind="ghost" onClick={() => setEditing(duplicateForEditing(s))} title="Crea una copia tuya que sí puedes cambiar">
+                      <Copy size={13} /> Duplicar para editarla
+                    </Button>
+                  ) : (
+                    <>
+                      <Button kind="ghost" onClick={() => setEditing({ ...s })}>
+                        <Pencil size={13} /> Editar
+                      </Button>
+                      <button onClick={() => remove(s)} className="ml-auto p-1 text-mute hover:text-bad" title="Borrar">
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
