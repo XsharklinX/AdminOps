@@ -710,8 +710,16 @@ export interface SessionRecord {
   contactId: string;
 }
 
+/** Qué es cada cosa de la agenda. */
+export type AgendaKind = "visit" | "task" | "call" | "meeting";
+
 export interface Visit {
   id: string;
+  /** visit · task · call · meeting ("" en las antiguas: visita). */
+  kind: AgendaKind | "";
+  /** Qué es. Obligatorio si no hay cliente. */
+  title: string;
+  /** Cliente, si es una visita a uno ("" si no). */
   clientId: string;
   clientName: string;
   /** Inicio en segundos (UTC). */
@@ -1259,6 +1267,96 @@ export const printersApi = {
   remove: (name: string) => invoke<void>("remove_printer", { name }),
 };
 
+// ---------- Discos: salud, reparación y rescate ----------
+
+export interface DiskVolume {
+  letter: string;
+  label: string;
+  fs: string;
+  size: number;
+  free: number;
+  health: string;
+  /** Windows lo marcó como dañado («Reparar disco»). null: no se pudo mirar (sin administrador). */
+  dirty: boolean | null;
+  system: boolean;
+}
+
+export interface DiskVerdict {
+  level: "ok" | "warn" | "bad";
+  title: string;
+  text: string;
+  advice: string[];
+}
+
+export interface DiskReport {
+  number: number;
+  model: string;
+  /** USB, SATA, NVMe… */
+  bus: string;
+  /** HDD, SSD o Unspecified. */
+  media: string;
+  size: number;
+  health: string;
+  system: boolean;
+  /** -1: no se sabe. */
+  temperature: number;
+  hours: number;
+  readErrors: number;
+  writeErrors: number;
+  wear: number;
+  volumes: DiskVolume[];
+  predictFailure: boolean;
+  reallocated: number | null;
+  pending: number | null;
+  uncorrectable: number | null;
+  crcErrors: number | null;
+  verdict: DiskVerdict;
+}
+
+export interface DiskCheck {
+  level: "ok" | "warn" | "bad";
+  text: string;
+}
+
+export interface RescueResult {
+  /** Archivos y bytes que hay ahora en el destino. */
+  copied: number;
+  bytes: number;
+  /** Lo que no se pudo leer y se quedó en el disco. */
+  failed: string[];
+}
+
+export const disksApi = {
+  status: () => invoke<DiskReport[]>("disks_status"),
+  /** Comprueba el sistema de archivos sin cambiar nada. */
+  check: (letter: string) => invoke<DiskCheck>("disk_check", { letter }),
+  /** Repara el sistema de archivos (en el disco de Windows, al reiniciar). */
+  repair: (letter: string) => invoke<DiskCheck>("disk_repair", { letter }),
+  /** chkdsk /r: tarea «disk-surface:LETRA». */
+  surfaceScan: (letter: string) => invoke<DiskCheck>("disk_surface_scan", { letter }),
+  /** Copia lo legible: tarea «disk-rescue». */
+  rescue: (source: string, dest: string) => invoke<RescueResult>("disk_rescue", { source, dest }),
+  pickFolder: () => invoke<string | null>("disk_pick_folder"),
+};
+
+/** Dónde guarda AdminOps sus datos (Ajustes → Datos). */
+export interface StorageInfo {
+  /** Los datos viajan con el programa. */
+  portable: boolean;
+  /** "removable" (está en un pendrive) · "marker" (se pidió) · "" (instalado) */
+  reason: string;
+  /** Unidad del programa («E:»). */
+  drive: string;
+  canSwitch: boolean;
+  migrated: { at: number; files: number; secrets: number; browser: boolean; fromHost: string } | null;
+}
+
+export const storageApi = {
+  info: () => invoke<StorageInfo>("storage_info"),
+  /** Guarda todo en la carpeta del programa al volver a abrir AdminOps. */
+  makePortable: () => invoke<void>("storage_make_portable"),
+};
+
 export interface MigrateEstimate {
   id: string;
   label: string;
@@ -1486,12 +1584,22 @@ export const followupsApi = {
   remove: (id: string) => invoke<void>("delete_followup", { id }),
 };
 
+/** Lo que se tapó en un recorte (evento «screen-clip» y «Tapar datos»). */
+export interface ClipRedacted {
+  covered: number;
+  words: number;
+  /** "" si fue bien; si no, por qué (el recorte queda como estaba). */
+  error: string;
+}
+
 export const noteApi = {
   /** La ventana de la nota de llamada (también con Ctrl+Alt+N desde cualquier sitio). */
   open: () => invoke<void>("open_quick_note"),
   close: () => invoke<void>("close_quick_note"),
   /** El recorte de pantalla de Windows: lo recortado queda en el portapapeles. */
   screenClip: () => invoke<void>("open_screen_clip"),
+  /** Tapa con el OCR de Windows las rutas y nombres de la imagen del portapapeles. */
+  redactClipboard: () => invoke<ClipRedacted>("redact_clipboard_image"),
 };
 
 /** Mañana a las 9:00 (hora local), en segundos Unix: la fecha por defecto de un seguimiento. */
@@ -1998,7 +2106,8 @@ export const officeApi = {
   enableWol: () => invoke<void>("enable_wake_on_lan"),
   setRdp: (enabled: boolean) => invoke<void>("set_remote_desktop", { enabled }),
   rdp: (host: string) => invoke<void>("open_remote_desktop", { host }),
-  quickAssist: () => invoke<void>("open_quick_assist"),
+  /** Asistencia remota de Windows (msra.exe). */
+  remoteAssistance: () => invoke<void>("open_remote_assistance"),
   shares: () => invoke<SharingStatus>("list_shares"),
   createShare: (path: string, name: string, who: string, write: boolean) => invoke<void>("create_share", { path, name, who, write }),
   removeShare: (name: string) => invoke<void>("remove_share", { name }),

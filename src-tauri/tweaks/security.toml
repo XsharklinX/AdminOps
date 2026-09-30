@@ -97,7 +97,7 @@ description = "Impide conectarse a este equipo por RDP. Recomendado si nadie lo 
 category = "security"
 risk = "medium"
 admin = true
-note = "No afecta a conectarte tú desde este equipo a otros ni a AnyDesk, TeamViewer o Asistencia rápida."
+note = "No afecta a conectarte tú desde este equipo a otros ni a AnyDesk, TeamViewer o RustDesk."
 
 [[tweak.registry]]
 path = 'HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server'

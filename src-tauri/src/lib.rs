@@ -15,6 +15,11 @@ mod cases;
 mod followups;
 mod graph;
 mod snmp;
+mod storage;
+mod disks;
+mod toast;
+mod evtwatch;
+mod ocr;
 mod discovery;
 mod quicknote;
 mod paths;
@@ -89,6 +94,12 @@ pub fn run() {
     // va al USB; instalado, una carpeta propia y escribible por este usuario, para
     // no depender de la de por defecto (que puede quedar de otro usuario y hacer
     // que WebView2 no abra: «can't read and write to its data directory»).
+    // AdminOps en un pendrive por primera vez: se trae lo de este equipo antes
+    // de abrir nada (ver storage.rs). El registro aún no existe: se anota luego.
+    let migrated = boottime::step("Datos al pendrive", paths::migrate_to_portable_if_needed);
+    if let Some(m) = &migrated {
+        std::env::set_var("ADMINOPS_MIGRATED", format!("{} archivos, {} contraseñas, sesión del navegador: {}", m.files, m.secrets, if m.browser { "sí" } else { "no" }));
+    }
     if let Some(dir) = boottime::step("Carpeta de datos de WebView2", || paths::portable_webview_dir().or_else(paths::installed_webview_dir)) {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", dir);
     }
@@ -150,7 +161,10 @@ pub fn run() {
                 elevation::is_elevated(),
                 paths::is_portable()
             );
-            let state = boottime::step("Catálogo de ajustes e historial", || tweaks::TweakState::new(app.handle()));
+            if let Ok(m) = std::env::var("ADMINOPS_MIGRATED") {
+                log::info!("Datos de este equipo traídos al pendrive: {m}");
+            }
+            let state =boottime::step("Catálogo de ajustes e historial", || tweaks::TweakState::new(app.handle()));
             app.manage(state);
             boottime::step("Tamaño y posición de la ventana", || window_state::restore(app.handle()));
             // La ventana se crea oculta y se enseña cuando la interfaz ya tiene
@@ -255,6 +269,7 @@ pub fn run() {
             quicknote::open_quick_note,
             quicknote::close_quick_note,
             quicknote::open_screen_clip,
+            quicknote::redact_clipboard_image,
             graph::graph_status,
             graph::graph_configure,
             graph::graph_login_start,
@@ -293,6 +308,14 @@ pub fn run() {
             hardware::hardware_inventory,
             hardware::memory_test_result,
             hardware::smart::smart_status,
+            disks::disks_status,
+            disks::disk_check,
+            disks::disk_repair,
+            disks::disk_surface_scan,
+            disks::disk_rescue,
+            disks::disk_pick_folder,
+            storage::storage_info,
+            storage::storage_make_portable,
             hardware::sensors::read_sensors,
             hardware::sensors::install_pawnio,
             hardware::sensors::open_third_party_notices,
@@ -430,7 +453,7 @@ pub fn run() {
             office::enable_wake_on_lan,
             office::set_remote_desktop,
             office::open_remote_desktop,
-            office::open_quick_assist,
+            office::open_remote_assistance,
             office::list_shares,
             office::create_share,
             office::remove_share,

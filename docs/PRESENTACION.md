@@ -164,7 +164,7 @@ Se descartó explícitamente durante el desarrollo:
 - No hace nada para ocultarse del antivirus ni de las herramientas de administración.
 - No desactiva Defender ni el firewall por su cuenta.
 
-Para la asistencia remota se usan las herramientas legítimas: la Asistencia rápida de Windows,
+Para la asistencia remota se usan las herramientas legítimas: la Asistencia remota de Windows,
 Escritorio remoto, o AnyDesk/RustDesk/TeamViewer si ya están aprobados.
 
 ---

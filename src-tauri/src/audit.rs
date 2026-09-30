@@ -27,6 +27,10 @@ const BLOCKED: &[&str] = &[
     "set_maintenance_schedule",
     "troubleshoot_fix",
     "repair_network",
+    // Discos: reparar el sistema de archivos, chkdsk /r y copiar archivos a otra carpeta
+    "disk_repair",
+    "disk_surface_scan",
+    "disk_rescue",
     // Programas y Windows
     "remove_apps",
     "reinstall_app",
@@ -156,7 +160,7 @@ const SAFE: &[&str] = &[
     // hardware::sensors
     "read_sensors", "open_third_party_notices",
     // hardware::smart
-    "smart_status",
+    "smart_status", "disks_status", "disk_check", "disk_pick_folder", "storage_info", "storage_make_portable",
     // keys
     "try_shortcut",
     // library
@@ -181,12 +185,12 @@ const SAFE: &[&str] = &[
     // network::wifictl
     "wifi_state",
     // office
-    "wake_on_lan", "remote_status", "open_remote_desktop", "open_quick_assist", "list_shares", "ip_conflicts", "export_csv",
+    "wake_on_lan", "remote_status", "open_remote_desktop", "open_remote_assistance", "list_shares", "ip_conflicts", "export_csv",
     // officemap
     "office_map", "save_device_meta", "refresh_device_ips", "watch_status",
     // followups y nota de llamada (datos y ventanas del propio técnico)
     "list_followups", "add_followup", "set_followup_done", "snooze_followup", "delete_followup",
-    "open_quick_note", "close_quick_note", "open_screen_clip",
+    "open_quick_note", "close_quick_note", "open_screen_clip", "redact_clipboard_image",
     // graph (consultas, conexión del propio técnico, su calendario y sus mensajes)
     "graph_status", "graph_configure", "graph_login_start", "graph_login_poll", "graph_logout", "graph_open_devicelogin",
     "graph_signins", "graph_mfa_methods", "graph_service_health", "graph_calendar_sync", "graph_teams_send",

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { ContactDetail, type ContactActions } from "../components/contacts/ContactDetail";
 import { ContactEditor } from "../components/contacts/ContactEditor";
 import { ContactTools, type ToolTab } from "../components/contacts/ContactTools";
+import { QuickDial } from "../components/contacts/QuickDial";
 import { CardsView, DirectoryView, TableView, type ViewProps } from "../components/contacts/ContactViews";
 import { colorOf, TagChip, TagInput, type TagColors } from "../components/contacts/Tags";
 import { ChipRow } from "../components/ChipRow";
@@ -123,7 +124,26 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
   }, [live]);
   const tagNames = useMemo(() => tagCounts.map(([t]) => t), [tagCounts]);
   const companies = useMemo(() => [...new Set(live.map((c) => c.company).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")), [live]);
-  const frequent = useMemo(() => [...live].filter((c) => c.uses > 0).sort((a, b) => b.uses - a.uses || b.lastUsed - a.lastUsed).slice(0, 6), [live]);
+  // Marcación rápida: primero los favoritos, luego los que más se usan.
+  const frequent = useMemo(
+    () =>
+      [...live]
+        .filter((c) => c.favorite || c.uses > 0)
+        .sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.uses - a.uses || b.lastUsed - a.lastUsed)
+        .slice(0, 8),
+    [live],
+  );
+  const stats = useMemo(() => {
+    const month = Date.now() / 1000 - 30 * 86_400;
+    return {
+      total: live.length,
+      favorites: live.filter((c) => c.favorite).length,
+      withExt: live.filter((c) => c.extension).length,
+      companies: new Set(live.map((c) => c.company).filter(Boolean)).size,
+      usedMonth: live.filter((c) => c.lastUsed > month).length,
+      incomplete: live.filter((c) => !(c.phone || c.mobile || c.extension) || !c.email).length,
+    };
+  }, [live]);
 
   // Desde la búsqueda global (Ctrl+K): abrir la ficha del contacto.
   useEffect(() => {
@@ -301,6 +321,18 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
 
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+      {/* De un vistazo: cuántos hay y qué falta. Cada cifra filtra. */}
+      {live.length > 0 && (
+        <div className="col-span-12 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <StatTile label="Contactos" value={stats.total} onClick={() => setView({ filters: EMPTY_FILTERS })} active={!filtering} />
+          <StatTile label="Favoritos" value={stats.favorites} onClick={() => toggleQuick("favorites")} active={f.quick.includes("favorites")} />
+          <StatTile label="Con extensión" value={stats.withExt} onClick={() => toggleQuick("withExt")} active={f.quick.includes("withExt")} />
+          <StatTile label="Empresas" value={stats.companies} onClick={() => setView({ group: view.group === "company" ? "none" : "company" })} active={view.group === "company"} />
+          <StatTile label="Usados este mes" value={stats.usedMonth} onClick={() => setView({ sort: "recent" })} active={view.sort === "recent"} />
+          <StatTile label="Sin completar" value={stats.incomplete} onClick={() => toggleQuick("incomplete")} active={f.quick.includes("incomplete")} warn />
+        </div>
+      )}
+
       {/* Sin Card: su «contain: paint» recortaría los menús desplegables. */}
       <section className="col-span-12 rounded-xl border border-line bg-panel p-4">
         <header className="mb-3 flex items-center justify-between">
@@ -586,22 +618,13 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
         </div>
       )}
 
-      {/* Más usados */}
+      {/* Marcación rápida */}
       {!filtering && frequent.length > 0 && view.view !== "table" && (
         <div className="col-span-12">
-          <p className="mb-1.5 text-[11px] font-medium tracking-wide text-mute uppercase">Más usados</p>
-          <div className="flex flex-wrap gap-2">
-            {frequent.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setDetail(c.id)}
-                className="flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-1.5 text-left hover:border-neon/50"
-              >
-                <span className="text-sm text-ink">{c.name}</span>
-                {c.extension && <span className="font-mono text-sm text-neon">{c.extension}</span>}
-              </button>
-            ))}
-          </div>
+          <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-mute uppercase">
+            <Star size={11} /> Marcación rápida
+          </p>
+          <QuickDial items={frequent} actions={actions} />
         </div>
       )}
 
@@ -671,5 +694,17 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
       {tools && <ContactTools tab={tools} contacts={all ?? []} colors={colors} onChanged={load} onClose={() => setTools(null)} />}
       {dialog}
     </div>
+  );
+}
+
+function StatTile({ label, value, onClick, active, warn = false }: { label: string; value: number; onClick: () => void; active: boolean; warn?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${active ? "border-neon/50 bg-neon/10" : "border-line bg-panel hover:border-line-2"}`}
+    >
+      <div className={`font-mono text-xl leading-none font-semibold ${warn && value > 0 ? "text-warn" : "text-ink"}`}>{value}</div>
+      <div className="mt-1 truncate text-[11px] text-mute">{label}</div>
+    </button>
   );
 }

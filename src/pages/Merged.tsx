@@ -13,6 +13,7 @@ import {
   Activity,
   Cpu,
   FolderKey,
+  HardDrive,
   History as HistoryIcon,
   Keyboard,
   Layers,
@@ -30,6 +31,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Stethoscope,
   Store,
   Trash2,
   Undo2,
@@ -58,6 +60,8 @@ import { Recipes } from "./Recipes";
 import { Recover } from "./Recover";
 import { Report } from "./Report";
 import { Session } from "./Session";
+import { Disks } from "./Disks";
+import { Space } from "./Space";
 import { Shortcuts } from "./Shortcuts";
 import { Startup } from "./Startup";
 import { Tools } from "./Tools";
@@ -588,6 +592,35 @@ export function AccountsAndDomain({
       }
     />
   );
+}
+
+type DiskTab = "space" | "health";
+const DISK_TABS: PageTab<DiskTab>[] = [
+  {
+    id: "space",
+    label: "Espacio",
+    icon: <HardDrive size={14} />,
+    help: "Dónde se ha ido el espacio y qué se puede recuperar: temporales, papelera, Windows.old e hibernación, el disco carpeta por carpeta y los archivos grandes que nadie abre.",
+  },
+  {
+    id: "health",
+    label: "Salud y reparación",
+    icon: <Stethoscope size={14} />,
+    help: "Qué le pasa a cada disco (superficie, conexión o sistema de archivos), repararlo cuando se puede y rescatar los archivos de un disco que falla.",
+  },
+];
+
+/** Discos: el espacio y su salud (con reparación y rescate de archivos). */
+export function DiskTools({
+  isAdmin,
+  focus,
+  onNavigate,
+}: {
+  isAdmin: boolean;
+  focus?: string | null;
+  onNavigate?: (p: PageId, focus?: string | null) => void;
+}) {
+  return <Tabbed tabs={DISK_TABS} focus={focus} render={(t) => (t === "space" ? <Space onNavigate={onNavigate} /> : <Disks isAdmin={isAdmin} />)} />;
 }
 
 type SharedTab = "printers" | "shares";

@@ -2,7 +2,9 @@ import {
   ArrowDown,
   ArrowUp,
   BadgeCheck,
+  CheckCircle2,
   Download,
+  HardDrive,
   ImagePlus,
   PenLine,
   Plus,
@@ -40,6 +42,8 @@ import {
   type Settings,
   lockApi,
   type LockStatus,
+  storageApi,
+  type StorageInfo,
 } from "../lib/api";
 import { bytes } from "../lib/format";
 import {
@@ -508,43 +512,84 @@ function General({
 
 /** Qué se guarda una vez para todos los equipos y qué es de cada equipo. */
 function WhereStored({ portable }: { portable: boolean }) {
+  const [info, setInfo] = useState<StorageInfo | null>(null);
+  const [asked, setAsked] = useState(false);
+  const toast = useToast();
+  useEffect(() => {
+    storageApi.info().then(setInfo).catch(() => {});
+  }, []);
+
   const travels = [
     "Tus ajustes, marca, precios, checklist y firma",
-    "Portales de Tickets (la dirección; la sesión iniciada puede pedirte entrar otra vez en otro equipo, porque Windows la protege por equipo)",
-    "Accesos a routers, reconocidos por red (con su contraseña cifrada)",
-    "Contactos, clientes, conexiones de acceso remoto y perfiles",
+    "Clientes, contactos, agenda, seguimientos y casos",
+    "Portales (Tickets, Correo, Teams…) y sus cuentas guardadas para «Entrar solo», cifradas",
+    "La conexión con Microsoft 365",
+    "Accesos a routers y conexiones de acceso remoto (contraseñas cifradas)",
     "Apariencia, navegación, atajos y favoritos",
-    "Nombres que pongas a dispositivos de la red",
     "Informes PDF (todos juntos)",
   ];
   const perPc = [
+    "La sesión iniciada en los portales (Correo, Teams…): Windows la cifra para cada equipo. Se entra una vez en cada PC y luego se mantiene",
     "Diario de cambios y «Deshacer» (solo sirven en ese equipo)",
     "Diagnósticos y su comparación",
     "Avisos de Windows y línea de tiempo",
     "Sesión de servicio en curso",
-    "Pruebas de velocidad y registro técnico",
-    "Posición y tamaño de la ventana",
+    "Pruebas de velocidad, registro técnico y tamaño de la ventana",
   ];
+
+  const makePortable = async () => {
+    try {
+      await storageApi.makePortable();
+      setAsked(true);
+      toast("ok", "Listo. Cierra AdminOps y vuelve a abrirlo: traerá tus datos a la carpeta del programa.");
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+
+  const reason =
+    info?.reason === "removable"
+      ? `AdminOps está en un pendrive (${info.drive}): todo se guarda en la carpeta del programa, AdminOps-data.`
+      : info?.reason === "marker"
+        ? `Todo se guarda en la carpeta del programa (${info?.drive}), en AdminOps-data.`
+        : "Instalada en este equipo: los datos están en este equipo.";
+
   return (
-    <Card
-      title={
-        portable
-          ? "Qué viaja en el USB y qué se queda por equipo"
-          : "Qué se comparte y qué es de cada equipo"
-      }
-    >
-      <p className="mb-3 text-sm text-dim">
-        {portable
-          ? "Con el portable, todo se guarda en la carpeta AdminOps-data del USB, sin dejar nada en el equipo del cliente. Lo tuyo se configura una vez y te acompaña; lo de cada equipo se separa por su nombre para no mezclarse."
-          : "Instalada, los datos están en este equipo. Con la versión portable en un USB, lo de la izquierda te acompaña a todos los equipos."}
-      </p>
+    <Card title={portable ? "Tus datos viajan con AdminOps" : "Dónde se guardan tus datos"}>
+      <p className="mb-2 text-sm text-dim">{reason}</p>
+      {portable && (
+        <p className="mb-3 text-xs text-dim">
+          Para actualizar, vuelve a pasar el instalador sobre la misma carpeta: los datos no se tocan (el instalador solo cambia los archivos del programa). Lo tuyo
+          se configura una vez y te acompaña; lo de cada equipo se separa por su nombre.
+        </p>
+      )}
+      {info?.migrated && (
+        <p className="mb-3 flex items-start gap-1.5 text-xs text-ok">
+          <CheckCircle2 size={13} className="mt-0.5 shrink-0" />
+          Datos traídos del equipo {info.migrated.fromHost} el {new Date(info.migrated.at * 1000).toLocaleDateString("es")}: {info.migrated.files} archivos
+          {info.migrated.secrets > 0 && `, ${info.migrated.secrets} contraseñas cifradas de nuevo para el pendrive`}
+          {info.migrated.browser && ", y la sesión de los portales de ese equipo"}.
+        </p>
+      )}
+      {!portable && info && (
+        <div className="mb-3 rounded-lg border border-line bg-panel-2 p-3">
+          <p className="text-xs text-dim">
+            Si llevas AdminOps en un pendrive (instalado en él o el portable), tus datos van con él: instálalo en el pendrive y lo detecta solo. Para usar la carpeta
+            del programa en cualquier otra unidad (un disco externo), actívalo aquí: al volver a abrir AdminOps se traen tus datos de este equipo y las contraseñas
+            se cifran con la clave de esa carpeta.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button kind="ghost" onClick={() => void makePortable()} disabled={!info.canSwitch || asked}>
+              <HardDrive size={14} /> Guardar todo en la carpeta del programa
+            </Button>
+            {!info.canSwitch && <span className="text-[11px] text-mute">La carpeta del programa no se puede escribir (Archivos de programa): abre AdminOps como administrador.</span>}
+            {asked && <span className="text-[11px] text-ok">Se aplicará al volver a abrir AdminOps.</span>}
+          </div>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <p className="mb-1.5 text-xs font-medium text-ok">
-            {portable
-              ? "Viaja contigo (igual en todos)"
-              : "Tuyo (igual en todos, con el portable)"}
-          </p>
+          <p className="mb-1.5 text-xs font-medium text-ok">{portable ? "Viaja contigo (igual en todos)" : "Tuyo (viaja si guardas en la carpeta del programa)"}</p>
           <ul className="space-y-1 text-xs text-dim">
             {travels.map((t) => (
               <li key={t}>· {t}</li>
@@ -552,9 +597,7 @@ function WhereStored({ portable }: { portable: boolean }) {
           </ul>
         </div>
         <div>
-          <p className="mb-1.5 text-xs font-medium text-neon">
-            Propio de cada equipo
-          </p>
+          <p className="mb-1.5 text-xs font-medium text-neon">Propio de cada equipo</p>
           <ul className="space-y-1 text-xs text-dim">
             {perPc.map((t) => (
               <li key={t}>· {t}</li>
@@ -564,10 +607,8 @@ function WhereStored({ portable }: { portable: boolean }) {
       </div>
       {portable && (
         <p className="mt-3 text-xs text-mute">
-          Las contraseñas guardadas van cifradas con una clave del propio USB:
-          funcionan en cualquier equipo, pero no en otro USB. Si pierdes el USB
-          se pierde todo lo anterior: exporta de vez en cuando la configuración
-          y los contactos (CSV), y activa el bloqueo con PIN en Seguridad.
+          Las contraseñas guardadas van cifradas con una clave de la propia carpeta: funcionan en cualquier equipo, pero quien se lleve el pendrive entero podría
+          leerlas. Activa el bloqueo con PIN en Seguridad y haz de vez en cuando una copia cifrada (aquí abajo): si pierdes el pendrive, lo pierdes todo.
         </p>
       )}
     </Card>

@@ -131,9 +131,9 @@ export const NAV: NavItem[] = [
   { id: "processes", label: "Procesos", tab: "Procesos", help: "Qué está usando procesador, memoria y disco ahora mismo, y finalizar lo que se cuelga." },
   {
     id: "space",
-    label: "Espacio en disco",
-    tab: "Espacio en disco",
-    help: "Dónde se ha ido el espacio y qué se puede recuperar: temporales, papelera, Windows.old e hibernación medidos de verdad, el disco carpeta por carpeta, y los archivos grandes que nadie abre desde hace un año, que puedes mandar a la papelera desde aquí.",
+    label: "Discos",
+    tab: "Discos",
+    help: "El espacio (qué ocupa y qué se puede liberar) y la salud de cada disco: qué le pasa, repararlo cuando se puede («Reparar disco» de Windows, sectores dañados) y rescatar los archivos de un disco que falla.",
   },
   // Ajustes de Windows
   {
@@ -198,7 +198,7 @@ export const NAV: NavItem[] = [
     id: "agenda",
     label: "Agenda",
     tab: "Agenda",
-    help: "Visitas de mantenimiento planificadas: qué toca hoy y los próximos días, a qué clientes ya les toca, y aviso de Windows antes de cada visita.",
+    help: "Tareas, llamadas, reuniones y visitas, con cliente o sin él: lo de hoy, lo de mañana y la semana, los seguimientos, a qué clientes les toca mantenimiento y aviso de Windows 30 minutos antes.",
   },
   {
     id: "mail",

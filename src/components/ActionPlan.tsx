@@ -61,9 +61,10 @@ export function ActionPlan({
           key: `visit:${v.id}`,
           level: "info",
           source: "Agenda",
-          title: `Hoy a las ${at}: visita a ${v.clientName}`,
-          detail: [v.machines ? `${v.machines} ${v.machines === 1 ? "equipo" : "equipos"}` : "", v.notes].filter(Boolean).join(" · ") || undefined,
-          action: { label: "Empezar", run: () => onNavigate("session", v.clientId) },
+          title: v.title ? `Hoy a las ${at}: ${v.title}` : `Hoy a las ${at}: visita a ${v.clientName}`,
+          detail: [v.title ? v.clientName : "", v.machines ? `${v.machines} ${v.machines === 1 ? "equipo" : "equipos"}` : "", v.notes].filter(Boolean).join(" · ") || undefined,
+          // Sin cliente no hay sesión de servicio que empezar: se abre la Agenda.
+          action: v.clientId ? { label: "Empezar", run: () => onNavigate("session", v.clientId) } : { label: "Ver", run: () => onNavigate("agenda") },
         });
       }
       const overdue = (agenda?.due ?? []).filter((d) => d.date < now);

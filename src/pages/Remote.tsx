@@ -203,9 +203,9 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
         </div>
         <div className="mt-5 grid grid-cols-1 gap-4 border-t border-line/60 pt-4 md:grid-cols-2">
           <div>
-            <div className="mb-1 text-xs text-dim">Asistencia rápida de Windows (por Internet, con un código)</div>
-            <Button kind="ghost" onClick={() => officeApi.quickAssist().catch(fail)}>
-              <Headset size={14} /> Abrir Asistencia rápida
+            <div className="mb-1 text-xs text-dim">Asistencia remota de Windows (con una invitación)</div>
+            <Button kind="ghost" onClick={() => officeApi.remoteAssistance().catch(fail)}>
+              <Headset size={14} /> Abrir Asistencia remota
             </Button>
           </div>
           <div>

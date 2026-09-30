@@ -49,7 +49,7 @@ const Onboarding = lazyPage("Onboarding", () => import("./components/Onboarding"
 const TweaksPage = lazyPage("TweaksPage", () => import("./pages/TweaksPage"));
 const Processes = lazyPage("Processes", () => import("./pages/Processes"));
 const Network = lazyPage("Network", () => import("./pages/Network"));
-const Space = lazyPage("Space", () => import("./pages/Space"));
+const DiskTools = lazyPage("DiskTools", () => import("./pages/Merged"));
 const Clients = lazyPage("Clients", () => import("./pages/Clients"));
 const Users = lazyPage("Users", () => import("./pages/Users"));
 const NetTools = lazyPage("NetTools", () => import("./pages/NetTools"));
@@ -416,7 +416,18 @@ export default function App() {
       { id: "setup", title: "Volver a abrir el asistente de inicio", run: () => setOnboarding(true) },
       { id: "case", title: "Nuevo caso", subtitle: "Lo que hagas queda apuntado y la resolución se redacta sola", keywords: "ticket incidencia caso abrir atender", run: () => openCase() },
       { id: "note", title: "Nota de llamada", subtitle: "También con Ctrl+Alt+N, aunque AdminOps esté minimizado", keywords: "telefono llamada apuntar nota rapida", run: () => noteApi.open() },
-      { id: "clip", title: "Recorte de pantalla", subtitle: "Queda en el portapapeles para pegarlo en el ticket", keywords: "captura pantallazo imagen recortes", run: () => noteApi.screenClip() },
+      { id: "clip", title: "Recorte de pantalla", subtitle: "Tapa solo rutas, usuario y equipo; queda en el portapapeles para el ticket", keywords: "captura pantallazo imagen recortes ocr privacidad", run: () => noteApi.screenClip() },
+      {
+        id: "redact",
+        title: "Tapar datos personales del portapapeles",
+        subtitle: "Para una captura hecha fuera de AdminOps: rutas, usuario y equipo, con el OCR de Windows",
+        keywords: "ocr privacidad captura recorte ocultar censurar",
+        run: () =>
+          void noteApi.redactClipboard().then(
+            (r) => window.dispatchEvent(new CustomEvent("adminops:clip", { detail: r })),
+            (e) => window.dispatchEvent(new CustomEvent("adminops:clip", { detail: { covered: 0, words: 0, error: String(e) } })),
+          ),
+      },
       // Síntomas: abren «Solucionar problemas» y lo comprueban.
       ...SYMPTOMS.map((s) => ({ id: `trouble:${s.id}`, title: `Solucionar: ${s.title}`, subtitle: s.hint, keywords: `${s.keywords} problema arreglar no funciona`, run: () => navigate("troubleshoot", s.id) })),
       { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },
@@ -472,7 +483,7 @@ export default function App() {
     if (p === "apps") return <Apps isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "tools") return <WindowsToolbox isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "data") return <DataTools focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
-    if (p === "space") return <Space onNavigate={navigate} />;
+    if (p === "space") return <DiskTools isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "session") return <ServiceSession onSessionChange={setSessionActive} focus={p === page ? focus : null} />;
     if (p === "agenda") return <Agenda onNavigate={navigate} />;
     if (p === "people") return <People focus={p === page ? focus : null} />;

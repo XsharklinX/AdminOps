@@ -7,7 +7,7 @@
 import { ClipboardCheck, Copy, Crop, Loader2, Pencil, Send, TicketPlus, Trash2, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
-import { casesApi, graphApi, noteApi, peopleApi, portalsApi, type Case } from "../lib/api";
+import { casesApi, graphApi, noteApi, peopleApi, portalsApi, type Case, type ClipRedacted } from "../lib/api";
 import { CASE_CHANGED_EVENT, caseChanged, elapsed, OPEN_CASE_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { lastPortalKey } from "../lib/portalState";
@@ -30,6 +30,13 @@ export function NewCaseButton({ hidden }: { hidden: boolean }) {
       <TicketPlus size={13} /> Nuevo caso
     </button>
   );
+}
+
+/** Lo que se tapó en un recorte, dicho en una línea. */
+export function clipMessage(r: ClipRedacted): { kind: "ok" | "info" | "error"; text: string } {
+  if (r.error) return { kind: "error", text: `Recorte en el portapapeles, pero sin tapar: ${r.error}` };
+  if (r.covered > 0) return { kind: "ok", text: `Recorte listo: ${r.covered} ${r.covered === 1 ? "dato personal tapado" : "datos personales tapados"} (rutas, usuario o equipo). Pégalo con Ctrl+V.` };
+  return { kind: "info", text: r.words > 0 ? "Recorte listo, sin datos personales a la vista. Pégalo con Ctrl+V." : "Recorte listo. Pégalo con Ctrl+V." };
 }
 
 export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
@@ -73,6 +80,22 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
     window.addEventListener(OPEN_CASE_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_CASE_EVENT, onOpen);
   }, [current, toast]);
+
+  // El recorte de pantalla avisa de lo que tapó (el OCR va por detrás, en Rust).
+  useEffect(() => {
+    const show = (r: ClipRedacted) => {
+      const m = clipMessage(r);
+      toast(m.kind, m.text);
+    };
+    const off = listen<ClipRedacted>("screen-clip", (e) => show(e.payload));
+    // «Tapar datos personales del portapapeles», desde Ctrl+K.
+    const onClip = (e: Event) => show((e as CustomEvent<ClipRedacted>).detail);
+    window.addEventListener("adminops:clip", onClip);
+    return () => {
+      window.removeEventListener("adminops:clip", onClip);
+      void off.then((f) => f());
+    };
+  }, [toast]);
 
   // Los diálogos tapan los portales (sus vistas van por encima de la interfaz).
   useEffect(() => onOpenChange?.(dialog !== null), [dialog, onOpenChange]);
@@ -122,7 +145,7 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
           <button
             onClick={() => void noteApi.screenClip().catch((e) => toast("error", String(e)))}
             className="rounded-md p-1 text-mute hover:bg-panel-2 hover:text-ink"
-            title="Recorte de pantalla (Win+Mayús+S): queda en el portapapeles para pegarlo en el ticket"
+            title="Recorte de pantalla: se tapan solas las rutas, el usuario y el equipo, y queda en el portapapeles para pegarlo en el ticket"
           >
             <Crop size={13} />
           </button>

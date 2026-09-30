@@ -37,6 +37,26 @@ fn installed() -> Option<(String, PathBuf)> {
     None
 }
 
+/// AdminOps instalado en otra unidad (el pendrive) que este equipo no tiene
+/// registrado: en cada PC el pendrive puede tener otra letra y Windows solo
+/// recuerda la instalación del equipo donde se hizo. Primero la unidad desde la
+/// que se abre este instalador.
+fn installed_on_other_drive() -> Option<PathBuf> {
+    let system = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into()).to_uppercase();
+    let own = std::env::current_exe().ok().and_then(|e| e.to_str().and_then(|s| s.chars().next())).map(|c| c.to_ascii_uppercase());
+    let letters = own.into_iter().chain('D'..='Z');
+    for c in letters {
+        if format!("{c}:") == system {
+            continue;
+        }
+        let dir = PathBuf::from(format!("{c}:\\AdminOps"));
+        if dir.join("adminops.exe").is_file() {
+            return Some(dir);
+        }
+    }
+    None
+}
+
 fn default_dir() -> PathBuf {
     PathBuf::from(std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".into())).join("AdminOps")
 }
@@ -55,17 +75,23 @@ struct SetupInfo {
     install_dir: String,
     /// La versión instalada es más nueva: no se permite "actualizar" hacia atrás.
     downgrade: bool,
+    /// Se encontró AdminOps en otra unidad (el pendrive) sin registrar en este equipo.
+    found_on_drive: bool,
     app_running: bool,
 }
 
 #[tauri::command]
 fn setup_info() -> SetupInfo {
-    let current = installed();
+    // La instalación que recuerda Windows, si su carpeta sigue ahí (la de un
+    // pendrive puede haber cambiado de letra).
+    let current = installed().filter(|(_, d)| d.join("adminops.exe").is_file());
+    let other = if current.is_none() { installed_on_other_drive() } else { None };
     SetupInfo {
         version: VERSION.into(),
         downgrade: current.as_ref().is_some_and(|(v, _)| parse_version(v) > parse_version(VERSION)),
-        install_dir: current.as_ref().map_or_else(default_dir, |(_, d)| d.clone()).display().to_string(),
+        install_dir: current.as_ref().map(|(_, d)| d.clone()).or_else(|| other.clone()).unwrap_or_else(default_dir).display().to_string(),
         installed_version: current.map(|(v, _)| v),
+        found_on_drive: other.is_some(),
         app_running: app_running(),
     }
 }

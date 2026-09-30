@@ -193,6 +193,12 @@
       }
       $("desktop").closest("label").style.display = "none"; // al actualizar se respetan los accesos que ya hay
     }
+    if (!info.installedVersion && info.foundOnDrive) {
+      // Instalado en el pendrive desde otro equipo: se actualiza ahí mismo.
+      $("w-title").textContent = "Actualizar AdminOps del pendrive";
+      $("w-lead").textContent = `Hay un AdminOps en ${info.installDir.slice(0, 2)}. Se actualiza en esa misma carpeta y sus datos (junto al programa) se conservan.`;
+      $("install").textContent = "Actualizar";
+    }
     if (info.appRunning) note("warn", "AdminOps está abierto: se cerrará para continuar.");
   }
 

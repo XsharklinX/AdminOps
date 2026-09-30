@@ -1,7 +1,8 @@
-import { ArrowDown, Copy, Mail, Phone, Smartphone, Star } from "lucide-react";
+import { ArrowDown, Clock, Copy, Mail, MessageSquare, Phone, PhoneCall, Smartphone, Star } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import type { Contact } from "../../lib/api";
 import { COLUMNS, type Column, type SortBy } from "../../lib/contacts";
+import { Avatar } from "./Avatar";
 import type { ContactActions } from "./ContactDetail";
 import { colorOf, TagChip, type TagColors } from "./Tags";
 
@@ -56,45 +57,81 @@ function CopyLine({ icon, value, onCopy, mono = true }: { icon: ReactNode; value
 // ---------- Tarjetas ----------
 
 export function CardsView({ items, selected, selecting, onSelect, onOpen, actions: a, colors }: ViewProps) {
+  const act = "rounded-md p-1.5 text-mute transition-colors hover:bg-neon/10 hover:text-neon";
   return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-      {items.map((c) => (
-        <div
-          key={c.id}
-          id={`contact-${c.id}`}
-          onClick={() => onOpen(c)}
-          className={`group flex cursor-pointer flex-col gap-1.5 rounded-xl border bg-panel px-3.5 py-3 transition-colors hover:border-line-2 ${
-            selected.has(c.id) ? "border-neon/60 bg-neon/5" : "border-line"
-          }`}
-        >
-          <div className="flex items-start gap-2">
-            <Check c={c} selected={selected} selecting={selecting} onSelect={onSelect} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-ink">{c.name}</p>
-              {(c.role || c.company) && <p className="truncate text-[11px] text-dim">{[c.role, c.company].filter(Boolean).join(" · ")}</p>}
+    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+      {items.map((c) => {
+        const number = c.extension || c.phone || c.mobile;
+        return (
+          <div
+            key={c.id}
+            id={`contact-${c.id}`}
+            onClick={() => onOpen(c)}
+            className={`group flex cursor-pointer flex-col rounded-xl border bg-panel transition-colors hover:border-line-2 ${
+              selected.has(c.id) ? "border-neon/60 bg-neon/5" : "border-line"
+            }`}
+          >
+            <div className="flex items-start gap-2.5 px-3.5 pt-3">
+              <Avatar c={c} size={38} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-ink">{c.name}</p>
+                {(c.role || c.company) && <p className="truncate text-[11px] text-dim">{[c.role, c.company].filter(Boolean).join(" · ")}</p>}
+                {c.availability && (
+                  <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mute">
+                    <Clock size={10} className="shrink-0" /> {c.availability}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Check c={c} selected={selected} selecting={selecting} onSelect={onSelect} />
+                <StarBtn c={c} actions={a} />
+              </div>
             </div>
-            {c.extension && (
-              <button onClick={stop(() => a.copy(c, c.extension, "Extensión"))} className="shrink-0 rounded-md border border-line px-1.5 font-mono text-sm text-ink hover:border-neon/50 hover:text-neon" title="Copiar extensión">
-                {c.extension}
-              </button>
+            {c.reason && <p className="mx-3.5 mt-2 line-clamp-2 rounded-md bg-neon/5 px-2 py-1 text-xs text-neon">Para: {c.reason}</p>}
+            <div className="mt-2 flex flex-col gap-0.5 px-3.5">
+              {c.phone && <CopyLine icon={<Phone size={11} />} value={c.phone} onCopy={() => a.copy(c, c.phone, "Teléfono")} />}
+              {c.mobile && <CopyLine icon={<Smartphone size={11} />} value={c.mobile} onCopy={() => a.copy(c, c.mobile, "Móvil")} />}
+              {c.email && <CopyLine icon={<Mail size={11} />} value={c.email} onCopy={() => a.copy(c, c.email, "Correo")} mono={false} />}
+            </div>
+            {c.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1 px-3.5">
+                {c.tags.map((t) => (
+                  <TagChip key={t} name={t} color={colorOf(colors, t)} />
+                ))}
+              </div>
             )}
-            <StarBtn c={c} actions={a} />
-          </div>
-          {c.reason && <p className="line-clamp-2 text-xs text-neon">Para: {c.reason}</p>}
-          <div className="flex flex-col gap-0.5">
-            {c.phone && <CopyLine icon={<Phone size={11} />} value={c.phone} onCopy={() => a.copy(c, c.phone, "Teléfono")} />}
-            {c.mobile && <CopyLine icon={<Smartphone size={11} />} value={c.mobile} onCopy={() => a.copy(c, c.mobile, "Móvil")} />}
-            {c.email && <CopyLine icon={<Mail size={11} />} value={c.email} onCopy={() => a.copy(c, c.email, "Correo")} mono={false} />}
-          </div>
-          {c.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {c.tags.map((t) => (
-                <TagChip key={t} name={t} color={colorOf(colors, t)} />
-              ))}
+            <div className="h-3" />
+            <div className="mt-auto flex items-center gap-0.5 border-t border-line/60 px-2 py-1.5">
+              {c.extension ? (
+                <button onClick={stop(() => a.copy(c, c.extension, "Extensión"))} className="mr-auto rounded-md px-1.5 py-0.5 font-mono text-base font-semibold text-ink hover:text-neon" title="Copiar extensión">
+                  <span className="mr-1 text-[10px] font-normal text-mute">ext.</span>
+                  {c.extension}
+                </button>
+              ) : (
+                <span className="mr-auto" />
+              )}
+              {number && (
+                <button onClick={stop(() => a.call(c, number))} className={act} title={`Llamar al ${number}`}>
+                  <PhoneCall size={14} />
+                </button>
+              )}
+              {c.email && (
+                <>
+                  <button onClick={stop(() => a.email(c, c.email))} className={act} title="Escribir un correo">
+                    <Mail size={14} />
+                  </button>
+                  <button onClick={stop(() => a.teams(c, c.email, false))} className={act} title="Chat de Teams">
+                    <MessageSquare size={14} />
+                  </button>
+                </>
+              )}
+              <button onClick={stop(() => a.copyCard(c))} className={act} title="Copiar tarjeta">
+                <Copy size={14} />
+              </button>
             </div>
-          )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -192,7 +229,12 @@ export function TableView({
               <td>
                 <StarBtn c={c} actions={a} />
               </td>
-              <td className="px-2 py-1.5 text-sm text-ink">{c.name}</td>
+              <td className="px-2 py-1.5 text-sm text-ink">
+                <span className="flex items-center gap-2">
+                  <Avatar c={c} size={22} />
+                  {c.name}
+                </span>
+              </td>
               {cols.map((col) => (
                 <td key={col.id} className="max-w-64 px-2 py-1.5">
                   {cell(c, col.id)}
@@ -214,6 +256,7 @@ export function DirectoryView({ items, selected, selecting, onSelect, onOpen, ac
       {items.map((c) => (
         <div key={c.id} id={`contact-${c.id}`} onClick={() => onOpen(c)} className="group flex cursor-pointer items-center gap-2 border-b border-line/40 py-1.5 hover:bg-panel-2">
           <Check c={c} selected={selected} selecting={selecting} onSelect={onSelect} />
+          <Avatar c={c} size={24} />
           <span className="min-w-0 flex-1 truncate text-sm text-ink">
             {c.favorite && <Star size={10} className="mr-1 inline text-warn" fill="currentColor" />}
             {c.name}

@@ -235,14 +235,6 @@ advice = "optional"
 store_id = "9NMPJ99VJBWV"
 
 [[app]]
-package = "MicrosoftCorporationII.QuickAssist"
-name = "Asistencia rápida"
-description = "Soporte remoto integrado de Windows."
-advice = "keep"
-store_id = "9P7BP5VNWKX5"
-note = "Muy útil para soporte técnico remoto. Recomendado mantenerla."
-
-[[app]]
 package = "Microsoft.OutlookForWindows"
 name = "Outlook (nuevo)"
 description = "Cliente de correo que reemplaza a Correo y Calendario."

@@ -103,6 +103,86 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
 - **Deuda cerrada**: los 9 avisos de ESLint `no-floating-promises` (promesas sin gestionar en
   Knowledge, Migrate, Report, Ajustes → Bloqueo, Cuentas, Dispositivos, Plan de acción e informe de
   servicio). `npx eslint .` queda sin avisos.
+- **La ayuda «?» de las pestañas salía vacía** (una raya bajo el icono) en todas las páginas con
+  pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
+  ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
+
+### v1.1.7 — AdminOps en el pendrive y Discos (hecho, sin probar en otro equipo)
+
+- **Instalado en el pendrive, los datos viajan con él.** Si el programa está en una unidad
+  extraíble, AdminOps se pone solo en modo portable (todo en `AdminOps-data` junto al programa); en
+  cualquier otra carpeta, Ajustes → Datos → «Guardar todo en la carpeta del programa». Actualizar es
+  volver a pasar el instalador: su desinstalador solo borra los archivos que instaló (se comprobó
+  en el script NSIS generado), así que `AdminOps-data` se conserva.
+- **La primera vez se trae lo de este equipo**, al arrancar y antes de abrir ninguna vista web:
+  ajustes, clientes, contactos, agenda, portales, Microsoft 365…; lo propio del equipo (diario,
+  diagnósticos, ventana) a `equipos\<equipo>`. Las contraseñas cifradas con DPAPI (solo legibles en
+  este equipo) se cifran de nuevo con la clave del pendrive; también la sesión de los portales de
+  este equipo. Queda anotado (registro y Ajustes).
+- **Un perfil del navegador por equipo dentro del pendrive.** Windows cifra las sesiones de los
+  portales para cada equipo: con una sola carpeta compartida, cada cambio de PC obligaba a entrar de
+  nuevo en todo (y otra vez al volver). Ahora se entra una vez en cada PC y se mantiene. Llevarse
+  la sesión de un equipo a otro no se hace: es lo que Microsoft detecta como robo de sesión. Las
+  cuentas guardadas para «Entrar solo» sí viajan (cifradas con la clave del pendrive).
+- **El instalador encuentra el AdminOps del pendrive** en un equipo que no lo tiene registrado (o
+  si el pendrive cambió de letra) y lo actualiza en esa misma carpeta.
+- **Discos** (antes «Espacio en disco»), con una pestaña nueva, **Salud y reparación**: un veredicto
+  por disco con lo que se estropea primero (superficie: sectores pendientes o no corregibles,
+  errores de lectura, aviso del propio disco → «copia ya y no pases chkdsk /r antes»; conexión: CRC
+  → cable, puerto o caja USB; sistema de archivos marcado como dañado → el «Reparar disco» de
+  Windows; sectores ya apartados; desgaste de SSD; temperatura). Por volumen: **Comprobar** (sin
+  cambiar nada, `Repair-Volume -Scan`), **Reparar sistema de archivos** (`-OfflineScanAndFix`; en el
+  de Windows se programa al reiniciar) y **Buscar sectores dañados** (chkdsk /r con progreso y
+  cancelable; no en el de Windows). **Rescatar archivos**: copia a otro disco todo lo que se lee
+  (robocopy con un reintento de 1 s en vez de un millón) y lista lo que se quedó. El estado sucio se
+  lee con `FSCTL_IS_VOLUME_DIRTY` (sin depender del idioma). Reparar, chkdsk /r y rescatar van al
+  diario y el modo auditoría los bloquea.
+
+### Agenda para todos, Contactos, fuera la Asistencia rápida y cuatro APIs de Windows (hecho)
+
+- **La Agenda ya no depende de tener clientes.** Cada cosa es una **tarea, llamada, reunión o
+  visita**, con cliente o sin él (quien trabaja en una sola empresa no tiene «clientes»): basta un
+  título. Arriba, **apuntar en una línea** (qué + hoy/mañana/pasado/otro día + hora, Enter); si no
+  se pone hora, hoy la siguiente en punto y otro día las 9:00. **La semana de un vistazo** (siete
+  días con un punto de color por cosa; al pulsar uno, solo ese día). A la izquierda, **lo próximo de
+  hoy** («En 25 min: …») y **lo de mañana**, con los **seguimientos** (los de la nota de llamada)
+  metidos en su día, con «Hecho» y «Mañana». «Toca mantenimiento» solo sale si hay clientes. En
+  cada fila, una franja del color del tipo; «Empezar» (sesión de servicio) solo con cliente. Los
+  avisos y el evento de Outlook usan el título. Las visitas antiguas siguen igual (sin tipo =
+  visita).
+- **Contactos, más útil de un vistazo**: seis cifras arriba (contactos, favoritos, con extensión,
+  empresas, usados este mes, sin completar) que filtran al pulsarlas; **marcación rápida** con los
+  favoritos y los más usados (extensión en grande, llamar, Teams, correo y copiar al pasar el
+  ratón); **avatares** con las iniciales y un color estable por persona en tarjetas, tabla y
+  directorio; tarjetas con la disponibilidad y una barra de acciones; la ficha con una cabecera del
+  color de la persona, la extensión en grande y cuatro botones (Llamar, Correo, Chat, Tarjeta).
+- **Fuera la Asistencia rápida** de toda la app (Microsoft la retiró): el botón de Acceso remoto
+  abre ahora la **Asistencia remota de Windows** (`msra.exe`); fuera también su atajo del catálogo
+  de herramientas, su ficha en «Apps preinstaladas», sus atajos de teclado y las menciones en los
+  textos de ayuda y documentación.
+- **Tapar datos personales en los recortes, con el OCR de Windows** (`Windows.Media.Ocr`, sin nube).
+  Al recortar desde AdminOps (barra del caso o Ctrl+K), en cuanto la imagen llega al portapapeles se
+  leen sus palabras y se tapan las rutas de perfil (`C:\Users\…`) y las que llevan el usuario, la
+  carpeta del perfil, el equipo o el dominio; la imagen tapada vuelve al portapapeles y se dice
+  cuántas se taparon. Para capturas hechas fuera: Ctrl+K → «Tapar datos personales del
+  portapapeles». El portapapeles se lee y escribe con Win32; WinRT solo para el OCR. Si Windows no
+  tiene el reconocimiento de texto del idioma, se dice y el recorte queda como estaba.
+- **El Visor de eventos, en tiempo real**: la vigilancia de errores se suscribe (`EvtSubscribe`) a
+  los eventos que vigila y hace la pasada en cuanto Windows escribe uno (esperando 3 s a que lleguen
+  los que van juntos), en vez de preguntar cada minuto con PowerShell. El espacio libre y los
+  dispositivos, que no dejan evento, cada 10 minutos. Si Windows no deja suscribirse, cada minuto
+  como antes (se dice en el registro).
+- **Avisos de seguimientos con botones**: «Hecho» y «Mañana» en el propio aviso de Windows, sin
+  abrir AdminOps; pulsar el aviso trae AdminOps delante. Uno por seguimiento si son hasta tres; más,
+  un resumen. Si Windows no deja mostrar botones, el aviso de siempre.
+- **API COM de winget: no se hizo.** Windows solo registra los intermediarios COM de winget
+  (Microsoft.Management.Deployment) para aplicaciones empaquetadas (MSIX); desde AdminOps falla con
+  «Failed to find proxy registration» (0x80073D54), y además Microsoft no la admite desde procesos
+  elevados. Se probó con enlaces generados del propio `.winmd` y se quitó para no dejar código
+  muerto. Alternativas: distribuir el paquete de interoperabilidad COM de Microsoft junto a
+  AdminOps (más peso y atado a sus versiones), o usar el módulo Microsoft.WinGet.Client de
+  PowerShell cuando esté instalado. Mientras tanto, winget sigue por la consola (los ids instalados
+  ya salen del JSON de `winget export`, que no depende del idioma ni del formato de la tabla).
 
 ### Fase 30 — Probar la aplicación en marcha
 
@@ -1238,7 +1318,7 @@ Pulido para el uso diario.
 - **Estadísticas**: ingresos por mes, servicios más vendidos y clientes frecuentes (de los recibos).
 - **Enviar el informe por WhatsApp** con el número del cliente y el mensaje listo.
 - **Avisos al abrir la app**: mantenimientos vencidos y garantías que terminan.
-- **Asistencia remota** apuntada en la sesión (código de Asistencia rápida o AnyDesk).
+- **Asistencia remota** apuntada en la sesión (invitación de Asistencia remota o id de AnyDesk/RustDesk).
 
 ### Fase 27 — Plantillas de preparación (más adelante)
 

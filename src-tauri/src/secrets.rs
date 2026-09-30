@@ -69,6 +69,24 @@ fn open_with(root: &Path, stored: &str) -> Result<String, String> {
     String::from_utf8(plain).map_err(|_| "Contraseña guardada dañada.".into())
 }
 
+/// Comienzo en base64 de todo blob de DPAPI (versión 1 + el GUID del proveedor).
+const DPAPI_B64: &str = "AQAAANCMnd8BFdERjHoAwE/Cl+s";
+
+/// ¿Es una contraseña cifrada con DPAPI (solo legible en el equipo donde se guardó)?
+pub fn is_dpapi(stored: &str) -> bool {
+    stored.starts_with(DPAPI_B64)
+}
+
+/// Cifra con la clave de un pendrive concreto (al pasar los datos de un equipo al pendrive).
+pub fn seal_in(root: &Path, secret: &str) -> Result<String, String> {
+    seal_with(root, secret)
+}
+
+#[cfg(test)]
+pub fn open_in(root: &Path, stored: &str) -> Result<String, String> {
+    open_with(root, stored)
+}
+
 /// Cifra una contraseña para guardarla.
 pub fn seal(secret: &str) -> Result<String, String> {
     if secret.is_empty() {

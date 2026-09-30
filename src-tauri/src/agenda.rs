@@ -1,6 +1,7 @@
-//! Agenda de mantenimientos: visitas planificadas a los clientes, lo que toca
-//! hoy y un aviso de Windows antes de cada visita. Viaja con los datos
-//! compartidos (en el USB con el portable), como los clientes.
+//! Agenda: visitas a clientes, pero también tareas, llamadas y reuniones sin
+//! cliente (quien trabaja en una sola empresa no tiene «clientes»). Lo que toca
+//! hoy, lo de mañana y un aviso de Windows antes de cada cosa. Viaja con los
+//! datos compartidos (en el USB con el portable), como los clientes.
 
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -18,6 +19,11 @@ const DAY: u64 = 86_400;
 #[serde(rename_all = "camelCase", default)]
 pub struct Visit {
     pub id: String,
+    /// "" o "visit" visita · "task" tarea · "call" llamada · "meeting" reunión.
+    pub kind: String,
+    /// Qué es («Cambiar el disco del servidor»). Obligatorio si no hay cliente.
+    pub title: String,
+    /// Cliente, si es una visita a uno. Puede ir vacío.
     pub client_id: String,
     /// Copia del nombre, por si el cliente se borra después.
     pub client_name: String,
@@ -77,9 +83,27 @@ fn save(app: &tauri::AppHandle, v: &[Visit]) -> Result<(), String> {
     crate::paths::write_json(&path(app), &v)
 }
 
+impl Visit {
+    /// Cómo se nombra en avisos, listas y conflictos: el título o, si no hay, el cliente.
+    pub fn label(&self) -> &str {
+        if self.title.is_empty() {
+            &self.client_name
+        } else {
+            &self.title
+        }
+    }
+}
+
+const KINDS: &[&str] = &["visit", "task", "call", "meeting"];
+
 fn validate(mut v: Visit) -> Result<Visit, String> {
-    if v.client_id.trim().is_empty() {
-        return Err("Elige el cliente.".into());
+    v.client_id = v.client_id.trim().to_string();
+    v.title = v.title.trim().chars().take(120).collect();
+    if v.client_id.is_empty() && v.title.is_empty() {
+        return Err("Escribe qué es, o elige un cliente.".into());
+    }
+    if !KINDS.contains(&v.kind.as_str()) {
+        v.kind = "visit".into();
     }
     if v.start == 0 {
         return Err("Elige el día y la hora.".into());
@@ -146,6 +170,16 @@ fn machines_text(n: u32) -> String {
     }
 }
 
+/// «Visita», «Tarea», «Llamada», «Reunión».
+pub fn kind_name(kind: &str) -> &'static str {
+    match kind {
+        "task" => "Tarea",
+        "call" => "Llamada",
+        "meeting" => "Reunión",
+        _ => "Visita",
+    }
+}
+
 fn notify(app: &tauri::AppHandle, title: &str, body: &str) {
     use tauri_plugin_notification::NotificationExt;
     let _ = app.notification().builder().title(title).body(body.chars().take(240).collect::<String>()).show();
@@ -165,9 +199,9 @@ fn tick(app: &tauri::AppHandle) {
         *summary = Some(day_key);
         let todays: Vec<&Visit> = visits.iter().filter(|v| v.status == "planned" && v.start >= at && local_time(v.start).date_naive() == today.date_naive()).collect();
         if !todays.is_empty() {
-            let list = todays.iter().map(|v| format!("{} {}", local_time(v.start).format("%H:%M"), v.client_name)).collect::<Vec<_>>().join(" · ");
+            let list = todays.iter().map(|v| format!("{} {}", local_time(v.start).format("%H:%M"), v.label())).collect::<Vec<_>>().join(" · ");
             let n = todays.len();
-            notify(app, &format!("Hoy tienes {n} {}", if n == 1 { "visita" } else { "visitas" }), &list);
+            notify(app, &format!("Hoy tienes {n} {} en la agenda", if n == 1 { "cosa" } else { "cosas" }), &list);
         }
     }
     drop(summary);
@@ -179,8 +213,8 @@ fn tick(app: &tauri::AppHandle) {
     for i in due {
         let v = &mut visits[i];
         v.reminded = true;
-        let body = format!("{} a las {}{}{}", v.client_name, local_time(v.start).format("%H:%M"), machines_text(v.machines), if v.notes.is_empty() { String::new() } else { format!(" · {}", v.notes) });
-        notify(app, "Visita en menos de 30 minutos", &body);
+        let body = format!("{} a las {}{}{}", v.label(), local_time(v.start).format("%H:%M"), machines_text(v.machines), if v.notes.is_empty() { String::new() } else { format!(" · {}", v.notes) });
+        notify(app, &format!("{} en menos de 30 minutos", kind_name(&v.kind)), &body);
     }
     if let Err(e) = save(app, &visits) {
         log::warn!("Agenda: no se pudo guardar el aviso: {e}");
@@ -224,10 +258,14 @@ pub struct SavedVisit {
 #[tauri::command]
 pub fn save_visit(app: tauri::AppHandle, visit: Visit) -> Result<SavedVisit, String> {
     let mut v = validate(visit)?;
-    let client = crate::workflow::find_client(&app, &v.client_id).ok_or("Ese cliente ya no existe.")?;
-    v.client_name = client.name.clone();
-    if v.machines == 0 {
-        v.machines = client.machines.len() as u32;
+    if v.client_id.is_empty() {
+        v.client_name.clear();
+    } else {
+        let client = crate::workflow::find_client(&app, &v.client_id).ok_or("Ese cliente ya no existe.")?;
+        v.client_name = client.name.clone();
+        if v.machines == 0 && v.kind == "visit" {
+            v.machines = client.machines.len() as u32;
+        }
     }
     let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut list = load(&app);
@@ -312,7 +350,7 @@ pub fn overlaps(visits: &[Visit], candidate: &Visit) -> Option<String> {
     visits
         .iter()
         .find(|v| v.id != candidate.id && v.status == "planned" && v.start < fin(candidate) && candidate.start < fin(v))
-        .map(|v| v.client_name.clone())
+        .map(|v| v.label().to_string())
 }
 
 /// La siguiente visita de una serie que se repite, si la hay.
@@ -427,6 +465,21 @@ mod tests {
 
     fn visit(client: &str, start: u64, status: &str) -> Visit {
         Visit { id: format!("v{start}"), client_id: client.into(), client_name: client.into(), start, minutes: 60, status: status.into(), ..Default::default() }
+    }
+
+    /// Quien trabaja en una sola empresa no tiene clientes: una tarea con título basta.
+    #[test]
+    fn entries_without_a_client_are_fine() {
+        let v = validate(Visit { title: "  Cambiar el disco del servidor ".into(), kind: "task".into(), start: 10, ..Default::default() }).unwrap();
+        assert_eq!((v.title.as_str(), v.kind.as_str(), v.label()), ("Cambiar el disco del servidor", "task", "Cambiar el disco del servidor"));
+        // Sin título ni cliente no se sabe qué es.
+        assert!(validate(Visit { title: "   ".into(), start: 10, ..Default::default() }).is_err());
+        // Un tipo inventado es una visita; las viejas (sin tipo) también.
+        assert_eq!(validate(Visit { client_id: "c1".into(), kind: "fiesta".into(), start: 10, ..Default::default() }).unwrap().kind, "visit");
+        // Con cliente y sin título, se nombra por el cliente.
+        assert_eq!(Visit { client_name: "Clínica Norte".into(), ..Default::default() }.label(), "Clínica Norte");
+        assert_eq!(kind_name("call"), "Llamada");
+        assert_eq!(kind_name(""), "Visita");
     }
 
     #[test]

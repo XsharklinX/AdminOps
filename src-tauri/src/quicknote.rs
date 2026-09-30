@@ -80,11 +80,52 @@ pub fn close_quick_note(app: tauri::AppHandle) {
 }
 
 /// Abre el recorte de pantalla de Windows (Win+Mayús+S). Lo que se recorta
-/// queda en el portapapeles, listo para pegar en el ticket.
+/// queda en el portapapeles y, en cuanto llega, se le tapan con el OCR de
+/// Windows las rutas y los nombres de usuario y de equipo (ver `ocr`). La
+/// interfaz recibe «screen-clip» con lo que se tapó.
 #[tauri::command]
-pub fn open_screen_clip() -> Result<(), String> {
-    if crate::shellopen::protocol_registered("ms-screenclip") {
-        return crate::shellopen::open("ms-screenclip:");
+pub fn open_screen_clip(app: tauri::AppHandle) -> Result<(), String> {
+    if !crate::shellopen::protocol_registered("ms-screenclip") {
+        return Err("Este equipo no tiene la herramienta de recortes de Windows. Prueba con Win+Mayús+S, o con Impr Pant.".into());
     }
-    Err("Este equipo no tiene la herramienta de recortes de Windows. Prueba con Win+Mayús+S, o con Impr Pant.".into())
+    #[cfg(windows)]
+    let before = crate::ocr::clipboard_sequence();
+    crate::shellopen::open("ms-screenclip:")?;
+    #[cfg(windows)]
+    std::thread::spawn(move || {
+        use tauri::Emitter;
+        // Dos minutos para recortar; el primer cambio del portapapeles es el recorte.
+        let limit = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        while std::time::Instant::now() < limit {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            if crate::ocr::clipboard_sequence() != before {
+                // La herramienta pone varios formatos seguidos: se le deja terminar.
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                let r = crate::ocr::redact_clipboard();
+                if r.error != crate::ocr::NO_IMAGE {
+                    log::info!("Recorte: {} de {} palabras tapadas{}", r.covered, r.words, if r.error.is_empty() { String::new() } else { format!(" ({})", r.error) });
+                    let _ = app.emit("screen-clip", &r);
+                }
+                return;
+            }
+        }
+    });
+    Ok(())
+}
+
+/// Tapa los datos personales de la imagen que haya ahora en el portapapeles
+/// (un recorte hecho con Win+Mayús+S fuera de AdminOps, una captura…).
+#[tauri::command(async)]
+pub fn redact_clipboard_image() -> Result<crate::ocr::Redacted, String> {
+    #[cfg(windows)]
+    {
+        let r = crate::ocr::redact_clipboard();
+        if r.error.is_empty() {
+            Ok(r)
+        } else {
+            Err(r.error)
+        }
+    }
+    #[cfg(not(windows))]
+    Err("Solo en Windows.".into())
 }

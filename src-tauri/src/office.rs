@@ -1,5 +1,5 @@
 //! La oficina completa: encender equipos por la red (Wake-on-LAN), acceso
-//! remoto (Escritorio remoto, Asistencia rápida), carpetas compartidas y
+//! remoto (Escritorio remoto, Asistencia remota), carpetas compartidas y
 //! conflictos de IP en la red.
 
 use crate::ps::text_var;
@@ -151,7 +151,7 @@ Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\P
 pub fn set_remote_desktop(tweaks: State<'_, TweakState>, enabled: bool) -> Result<(), String> {
     elevated()?;
     if enabled && !crate::vault::vault_support().bitlocker {
-        return Err("Windows Home no puede recibir conexiones de Escritorio remoto (sí conectarse a otros). Usa Asistencia rápida.".into());
+        return Err("Windows Home no puede recibir conexiones de Escritorio remoto (sí conectarse a otros). Usa AnyDesk o RustDesk.".into());
     }
     // "@FirewallAPI.dll,-28752" es el grupo "Escritorio remoto" en cualquier idioma.
     let script = format!(
@@ -180,32 +180,17 @@ pub fn open_remote_desktop(host: String) -> Result<(), String> {
     std::process::Command::new(format!("{system}\\System32\\mstsc.exe")).arg(format!("/v:{host}")).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
-/// Página de la Asistencia rápida en la Microsoft Store.
-const QUICK_ASSIST_STORE: &str = "ms-windows-store://pdp/?productid=9P7BP5VNPTZ9";
-
-/// Abre la Asistencia rápida de Windows.
-///
-/// En Windows 11 es una app de la Store con su propio protocolo; en Windows 10
-/// (y en equipos donde esa app se quitó) sigue estando `quickassist.exe`. Si no
-/// hay ninguna de las dos, Windows sacaba su propio aviso en inglés: ahora se
-/// abre su ficha de la Store y se explica en español qué hacer.
+/// Abre la Asistencia remota de Windows (msra.exe): invitar a alguien de
+/// confianza o ayudar a quien te invitó. Viene con Windows y no depende de la
+/// Store. (La Asistencia rápida ya no se puede usar y se quitó de AdminOps.)
 #[tauri::command]
-pub fn open_quick_assist() -> Result<(), String> {
-    // Primero el programa de Windows, si está: es el que nunca falla ni saca
-    // cuadros de diálogo raros. En Windows 10 y en buena parte de los Windows 11
-    // sigue ahí.
+pub fn open_remote_assistance() -> Result<(), String> {
     let system = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-    let exe = std::path::PathBuf::from(system).join("System32").join("quickassist.exe");
-    if exe.is_file() {
-        return crate::shellopen::open(&exe.to_string_lossy());
+    let exe = std::path::PathBuf::from(system).join("System32").join("msra.exe");
+    if !exe.is_file() {
+        return Err("Este equipo no tiene la Asistencia remota de Windows. Usa AnyDesk, RustDesk o TeamViewer, aquí abajo.".into());
     }
-    // Si no, el protocolo de la app de la Store, pero solo si de verdad hay algo
-    // que lo abra (ver `protocol_registered`).
-    if crate::shellopen::protocol_registered("ms-quick-assist") {
-        return crate::shellopen::open("ms-quick-assist:");
-    }
-    let _ = crate::shellopen::open(QUICK_ASSIST_STORE);
-    Err("Este equipo no tiene la Asistencia rápida de Windows. Te he abierto su ficha en la Microsoft Store para instalarla; mientras tanto puedes usar AnyDesk, RustDesk o TeamViewer, aquí abajo.".into())
+    crate::shellopen::open(&exe.to_string_lossy())
 }
 
 // ---------- Carpetas compartidas ----------

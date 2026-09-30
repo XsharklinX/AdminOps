@@ -842,16 +842,6 @@ keywords = "unidad recuperacion usb"
 # ---------- Asistencia remota ----------
 
 [[tool]]
-id = "quickassist"
-name = "Asistencia rápida"
-description = "Ayuda o recibe ayuda remota con una cuenta de Microsoft."
-group = "remote"
-icon = "handshake"
-run = "{System32}\\quickassist.exe"
-requires = "{System32}\\quickassist.exe"
-keywords = "asistencia rapida remoto quick assist"
-
-[[tool]]
 id = "msra"
 name = "Asistencia remota de Windows"
 description = "msra: invitar a alguien de confianza a conectarse."

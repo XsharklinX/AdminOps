@@ -294,7 +294,7 @@ pub fn test_connection(target: String) -> Result<Reach, String> {
     let rdp_open = TcpStream::connect_timeout(&SocketAddr::from((ip, 3389)), Duration::from_millis(1500)).is_ok();
     let hint = match (ping_ms.is_some(), rdp_open) {
         (_, true) => String::new(),
-        (true, false) => "El equipo responde pero no acepta Escritorio remoto: puede estar desactivado, bloqueado por el firewall o ser Windows Home (que no puede recibirlo). En ese caso usa Asistencia rápida o AnyDesk/RustDesk.".into(),
+        (true, false) => "El equipo responde pero no acepta Escritorio remoto: puede estar desactivado, bloqueado por el firewall o ser Windows Home (que no puede recibirlo). En ese caso usa AnyDesk o RustDesk.".into(),
         (false, false) => "El equipo no responde: puede estar apagado (prueba a encenderlo por la red), en otra red o con el firewall bloqueando todo.".into(),
     };
     Ok(Reach { resolved: Some(ip.to_string()), ping_ms, rdp_open, hint })

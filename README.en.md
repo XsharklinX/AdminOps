@@ -98,7 +98,7 @@ or build your own. One restore point per profile, and it can be undone as a whol
 | **Tickets** | Opens your company's ticketing site (intranet, GLPI, osTicket…) inside AdminOps, with the session remembered. |
 | **My network & router** | Current network (IP, router, DNS, public IP), the router's admin panel inside AdminOps with its saved, encrypted login, router and Wi-Fi security check, double NAT and a QR code to connect a phone. |
 | **Network devices** | Everything on the local network with IP, MAC, vendor and name; label yours and spot new ones. |
-| **Remote access** | Remote Desktop, Quick Assist and waking PCs over the network (Wake-on-LAN). |
+| **Remote access** | Remote Desktop, Windows Remote Assistance and waking PCs over the network (Wake-on-LAN). |
 | **Windows error alerts** | While open, it spots blue screens, failing disks, crashing apps, low memory or disk space, threats… and explains what they mean and what to do. |
 | **Vault** | A BitLocker-encrypted, password-protected drive stored in a file that opens with a double click, even without AdminOps. On Windows Home, AES-256 encrypted .zip folders. |
 | **Secure delete** | Deletes files beyond recovery, wipes free space and walks you through preparing a PC before selling or donating it. |

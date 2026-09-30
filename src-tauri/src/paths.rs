@@ -17,14 +17,63 @@ fn exe_dir() -> Option<PathBuf> {
     std::env::current_exe().ok()?.parent().map(PathBuf::from)
 }
 
-/// Carpeta portable, si el marcador existe junto al ejecutable.
-fn portable_root() -> Option<&'static PathBuf> {
-    static ROOT: OnceLock<Option<PathBuf>> = OnceLock::new();
-    ROOT.get_or_init(|| {
-        let dir = exe_dir()?;
-        dir.join(MARKER).is_file().then(|| dir.join("AdminOps-data"))
+/// Por qué es portable: "marker" (archivo junto al exe), "removable" (el
+/// programa está en un pendrive) o "" (instalado en el equipo).
+fn portable_state() -> &'static (Option<PathBuf>, &'static str) {
+    static STATE: OnceLock<(Option<PathBuf>, &'static str)> = OnceLock::new();
+    STATE.get_or_init(|| {
+        let Some(dir) = exe_dir() else { return (None, "") };
+        if dir.join(MARKER).is_file() {
+            (Some(dir.join("AdminOps-data")), "marker")
+        } else if crate::storage::on_removable_drive(&dir) {
+            // Instalado en un pendrive: los datos viajan con él (ver storage.rs).
+            (Some(dir.join("AdminOps-data")), "removable")
+        } else {
+            (None, "")
+        }
     })
-    .as_ref()
+}
+
+/// Carpeta portable, si el marcador existe junto al ejecutable o está en un pendrive.
+fn portable_root() -> Option<&'static PathBuf> {
+    portable_state().0.as_ref()
+}
+
+pub fn portable_reason() -> &'static str {
+    portable_state().1
+}
+
+/// El marcador pide traer los datos de este equipo la próxima vez que arranque.
+const MIGRATE_REQUEST: &str = "migrar";
+
+pub fn marker_requests_migration() -> bool {
+    exe_dir().and_then(|d| std::fs::read_to_string(d.join(MARKER)).ok()).is_some_and(|t| t.trim() == MIGRATE_REQUEST)
+}
+
+pub fn clear_migration_request() {
+    if marker_requests_migration() {
+        if let Some(d) = exe_dir() {
+            let _ = std::fs::write(d.join(MARKER), "");
+        }
+    }
+}
+
+/// ¿Se puede escribir junto al programa? (En Archivos de programa, solo como administrador.)
+pub fn exe_dir_writable() -> bool {
+    exe_dir().is_some_and(|d| {
+        let probe = d.join(".adminops-write-test");
+        let ok = std::fs::write(&probe, b"ok").is_ok();
+        let _ = std::fs::remove_file(&probe);
+        ok
+    })
+}
+
+/// Pasa a portable al volver a abrir AdminOps, trayendo los datos de este equipo.
+pub fn request_portable_with_migration() -> Result<(), String> {
+    let dir = exe_dir().ok_or("No se encuentra la carpeta del programa.")?;
+    std::fs::write(dir.join(MARKER), MIGRATE_REQUEST).map_err(|_| {
+        "No se puede escribir en la carpeta del programa. Si está en Archivos de programa, abre AdminOps como administrador (o instálalo en el pendrive).".to_string()
+    })
 }
 
 /// Carpeta de datos del USB (solo en portable).
@@ -44,7 +93,24 @@ pub fn is_portable() -> bool {
 /// primera creación), WebView2 no arrancaría y la ventana se quedaría en negro.
 /// En ese caso no se devuelve nada y se usa la carpeta del equipo.
 pub fn portable_webview_dir() -> Option<PathBuf> {
-    portable_root().map(|root| root.join("webview")).filter(|d| is_writable(d))
+    let root = portable_root()?;
+    // Una por equipo: las sesiones de los portales van cifradas por Windows para
+    // cada equipo, y una sola carpeta compartida obligaba a volver a entrar en
+    // todo al cambiar de PC (y otra vez al volver). Así, una vez en cada PC.
+    let dir = root.join("equipos").join(host()).join("webview");
+    let legacy = root.join("webview");
+    if !dir.exists() && legacy.is_dir() {
+        let _ = std::fs::create_dir_all(dir.parent().unwrap_or(root));
+        let _ = std::fs::rename(&legacy, &dir);
+    }
+    Some(dir).filter(|d| is_writable(d))
+}
+
+/// Al arrancar en portable, antes de WebView2: traer los datos de este equipo
+/// si el pendrive aún no tiene (ver storage.rs).
+pub fn migrate_to_portable_if_needed() -> Option<crate::storage::Migrated> {
+    let root = portable_root()?;
+    crate::storage::migrate_if_needed(root, &host())
 }
 
 /// ¿Se puede crear y escribir en esta carpeta? (Una carpeta heredada de otro

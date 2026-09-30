@@ -75,7 +75,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["Win", "B"], what: "Ir a los iconos junto al reloj (bandeja del sistema)", try: true },
       { keys: ["Win", "1…9"], what: "Abrir el programa anclado en esa posición de la barra de tareas" },
       { keys: ["Win", "Alt", "D"], what: "Mostrar la fecha y la hora", try: true },
-      { keys: ["Win", "Ctrl", "Q"], what: "Asistencia rápida (ayuda remota con un código)", tip: "El atajo más útil para que un cliente te deje entrar a su equipo.", try: true },
       { keys: ["Win", "Space"], what: "Cambiar el idioma o distribución del teclado", try: true },
       { keys: ["Win", "Ctrl", "V"], what: "Elegir por dónde sale el sonido (altavoces, auriculares…)", try: true, win11: true },
       { keys: ["Win", "Alt", "K"], what: "Silenciar o activar el micrófono en una llamada (Teams y otras apps compatibles)", win11: true },
@@ -337,7 +336,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["Ctrl", "Alt", "+"], what: "Captura de todo el escritorio remoto al portapapeles" },
       { keys: ["Ctrl", "Alt", "-"], what: "Captura de la ventana activa del equipo remoto" },
       { keys: ["Ctrl", "Alt", "Inicio"], what: "Activar la barra de conexión (para salir de pantalla completa)" },
-      { keys: ["Win", "Ctrl", "Q"], what: "Asistencia rápida: el cliente te da acceso con un código" },
     ],
   },
   {

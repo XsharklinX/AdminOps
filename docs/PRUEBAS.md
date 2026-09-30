@@ -146,6 +146,51 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Buscar en la red: las impresoras salen con nombre y modelo; una que este equipo no había visto nunca también aparece.
 - [ ] En una red sin impresoras: «No se ha visto ninguna», sin colgarse.
 
+## AdminOps en el pendrive (1.1.7)
+- [ ] En el PC donde ya estaba instalado: instalar la 1.1.7 en el pendrive. Al abrirla, Ajustes → Datos dice «está en un pendrive (E:)» y «Datos traídos del equipo …»: clientes, contactos, agenda y portales están.
+- [ ] Un router o portal con contraseña guardada: funciona desde el pendrive en OTRO equipo (se cifró de nuevo con la clave del pendrive).
+- [ ] En ese mismo PC, Correo y Teams siguen con la sesión iniciada (se trajo su sesión).
+- [ ] En otro PC: hay que entrar una vez en Correo y Teams («Entrar solo» rellena la cuenta). Volver al primero: sigue con su sesión. Volver al segundo: también.
+- [ ] Actualizar: pasar el instalador de una versión nueva sobre la carpeta del pendrive → `AdminOps-data` sigue ahí con todo.
+- [ ] En un PC sin AdminOps registrado, abrir el instalador desde el pendrive: propone «Actualizar AdminOps del pendrive» con la carpeta del pendrive.
+- [ ] Instalado en C:\Archivos de programa sin administrador: el botón «Guardar todo en la carpeta del programa» está desactivado y lo explica.
+- [ ] Un pendrive que ya tenía datos (del portable antiguo) no se sobrescribe con los de este equipo.
+
+## Discos: salud, reparación y rescate (1.1.7)
+- [ ] La página se llama «Discos», con las pestañas Espacio y Salud y reparación. Ctrl+K y los enlaces que llevaban a «Espacio» siguen funcionando.
+- [ ] Sin administrador: aviso de que faltan SMART y temperaturas; los botones de reparar desactivados; Rescatar funciona.
+- [ ] Como administrador: cada disco con su veredicto; los externos salen como «Externo (USB)».
+- [ ] Un disco externo quitado sin expulsar: sale «marcado como dañado» y el veredicto dice que es el sistema de archivos. «Reparar sistema de archivos» lo arregla y la marca desaparece al actualizar.
+- [ ] En C: «Reparar sistema de archivos» dice que se hará al reiniciar; al reiniciar, Windows lo revisa antes de arrancar.
+- [ ] «Buscar sectores dañados» en un pendrive: pide confirmación, enseña el porcentaje, se puede cancelar y la unidad vuelve a estar disponible.
+- [ ] Un disco con sectores pendientes (si hay uno a mano): veredicto «Fallando», primer consejo «Rescatar archivos»; «Buscar sectores dañados» avisa en rojo.
+- [ ] Rescatar de una carpeta del disco externo a otro disco: copia, dice cuántos archivos hay en el destino y lista los que no se pudieron leer (si los hay). Repetirlo no vuelve a copiar lo ya copiado.
+- [ ] Rescatar con destino dentro del origen: lo impide con un mensaje claro.
+- [ ] Modo auditoría: reparar, chkdsk /r y rescatar se bloquean; ver y comprobar funcionan.
+
+## Agenda sin clientes, Contactos, recortes, avisos y Visor de eventos
+- [ ] Sin ningún cliente creado: la Agenda deja apuntar. «Llamar a Contabilidad» + Mañana + Enter → aparece en «Mañana» a las 9:00 y en la semana con un punto.
+- [ ] Apuntar algo para hoy sin hora: queda a la siguiente hora en punto. Con hora: a esa hora.
+- [ ] Nueva → tipo Reunión, sin cliente, con título: se guarda; «Empezar» no sale (no hay cliente). Con cliente: sale.
+- [ ] Una visita antigua (de antes de esta versión) sigue saliendo como visita, con su cliente.
+- [ ] Pulsar un día de la semana: solo sale ese día; «Ver todo» lo quita. «Añadir» en un día abre el editor con esa fecha.
+- [ ] Un seguimiento de la nota de llamada para mañana sale en «Mañana» y en su día, con «Hecho» y «Mañana».
+- [ ] «Hoy» dice «En N min» con lo próximo y tacha lo que ya pasó.
+- [ ] Aviso 30 minutos antes: «Llamada en menos de 30 minutos» con el título.
+- [ ] Outlook: el evento de una tarea sin cliente se llama «Tarea · título».
+- [ ] Contactos: las seis cifras filtran al pulsarlas (y «Contactos» quita los filtros). «Sin completar» en ámbar si hay alguno.
+- [ ] Marcación rápida: favoritos primero; al pasar el ratón, llamar, Teams, correo y copiar funcionan.
+- [ ] Las tarjetas, la tabla, el directorio y la ficha muestran el avatar del mismo color para la misma persona, en claro y en oscuro.
+- [ ] Ficha: la extensión en grande se copia al pulsarla; los cuatro botones funcionan y se desactivan si falta el dato.
+- [ ] En ninguna parte de la app sale «Asistencia rápida»; Acceso remoto → «Abrir Asistencia remota» abre la de Windows.
+- [ ] Recorte desde la barra del caso sobre una ventana con `C:\Users\<tu usuario>\…` visible: al pegarlo, la ruta sale tapada y AdminOps dice cuántos datos tapó.
+- [ ] Recorte de algo sin datos personales: «sin datos personales a la vista»; la imagen se pega igual.
+- [ ] Captura hecha con Win+Mayús+S fuera de AdminOps → Ctrl+K «Tapar datos personales del portapapeles»: se tapan.
+- [ ] Con texto (no imagen) en el portapapeles, «Tapar datos…» dice que no hay imagen y no toca nada.
+- [ ] Aviso de un seguimiento con AdminOps minimizado: tiene «Hecho» y «Mañana»; «Hecho» lo marca (sale en «Hoy» sin recargar); «Mañana» lo aplaza.
+- [ ] El registro dice «Vigilancia de Windows: en tiempo real». Provocar un error de aplicación (cerrar un programa que falle): el aviso llega en segundos, no al minuto.
+- [ ] Con el equipo en reposo, AdminOps no lanza PowerShell cada minuto para vigilar (Administrador de tareas).
+
 ## Agenda, Usuarios, Impresoras y Carpetas
 - [ ] Agenda: crear una visita «cada mes» y marcarla como hecha → aparece la siguiente un mes después, con el mismo sitio, tipo y duración.
 - [ ] Agenda: crear dos visitas que se solapen → al guardar la segunda avisa con el nombre del otro cliente, pero la guarda igual.
@@ -175,9 +220,9 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] En ese mismo equipo, abrir y cerrar la app tres veces seguidas: entra siempre a la primera, sin quedarse en negro ni recargarse sola.
 - [ ] Dejar el Panel abierto un minuto: el uso de CPU de AdminOps se mantiene bajo (la lista de procesos ya solo se relee cada 6 s).
 - [ ] En el registro técnico aparece «N núcleos · ~N GB» al arrancar.
-- [ ] Acceso remoto → «Abrir Asistencia rápida»: abre el programa. Nunca debe salir el cuadro en inglés de Windows.
 
 ## Texto y espacio
+- [ ] En una página con pestañas (Impresoras, Actualizaciones, Mi red…), pasar el ratón por el «?» de la derecha: sale el texto entero, dentro de la ventana, sin recortar. Con clic se queda abierto; clic fuera lo cierra.
 - [ ] En una tabla con nombres largos (Procesos, Aplicaciones, Contactos), pasar el ratón por un texto cortado con «…»: se ve entero en un globo. Donde no está cortado, no aparece globo.
 - [ ] Achicar la ventana al mínimo y volver a agrandarla en Herramientas de red, Espacio, Historial e Informe: las cajas con scroll se ajustan y no queda contenido metido en una rendija.
 
@@ -198,6 +243,5 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Arranque: al abrir AdminOps, la ventana aparece ya dibujada (o con «Abriendo AdminOps…»), nunca en negro. En el registro técnico hay una línea «Ventana visible a los N ms».
 - [ ] Portable, primera vez en un equipo ajeno 🔌: con el USB recién preparado, abrir AdminOps: debe entrar a la primera, sin cerrar y volver a abrir. Comprobar que se creó la carpeta `webview` en el USB. Con el USB protegido contra escritura, la app abre igual (usa la carpeta del equipo) y lo dice en el registro.
 - [ ] Ajustes → General → «Volver a ver la bienvenida»: abre el asistente; al terminarlo, la configuración que ya había sigue como estaba.
-- [ ] Acceso remoto → «Abrir Asistencia rápida»: en Windows 11 abre la app; en un equipo sin ella, abre la Microsoft Store y avisa en español (sin el cuadro en inglés de Windows).
 - [ ] Rendimiento: tras abrir varias páginas, aparecen el arranque por partes, cada página (código, pintada, lista) y las consultas más lentas; «Copiar todo» copia el texto; en el registro técnico hay una línea «Tiempos:».
 - [ ] 🔌 En el segundo equipo: contactos, conocimiento, routers (contraseña visible) y ajustes están; el historial y los diagnósticos son los de ese equipo.

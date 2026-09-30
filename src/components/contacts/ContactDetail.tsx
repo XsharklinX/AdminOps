@@ -1,6 +1,7 @@
 import { Briefcase, Clock, History, ClipboardCopy, Copy, Mail, MessageSquare, Pencil, Phone, PhoneCall, Smartphone, Star, Trash2, UserRound, Users, X } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Client, Contact } from "../../lib/api";
+import { Avatar, hueOf } from "./Avatar";
 import { colorOf, TagChip, type TagColors } from "./Tags";
 
 /** Lo que se puede hacer con un contacto (lo implementa la página: cuenta el uso). */
@@ -35,6 +36,19 @@ const Btn = ({ title, onClick, children }: { title: string; onClick: () => void;
   </button>
 );
 
+function QuickAction({ label, onClick, disabled = false, children }: { label: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-col items-center gap-1 rounded-lg border border-line bg-panel/60 py-2 text-[11px] text-dim transition-colors hover:border-neon/40 hover:text-neon disabled:pointer-events-none disabled:opacity-35"
+    >
+      {children}
+      {label}
+    </button>
+  );
+}
+
 /** Ficha del contacto en un panel lateral. */
 export function ContactDetail({
   contact: c,
@@ -52,6 +66,7 @@ export function ContactDetail({
   onClose: () => void;
 }) {
   const sub = c.substituteId ? byId.get(c.substituteId) : undefined;
+  const mainNumber = c.extension || c.phone || c.mobile;
   const client = c.clientId ? clients.find((x) => x.id === c.clientId) : undefined;
   const phone = (label: string, value: string, icon: ReactNode) => (
     <Line key={label + value} icon={icon} label={label} value={<span className="font-mono">{value}</span>}>
@@ -88,24 +103,41 @@ export function ContactDetail({
 
   return (
     <aside className="fixed top-0 right-0 bottom-0 z-30 flex w-[400px] max-w-[92vw] flex-col border-l border-line-2 bg-panel shadow-2xl">
-      <header className="flex items-start gap-3 border-b border-line px-5 py-4">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-neon/15 text-sm font-semibold text-neon">
-          {c.name
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((w) => w.charAt(0).toUpperCase())
-            .join("")}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold break-words text-ink">{c.name}</h3>
-          {(c.role || c.company) && <p className="text-xs text-dim">{[c.role, c.company].filter(Boolean).join(" · ")}</p>}
+      <header className="border-b border-line px-5 pt-4 pb-3" style={{ background: `linear-gradient(180deg, hsl(${hueOf(c.name)} 70% 50% / 0.10), transparent)` }}>
+        <div className="flex items-start gap-3">
+          <Avatar c={c} size={52} />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold break-words text-ink">{c.name}</h3>
+            {(c.role || c.company) && <p className="text-xs text-dim">{[c.role, c.company].filter(Boolean).join(" · ")}</p>}
+            {c.extension && (
+              <button onClick={() => a.copy(c, c.extension, "Extensión")} className="mt-1 font-mono text-xl leading-none font-semibold text-ink hover:text-neon" title="Copiar extensión">
+                <span className="mr-1 text-[11px] font-normal text-mute">ext.</span>
+                {c.extension}
+              </button>
+            )}
+          </div>
+          <button onClick={() => a.star(c)} className={c.favorite ? "text-warn" : "text-mute hover:text-warn"} title="Favorito">
+            <Star size={16} fill={c.favorite ? "currentColor" : "none"} />
+          </button>
+          <button onClick={onClose} className="text-mute hover:text-ink" title="Cerrar (Esc)">
+            <X size={16} />
+          </button>
         </div>
-        <button onClick={() => a.star(c)} className={c.favorite ? "text-warn" : "text-mute hover:text-warn"} title="Favorito">
-          <Star size={16} fill={c.favorite ? "currentColor" : "none"} />
-        </button>
-        <button onClick={onClose} className="text-mute hover:text-ink" title="Cerrar (Esc)">
-          <X size={16} />
-        </button>
+        {/* Lo que se hace con un contacto, a un clic y sin buscar el dato. */}
+        <div className="mt-3 grid grid-cols-4 gap-1.5">
+          <QuickAction label="Llamar" disabled={!mainNumber} onClick={() => mainNumber && a.call(c, mainNumber)}>
+            <PhoneCall size={15} />
+          </QuickAction>
+          <QuickAction label="Correo" disabled={!c.email} onClick={() => c.email && a.email(c, c.email)}>
+            <Mail size={15} />
+          </QuickAction>
+          <QuickAction label="Chat" disabled={!c.email} onClick={() => c.email && a.teams(c, c.email, false)}>
+            <MessageSquare size={15} />
+          </QuickAction>
+          <QuickAction label="Tarjeta" onClick={() => a.copyCard(c)}>
+            <ClipboardCopy size={15} />
+          </QuickAction>
+        </div>
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-3 py-3">

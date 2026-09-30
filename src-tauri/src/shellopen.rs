@@ -25,7 +25,7 @@ pub fn open(uri: &str) -> Result<(), String> {
     }
 }
 
-/// ¿Hay un programa registrado para este protocolo (msteams:, ms-quick-assist:…)?
+/// ¿Hay un programa registrado para este protocolo (msteams:, ms-settings:…)?
 ///
 /// Se comprueba antes de abrirlo: si no lo hay, Windows saca su propio aviso en
 /// inglés («This file does not have an app associated with it») en vez de dejar

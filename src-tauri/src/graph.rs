@@ -608,7 +608,7 @@ pub async fn graph_calendar_sync(app: tauri::AppHandle, visit_id: String) -> Res
     let v = crate::agenda::visit_by_id(&app, &visit_id).ok_or("Esa visita ya no existe.")?;
     let iso = |t: u64| chrono::DateTime::from_timestamp(t as i64, 0).map(|d| d.format("%Y-%m-%dT%H:%M:%S").to_string()).unwrap_or_default();
     let evento = json!({
-        "subject": format!("Visita · {}", v.client_name),
+        "subject": if v.client_name.is_empty() || v.title.is_empty() { format!("{} · {}", crate::agenda::kind_name(&v.kind), v.label()) } else { format!("{} · {}", v.title, v.client_name) },
         "start": { "dateTime": iso(v.start), "timeZone": "UTC" },
         "end": { "dateTime": iso(v.start + u64::from(v.minutes) * 60), "timeZone": "UTC" },
         "location": { "displayName": v.place },

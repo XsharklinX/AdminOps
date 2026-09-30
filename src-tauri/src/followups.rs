@@ -104,9 +104,49 @@ pub fn check_due(app: &tauri::AppHandle) {
         return;
     }
     let _ = save(app, &list);
-    let titulo = if due.len() == 1 { "Seguimiento pendiente".to_string() } else { format!("{} seguimientos pendientes", due.len()) };
+    drop(_g);
+    // Pocos a la vez: uno por seguimiento, con «Hecho» y «Mañana» en el propio
+    // aviso, sin abrir AdminOps. Muchos: uno solo que los resume.
+    if due.len() <= 3 {
+        for f in &due {
+            let detalle = [f.person.as_str(), f.machine.as_str()].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" · ");
+            let cuerpo = if detalle.is_empty() { f.text.clone() } else { format!("{} · {detalle}", f.text) };
+            let handle = app.clone();
+            let shown = crate::toast::show(app, "Seguimiento pendiente", &cuerpo, &[("Hecho", format!("done:{}", f.id)), ("Mañana", format!("snooze:{}", f.id))], move |arg| {
+                on_toast_action(&handle, arg.as_deref())
+            });
+            if !shown {
+                let _ = app.notification().builder().title("Seguimiento pendiente").body(cuerpo.chars().take(240).collect::<String>()).show();
+            }
+        }
+        return;
+    }
+    let titulo = format!("{} seguimientos pendientes", due.len());
     let cuerpo = due.iter().map(|f| f.text.as_str()).collect::<Vec<_>>().join(" · ");
     let _ = app.notification().builder().title(titulo).body(cuerpo.chars().take(240).collect::<String>()).show();
+}
+
+/// Lo que se pulsó en el aviso: «Hecho», «Mañana» o el aviso en sí (abre AdminOps).
+fn on_toast_action(app: &tauri::AppHandle, arg: Option<&str>) {
+    use tauri::{Emitter, Manager};
+    let r = match arg.and_then(crate::toast::parse_action) {
+        Some(("done", id)) => set_followup_done(app.clone(), id.to_string(), true),
+        Some(("snooze", id)) => snooze_followup(app.clone(), id.to_string(), 1),
+        _ => {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+            Ok(())
+        }
+    };
+    match r {
+        Ok(()) => {
+            let _ = app.emit("followups-changed", ());
+        }
+        Err(e) => log::warn!("Seguimiento desde el aviso: {e}"),
+    }
 }
 
 // ---------- Comandos ----------

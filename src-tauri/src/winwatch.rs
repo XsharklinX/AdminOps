@@ -1,5 +1,7 @@
-//! Vigilancia de errores de Windows mientras AdminOps está abierta: cada minuto
-//! mira el Visor de eventos (y el espacio libre) y, si aparece un error típico,
+//! Vigilancia de errores de Windows mientras AdminOps está abierta: en cuanto
+//! Windows escribe uno de los eventos vigilados (suscripción, ver `evtwatch`),
+//! o cada minuto si no deja suscribirse, mira el Visor de eventos (y cada diez
+//! minutos el espacio libre y los dispositivos) y, si aparece un error típico,
 //! avisa explicando qué es y qué hacer. Sin jerga: el técnico se lo puede
 //! contar tal cual al cliente.
 
@@ -9,6 +11,12 @@ use std::time::Duration;
 use tauri::{Emitter, Manager};
 
 const POLL: Duration = Duration::from_secs(60);
+/// Con la suscripción al Visor de eventos activa, la pasada periódica solo hace
+/// falta para el espacio libre y los dispositivos (que no dejan evento).
+const POLL_SUBSCRIBED: Duration = Duration::from_secs(10 * 60);
+/// Tras un evento se espera un poco: suelen llegar varios seguidos (un
+/// pantallazo deja tres o cuatro) y basta una pasada para todos.
+const SETTLE: Duration = Duration::from_secs(3);
 /// La primera vez se miran las últimas 24 h (pantallazos o apagados antes de abrir AdminOps).
 const FIRST_LOOKBACK: u64 = 24 * 3600;
 const MAX_ALERTS: usize = 200;
@@ -517,6 +525,10 @@ pub fn start(app: tauri::AppHandle) {
         std::thread::sleep(Duration::from_secs(8));
         environment_check(&app);
         std::thread::sleep(Duration::from_secs(12));
+        // Windows avisa cuando se escribe un evento vigilado; si no deja
+        // suscribirse, se sigue preguntando cada minuto como antes.
+        let wake = crate::evtwatch::subscribe(SOURCES);
+        log::info!("Vigilancia de Windows: {}", if wake.is_some() { "en tiempo real (suscripción al Visor de eventos)" } else { "cada minuto" });
         loop {
             if crate::workflow::settings(&app).watch_windows {
                 match poll(&app) {
@@ -539,7 +551,15 @@ pub fn start(app: tauri::AppHandle) {
                     Err(e) => log::debug!("Vigilancia de Windows: {e}"),
                 }
             }
-            std::thread::sleep(POLL);
+            match &wake {
+                Some(rx) => {
+                    if rx.recv_timeout(POLL_SUBSCRIBED).is_ok() {
+                        std::thread::sleep(SETTLE);
+                        while rx.try_recv().is_ok() {}
+                    }
+                }
+                None => std::thread::sleep(POLL),
+            }
         }
     });
 }
