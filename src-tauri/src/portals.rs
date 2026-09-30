@@ -994,6 +994,69 @@ pub fn portal_hide(app: tauri::AppHandle, id: String) {
     }
 }
 
+/// Script que escribe `text` en el campo que el técnico tiene seleccionado en
+/// la web (el de «Resolución» del ticket, por ejemplo). Devuelve si lo hizo.
+/// El texto va como JSON, nunca como código. Baja por los iframes de la misma
+/// web, que es donde muchos sistemas de tickets meten su formulario.
+fn insert_text_script(text: &str) -> String {
+    let t = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".into());
+    format!(
+        r#"(() => {{
+  const t = {t};
+  let e = document.activeElement;
+  try {{ while (e && e.tagName === "IFRAME" && e.contentDocument) e = e.contentDocument.activeElement; }} catch (_) {{}}
+  if (!e) return false;
+  if (e.isContentEditable) {{ e.focus(); e.ownerDocument.execCommand("insertText", false, t); return true; }}
+  const campo = e.tagName === "TEXTAREA" || (e.tagName === "INPUT" && /^(text|search|)$/i.test(e.type || ""));
+  if (!campo || e.readOnly || e.disabled) return false;
+  const proto = e.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const set = Object.getOwnPropertyDescriptor(proto, "value").set;
+  const a = e.selectionStart ?? e.value.length, b = e.selectionEnd ?? e.value.length;
+  set.call(e, e.value.slice(0, a) + t + e.value.slice(b));
+  e.dispatchEvent(new Event("input", {{ bubbles: true }}));
+  e.dispatchEvent(new Event("change", {{ bubbles: true }}));
+  return true;
+}})()"#
+    )
+}
+
+/// Escribe un texto en el campo seleccionado del portal (la resolución del caso
+/// en el formulario del ticket). `false` si el portal no está abierto o no hay
+/// un campo de texto seleccionado: entonces la interfaz lo deja copiado y lo dice.
+#[tauri::command(async)]
+pub fn portal_insert_text(app: tauri::AppHandle, id: String, text: String) -> Result<bool, String> {
+    let Some(v) = app.get_webview(&embedded_label(&id)) else { return Ok(false) };
+    let text: String = text.chars().take(8000).collect();
+    #[cfg(windows)]
+    {
+        let (tx, rx) = std::sync::mpsc::channel::<bool>();
+        let js = insert_text_script(&text);
+        v.with_webview(move |pw| unsafe {
+            use webview2_com::ExecuteScriptCompletedHandler;
+            let Ok(core) = pw.controller().CoreWebView2() else {
+                let _ = tx.send(false);
+                return;
+            };
+            let tx2 = tx.clone();
+            let handler = ExecuteScriptCompletedHandler::create(Box::new(move |res, json: String| {
+                let _ = tx2.send(res.is_ok() && json.trim() == "true");
+                Ok(())
+            }));
+            if core.ExecuteScript(&windows_core::HSTRING::from(js.as_str()), &handler).is_err() {
+                let _ = tx.send(false);
+            }
+        })
+        .map_err(|e| e.to_string())?;
+        // WebView2 contesta en milisegundos; si no, se da por no escrito.
+        Ok(rx.recv_timeout(Duration::from_secs(3)).unwrap_or(false))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (v, text);
+        Ok(false)
+    }
+}
+
 /// Destruye la vista de un portal (se vuelve a crear al mostrarlo).
 ///
 /// Para las vistas que no llegaron a arrancar. Una vista de WebView2 es una
@@ -1374,6 +1437,14 @@ mod tests {
         std::env::set_var(ARGS_ENV, "--disable-features=msWebOOUI --auth-server-allowlist=*.pgr.gob.do");
         assert_eq!(portal_browser_args(base.clone()), base);
         std::env::remove_var(ARGS_ENV);
+    }
+
+    /// El texto que se pega en el ticket va como dato JSON, nunca como código.
+    #[test]
+    fn insert_text_passes_the_text_as_data() {
+        let js = insert_text_script("Hola\"); alert(1); (\"");
+        assert!(js.contains(r#"const t = "Hola\"); alert(1); (\"";"#), "{js}");
+        assert!(js.starts_with("(() => {") && js.trim_end().ends_with("})()"), "{js}");
     }
 
     /// Cada portal de Microsoft cierra sesión donde le corresponde.

@@ -96,6 +96,56 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Informe: «Generar entrega de hoy».
 - [ ] Clientes: con dos visitas al mismo equipo, «Qué cambió entre visitas» muestra lo que cambió (verde mejor, rojo peor); al empezar otra sesión en ese equipo aparece «Desde la última visita».
 
+## Personas, el caso de ahora y Ctrl+K (en el dominio de la empresa)
+- [ ] 🔌 Personas: buscar por nombre, por usuario y por extensión; aparece la persona con su departamento y extensión.
+- [ ] 🔌 Una cuenta bloqueada sale como «Cuenta bloqueada»; «Desbloquear» la desbloquea y la ficha pasa a «Cuenta en orden».
+- [ ] 🔌 «Restablecer contraseña»: sale una temporal tipo `Norte-Pino-4827!`; con ella se entra y pide cambiarla. En el diario aparece que se cambió, sin la contraseña.
+- [ ] 🔌 Sin permisos de soporte sobre una cuenta: el mensaje dice que el dominio no deja, no un error en inglés.
+- [ ] 🔌 Tras comprobar Puestos a fondo, la ficha dice en qué equipo tiene la sesión abierta.
+- [ ] 🔌 LAPS de un equipo: «Mostrar» enseña la contraseña y se tapa sola al minuto. Sin LAPS o sin permiso, lo dice.
+- [ ] 🔌 BitLocker: las claves de un equipo, y la clave buscando por el ID de 8 caracteres de la pantalla de recuperación.
+- [ ] En un equipo fuera del dominio (o sin VPN), Personas lo explica en vez de fallar.
+- [ ] Caso: «Nuevo caso» en la cabecera; vaciar una cola de impresión y reparar la red; la barra cuenta 2 acciones; «Cerrar caso» redacta las dos, en orden, con el tiempo.
+- [ ] Caso: en el portal de Tickets, pulsar en el campo de la resolución, volver a AdminOps, «Cerrar caso» → «Pegar en Tickets»: el texto aparece en ese campo. Sin campo seleccionado, avisa de que lo ha copiado.
+- [ ] Caso: abrir otro con uno abierto avisa y ofrece cerrar el actual. «Descartar» lo quita sin guardarlo.
+- [ ] Caso cerrado desde la ficha de una persona: aparece en «Lo que ya se hizo con esta persona».
+- [ ] Ctrl+K: `PC-CONTA-03` ofrece contraseñas, conectar y abrir caso arriba del todo; `windows update` sigue ofreciendo primero la página de Windows Update.
+- [ ] Modo usuario: no se ve ni Personas, ni la barra del caso, ni «Nuevo caso».
+
+## Pantalla dividida, nota de llamada, seguimientos y Hoy
+- [ ] Tickets → «Al lado: Personas»: el portal ocupa la izquierda y Personas la derecha, las dos se usan a la vez; la vista web no tapa la mitad derecha. Personas se ve en una columna, sin apretar.
+- [ ] Cambiar a otra página y volver a Tickets: la división sigue. «Sin dividir» la quita. Cerrar y abrir AdminOps: se recuerda.
+- [ ] Con la ventana estrecha (1280 px), las dos mitades siguen siendo legibles.
+- [ ] Con AdminOps minimizado, Ctrl+Alt+N abre la nota encima de todo. «Abrir caso» → la barra del caso aparece en AdminOps sin recargar. Esc la cierra.
+- [ ] Nota → «Para mañana»: aparece mañana a las 9 en «Hoy», con aviso de Windows (una sola vez).
+- [ ] Si otro programa ya usa Ctrl+Alt+N, el registro lo dice y «Nota de llamada» sigue funcionando desde Ctrl+K.
+- [ ] Barra del caso → recorte: sale el recorte de Windows; lo recortado se pega en el ticket con Ctrl+V.
+- [ ] Hoy: con un caso abierto, un seguimiento vencido, una visita de hoy y un aviso de Windows, salen los cuatro, el vencido primero. «Hecho» y «Mañana» funcionan.
+- [ ] Modo usuario: el Panel no enseña «Hoy».
+
+## Microsoft 365 (Graph)
+- [ ] Ajustes → Portales y correo → Microsoft 365: inquilino e id de aplicación mal escritos → mensaje claro, no se guarda.
+- [ ] «Conectar»: se abre microsoft.com/devicelogin en el navegador y el código ya está copiado. Tras iniciar sesión (con MFA), AdminOps dice «Conectado como …» solo, sin pulsar nada.
+- [ ] Cancelar a mitad y volver a conectar: funciona. Dejar caducar el código: lo dice.
+- [ ] Cerrar AdminOps y abrirlo: sigue conectado (no vuelve a pedir el código).
+- [ ] Personas → alguien que falló el MFA hoy: «Inicios de sesión» muestra el fallo con el motivo en español, la app, el sitio y el detalle del MFA.
+- [ ] «MFA»: lista sus métodos; la contraseña no tiene «Quitar». Quitar el del móvil viejo pide confirmación y queda en el diario.
+- [ ] «Cerrar sus sesiones»: confirmación; en unos minutos Outlook web le pide entrar de nuevo.
+- [ ] Modo auditoría: quitar MFA y cerrar sesiones se bloquean; ver inicios de sesión sigue funcionando.
+- [ ] Sin un permiso (por ejemplo sin AuditLog.Read.All): esa función lo dice y las demás van.
+- [ ] Hoy: con una incidencia abierta en Microsoft 365, aparece arriba en rojo.
+- [ ] Agenda → icono de Outlook: la visita aparece en el calendario a su hora; cambiar la hora y volver a pulsar la actualiza (no duplica).
+- [ ] Cerrar un caso con persona del dominio → «Avisar por Teams»: le llega el mensaje en un chat uno a uno.
+- [ ] Desconectar: se borra la sesión; Personas dice cómo conectarlo.
+
+## Impresoras de red (SNMP, mDNS, WS-Discovery)
+- [ ] Revisar una impresora de red con SNMP: salen los niveles de tóner con barras y el contador de páginas.
+- [ ] Con el tóner por debajo del 10 %: el título dice «Tóner … al N %» en ámbar.
+- [ ] Abrir la tapa o provocar un atasco y Revisar: «La impresora avisa: puerta o tapa abierta».
+- [ ] Una impresora sin SNMP: Revisar funciona igual que antes, sin niveles (tarda unos segundos más como mucho).
+- [ ] Buscar en la red: las impresoras salen con nombre y modelo; una que este equipo no había visto nunca también aparece.
+- [ ] En una red sin impresoras: «No se ha visto ninguna», sin colgarse.
+
 ## Agenda, Usuarios, Impresoras y Carpetas
 - [ ] Agenda: crear una visita «cada mes» y marcarla como hecha → aparece la siguiente un mes después, con el mismo sitio, tipo y duración.
 - [ ] Agenda: crear dos visitas que se solapen → al guardar la segunda avisa con el nombre del otro cliente, pero la guarda igual.

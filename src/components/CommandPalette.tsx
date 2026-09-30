@@ -1,8 +1,10 @@
-import { AppWindow, CornerDownLeft, FileText, Lightbulb, Search, SlidersHorizontal, UserRound, Wrench, Zap } from "lucide-react";
+import { AppWindow, CornerDownLeft, FileText, Lightbulb, Search, SlidersHorizontal, Sparkles, UserRound, Wrench, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, pageLabel, type PageId } from "./Sidebar";
 import { useToast } from "./feedback";
-import { contactsApi, libraryApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
+import { contactsApi, lanApi, libraryApi, officeApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
+import { openCase } from "../lib/currentCase";
+import { recognize, type Recognized } from "../lib/recognize";
 import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
@@ -16,7 +18,7 @@ const CATEGORY_PAGE: Record<string, PageId> = {
   security: "security",
 };
 
-const KIND_LABEL = { page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla" };
+const KIND_LABEL = { smart: "Sugerido", page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla" };
 
 type Kind = keyof typeof KIND_LABEL;
 
@@ -43,6 +45,55 @@ export interface PaletteAction {
   keywords?: string;
   /** Si devuelve una promesa, su texto se muestra como aviso (y su error también). */
   run: () => void | Promise<unknown>;
+}
+
+/** La búsqueda de siempre: todas las palabras, y el título que empieza igual, antes. */
+function searchEntries(entries: Entry[], q: string): Entry[] {
+  const words = q.split(/\s+/);
+  return entries
+    .map((e) => {
+      const title = norm(e.title);
+      if (!words.every((w) => e.search.includes(w))) return null;
+      const score = (title.startsWith(q) ? 4 : title.includes(q) ? 2 : 0) + (e.kind === "page" ? 1 : 0);
+      return { e, score };
+    })
+    .filter((x): x is { e: Entry; score: number } => x !== null)
+    .sort((a, b) => b.score - a.score || a.e.title.localeCompare(b.e.title))
+    .slice(0, 40)
+    .map((x) => x.e);
+}
+
+/**
+ * Qué se puede hacer con lo que se ha escrito. Solo acciones que funcionan de
+ * verdad desde aquí: si una página no sabe recibir un equipo, no se promete.
+ */
+function smartEntries(r: Recognized, go: (page: PageId, focus?: string | null) => void): Entry[] {
+  const e = (key: string, title: string, subtitle: string, run: () => void | Promise<unknown>): Entry => ({ key: `smart:${key}`, kind: "smart", title, subtitle, search: "", run });
+  const v = r.value;
+  switch (r.kind) {
+    case "computer":
+      return [
+        e("pc-secrets", `Contraseñas de ${v}`, "LAPS y recuperación de BitLocker del dominio", () => go("people", `pc:${v}`)),
+        e("pc-rdp", `Conectar a ${v}`, "Escritorio remoto", () => officeApi.rdp(v)),
+        e("pc-case", `Abrir un caso con ${v}`, "Lo que hagas queda apuntado", () => openCase({ machine: v })),
+      ];
+    case "person":
+      return [
+        e("person", `Buscar a «${v}» en el dominio`, "Su cuenta, si está bloqueada, su equipo", () => go("people", v)),
+        e("person-case", `Abrir un caso con ${v}`, "Lo que hagas queda apuntado", () => openCase(r.sure ? { sam: v, person: v } : { person: v })),
+      ];
+    case "extension":
+      return [e("ext", `Buscar la extensión ${v} en el dominio`, "De quién es y su ficha", () => go("people", v))];
+    case "ip":
+      return [
+        e("ip-web", `Abrir la página de ${v}`, "Router, impresora o lo que sea que responda ahí", () => lanApi.openDevice(v)),
+        e("ip-tools", "Herramientas de red", "Ping, traceroute y puertos", () => go("nettools")),
+      ];
+    case "printer":
+      return [e("printer", "Revisar las impresoras", "Por qué no imprime y qué hacer", () => go("printers"))];
+    case "ticket":
+      return [e("ticket", `Abrir un caso para el ticket ${v}`, "Lo que hagas queda apuntado", () => openCase({ ticket: v }))];
+  }
 }
 
 export function CommandPalette({
@@ -145,22 +196,19 @@ export function CommandPalette({
     return out;
   }, [tools, tweaks, contacts, solutions, templates, actions, onNavigate, toast]);
 
+  // Lo que se ha escrito es un equipo, una persona, una IP…: sus acciones.
+  const smart = useMemo(() => {
+    const r = recognize(query);
+    return r ? { sure: r.sure, entries: smartEntries(r, onNavigate) } : null;
+  }, [query, onNavigate]);
+
   const results = useMemo(() => {
     const q = norm(query.trim());
     if (!q) return entries.filter((e) => e.kind === "page" || e.kind === "action").slice(0, 40);
-    const words = q.split(/\s+/);
-    return entries
-      .map((e) => {
-        const title = norm(e.title);
-        if (!words.every((w) => e.search.includes(w))) return null;
-        const score = (title.startsWith(q) ? 4 : title.includes(q) ? 2 : 0) + (e.kind === "page" ? 1 : 0);
-        return { e, score };
-      })
-      .filter((x): x is { e: Entry; score: number } => x !== null)
-      .sort((a, b) => b.score - a.score || a.e.title.localeCompare(b.e.title))
-      .slice(0, 40)
-      .map((x) => x.e);
-  }, [entries, query]);
+    const found = searchEntries(entries, q);
+    if (!smart) return found;
+    return (smart.sure ? [...smart.entries, ...found] : [...found, ...smart.entries]).slice(0, 40);
+  }, [entries, query, smart]);
 
   useEffect(() => setIndex(0), [query]);
   useEffect(() => {
@@ -177,7 +225,7 @@ export function CommandPalette({
   };
 
   const icon = (k: Kind) => {
-    const I = { page: CornerDownLeft, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText }[k];
+    const I = { smart: Sparkles, page: CornerDownLeft, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText }[k];
     return <I size={14} className="shrink-0 text-neon" />;
   };
 

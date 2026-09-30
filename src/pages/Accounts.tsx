@@ -299,7 +299,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
                   <button
                     onClick={async () => {
                       if (await confirm({ title: "Borrar credencial", body: `Windows olvidará la contraseña guardada para «${c.target}» y la pedirá la próxima vez.`, confirmLabel: "Borrar", danger: true }))
-                        run(c.target, async () => {
+                        await run(c.target, async () => {
                           await accountsApi.deleteCredential(c.target);
                           return "Credencial borrada.";
                         });

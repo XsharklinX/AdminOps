@@ -345,7 +345,7 @@ export function SendReportModal({
               `En él encontrarás el estado del equipo, el trabajo realizado, lo que queda pendiente y nuestras recomendaciones.\n\n` +
               `Quedo a tu disposición para cualquier consulta.\n\nUn saludo,${sign ? `\n${sign}` : ""}`,
       );
-    });
+    }).catch(() => {});
     // Solo al abrir: después el texto es del usuario.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- los datos del cliente solo se leen al preparar el mensaje
   }, [path]);

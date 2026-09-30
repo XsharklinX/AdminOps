@@ -4,8 +4,29 @@
 //! conectado y cuántos días llevan sin instalar actualizaciones.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
+
+/// Quién tenía la sesión abierta en cada puesto en la última comprobación a
+/// fondo (equipo → usuario). Solo en memoria: sirve para que la ficha de una
+/// persona diga en qué equipo está trabajando, sin preguntarle a nadie.
+static SIGNED_IN: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Default::default);
+
+/// Usuario sin el dominio delante: `EMPRESA\maria.perez` → `maria.perez`.
+fn bare_user(u: &str) -> String {
+    u.rsplit('\\').next().unwrap_or(u).trim().to_lowercase()
+}
+
+/// Equipos donde `sam` tenía la sesión abierta en la última comprobación a fondo.
+pub fn signed_in_on(sam: &str) -> Vec<String> {
+    let want = bare_user(sam);
+    let map = SIGNED_IN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut v: Vec<String> = map.iter().filter(|(_, u)| bare_user(u) == want).map(|(h, _)| h.clone()).collect();
+    v.sort();
+    v
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -157,6 +178,21 @@ pub fn check_stations(hosts: Vec<String>, deep: bool) -> Result<Vec<Station>, St
         out.extend(part);
     }
     log::info!("Puestos comprobados: {} en {:.1} s", out.len(), t.elapsed().as_secs_f64());
+    // Se apunta quién estaba en cada equipo (para la ficha de la persona).
+    {
+        let mut map = SIGNED_IN.lock().unwrap_or_else(|e| e.into_inner());
+        for st in &out {
+            match st.remote.as_ref().map(|r| r.user.trim()).filter(|u| !u.is_empty()) {
+                Some(u) => {
+                    map.insert(st.host.to_uppercase(), u.to_string());
+                }
+                None if deep => {
+                    map.remove(&st.host.to_uppercase());
+                }
+                None => {}
+            }
+        }
+    }
     Ok(out)
 }
 

@@ -8,7 +8,7 @@ import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { LockScreen } from "./components/LockScreen";
 import { NAV, Sidebar, allowedInMode, areaOf, isPageId, pageLabel, resolvePage, visibleAreas, type Area, type PageId } from "./components/Sidebar";
-import { api, appApi, appcareApi, lockApi, portalsApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { analyze } from "./lib/diagRun";
@@ -20,6 +20,9 @@ import { Dashboard } from "./pages/Dashboard";
 import { AuditBanner, AuditToggle } from "./components/AuditMode";
 import { PageHelp } from "./components/PageHelp";
 import { TasksIndicator } from "./components/TasksIndicator";
+import { CaseBar, NewCaseButton } from "./components/CaseBar";
+import { openCase } from "./lib/currentCase";
+import { SPLIT_LEFT, SPLIT_RIGHT } from "./lib/split";
 import { SYMPTOMS } from "./lib/symptoms";
 import { Loading } from "./components/ui";
 
@@ -66,6 +69,7 @@ const PrintersAndShares = lazyPage("PrintersAndShares", () => import("./pages/Me
 const MyNetwork = lazyPage("MyNetwork", () => import("./pages/Merged"));
 const Workstations = lazyPage("Workstations", () => import("./pages/Merged"));
 const Agenda = lazyPage("Agenda", () => import("./pages/Agenda"));
+const People = lazyPage("People", () => import("./pages/People"));
 const WindowsTweaks = lazyPage("WindowsTweaks", () => import("./pages/Merged"));
 const RecipesAndProfiles = lazyPage("RecipesAndProfiles", () => import("./pages/Merged"));
 
@@ -75,6 +79,9 @@ const TWEAK_PAGES: Partial<Record<PageId, string>> = {
 };
 
 const LAST_PAGE = "adminops.lastPage";
+/** Página que va al lado del portal en la pantalla dividida (se recuerda). */
+const SPLIT_KEY = "adminops.split";
+
 /** Página donde vive el portal de cada tipo (para precargar solo el que toca). */
 const PORTAL_PAGE = { inventory: "stations", mail: "mail", teams: "teams" } as const;
 /** Páginas que se mantienen vivas a la vez; la menos usada se descarta al pasar de aquí. */
@@ -251,6 +258,26 @@ export default function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  // Un diálogo del caso está abierto: tapa los portales como cualquier otro diálogo.
+  const [caseDialog, setCaseDialog] = useState(false);
+  // Pantalla dividida: el portal a la izquierda y esta página a la derecha.
+  const [split, setSplitState] = useState<PageId | null>(() => {
+    try {
+      const v = localStorage.getItem(SPLIT_KEY);
+      return v && SPLIT_RIGHT.includes(v as PageId) ? (v as PageId) : null;
+    } catch {
+      return null;
+    }
+  });
+  const setSplit = useCallback((p: PageId | null) => {
+    setSplitState(p);
+    try {
+      if (p) localStorage.setItem(SPLIT_KEY, p);
+      else localStorage.removeItem(SPLIT_KEY);
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
   const [sessionActive, setSessionActive] = useState(false);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   // Aviso de versión nueva (Ajustes → General), unos segundos después de abrir.
@@ -272,6 +299,12 @@ export default function App() {
   useEffect(() => {
     setAlive((a) => (a[0] === page ? a : [page, ...a.filter((x) => x !== page)].slice(0, MAX_ALIVE)));
   }, [page]);
+  // La pantalla dividida está puesta si se está en un portal y hay página para el lado.
+  const splitOn = split !== null && SPLIT_LEFT.includes(page) && allowedInMode(split, prefs.mode);
+  // La página de la derecha tiene que estar montada, aunque no sea la actual.
+  useEffect(() => {
+    if (splitOn && split) setAlive((a) => (a.includes(split) ? a : [...a, split].slice(-MAX_ALIVE)));
+  }, [splitOn, split]);
   // Bloqueo con PIN o contraseña: null mientras se consulta (no se enseña nada hasta saberlo).
   const [lock, setLock] = useState<LockStatus | null>(null);
   const [locked, setLocked] = useState<boolean | null>(null);
@@ -381,6 +414,9 @@ export default function App() {
       { id: "join", title: "Unir el equipo a un dominio", run: () => navigate("domain") },
       { id: "newuser", title: "Crear un usuario local", run: () => navigate("users") },
       { id: "setup", title: "Volver a abrir el asistente de inicio", run: () => setOnboarding(true) },
+      { id: "case", title: "Nuevo caso", subtitle: "Lo que hagas queda apuntado y la resolución se redacta sola", keywords: "ticket incidencia caso abrir atender", run: () => openCase() },
+      { id: "note", title: "Nota de llamada", subtitle: "También con Ctrl+Alt+N, aunque AdminOps esté minimizado", keywords: "telefono llamada apuntar nota rapida", run: () => noteApi.open() },
+      { id: "clip", title: "Recorte de pantalla", subtitle: "Queda en el portapapeles para pegarlo en el ticket", keywords: "captura pantallazo imagen recortes", run: () => noteApi.screenClip() },
       // Síntomas: abren «Solucionar problemas» y lo comprueban.
       ...SYMPTOMS.map((s) => ({ id: `trouble:${s.id}`, title: `Solucionar: ${s.title}`, subtitle: s.hint, keywords: `${s.keywords} problema arreglar no funciona`, run: () => navigate("troubleshoot", s.id) })),
       { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },
@@ -439,19 +475,20 @@ export default function App() {
     if (p === "space") return <Space onNavigate={navigate} />;
     if (p === "session") return <ServiceSession onSessionChange={setSessionActive} focus={p === page ? focus : null} />;
     if (p === "agenda") return <Agenda onNavigate={navigate} />;
+    if (p === "people") return <People focus={p === page ? focus : null} />;
     if (p === "clients") return <Clients />;
     if (p === "contacts") return <Contacts focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "recipes") return <RecipesAndProfiles isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "stations") return <Workstations covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "stations") return <Workstations covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "users") return <Users isAdmin={!!isAdmin} />;
     if (p === "accounts") return <AccountsAndDomain isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "nettools") return <NetTools isAdmin={!!isAdmin} />;
     if (p === "printers") return <PrintersAndShares isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "tickets") return <Tickets covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
-    if (p === "mail") return <Tickets kind="mail" covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
-    if (p === "teams") return <Tickets kind="teams" covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
-    if (p === "router") return <MyNetwork covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "tickets") return <Tickets split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
+    if (p === "mail") return <Tickets kind="mail" split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
+    if (p === "teams") return <Tickets kind="teams" split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
+    if (p === "router") return <MyNetwork covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "remote") return <Remote isAdmin={!!isAdmin} />;
     if (p === "settings") return <SettingsPage appInfo={appInfo} onNavigate={(x: PageId) => navigate(x)} />;
     if (category) return <TweaksPage category={category} isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
@@ -477,6 +514,7 @@ export default function App() {
         <main className="flex min-w-0 flex-1 flex-col">
           {isAdmin === false && <AdminBanner />}
           <AuditBanner />
+          <CaseBar onOpenChange={setCaseDialog} />
           <header className="flex items-end justify-between border-b border-line px-8 pt-5 pb-4">
             <div className="min-w-0">
               {area && area.pages.length > 1 && !showTabs && <div className="mb-0.5 text-xs text-mute">{area.label}</div>}
@@ -499,6 +537,7 @@ export default function App() {
               )}
             </div>
             <div className="flex items-center gap-2">
+            <NewCaseButton hidden={false} />
             <TasksIndicator />
             <AuditToggle />
             {page === "dashboard" ? (
@@ -518,9 +557,14 @@ export default function App() {
             </div>
           </header>
           <div className="relative min-h-0 flex-1">
-            {alive.map((p) => (
-              <div key={`${p}-${reloads[p] ?? 0}`} hidden={p !== page} className="absolute inset-0 overflow-y-auto">
-                <PageActiveContext.Provider value={p === page}>
+            {alive.map((p) => {
+              const left = splitOn && p === page;
+              const right = splitOn && p === split;
+              const visible = p === page || right;
+              const pos = left ? "inset-y-0 left-0 w-[56%] border-r border-line" : right ? "inset-y-0 right-0 w-[44%]" : "inset-0";
+              return (
+              <div key={`${p}-${reloads[p] ?? 0}`} hidden={!visible} className={`absolute overflow-y-auto ${pos}`}>
+                <PageActiveContext.Provider value={visible}>
                   <ErrorBoundary onHome={() => navigate("dashboard")}>
                     <Suspense fallback={<Loading page />}>
                       {renderPage(p)}
@@ -529,7 +573,8 @@ export default function App() {
                   </ErrorBoundary>
                 </PageActiveContext.Provider>
               </div>
-            ))}
+              );
+            })}
           </div>
         </main>
       </div>

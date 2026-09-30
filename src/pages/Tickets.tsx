@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  Columns2,
   Download,
   ExternalLink,
   FileDown,
@@ -41,6 +42,8 @@ import { Button, inputClass, Loading, Modal } from "../components/ui";
 import { lockApi, portalsApi, type Portal, type PortalAction } from "../lib/api";
 import { clearPortalError, failPortal, lastPortalKey, stowPortal, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
 import { getPrefs, windowRect } from "../lib/prefs";
+import { pageLabel, type PageId } from "../components/Sidebar";
+import { SPLIT_RIGHT } from "../lib/split";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 // Con el zoom de la interfaz aplicado: la vista web va en píxeles de la ventana.
@@ -88,7 +91,18 @@ function pickActive(list: Portal[], current: string | null, lastKey: string): st
  * web de la empresa, "mail" el correo de Outlook, "teams" Teams. `covered`: hay
  * un diálogo de la app encima (la vista web nativa lo taparía).
  */
-export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kind?: PortalKind }) {
+export function Tickets({
+  covered = false,
+  kind = "",
+  split = null,
+  onSplit,
+}: {
+  covered?: boolean;
+  kind?: PortalKind;
+  /** Página que va a la derecha en la pantalla dividida. */
+  split?: PageId | null;
+  onSplit?: (p: PageId | null) => void;
+}) {
   const lastKey = lastPortalKey(kind);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [portals, setPortalsState] = useState<Portal[] | null>(() => listCache.get(kind) ?? null);
@@ -291,6 +305,24 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
           >
             <LogOut size={13} /> Cerrar sesión
           </button>
+        )}
+        {portal && onSplit && (
+          <label className="flex shrink-0 items-center gap-1.5 text-xs text-mute" title="El portal a la izquierda y otra página de AdminOps a la derecha">
+            <Columns2 size={14} className={split ? "text-neon" : ""} />
+            <select
+              value={split ?? ""}
+              onChange={(e) => onSplit((e.target.value || null) as PageId | null)}
+              className="rounded-md border border-line bg-void/60 px-2 py-1 text-xs text-ink outline-none focus:border-neon/50"
+              aria-label="Página al lado"
+            >
+              <option value="">Sin dividir</option>
+              {SPLIT_RIGHT.map((o) => (
+                <option key={o} value={o}>
+                  Al lado: {pageLabel(o)}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
         {portal && (
           <div className="flex shrink-0 items-center gap-0.5">

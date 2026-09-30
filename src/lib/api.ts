@@ -727,6 +727,8 @@ export interface Visit {
   repeatEvery: string;
   /** Dónde es: sede, planta, sala. */
   place: string;
+  /** Id del evento de Outlook, si se puso en el calendario ("" si no). */
+  outlookEvent?: string;
 }
 
 /** Cada cuánto se repite una visita, para el desplegable. */
@@ -1212,6 +1214,26 @@ export interface PrinterCheck {
   reachable: boolean | null;
   jobs: number;
   oldestJobMin: number;
+  /** Lo que cuenta la propia impresora por SNMP (null si no contesta). */
+  device: PrinterDevice | null;
+}
+
+export interface PrinterSupply {
+  name: string;
+  /** 0-100, o null si la impresora no lo sabe. */
+  percent: number | null;
+  /** Tóner o tinta (lo que se cambia a menudo). */
+  consumable: boolean;
+}
+
+export interface PrinterDevice {
+  reachable: boolean;
+  name: string;
+  model: string;
+  pages: number | null;
+  supplies: PrinterSupply[];
+  /** Avisos del aparato, en español («Atasco de papel»). */
+  alerts: string[];
 }
 
 /** Impresora vista en la red. */
@@ -1220,6 +1242,11 @@ export interface FoundPrinter {
   /** Puertos de impresión abiertos: 9100 RAW, 631 IPP, 515 LPD. */
   ports: number[];
   installed: boolean;
+  /** Nombre y modelo con que se anuncia ("" si no lo dice). */
+  name: string;
+  model: string;
+  /** mdns · wsd · ports */
+  via: string;
 }
 
 export const printersApi = {
@@ -1292,6 +1319,225 @@ export interface Portal {
 
 export type PortalAction = "back" | "forward" | "reload" | "stop" | "home" | "print";
 
+// ---------- Personas (dominio) ----------
+
+/** Resultado de buscar personas en el dominio. */
+export interface PersonHit {
+  sam: string;
+  name: string;
+  department: string;
+  title: string;
+  mail: string;
+  phone: string;
+  extension: string;
+  disabled: boolean;
+  /** Tuvo un bloqueo (puede haber caducado; el estado real está en la ficha). */
+  lockedHint: boolean;
+}
+
+/** La ficha de una persona del dominio. Fechas en segundos Unix (0 = no se sabe). */
+export interface Person {
+  sam: string;
+  /** Usuario de Microsoft 365 (normalmente el correo). */
+  upn: string;
+  name: string;
+  department: string;
+  title: string;
+  office: string;
+  mail: string;
+  phone: string;
+  extension: string;
+  mobile: string;
+  manager: string;
+  groups: string[];
+  disabled: boolean;
+  locked: boolean;
+  passwordExpired: boolean;
+  passwordNeverExpires: boolean;
+  passwordLastSet: number;
+  passwordExpires: number;
+  lastLogon: number;
+  /** Equipos donde tiene la sesión abierta, según la última comprobación de Puestos. */
+  signedInOn: string[];
+}
+
+export interface LapsPassword {
+  found: boolean;
+  account: string;
+  password: string;
+  expires: number;
+  source: string;
+}
+
+export interface RecoveryKey {
+  computer: string;
+  name: string;
+  password: string;
+  created: number;
+  keyId: string;
+}
+
+export const peopleApi = {
+  search: (query: string) => invoke<PersonHit[]>("search_people", { query }),
+  details: (sam: string) => invoke<Person>("person_details", { sam }),
+  unlock: (sam: string) => invoke<void>("unlock_account", { sam }),
+  /** Devuelve la contraseña temporal para dictarla. */
+  resetPassword: (sam: string, mustChange: boolean, unlock: boolean) => invoke<string>("reset_domain_password", { sam, mustChange, unlock }),
+  laps: (computer: string) => invoke<LapsPassword>("laps_password", { computer }),
+  bitlocker: (computer: string | null, keyId: string | null) => invoke<RecoveryKey[]>("bitlocker_recovery", { computer, keyId }),
+};
+
+// ---------- Microsoft 365 (Graph) ----------
+
+export interface GraphStatus {
+  /** Hay inquilino e id de aplicación. */
+  configured: boolean;
+  /** Hay sesión guardada. */
+  connected: boolean;
+  account: string;
+  tenant: string;
+  clientId: string;
+}
+
+export interface DeviceCode {
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+}
+
+export interface LoginPoll {
+  state: "pending" | "done" | "expired" | "declined" | "error";
+  message: string;
+  account: string;
+}
+
+/** Un inicio de sesión de Entra ID, con el motivo explicado. */
+export interface SignIn {
+  when: string;
+  ok: boolean;
+  code: number;
+  reason: string;
+  app: string;
+  client: string;
+  ip: string;
+  place: string;
+  mfa: string;
+  conditionalAccess: string;
+}
+
+export interface AuthMethod {
+  kind: string;
+  id: string;
+  label: string;
+  /** La contraseña no se quita: el resto sí. */
+  removable: boolean;
+}
+
+export interface ServiceIssue {
+  id: string;
+  service: string;
+  title: string;
+  /** incident (no funciona) · advisory (funciona con limitaciones) */
+  classification: string;
+  status: string;
+  impact: string;
+  start: string;
+}
+
+export const graphApi = {
+  status: () => invoke<GraphStatus>("graph_status"),
+  configure: (tenant: string, clientId: string) => invoke<void>("graph_configure", { tenant, clientId }),
+  loginStart: () => invoke<DeviceCode>("graph_login_start"),
+  loginPoll: () => invoke<LoginPoll>("graph_login_poll"),
+  logout: () => invoke<void>("graph_logout"),
+  /** Abre microsoft.com/devicelogin en el navegador. */
+  openDeviceLogin: () => invoke<void>("graph_open_devicelogin"),
+  signins: (upn: string) => invoke<SignIn[]>("graph_signins", { upn }),
+  mfaMethods: (upn: string) => invoke<AuthMethod[]>("graph_mfa_methods", { upn }),
+  mfaRemove: (upn: string, kind: string, id: string) => invoke<void>("graph_mfa_remove", { upn, kind, id }),
+  revokeSessions: (upn: string) => invoke<void>("graph_revoke_sessions", { upn }),
+  serviceHealth: () => invoke<ServiceIssue[]>("graph_service_health"),
+  /** Devuelve el id del evento de Outlook. */
+  calendarSync: (visitId: string) => invoke<string>("graph_calendar_sync", { visitId }),
+  teamsSend: (upn: string, text: string) => invoke<void>("graph_teams_send", { upn, text }),
+};
+
+// ---------- Seguimientos y nota de llamada ----------
+
+/** «Volver a mirar esto el jueves». Fechas en segundos Unix. */
+export interface Followup {
+  id: string;
+  text: string;
+  due: number;
+  done: boolean;
+  person: string;
+  machine: string;
+  created: number;
+  notified: boolean;
+}
+
+export const followupsApi = {
+  list: () => invoke<Followup[]>("list_followups"),
+  add: (f: Pick<Followup, "text" | "due"> & Partial<Pick<Followup, "person" | "machine">>) =>
+    invoke<Followup>("add_followup", { followup: { id: "", done: false, created: 0, notified: false, person: "", machine: "", ...f } }),
+  setDone: (id: string, done: boolean) => invoke<void>("set_followup_done", { id, done }),
+  snooze: (id: string, days: number) => invoke<void>("snooze_followup", { id, days }),
+  remove: (id: string) => invoke<void>("delete_followup", { id }),
+};
+
+export const noteApi = {
+  /** La ventana de la nota de llamada (también con Ctrl+Alt+N desde cualquier sitio). */
+  open: () => invoke<void>("open_quick_note"),
+  close: () => invoke<void>("close_quick_note"),
+  /** El recorte de pantalla de Windows: lo recortado queda en el portapapeles. */
+  screenClip: () => invoke<void>("open_screen_clip"),
+};
+
+/** Mañana a las 9:00 (hora local), en segundos Unix: la fecha por defecto de un seguimiento. */
+export function tomorrowMorning(days = 1): number {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(9, 0, 0, 0);
+  return Math.floor(d.getTime() / 1000);
+}
+
+// ---------- El caso de ahora ----------
+
+export interface Case {
+  id: string;
+  ticket: string;
+  person: string;
+  sam: string;
+  machine: string;
+  notes: string;
+  started: number;
+  /** 0 mientras está abierto. */
+  ended: number;
+  resolution: string;
+}
+
+export interface CaseAction {
+  at: number;
+  title: string;
+  ok: boolean;
+}
+
+export const casesApi = {
+  current: () => invoke<Case | null>("case_current"),
+  open: (c: Partial<Case>) => invoke<Case>("case_open", { case: emptyCase(c) }),
+  update: (c: Partial<Case>) => invoke<Case>("case_update", { case: emptyCase(c) }),
+  actions: () => invoke<CaseAction[]>("case_actions"),
+  draft: () => invoke<string>("case_draft"),
+  close: (resolution: string) => invoke<Case>("case_close", { resolution }),
+  discard: () => invoke<void>("case_discard"),
+  forPerson: (sam: string, person: string) => invoke<Case[]>("cases_for_person", { sam, person }),
+};
+
+function emptyCase(c: Partial<Case>): Case {
+  return { id: "", ticket: "", person: "", sam: "", machine: "", notes: "", started: 0, ended: 0, resolution: "", ...c };
+}
+
 export const portalsApi = {
   list: () => invoke<Portal[]>("list_portals"),
   save: (portal: Portal) => invoke<Portal>("save_portal", { portal }),
@@ -1306,6 +1552,8 @@ export const portalsApi = {
   hide: (id: string) => invoke<void>("portal_hide", { id }),
   /** Destruye la vista (para las que no arrancaron: ocultarlas no las quita de encima). */
   reset: (id: string) => invoke<void>("portal_reset", { id }),
+  /** Escribe en el campo seleccionado del portal. `false`: no había portal abierto o campo de texto seleccionado. */
+  insertText: (id: string, text: string) => invoke<boolean>("portal_insert_text", { id, text }),
   nav: (id: string, action: PortalAction) => invoke<void>("portal_nav", { id, action }),
   /** `false`: la dirección está fuera del portal y se abrió en el navegador. */
   go: (id: string, url: string) => invoke<boolean>("portal_go", { id, url }),

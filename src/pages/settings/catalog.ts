@@ -58,6 +58,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { section: "portals", title: "Zoom de los portales", keywords: "tamaño letra web" },
   { section: "portals", title: "Dominio de la empresa", keywords: "intranet cuenta windows autenticacion integrada" },
   { section: "portals", title: "Portales configurados", keywords: "tickets inventario correo teams web" },
+  { section: "portals", title: "Microsoft 365", keywords: "graph entra azure mfa inicio sesion outlook calendario teams estado servicio inquilino" },
   // Seguridad
   { section: "security", title: "Bloqueo de AdminOps", keywords: "pin contraseña bloquear inactividad" },
   { section: "security", title: "Modo solo mirar", keywords: "auditoria sin cambios" },

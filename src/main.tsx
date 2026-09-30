@@ -2,20 +2,26 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { QuickNote } from "./components/QuickNote";
 import { appApi } from "./lib/api";
 import { showFullTextOnHover } from "./lib/fullTextOnHover";
 import { applyAppearance } from "./lib/prefs";
 import { applyTheme, getTheme } from "./lib/theme";
 import "./index.css";
 
+// ¿Es la ventanita de la nota de llamada (Ctrl+Alt+N) y no la aplicación?
+// Lo marca el programa al crearla (quicknote.rs).
+const isNote = (window as unknown as { __ADMINOPS_NOTE__?: boolean }).__ADMINOPS_NOTE__ === true;
+
 // Lo primero de todo: decirle al programa que el código ya se está ejecutando.
 // En un equipo viejo pueden pasar diez segundos largos de aquí a la primera
 // pantalla, y sin esta señal el vigilante del arranque lo tomaría por WebView2
-// muerto y recargaría, dejándolo peor.
-void appApi.uiBooting();
+// muerto y recargaría, dejándolo peor. (La nota no es la ventana principal.)
+if (!isNote) void appApi.uiBooting();
 
 applyTheme(getTheme());
-applyAppearance();
+// El tamaño de la interfaz se aplica a la ventana principal; la nota no lo necesita.
+if (!isNote) applyAppearance();
 
 // Sin menú contextual del navegador: esto es una app de escritorio, no una web.
 document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -29,9 +35,7 @@ window.addEventListener("unhandledrejection", (e) => appApi.logError(`Promesa si
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
+    <ErrorBoundary>{isNote ? <QuickNote /> : <App />}</ErrorBoundary>
   </React.StrictMode>,
 );
 
@@ -41,6 +45,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 requestAnimationFrame(() =>
   requestAnimationFrame(() => {
     document.getElementById("boot")?.remove();
-    void appApi.uiReady();
+    if (!isNote) void appApi.uiReady();
   }),
 );

@@ -42,7 +42,7 @@ export function ActionPlan({
   // Lo que no depende del diagnóstico: avisos, actualizaciones, datos, sesión.
   useEffect(() => {
     let alive = true;
-    (async () => {
+    void (async () => {
       const now = Date.now() / 1000;
       const [alerts, updates, ignored, health, session, agenda] = await Promise.all([
         alertsApi.list().catch(() => []),

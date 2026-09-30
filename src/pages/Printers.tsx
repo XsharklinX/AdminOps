@@ -2,7 +2,7 @@ import { CheckCircle2, CircleAlert, ExternalLink, FileCheck2, Loader2, Printer, 
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button } from "../components/ui";
-import { printersApi, tweaksApi, type FoundPrinter, type PrinterCheck, type PrinterInfo } from "../lib/api";
+import { printersApi, tweaksApi, type FoundPrinter, type PrinterCheck, type PrinterInfo, type PrinterSupply } from "../lib/api";
 
 const STATUS: Record<number, string> = { 1: "Otro", 2: "Desconocido", 3: "Lista", 4: "Imprimiendo", 5: "Calentando", 6: "Detenida", 7: "Sin conexión" };
 
@@ -221,13 +221,41 @@ function CheckBox({ c, onClose }: { c: PrinterCheck; onClose: () => void }) {
               </span>
             )}
             {c.jobs > 0 && <span>{c.jobs} en cola, el más viejo de hace {c.oldestJobMin} min</span>}
+            {c.device?.model && <span>{c.device.model}</span>}
+            {c.device?.pages != null && <span>{c.device.pages.toLocaleString("es")} páginas impresas</span>}
           </div>
+          {c.device && c.device.supplies.length > 0 && <Supplies supplies={c.device.supplies} />}
         </div>
         <button onClick={onClose} className="shrink-0 text-mute hover:text-ink" title="Cerrar">
           <X size={14} />
         </button>
       </div>
     </div>
+  );
+}
+
+/** Niveles de tóner, tinta y demás consumibles, como los cuenta la impresora. */
+function Supplies({ supplies }: { supplies: PrinterSupply[] }) {
+  // Primero lo que se cambia a menudo (tóner, tinta); luego fusor, tambor, etc.
+  const orden = [...supplies].sort((a, b) => Number(b.consumable) - Number(a.consumable));
+  return (
+    <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+      {orden.map((s, i) => {
+        const pct = s.percent;
+        const color = pct === null ? "bg-mute" : pct <= 10 ? "bg-bad" : pct <= 25 ? "bg-warn" : "bg-ok";
+        return (
+          <li key={`${s.name}-${i}`} className="flex items-center gap-2 text-[11px]">
+            <span className="min-w-0 flex-1 truncate text-dim" title={s.name}>
+              {s.name}
+            </span>
+            <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-line">
+              {pct !== null && <span className={`block h-full ${color}`} style={{ width: `${pct}%` }} />}
+            </span>
+            <span className="w-9 shrink-0 text-right font-mono text-mute">{pct === null ? "—" : `${pct} %`}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -260,7 +288,7 @@ function NetworkPrinters({ isAdmin }: { isAdmin: boolean }) {
         <Search size={16} className="text-neon" />
         <div className="min-w-0 flex-1">
           <div className="text-sm text-ink">Buscar impresoras en la red</div>
-          <div className="text-[11px] text-mute">Prueba los puertos de impresión en los equipos que ya responden en esta red. No instala nada.</div>
+          <div className="text-[11px] text-mute">Pregunta en la red quién es impresora (mDNS y WS-Discovery) y prueba los puertos de impresión de los equipos que ya responden. No instala nada.</div>
         </div>
         <Button kind="ghost" onClick={buscar} disabled={busy}>
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} {busy ? "Buscando…" : "Buscar"}
@@ -278,8 +306,11 @@ function NetworkPrinters({ isAdmin }: { isAdmin: boolean }) {
               <ul className="space-y-1">
                 {found.map((f) => (
                   <li key={f.ip} className="flex items-center gap-3 text-xs">
-                    <span className="w-32 font-mono text-ink select-text">{f.ip}</span>
-                    <span className="flex-1 text-mute">{f.ports.map((p) => (p === 9100 ? "RAW" : p === 631 ? "IPP" : "LPD")).join(" · ")}</span>
+                    <span className="w-32 shrink-0 font-mono text-ink select-text">{f.ip}</span>
+                    <span className="min-w-0 flex-1 truncate" title={[f.name, f.model].filter(Boolean).join(" · ")}>
+                      {f.name || f.model ? <span className="text-dim">{[f.name, f.model !== f.name ? f.model : ""].filter(Boolean).join(" · ")}</span> : null}
+                      <span className="ml-2 text-mute">{f.ports.map((p) => (p === 9100 ? "RAW" : p === 631 ? "IPP" : "LPD")).join(" · ") || (f.via === "wsd" ? "WS-Discovery" : "mDNS")}</span>
+                    </span>
                     {f.installed ? (
                       <span className="text-mute">ya instalada</span>
                     ) : (

@@ -73,6 +73,7 @@ export type PageId =
   | "nettools"
   | "session"
   | "tickets"
+  | "people"
   | "mail"
   | "teams"
   | "agenda"
@@ -187,6 +188,12 @@ export const NAV: NavItem[] = [
   },
   // Soporte
   { id: "tickets", label: "Tickets", tab: "Tickets", help: "Tu sistema de tickets dentro de AdminOps, sin salir de la app." },
+  {
+    id: "people",
+    label: "Personas",
+    tab: "Personas",
+    help: "La ficha de alguien del dominio: si su cuenta está bloqueada o caducada, desbloquearla, darle una contraseña temporal, en qué equipo está, y las contraseñas LAPS y de BitLocker de un equipo. Con tus propios permisos del dominio.",
+  },
   {
     id: "agenda",
     label: "Agenda",
@@ -329,7 +336,7 @@ const DEFAULT_AREAS: Omit<Area, "icon">[] = [
   // Los id se conservan: las navegaciones personalizadas siguen funcionando.
   { id: "panel", label: "Inicio", iconName: "Home", pages: ["dashboard", "troubleshoot", "session"] },
   { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["machine", "tweaks", "processes", "space"] },
-  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "mail", "teams", "agenda", "clients", "contacts", "knowledge"] },
+  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "people", "mail", "teams", "agenda", "clients", "contacts", "knowledge"] },
   { id: "red", label: "Red", iconName: "Network", pages: ["router", "network", "nettools"] },
   { id: "programas", label: "Aplicaciones", iconName: "Package", pages: ["apps", "recipes"] },
   { id: "admin", label: "Administración", iconName: "Building2", pages: ["stations", "users", "accounts", "printers", "remote", "tools"] },

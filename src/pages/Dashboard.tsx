@@ -10,6 +10,7 @@ import { tempColor, useSensors } from "../hooks/useSensors";
 import { api, diagApi, toolboxApi, tweaksApi, type JournalEntry, type SystemInfo } from "../lib/api";
 import { getPrefs } from "../lib/prefs";
 import { bytes, duration, loadColor, rate } from "../lib/format";
+import { TodayCard } from "../components/TodayCard";
 
 type Latest = Awaited<ReturnType<typeof diagApi.latest>>;
 
@@ -163,6 +164,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-7 px-8 py-6">
+      {/* Lo pendiente del técnico: casos, seguimientos, visitas y avisos (no en modo usuario). */}
+      <TodayCard />
       {/* Lo que se apuntó de este equipo o de esta red la última vez */}
       <PlaceNotes compact />
       {/* Veredicto */}

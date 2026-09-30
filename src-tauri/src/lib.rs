@@ -11,7 +11,14 @@ mod maintenance;
 mod metrics;
 mod migrate;
 mod network;
+mod cases;
+mod followups;
+mod graph;
+mod snmp;
+mod discovery;
+mod quicknote;
 mod paths;
+mod people;
 mod portals;
 mod printers;
 mod processes;
@@ -166,6 +173,8 @@ pub fn run() {
             boottime::step("Vigilancia de la red", || officemap::start(app.handle().clone()));
             // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
             agenda::start(app.handle().clone());
+            // Nota de llamada con Ctrl+Alt+N, aunque AdminOps esté minimizado.
+            quicknote::start(app.handle().clone());
             if std::env::args().any(|a| a == "--auditoria") {
                 audit::set(true);
             }
@@ -229,6 +238,36 @@ pub fn run() {
             portals::portal_bounds,
             portals::portal_hide_all,
             portals::portal_reset,
+            portals::portal_insert_text,
+            cases::case_current,
+            cases::case_open,
+            cases::case_update,
+            cases::case_actions,
+            cases::case_draft,
+            cases::case_close,
+            cases::case_discard,
+            cases::cases_for_person,
+            followups::list_followups,
+            followups::add_followup,
+            followups::set_followup_done,
+            followups::snooze_followup,
+            followups::delete_followup,
+            quicknote::open_quick_note,
+            quicknote::close_quick_note,
+            quicknote::open_screen_clip,
+            graph::graph_status,
+            graph::graph_configure,
+            graph::graph_login_start,
+            graph::graph_login_poll,
+            graph::graph_logout,
+            graph::graph_open_devicelogin,
+            graph::graph_signins,
+            graph::graph_mfa_methods,
+            graph::graph_mfa_remove,
+            graph::graph_revoke_sessions,
+            graph::graph_service_health,
+            graph::graph_calendar_sync,
+            graph::graph_teams_send,
             portals::portal_nav,
             portals::portal_open_window,
             portals::portal_open_external,
@@ -482,6 +521,12 @@ pub fn run() {
             users::user_profile_size,
             users::delete_user,
             users::rename_user,
+            people::search_people,
+            people::person_details,
+            people::unlock_account,
+            people::reset_domain_password,
+            people::laps_password,
+            people::bitlocker_recovery,
             tweaks::profiles::list_profiles,
             tweaks::profiles::apply_profile,
             tweaks::profiles::revert_profile,

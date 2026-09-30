@@ -117,7 +117,7 @@ function Backup() {
     migrateApi.profiles().then((p) => {
       setProfiles(p);
       setSid(p[0]?.sid ?? "");
-    });
+    }).catch(() => setProfiles([]));
   }, []);
 
   // Al cambiar de usuario, lo que tarde en llegar del anterior se descarta:

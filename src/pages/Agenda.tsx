@@ -2,6 +2,7 @@ import { BellRing, CalendarCheck, CalendarDays, CalendarPlus, Check, Mail, MapPi
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { OutlookButton } from "../components/M365";
 import type { PageId } from "../components/Sidebar";
 import { Button, Card, EmptyState, inputClass, Loading, Modal } from "../components/ui";
 import { agendaApi, portalsApi, REPEATS, workApi, type Client, type DueClient, type Settings, type Visit } from "../lib/api";
@@ -246,6 +247,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
                     onEdit={() => setEditing(v)}
                     onRemind={() => remind(v)}
                     onPostpone={(d) => postpone(v, d)}
+                    onChanged={() => void load()}
                   />
                 ))}
               </ul>
@@ -316,6 +318,7 @@ function VisitRow({
   onEdit,
   onRemind,
   onPostpone,
+  onChanged,
 }: {
   v: Visit;
   client?: Client;
@@ -325,6 +328,7 @@ function VisitRow({
   onEdit: () => void;
   onRemind: () => void;
   onPostpone: (days: number) => void;
+  onChanged: () => void;
 }) {
   const btn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink";
   return (
@@ -374,6 +378,7 @@ function VisitRow({
         <button onClick={() => onPostpone(1)} className={btn} title="Aplazar un día (sin abrir el editor)">
           <CalendarPlus size={14} />
         </button>
+        <OutlookButton visitId={v.id} inOutlook={!!v.outlookEvent} onDone={onChanged} className={btn} />
         <button onClick={onEdit} className={btn} title="Cambiar día, hora, sitio o repetición">
           <Pencil size={14} />
         </button>

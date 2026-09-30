@@ -24,6 +24,86 @@ siempre bien. Este plan sale de lo que pasó entre la 1.1.5 y la 1.1.6, no de un
 Cada fase cierra un tipo de fallo de los que ya han pasado. Van en orden: la 30 es la que más
 problemas evita, y conviene hacerla antes que ninguna otra.
 
+### Una sola estación: las tres primeras (hecho, sin probar en un dominio real)
+
+Adelantadas a la Fase 30 por decisión del técnico. Están verificadas con pruebas y el compilador,
+pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede probar allí.
+
+- **Personas** (Soporte → Personas). La ficha de alguien del dominio buscando por nombre, usuario,
+  correo o extensión: cuenta bloqueada, desactivada o con la contraseña caducada o a punto; su
+  departamento, extensión y responsable; en qué equipo tiene la sesión abierta (según la última
+  comprobación a fondo de Puestos); y lo que ya se hizo con ella en casos anteriores. Acciones:
+  **desbloquear**, **contraseña temporal** (fácil de dictar, obliga a cambiarla y desbloquea a la vez;
+  se enseña una vez y no se guarda en ningún sitio), **Teams** y **abrir un caso**. Además, las
+  **contraseñas de un equipo**: la **LAPS** del administrador local (Windows LAPS, también cifrada, y la
+  versión anterior; se tapa sola al minuto) y las **claves de recuperación de BitLocker** guardadas en
+  el dominio, por equipo o por el **ID que enseña la pantalla de recuperación**.
+  Por ADSI, que viene con Windows (no hace falta RSAT), y **con los permisos del técnico**: si el dominio
+  no le deja, se lo dice. Desbloquear y cambiar la contraseña quedan en el diario y los bloquea el modo
+  auditoría; consultar LAPS o BitLocker también queda en el diario (qué equipo, nunca la contraseña).
+- **El caso de ahora**. Una barra arriba, en cualquier página, con el ticket, la persona, el equipo, el
+  tiempo y lo que va quedando apuntado. **No hay que registrar nada**: se lee del diario, que ya guarda
+  cada cambio. Al cerrarlo se redacta la resolución con lo que se hizo de verdad (lo que falló, aparte y
+  con el motivo), editable, para **copiarla** o **pegarla en el campo del ticket** que tengas seleccionado
+  en el portal (AdminOps comprueba si la escribió; si no, la deja copiada y lo dice). Se abre desde la
+  cabecera, desde la ficha de una persona o desde Ctrl+K. Queda en la ficha de la persona.
+- **Ctrl+K reconoce lo que escribes**: un equipo (`PC-CONTA-03`), una persona (`maria.perez`), una
+  extensión, una IP, una impresora o un ticket (`#4521`), y ofrece lo que se hace con cada uno. Lo
+  inconfundible va arriba; dos palabras sueltas (que pueden ser un nombre o «windows update») van al
+  final, sin tapar lo que Ctrl+K ya encontraba. Solo ofrece acciones que funcionan de verdad.
+
+### Una sola estación: las tres siguientes (hecho)
+
+- **Pantalla dividida.** En Tickets, Correo y Teams, un selector «Al lado» pone otra página de
+  AdminOps a la derecha: Personas, Solucionar problemas, Impresoras, Contactos o Soluciones. Se lee el
+  ticket mientras se resuelve. Solo páginas que se leen bien en media pantalla, y ningún portal (dos
+  vistas web nativas no se reparten bien la ventana). Personas usa *container queries*: sus columnas
+  dependen del hueco que tiene, no del ancho de la ventana, así que se ve bien a pantalla completa y
+  en media. Se recuerda la elección.
+- **Nota de llamada con Ctrl+Alt+N**, aunque AdminOps esté minimizado: una ventana pequeña, siempre
+  encima, para apuntar quién llama, su equipo y qué le pasa, y convertirlo en un caso o en un
+  seguimiento para mañana. El atajo usa `RegisterHotKey` de Windows (sin plugins nuevos); si otro
+  programa ya lo tiene, se dice en el registro y la nota se abre desde Ctrl+K. La ventana se crea con
+  las mismas opciones de navegador que la principal.
+- **Seguimientos**: «volver a mirar esto el jueves», con fecha. Aparecen en «Hoy» cuando tocan y avisan
+  por Windows una sola vez; se marcan hechos o se aplazan. Nunca se borra uno pendiente al podar.
+- **Recorte de pantalla** desde la barra del caso y desde Ctrl+K: abre el recorte de Windows y lo
+  recortado queda en el portapapeles para pegarlo en el ticket. *No tapa datos personales*: eso sobre
+  una captura cualquiera necesitaría leer el texto de la imagen (OCR), y no se promete lo que no hace.
+- **Hoy**, arriba del Panel: el caso abierto, los seguimientos que tocan o se pasaron, las visitas de
+  hoy, los clientes con el mantenimiento vencido y los avisos de Windows sin leer, ordenados por lo que
+  corre más prisa, con la acción de cada cosa. No sale en modo usuario (ahí el Panel lo ve el cliente).
+
+### Microsoft 365 e impresoras que hablan (hecho, sin probar en un inquilino real)
+
+- **Microsoft 365 con Graph**, con la cuenta del técnico. Se conecta en Ajustes → Portales y correo
+  con el inicio de sesión **por código** (microsoft.com/devicelogin en el navegador de siempre, con
+  su MFA): no pasa por ninguna vista web integrada. La sesión se guarda cifrada; el token de acceso,
+  solo en memoria. Permisos **delegados** y `.default`: AdminOps solo puede lo que IT concedió a la
+  aplicación *y* lo que el rol del técnico permite; si falta un permiso, esa función lo dice.
+  - **Personas → Microsoft 365**: los últimos inicios de sesión con el motivo en español (50126
+    contraseña, 50053 bloqueo, 500121 MFA no aprobado, 53003 acceso condicional…; los que no se
+    conocen, con el texto de Microsoft y el código), **métodos de MFA** con «Quitar» (el móvil
+    perdido: al quedarse sin métodos, Microsoft le pide registrarlos de nuevo), **cerrar todas sus
+    sesiones** y **mensaje por Teams**. Quitar MFA y cerrar sesiones van al diario y el modo
+    auditoría los bloquea.
+  - **Hoy**: las incidencias abiertas de Microsoft 365 (cada 10 minutos, no cada minuto).
+  - **Agenda**: cada visita se pone en el calendario de Outlook del técnico (y se actualiza si ya
+    estaba; si la borraron en Outlook, se crea otra).
+  - **Cerrar caso → «Avisar por Teams»** a la persona de que ya está resuelto.
+- **Impresoras por SNMP** (Printer-MIB, v2c con v1 de reserva, comunidad `public`, solo lectura):
+  «Revisar» dice ahora lo que cuenta el propio aparato — atasco, puerta abierta, sin papel — con
+  prioridad sobre lo que sabe Windows, y **«Tóner negro al 8 %»** cuando no hay nada peor. Muestra
+  los niveles de cada consumible y el contador de páginas. Cliente SNMP propio (unas 200 líneas de
+  BER probadas byte a byte) en vez de una dependencia.
+- **Descubrir impresoras por su nombre**: mDNS (`_ipp`, `_pdl-datastream`, `_printer`) y
+  WS-Discovery a la vez que la tabla de vecinos. Salen también las que este equipo nunca ha visto,
+  con su nombre y modelo (mDNS, o SNMP si no se anuncian). Si el cortafuegos no deja pasar las
+  respuestas, la búsqueda por puertos sigue igual.
+- **Deuda cerrada**: los 9 avisos de ESLint `no-floating-promises` (promesas sin gestionar en
+  Knowledge, Migrate, Report, Ajustes → Bloqueo, Cuentas, Dispositivos, Plan de acción e informe de
+  servicio). `npx eslint .` queda sin avisos.
+
 ### Fase 30 — Probar la aplicación en marcha
 
 **Prioridad: máxima.** Es lo que habría parado los cinco fallos de arriba antes de llegarte.
@@ -190,6 +270,11 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
 - **Dependencia de Edge para el PDF.** Si falta, el informe cae a HTML.
 - **Sin firma de código** (decisión: no se contempla por coste). SmartScreen avisará al instalar.
 - **Solo español** (inglés en la Fase 28).
+- **Microsoft 365 y SNMP sin probar contra un inquilino y una impresora reales.** Los mensajes se
+  prueban con respuestas de ejemplo; falta verlo con los permisos de la empresa y una impresora de
+  red de la oficina.
+- **Descubrimiento en la red y cortafuegos**: las respuestas de mDNS y WS-Discovery llegan por UDP a
+  un puerto efímero; si el cortafuegos de Windows las filtra, esas impresoras solo salen por puertos.
 - **Notificaciones en portable**: sin instalador, Windows puede mostrarlas con otro nombre de app.
 - **Tickets incrustados** usan la API "unstable" de Tauri (vistas hijas); si una versión futura la
   cambia, queda la ventana aparte como alternativa.

@@ -56,6 +56,10 @@ const BLOCKED: &[&str] = &[
     "set_user_admin",
     "delete_user",
     "rename_user",
+    "unlock_account",
+    "reset_domain_password",
+    "graph_mfa_remove",
+    "graph_revoke_sessions",
     "set_dns_filter",
     "set_blocked_sites",
     "set_logon_hours",
@@ -180,10 +184,20 @@ const SAFE: &[&str] = &[
     "wake_on_lan", "remote_status", "open_remote_desktop", "open_quick_assist", "list_shares", "ip_conflicts", "export_csv",
     // officemap
     "office_map", "save_device_meta", "refresh_device_ips", "watch_status",
+    // followups y nota de llamada (datos y ventanas del propio técnico)
+    "list_followups", "add_followup", "set_followup_done", "snooze_followup", "delete_followup",
+    "open_quick_note", "close_quick_note", "open_screen_clip",
+    // graph (consultas, conexión del propio técnico, su calendario y sus mensajes)
+    "graph_status", "graph_configure", "graph_login_start", "graph_login_poll", "graph_logout", "graph_open_devicelogin",
+    "graph_signins", "graph_mfa_methods", "graph_service_health", "graph_calendar_sync", "graph_teams_send",
+    // cases
+    "case_current", "case_open", "case_update", "case_actions", "case_draft", "case_close", "case_discard", "cases_for_person",
+    // people
+    "search_people", "person_details", "laps_password", "bitlocker_recovery",
     // paths
     "get_app_info", "read_log", "log_frontend_error", "open_logs_folder", "open_app_folder",
     // portals
-    "list_portals", "save_portal", "delete_portal", "portal_show", "portal_bounds", "portal_hide_all", "portal_reset", "portal_nav", "portal_open_window",
+    "list_portals", "save_portal", "delete_portal", "portal_show", "portal_bounds", "portal_hide_all", "portal_reset", "portal_insert_text", "portal_nav", "portal_open_window",
     "portal_open_external", "portal_preload", "portal_close_idle", "portal_go", "portal_zoom", "portal_find", "portal_login_get", "portal_login_set",
     "portal_compose", "portal_teams", "portal_sign_out", "portal_download_open", "portal_download_reveal", "router_portal", "portal_hide",
     // printers

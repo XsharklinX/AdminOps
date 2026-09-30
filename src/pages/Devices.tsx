@@ -96,7 +96,7 @@ function WifiCard() {
   const toast = useToast();
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       let listError = "";
       const [info, profiles] = await Promise.all([
         lanApi.info().catch(() => null),

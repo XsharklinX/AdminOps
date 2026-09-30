@@ -51,7 +51,7 @@ export function Report() {
     workApi.settings().then((s) => {
       setSettings(s);
       setTechnician((t) => t || s.technician);
-    });
+    }).catch(() => {});
   }, []);
 
   const picked = clients.find((c) => c.id === clientId) ?? null;

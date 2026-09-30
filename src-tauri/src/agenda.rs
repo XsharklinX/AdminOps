@@ -38,6 +38,8 @@ pub struct Visit {
     pub repeat_every: String,
     /// Dónde es (sede, planta, sala). Lo que hace falta para llegar.
     pub place: String,
+    /// Id del evento en el calendario de Outlook, si se puso ahí (graph.rs).
+    pub outlook_event: String,
 }
 
 /// Cliente con el mantenimiento vencido o cerca, sin visita planificada.
@@ -192,6 +194,7 @@ pub fn start(app: tauri::AppHandle) {
         std::thread::sleep(Duration::from_secs(20));
         loop {
             tick(&app);
+            crate::followups::check_due(&app);
             std::thread::sleep(Duration::from_secs(60));
         }
     });
@@ -235,6 +238,10 @@ pub fn save_visit(app: tauri::AppHandle, visit: Visit) -> Result<SavedVisit, Str
                 v.reminded = false;
             } else {
                 v.reminded = x.reminded;
+            }
+            // El editor no conoce el evento de Outlook: se conserva el que tenía.
+            if v.outlook_event.is_empty() {
+                v.outlook_event = x.outlook_event.clone();
             }
             *x = v.clone();
         }
@@ -321,6 +328,20 @@ pub fn next_in_series(done: &Visit) -> Option<Visit> {
     siguiente.status = "planned".into();
     siguiente.reminded = false;
     Some(siguiente)
+}
+
+/// Una visita por su id (para ponerla en Outlook).
+pub fn visit_by_id(app: &tauri::AppHandle, id: &str) -> Option<Visit> {
+    load(app).into_iter().find(|v| v.id == id)
+}
+
+/// Apunta en la visita el evento de Outlook que le corresponde.
+pub fn set_outlook_event(app: &tauri::AppHandle, id: &str, event: &str) -> Result<(), String> {
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut list = load(app);
+    let v = list.iter_mut().find(|v| v.id == id).ok_or("Esa visita ya no existe.")?;
+    v.outlook_event = event.chars().take(300).collect();
+    save(app, &list)
 }
 
 /// Aplaza una visita el número de días indicado.

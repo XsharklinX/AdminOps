@@ -35,7 +35,7 @@ export function LockSettings() {
         setIdle(s.idleMinutes);
         setKind(s.kind === "password" ? "password" : "pin");
       }
-    });
+    }).catch(() => {});
   }, []);
   useEffect(load, [load]);
 

@@ -408,7 +408,7 @@ function Solutions({
   const copy = (s: Solution) => {
     navigator.clipboard
       .writeText(`${s.title}\n\n${s.solution}`)
-      .then(() => toast("ok", "Solución copiada."));
+      .then(() => toast("ok", "Solución copiada."), () => toast("error", "No se pudo copiar."));
     // Las de AdminOps no están en la biblioteca: no hay nada que marcar.
     if (!isBuiltin(s.id)) libraryApi.touch("solutions", s.id).catch(() => {});
   };
@@ -602,7 +602,7 @@ function UseTemplate({ t, onClose }: { t: TextTemplate; onClose: () => void }) {
   const copy = () => {
     navigator.clipboard
       .writeText(text)
-      .then(() => toast("ok", "Texto copiado."));
+      .then(() => toast("ok", "Texto copiado."), () => toast("error", "No se pudo copiar."));
     libraryApi.touch("templates", t.id).catch(() => {});
     onClose();
   };
