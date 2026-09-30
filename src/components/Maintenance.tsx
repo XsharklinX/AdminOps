@@ -44,7 +44,7 @@ export function BootCard() {
             {data.culprits.length === 0 ? (
               <p className="text-sm text-ok">Windows no ha detectado nada que ralentice el arranque.</p>
             ) : (
-              <div className="max-h-40 space-y-0.5 overflow-y-auto">
+              <div className="pane-sm space-y-0.5 overflow-y-auto">
                 {data.culprits.map((c) => (
                   <div key={`${c.kind}-${c.name}`} className="flex items-center gap-3 text-sm">
                     <span className="w-20 shrink-0 text-[11px] text-mute">{KIND[c.kind]}</span>
@@ -123,7 +123,7 @@ export function DriverRestoreButton() {
 
   const show = () => {
     setOpen(true);
-    maintenanceApi.driverBackups().then(setList);
+    void maintenanceApi.driverBackups().then(setList);
   };
 
   const restore = async (name: string) => {

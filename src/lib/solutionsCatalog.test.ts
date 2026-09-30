@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_PREFIX, BUILTIN_SOLUTIONS, duplicateForEditing, isBuiltin } from "./solutionsCatalog";
+import { BUILTIN_PREFIX, BUILTIN_SOLUTIONS, duplicateForEditing, isBuiltin, solutionForFinding } from "./solutionsCatalog";
 
 describe("soluciones que trae AdminOps", () => {
   it("todas tienen id propio, título, problema, pasos y etiquetas", () => {
@@ -34,5 +34,40 @@ describe("soluciones que trae AdminOps", () => {
     expect(copy.solution).toBe(BUILTIN_SOLUTIONS[0].solution);
     // Las etiquetas se copian, no se comparten.
     expect(copy.tags).not.toBe(BUILTIN_SOLUTIONS[0].tags);
+  });
+});
+
+describe("del hallazgo a la solución", () => {
+  const find = (area: string, title: string) => solutionForFinding({ area, title });
+
+  it("lleva cada problema típico a su solución", () => {
+    expect(find("Almacenamiento", "C: con poco espacio libre (8%)")).toBe(`${BUILTIN_PREFIX}disco-c-lleno`);
+    expect(find("Estabilidad", "3 pantallazo(s) azul(es) en 7 días (último: MEMORY_MANAGEMENT)")).toBe(`${BUILTIN_PREFIX}pantallazo-azul`);
+    expect(find("Sistema", "Windows no está activado")).toBe(`${BUILTIN_PREFIX}activacion-windows`);
+    expect(find("Rendimiento", "14 programas arrancan con Windows")).toBe(`${BUILTIN_PREFIX}equipo-lento`);
+    expect(find("Hardware", "Batería al 48% de su capacidad")).toBe(`${BUILTIN_PREFIX}bateria-dura-poco`);
+    expect(find("Drivers", "Realtek Audio: el dispositivo no funciona")).toBe(`${BUILTIN_PREFIX}pantallazo-azul`);
+  });
+
+  it("toda solución enlazada existe en el catálogo", () => {
+    const ids = new Set(BUILTIN_SOLUTIONS.map((s) => s.id));
+    const samples: [string, string][] = [
+      ["Almacenamiento", "poco espacio libre"],
+      ["Estabilidad", "2 pantallazos azules"],
+      ["Sistema", "Windows no está activado"],
+      ["Seguridad", "Firmas del antivirus con 30 días de antigüedad"],
+      ["Memoria", "La prueba de memoria de Windows encontró errores"],
+      ["Discos", "Samsung SSD: el disco anuncia un fallo inminente (SMART)"],
+      ["", "Windows Update lleva 40 días sin instalar nada"],
+    ];
+    for (const [area, title] of samples) {
+      const id = solutionForFinding({ area, title });
+      expect(id, `${area} · ${title}`).not.toBeNull();
+      expect(ids.has(id!), `${id} no está en el catálogo`).toBe(true);
+    }
+  });
+
+  it("un hallazgo sin solución conocida no inventa ninguna", () => {
+    expect(find("Otra cosa", "algo que nadie ha visto")).toBeNull();
   });
 });

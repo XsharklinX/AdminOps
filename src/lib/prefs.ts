@@ -63,13 +63,29 @@ export const DEFAULT_SIDEBAR: SidebarPrefs = {
   recents: 0,
 };
 
+/**
+ * Para quién es esta instalación.
+ *  - `admin`: el técnico. Todo AdminOps, y para cambiar el equipo hace falta
+ *    abrirlo como administrador.
+ *  - `user`: la persona que usa el equipo. Solo ver cómo está y dejar entrar al
+ *    técnico; no se muestran ni los datos del técnico ni lo que puede romper algo.
+ *
+ * Es un modo de la interfaz para evitar accidentes y no enseñar datos de otros
+ * clientes, no una barrera de seguridad: quien tenga el equipo y sepa, puede
+ * cambiarlo (por eso conviene poner un PIN en Ajustes → Seguridad).
+ */
+export type AppMode = "admin" | "user";
+
 export interface Prefs {
+  mode: AppMode;
   accent: Accent;
   /** Tamaño de toda la interfaz (zoom de la ventana). */
   zoom: number;
   reduceMotion: boolean;
   /** "last": la última página visitada. */
   startPage: "last" | PageId;
+  /** La página de inicio la eligió el técnico en Ajustes (y no es la de fábrica). */
+  startPageChosen?: boolean;
   /** Cada cuánto se actualiza el Panel (ms). */
   refreshMs: number;
   layout: NavLayout | null;
@@ -87,7 +103,7 @@ export interface Prefs {
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { accent: "blue", zoom: 1, reduceMotion: false, startPage: "last", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1 };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1 };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -123,6 +139,11 @@ export function getPrefs(): Prefs {
   p.sidebar = { ...DEFAULT_SIDEBAR, ...(p.sidebar && typeof p.sidebar === "object" ? p.sidebar : {}) };
   if (!Array.isArray(p.sidebar.favorites)) p.sidebar.favorites = [];
   if (!p.pageLabels || typeof p.pageLabels !== "object") p.pageLabels = {};
+  // AdminOps abre siempre en el Panel salvo que el técnico haya elegido otra
+  // página. Antes venía «la última que usé» de fábrica, y como las preferencias
+  // se guardan enteras al tocar cualquier ajuste, ese valor quedaba escrito
+  // aunque nadie lo hubiera elegido. Solo se respeta si se eligió a propósito.
+  if (!p.startPageChosen && p.startPage === "last") p.startPage = "dashboard";
   cache = p;
   return p;
 }

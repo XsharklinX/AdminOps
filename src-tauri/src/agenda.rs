@@ -31,6 +31,13 @@ pub struct Visit {
     pub status: String,
     /// Ya se avisó de esta visita.
     pub reminded: bool,
+    /// Tipo de visita (id de los configurados en Ajustes): al empezar la sesión
+    /// trae ya su checklist, en vez de elegirlo otra vez a mano.
+    pub visit_type: String,
+    /// "" no se repite · weekly · biweekly · monthly · quarterly · semiannual · yearly
+    pub repeat_every: String,
+    /// Dónde es (sede, planta, sala). Lo que hace falta para llegar.
+    pub place: String,
 }
 
 /// Cliente con el mantenimiento vencido o cerca, sin visita planificada.
@@ -81,6 +88,11 @@ fn validate(mut v: Visit) -> Result<Visit, String> {
     if !["planned", "done", "cancelled"].contains(&v.status.as_str()) {
         v.status = "planned".into();
     }
+    if repeat_seconds(&v.repeat_every).is_none() {
+        v.repeat_every = String::new();
+    }
+    v.visit_type = v.visit_type.trim().chars().take(60).collect();
+    v.place = v.place.trim().chars().take(120).collect();
     Ok(v)
 }
 
@@ -196,8 +208,18 @@ pub fn list_agenda(app: tauri::AppHandle) -> AgendaView {
     AgendaView { visits, due }
 }
 
+/// Visita guardada y, si la hay, la advertencia de que se pisa con otra.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedVisit {
+    pub visit: Visit,
+    /// Cliente de la visita con la que se solapa ("" si no hay conflicto). No
+    /// impide guardar: a veces se solapan a propósito; solo avisa.
+    pub conflict: String,
+}
+
 #[tauri::command]
-pub fn save_visit(app: tauri::AppHandle, visit: Visit) -> Result<Visit, String> {
+pub fn save_visit(app: tauri::AppHandle, visit: Visit) -> Result<SavedVisit, String> {
     let mut v = validate(visit)?;
     let client = crate::workflow::find_client(&app, &v.client_id).ok_or("Ese cliente ya no existe.")?;
     v.client_name = client.name.clone();
@@ -222,20 +244,33 @@ pub fn save_visit(app: tauri::AppHandle, visit: Visit) -> Result<Visit, String> 
             list.push(v.clone());
         }
     }
+    let conflict = overlaps(&list, &v).unwrap_or_default();
     save(&app, &list)?;
-    Ok(v)
+    Ok(SavedVisit { visit: v, conflict })
 }
 
+/// Cambia el estado de una visita. Al darla por hecha, si se repite, se crea ya
+/// la siguiente: así el ciclo de mantenimiento no depende de que alguien se
+/// acuerde de volver a apuntarlo.
 #[tauri::command]
-pub fn set_visit_status(app: tauri::AppHandle, id: String, status: String) -> Result<(), String> {
+pub fn set_visit_status(app: tauri::AppHandle, id: String, status: String) -> Result<Option<Visit>, String> {
     if !["planned", "done", "cancelled"].contains(&status.as_str()) {
         return Err("Estado no válido.".into());
     }
     let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut list = load(&app);
     let v = list.iter_mut().find(|v| v.id == id).ok_or("Esa visita ya no existe.")?;
-    v.status = status;
-    save(&app, &list)
+    v.status = status.clone();
+    let mut creada = None;
+    if status == "done" {
+        if let Some(mut siguiente) = next_in_series(v) {
+            siguiente.id = format!("v{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis()));
+            list.push(siguiente.clone());
+            creada = Some(siguiente);
+        }
+    }
+    save(&app, &list)?;
+    Ok(creada)
 }
 
 #[tauri::command]
@@ -246,9 +281,127 @@ pub fn delete_visit(app: tauri::AppHandle, id: String) -> Result<(), String> {
     save(&app, &list)
 }
 
+/// Cada cuánto se repite una visita. La mayor parte del trabajo de
+/// mantenimiento es periódico, y volver a crearla a mano cada vez es la razón
+/// por la que las agendas se abandonan.
+pub fn repeat_seconds(every: &str) -> Option<u64> {
+    match every {
+        "weekly" => Some(7 * DAY),
+        "biweekly" => Some(14 * DAY),
+        "monthly" => Some(30 * DAY),
+        "quarterly" => Some(91 * DAY),
+        "semiannual" => Some(182 * DAY),
+        "yearly" => Some(365 * DAY),
+        _ => None,
+    }
+}
+
+/// Visitas que se pisan con otra ya planificada.
+///
+/// Dos visitas a la vez no es un detalle estético: significa que una de las dos
+/// no se va a atender, y el técnico se entera el día de la visita.
+pub fn overlaps(visits: &[Visit], candidate: &Visit) -> Option<String> {
+    let fin = |v: &Visit| v.start + u64::from(v.minutes) * 60;
+    visits
+        .iter()
+        .find(|v| v.id != candidate.id && v.status == "planned" && v.start < fin(candidate) && candidate.start < fin(v))
+        .map(|v| v.client_name.clone())
+}
+
+/// La siguiente visita de una serie que se repite, si la hay.
+///
+/// Al marcar una como hecha se crea la próxima, para que el ciclo no dependa de
+/// que alguien se acuerde. Se cuenta desde la fecha planificada, no desde hoy,
+/// para que atender con retraso no desplace toda la serie.
+pub fn next_in_series(done: &Visit) -> Option<Visit> {
+    let paso = repeat_seconds(&done.repeat_every)?;
+    let mut siguiente = done.clone();
+    siguiente.id = String::new();
+    siguiente.start = done.start + paso;
+    siguiente.status = "planned".into();
+    siguiente.reminded = false;
+    Some(siguiente)
+}
+
+/// Aplaza una visita el número de días indicado.
+#[tauri::command]
+pub fn postpone_visit(app: tauri::AppHandle, id: String, days: i64) -> Result<(), String> {
+    if !(-30..=365).contains(&days) || days == 0 {
+        return Err("Solo se puede aplazar entre 1 y 365 días (o adelantar hasta 30).".into());
+    }
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut list = load(&app);
+    let v = list.iter_mut().find(|v| v.id == id).ok_or("Esa visita ya no existe.")?;
+    let nuevo = v.start as i64 + days * DAY as i64;
+    if nuevo <= 0 {
+        return Err("La fecha resultante no es válida.".into());
+    }
+    v.start = nuevo as u64;
+    // Cambió la fecha: hay que volver a avisar.
+    v.reminded = false;
+    save(&app, &list)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn visita(id: &str, start: u64, minutes: u32) -> Visit {
+        Visit { id: id.into(), client_id: "c1".into(), client_name: "Cliente".into(), start, minutes, status: "planned".into(), ..Default::default() }
+    }
+
+    /// Dos visitas a la vez no es un detalle estético: una de las dos no se va a
+    /// atender, y hay que saberlo al planificar, no el día de la visita.
+    #[test]
+    fn warns_when_two_visits_overlap() {
+        let list = vec![visita("a", 10_000, 60)];
+        // Empieza dentro de la anterior.
+        assert_eq!(overlaps(&list, &visita("b", 11_800, 60)).as_deref(), Some("Cliente"));
+        // Justo después: no se pisan.
+        assert!(overlaps(&list, &visita("b", 13_600, 60)).is_none());
+        // Justo antes de que empiece la otra.
+        assert!(overlaps(&list, &visita("b", 6_400, 60)).is_none());
+        // La misma visita no se pisa consigo misma al editarla.
+        assert!(overlaps(&list, &visita("a", 10_000, 120)).is_none());
+        // Una visita cancelada ya no ocupa hueco.
+        let cancelada = vec![Visit { status: "cancelled".into(), ..visita("a", 10_000, 60) }];
+        assert!(overlaps(&cancelada, &visita("b", 11_000, 60)).is_none());
+    }
+
+    /// Al dar por hecha una visita periódica se crea ya la siguiente, contada
+    /// desde la fecha planificada: atender con retraso no debe desplazar la serie.
+    #[test]
+    fn a_repeating_visit_schedules_the_next_one() {
+        let hecha = Visit { repeat_every: "monthly".into(), visit_type: "mantenimiento".into(), place: "Planta 2".into(), reminded: true, ..visita("a", 1_000_000, 90) };
+        let siguiente = next_in_series(&hecha).expect("mensual se repite");
+        assert_eq!(siguiente.start, 1_000_000 + 30 * DAY);
+        assert_eq!(siguiente.status, "planned");
+        assert!(!siguiente.reminded, "la nueva aún no se ha avisado");
+        assert!(siguiente.id.is_empty(), "el id lo pone quien la guarda");
+        // Se conserva lo que define la visita, no solo la fecha.
+        assert_eq!(siguiente.visit_type, "mantenimiento");
+        assert_eq!(siguiente.place, "Planta 2");
+        assert_eq!(siguiente.minutes, 90);
+        // Una visita suelta no genera nada.
+        assert!(next_in_series(&visita("a", 1_000_000, 60)).is_none());
+    }
+
+    #[test]
+    fn repeat_periods_are_known() {
+        assert_eq!(repeat_seconds("weekly"), Some(7 * DAY));
+        assert_eq!(repeat_seconds("quarterly"), Some(91 * DAY));
+        assert_eq!(repeat_seconds(""), None);
+        assert_eq!(repeat_seconds("cada rato"), None);
+    }
+
+    /// Los campos nuevos se limpian igual que los de siempre.
+    #[test]
+    fn validation_cleans_the_new_fields() {
+        let v = validate(Visit { client_id: "c1".into(), start: 10, repeat_every: "cada rato".into(), place: "  Sede central  ".into(), visit_type: " rutina ".into(), ..Default::default() }).unwrap();
+        assert_eq!(v.repeat_every, "", "un periodo inventado no se guarda");
+        assert_eq!(v.place, "Sede central");
+        assert_eq!(v.visit_type, "rutina");
+    }
     use crate::workflow::{Client, SessionRecord};
 
     fn visit(client: &str, start: u64, status: &str) -> Visit {

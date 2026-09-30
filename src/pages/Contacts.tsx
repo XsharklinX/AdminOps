@@ -25,6 +25,7 @@ import { ContactEditor } from "../components/contacts/ContactEditor";
 import { ContactTools, type ToolTab } from "../components/contacts/ContactTools";
 import { CardsView, DirectoryView, TableView, type ViewProps } from "../components/contacts/ContactViews";
 import { colorOf, TagChip, TagInput, type TagColors } from "../components/contacts/Tags";
+import { ChipRow } from "../components/ChipRow";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, EmptyState, inputClass, Loading } from "../components/ui";
 import { contactsApi, officeApi, portalsApi, workApi, type Client, type Contact } from "../lib/api";
@@ -52,6 +53,7 @@ import {
   type Filters,
   type ViewMode,
 } from "../lib/contacts";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 const VIEWS: { id: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
   { id: "cards", label: "Tarjetas", icon: LayoutGrid },
@@ -98,10 +100,13 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
     }
   }, [toast]);
 
-  useEffect(() => {
-    load();
-    workApi.clients().then(setClients).catch(() => {});
-  }, [load]);
+  useLiveEffect(
+    (vigente) => {
+      void load();
+      workApi.clients().then((c) => vigente() && setClients(c)).catch(() => {});
+    },
+    [load],
+  );
 
   const live = useMemo(() => (all ?? []).filter((c) => !c.deleted), [all]);
   const byId = useMemo(() => new Map((all ?? []).map((c) => [c.id, c])), [all]);
@@ -173,14 +178,20 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
         c,
         portalsApi.compose(addr).then((inApp) => (inApp ? onNavigate?.("mail") : contactsApi.email(addr))),
       ),
-    teams: (c, addr, call) => run(c, contactsApi.teams(addr, call)),
+    // Con Teams configurado en AdminOps, el chat se abre aquí; si no, en la
+    // aplicación de Teams del equipo (o en el navegador).
+    teams: (c, addr, call) =>
+      run(
+        c,
+        portalsApi.teams(addr, call).then((inApp) => (inApp ? onNavigate?.("teams") : contactsApi.teams(addr, call))),
+      ),
     copyCard: (c) => run(c, navigator.clipboard.writeText(cardText(c, c.substituteId ? byId.get(c.substituteId) : null)).then(() => toast("ok", "Tarjeta copiada."))),
     edit: (c) => setEditing({ ...c }),
     trash: async (c) => {
       await contactsApi.bulk([c.id], { op: "delete" }).catch((e) => toast("error", String(e)));
       if (detail === c.id) setDetail(null);
       toast("ok", `«${c.name}» está en la papelera (se puede recuperar 30 días).`);
-      load();
+      void load();
     },
     star: async (c) => {
       setAll((l) => l?.map((x) => (x.id === c.id ? { ...x, favorite: !x.favorite } : x)) ?? l);
@@ -226,7 +237,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
       const n = await contactsApi.bulk(ids, action);
       toast("ok", `${done} (${n}).`);
       if (action.op === "delete") setSelected(new Set());
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -234,7 +245,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
 
   const bulkTrash = async () => {
     if (!(await confirm({ title: "Enviar a la papelera", body: `${selected.size} contacto(s) irán a la papelera. Se pueden recuperar durante 30 días.`, confirmLabel: "A la papelera", danger: true }))) return;
-    bulk({ op: "delete" }, "En la papelera");
+    void bulk({ op: "delete" }, "En la papelera");
   };
 
   // ---------- Importar y exportar ----------
@@ -244,7 +255,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
       const r = await contactsApi.importFile();
       if (!r) return;
       toast("ok", `${r.added} contacto(s) añadidos${r.updated ? `, ${r.updated} ya existían y se completaron` : ""}.`);
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -457,7 +468,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
           ))}
         </div>
         {tagCounts.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <ChipRow storageKey="contacts" className="mt-2">
             <Tag size={12} className="text-mute" />
             {tagCounts.map(([t, n]) => (
               <TagChip key={t} name={t} count={n} color={colorOf(colors, t)} active={f.tags.some((x) => norm(x) === norm(t))} onClick={() => toggleTag(t)} />
@@ -471,7 +482,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
                 ))}
               </span>
             )}
-          </div>
+          </ChipRow>
         )}
 
         {/* Búsquedas guardadas */}

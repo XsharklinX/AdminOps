@@ -159,7 +159,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(() => toolboxApi.list().then(setData).catch((e) => toast("error", String(e))), [toast]);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const tiles = useMemo(() => {
@@ -229,7 +229,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
       return;
     try {
       await toolboxApi.deleteCustom(c.id);
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -337,7 +337,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            load();
+            void load();
           }}
         />
       )}

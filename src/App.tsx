@@ -1,4 +1,5 @@
 import { RotateCw } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminBanner } from "./components/AdminBanner";
 import type { PaletteAction } from "./components/CommandPalette";
@@ -6,13 +7,14 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { LockScreen } from "./components/LockScreen";
-import { NAV, Sidebar, areaOf, isPageId, pageLabel, resolvePage, visibleAreas, type Area, type PageId } from "./components/Sidebar";
+import { NAV, Sidebar, allowedInMode, areaOf, isPageId, pageLabel, resolvePage, visibleAreas, type Area, type PageId } from "./components/Sidebar";
 import { api, appApi, appcareApi, lockApi, portalsApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { analyze } from "./lib/diagRun";
 import { lastPortalKey, watchPortals } from "./lib/portalState";
-import { NAVIGATE_EVENT } from "./lib/navigate";
+import { isModestMachine, machineSummary } from "./lib/machine";
+import { NAVIGATE_EVENT, ONBOARDING_EVENT } from "./lib/navigate";
 import { appStarted, codeLoaded, onPerfChange, pageLoads, pageOpened, pagePainted } from "./lib/perf";
 import { Dashboard } from "./pages/Dashboard";
 import { AuditBanner, AuditToggle } from "./components/AuditMode";
@@ -22,6 +24,7 @@ import { SYMPTOMS } from "./lib/symptoms";
 import { Loading } from "./components/ui";
 
 // Solo el Panel se carga al abrir la app; el resto de páginas, al visitarlas.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- cada página tiene sus propias props
 const lazyPage = <T extends string>(name: T, load: () => Promise<Record<T, React.ComponentType<any>>>) =>
   lazy(() => {
     const t = performance.now();
@@ -40,11 +43,8 @@ function PaintMark({ page }: { page: string }) {
 const About = lazyPage("About", () => import("./components/About"));
 const CommandPalette = lazyPage("CommandPalette", () => import("./components/CommandPalette"));
 const Onboarding = lazyPage("Onboarding", () => import("./components/Onboarding"));
-const Diagnostics = lazyPage("Diagnostics", () => import("./pages/Diagnostics"));
-const History = lazyPage("History", () => import("./pages/History"));
 const TweaksPage = lazyPage("TweaksPage", () => import("./pages/TweaksPage"));
 const Processes = lazyPage("Processes", () => import("./pages/Processes"));
-const Hardware = lazyPage("Hardware", () => import("./pages/Hardware"));
 const Network = lazyPage("Network", () => import("./pages/Network"));
 const Space = lazyPage("Space", () => import("./pages/Space"));
 const Clients = lazyPage("Clients", () => import("./pages/Clients"));
@@ -52,7 +52,6 @@ const Users = lazyPage("Users", () => import("./pages/Users"));
 const NetTools = lazyPage("NetTools", () => import("./pages/NetTools"));
 const Tickets = lazyPage("Tickets", () => import("./pages/Tickets"));
 const Remote = lazyPage("Remote", () => import("./pages/Remote"));
-const Security = lazyPage("Security", () => import("./pages/Security"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
 const Troubleshoot = lazyPage("Troubleshoot", () => import("./pages/Troubleshoot"));
 const Contacts = lazyPage("Contacts", () => import("./pages/Contacts"));
@@ -62,6 +61,7 @@ const WindowsToolbox = lazyPage("WindowsToolbox", () => import("./pages/Merged")
 const ServiceSession = lazyPage("ServiceSession", () => import("./pages/Merged"));
 const DataTools = lazyPage("DataTools", () => import("./pages/Merged"));
 const AccountsAndDomain = lazyPage("AccountsAndDomain", () => import("./pages/Merged"));
+const MachineState = lazyPage("MachineState", () => import("./pages/Merged"));
 const PrintersAndShares = lazyPage("PrintersAndShares", () => import("./pages/Merged"));
 const MyNetwork = lazyPage("MyNetwork", () => import("./pages/Merged"));
 const Workstations = lazyPage("Workstations", () => import("./pages/Merged"));
@@ -75,12 +75,16 @@ const TWEAK_PAGES: Partial<Record<PageId, string>> = {
 };
 
 const LAST_PAGE = "adminops.lastPage";
+/** Página donde vive el portal de cada tipo (para precargar solo el que toca). */
+const PORTAL_PAGE = { inventory: "stations", mail: "mail", teams: "teams" } as const;
 /** Páginas que se mantienen vivas a la vez; la menos usada se descarta al pasar de aquí. */
 const MAX_ALIVE = 12;
 
 /** Página de inicio elegida en Ajustes, o la última visitada (Diagnóstico no: se ejecuta solo al abrirlo). */
 function initialPage(): PageId {
-  const start = getPrefs().startPage;
+  const prefs = getPrefs();
+  if (prefs.mode === "user") return "dashboard";
+  const start = prefs.startPage;
   if (start !== "last" && isPageId(start)) return resolvePage(start)[0];
   try {
     const p = localStorage.getItem(LAST_PAGE);
@@ -111,6 +115,9 @@ export default function App() {
   const navigate = useCallback((to: PageId, focusOn: string | null = null) => {
     // Las páginas que se unieron a otras llevan a la nueva, en su pestaña.
     const [p, f] = resolvePage(to, focusOn);
+    // En modo usuario, lo que no está permitido no se abre por ningún camino
+    // (Ctrl+K, un aviso, un enlace de una solución…).
+    if (!allowedInMode(p, getPrefs().mode)) return;
     if (p !== pageRef.current && !aliveRef.current.includes(p)) pageOpened(p);
     if (p !== pageRef.current) {
       back.current = [...back.current.slice(-49), pageRef.current];
@@ -138,7 +145,9 @@ export default function App() {
       logged = true;
       void import("./components/PerfPanel").then(({ fetchTiming, startupSummary }) =>
         fetchTiming()
-          .then((t) => appApi.logTiming(startupSummary(t, first)))
+          // Con el equipo delante: los mismos milisegundos no significan lo mismo
+          // en un i7 con 32 GB que en un portátil de hace ocho años.
+          .then((t) => appApi.logTiming(`${machineSummary()} · ${startupSummary(t, first)}`))
           .catch(() => {}),
       );
     });
@@ -153,26 +162,65 @@ export default function App() {
     window.addEventListener(NAVIGATE_EVENT, f);
     return () => window.removeEventListener(NAVIGATE_EVENT, f);
   }, [navigate]);
+  // «Volver a ver la bienvenida» (Ajustes → General).
+  useEffect(() => {
+    const f = () => setOnboarding(true);
+    window.addEventListener(ONBOARDING_EVENT, f);
+    return () => window.removeEventListener(ONBOARDING_EVENT, f);
+  }, []);
+  // Al pulsar un aviso de Windows, Windows trae AdminOps al frente. Como el
+  // aviso no dice cuál se pulsó, si acaba de salir uno se abre la campana con lo
+  // pendiente, en vez de dejar al técnico buscándolo.
+  const [alertSignal, setAlertSignal] = useState(0);
+  useEffect(() => {
+    let notifiedAt = 0;
+    const un = listen("alert-notified", () => (notifiedAt = Date.now()));
+    const onFocus = () => {
+      if (notifiedAt && Date.now() - notifiedAt < 2 * 60_000) {
+        notifiedAt = 0;
+        setAlertSignal((n) => n + 1);
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      void un.then((f) => f());
+    };
+  }, []);
+
   // Portales: el estado de cada vista web se escucha desde el principio y el
   // último portal usado de cada tipo se precarga, para que al entrar ya esté listo.
   useEffect(() => {
     watchPortals();
-    if (!getPrefs().preloadPortals) return;
-    const t = setTimeout(async () => {
-      const ids = (["", "inventory", "mail"] as const)
-        .map((k) => {
-          try {
-            return localStorage.getItem(lastPortalKey(k));
-          } catch {
-            return null;
-          }
-        })
-        .filter((x): x is string => !!x);
+    // Cada vista precargada es un proceso de navegador entero, y el correo y
+    // Teams son de las webs más pesadas que existen. Antes se precargaba el
+    // último portal de CADA tipo: hasta cuatro navegadores abiertos por detrás
+    // sin que el técnico hubiera pedido ninguno. Ahora solo el último usado, y
+    // en un equipo justo de recursos ninguno.
+    if (!getPrefs().preloadPortals || isModestMachine()) return;
+    const t = setTimeout(() => {
+      let id: string | null = null;
+      try {
+        id = localStorage.getItem(lastPortalKey(""));
+        for (const k of ["inventory", "mail", "teams"] as const) {
+          const v = localStorage.getItem(lastPortalKey(k));
+          if (v && localStorage.getItem(LAST_PAGE) === PORTAL_PAGE[k]) id = v;
+        }
+      } catch {
+        /* sin almacenamiento */
+      }
+      if (!id) return;
       const [w, h] = [Math.max(800, window.innerWidth - 260), Math.max(500, window.innerHeight - 140)];
-      // De uno en uno: crear varias vistas a la vez compite con la primera página.
-      for (const id of ids) await portalsApi.preload(id, w, h).catch(() => {});
-    }, 4000);
-    return () => clearTimeout(t);
+      void portalsApi.preload(id, w, h).catch(() => {});
+      // Más tarde que antes: primero que termine de abrirse la aplicación.
+    }, 8000);
+    // Cada vista web es un proceso: las que llevan mucho sin verse se cierran
+    // (al volver a entrar se abren de nuevo y la sesión de la web sigue).
+    const idle = setInterval(() => void portalsApi.closeIdle().catch(() => {}), 10 * 60_000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(idle);
+    };
   }, []);
   // «Diagnosticar al abrir»: se lanza cuando la ventana ya está pintada, sin
   // competir con la carga de la primera página.
@@ -380,22 +428,20 @@ export default function App() {
   const renderPage = (p: PageId) => {
     const category = TWEAK_PAGES[p];
     if (p === "dashboard") return <Dashboard onNavigate={navigate} />;
-    if (p === "history") return <History isAdmin={!!isAdmin} onNavigate={(x: PageId) => navigate(x)} />;
-    if (p === "diagnostics") return <Diagnostics focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "processes") return <Processes isAdmin={!!isAdmin} />;
-    if (p === "hardware") return <Hardware isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "network") return <Network isAdmin={!!isAdmin} />;
     if (p === "troubleshoot") return <Troubleshoot isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
     if (p === "tweaks") return <WindowsTweaks isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
+    if (p === "machine") return <MachineState isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "apps") return <Apps isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "tools") return <WindowsToolbox isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "data") return <DataTools focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
-    if (p === "space") return <Space />;
+    if (p === "space") return <Space onNavigate={navigate} />;
     if (p === "session") return <ServiceSession onSessionChange={setSessionActive} focus={p === page ? focus : null} />;
     if (p === "agenda") return <Agenda onNavigate={navigate} />;
     if (p === "clients") return <Clients />;
     if (p === "contacts") return <Contacts focus={p === page ? focus : null} onNavigate={navigate} />;
-    if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} />;
+    if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "recipes") return <RecipesAndProfiles isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "stations") return <Workstations covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "users") return <Users isAdmin={!!isAdmin} />;
@@ -404,9 +450,9 @@ export default function App() {
     if (p === "printers") return <PrintersAndShares isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "tickets") return <Tickets covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
     if (p === "mail") return <Tickets kind="mail" covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
+    if (p === "teams") return <Tickets kind="teams" covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} />;
     if (p === "router") return <MyNetwork covered={aboutOpen || paletteOpen || onboarding || alertsOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "remote") return <Remote isAdmin={!!isAdmin} />;
-    if (p === "security") return <Security isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "settings") return <SettingsPage appInfo={appInfo} onNavigate={(x: PageId) => navigate(x)} />;
     if (category) return <TweaksPage category={category} isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     return null;
@@ -439,7 +485,7 @@ export default function App() {
                 <PageHelp text={nav.help} />
               </h1>
               {showTabs && tabs.length > 1 && (
-                <div className="mt-3 -mb-4 flex gap-1 overflow-x-auto">
+                <div className="no-scrollbar mt-3 -mb-4 flex gap-1 overflow-x-auto">
                   {tabs.map((t) => (
                     <button
                       key={t}
@@ -468,7 +514,7 @@ export default function App() {
                 </button>
               )
             )}
-              <AlertCenter onNavigate={(p) => navigate(p)} onOpenChange={setAlertsOpen} />
+              <AlertCenter onNavigate={(p) => navigate(p)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
             </div>
           </header>
           <div className="relative min-h-0 flex-1">

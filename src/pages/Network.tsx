@@ -1,5 +1,5 @@
 import { CircleCheck, Gauge, Loader2, RefreshCw, Router, Wifi, XCircle } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useToast } from "../components/feedback";
 import { SpeedTest } from "../components/SpeedTest";
 import { NetRepairCard } from "../components/NetRepairCard";
@@ -7,6 +7,7 @@ import { WifiControl } from "../components/WifiControl";
 import { WifiProfiles } from "../components/WifiProfiles";
 import { Card } from "../components/ui";
 import { toolsApi, type NetworkReport, type SpeedResult } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 const when = (ts: number) => new Date(ts * 1000).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
 
@@ -27,10 +28,13 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [toast]);
 
-  useEffect(() => {
-    diagnose();
-    toolsApi.speedHistory().then(setHistory);
-  }, [diagnose]);
+  useLiveEffect(
+    (vigente) => {
+      void diagnose();
+      toolsApi.speedHistory().then((h) => vigente() && setHistory(h)).catch(() => {});
+    },
+    [diagnose],
+  );
 
   const mainAdapter = report?.adapters.find((a) => a.gateway.length > 0 && a.kind !== "Virtual/VPN") ?? null;
 

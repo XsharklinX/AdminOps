@@ -237,8 +237,20 @@ pub fn summarize(all: Vec<Sensor>) -> Sensors {
     }
 }
 
+/// Última lectura, para que las páginas que miran temperaturas a la vez (Panel
+/// y Hardware) compartan una sola y no dupliquen el trabajo de PowerShell.
+static LAST: std::sync::Mutex<Option<(std::time::Instant, Sensors)>> = std::sync::Mutex::new(None);
+const SHARE_FOR: Duration = Duration::from_millis(2000);
+
 pub fn read(app: &tauri::AppHandle) -> Result<Sensors, String> {
-    raw(app).map(summarize)
+    if let Some((t, v)) = LAST.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if t.elapsed() < SHARE_FOR {
+            return Ok(v.clone());
+        }
+    }
+    let v = raw(app).map(summarize)?;
+    *LAST.lock().unwrap_or_else(|e| e.into_inner()) = Some((std::time::Instant::now(), v.clone()));
+    Ok(v)
 }
 
 #[tauri::command(async)]

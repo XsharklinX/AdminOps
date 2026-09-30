@@ -8,9 +8,12 @@ import {
   Plus,
   Receipt,
   Save,
+  Sparkles,
   Trash2,
   Upload,
   X,
+  UserRound,
+  Wrench,
 } from "lucide-react";
 import {
   createContext,
@@ -24,8 +27,9 @@ import logo from "../assets/logo.svg";
 import { useToast } from "../components/feedback";
 import { SignaturePad } from "../components/service";
 import { NAV } from "../components/Sidebar";
-import { Button, Card, inputClass, Loading } from "../components/ui";
+import { Button, Card, inputClass, Loading, Modal } from "../components/ui";
 import { PerfPanel } from "../components/PerfPanel";
+import { openOnboarding } from "../lib/navigate";
 import {
   appApi,
   appcareApi,
@@ -34,6 +38,8 @@ import {
   type AppInfo,
   type DataUsage,
   type Settings,
+  lockApi,
+  type LockStatus,
 } from "../lib/api";
 import { bytes } from "../lib/format";
 import {
@@ -45,6 +51,7 @@ import {
   usePrefs,
   ZOOMS,
   type Accent,
+  type AppMode,
 } from "../lib/prefs";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { DataSafety } from "./settings/DataSafety";
@@ -103,7 +110,7 @@ export function SettingsPage({
   }, [highlight, tab]);
 
   useEffect(() => {
-    workApi.settings().then(setS);
+    void workApi.settings().then(setS);
   }, []);
 
   const pickTab = (t: Tab) => {
@@ -201,7 +208,7 @@ export function SettingsPage({
           aria-label="Secciones de ajustes"
           className="col-span-12 lg:col-span-3 lg:self-start"
         >
-          <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+          <ul className="no-scrollbar flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
             {SECTIONS.map((x) => {
               const Icon = x.icon;
               const on = tab === x.id;
@@ -348,15 +355,16 @@ function General({
 
   return (
     <div className="space-y-4">
+      <ModeCard />
       <Card title="Inicio y actualización">
         <Row
           title="Página al abrir AdminOps"
-          sub="La que se muestra al arrancar."
+          sub="La que se muestra al arrancar. De fábrica, el Panel."
         >
           <select
             value={prefs.startPage}
             onChange={(e) =>
-              setPrefs({ startPage: e.target.value as typeof prefs.startPage })
+              setPrefs({ startPage: e.target.value as typeof prefs.startPage, startPageChosen: true })
             }
             className={selectClass}
           >
@@ -367,6 +375,14 @@ function General({
               </option>
             ))}
           </select>
+        </Row>
+        <Row
+          title="Volver a ver la bienvenida"
+          sub="El asistente de la primera vez: elegir el modo (técnico o usuario), la página de inicio y lo básico de AdminOps. No borra nada de lo que ya tengas configurado."
+        >
+          <Button kind="ghost" onClick={openOnboarding}>
+            <Sparkles size={14} /> Ver la bienvenida
+          </Button>
         </Row>
         <Row
           title="Actualización del Panel"
@@ -384,7 +400,7 @@ function General({
         </Row>
         <Row
           title="Precargar los portales"
-          sub="Carga en segundo plano el último portal usado de Tickets, Inventario web y Correo, para que al entrar ya esté listo. Los de sesión privada no se precargan."
+          sub="Carga en segundo plano el último portal usado de Tickets, Inventario web, Correo y Teams, para que al entrar ya esté listo. Los de sesión privada no se precargan."
         >
           <input
             type="checkbox"
@@ -1293,6 +1309,139 @@ function About({ appInfo }: { appInfo: AppInfo | null }) {
           <span>Alt + ← / → · página anterior / siguiente</span>
         </div>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * Para quién es esta instalación. Volver al modo técnico pide el PIN si lo hay:
+ * así el técnico puede dejar la app a un usuario y que no se lo cambie.
+ */
+function ModeCard() {
+  const prefs = usePrefs();
+  const [lock, setLock] = useState<LockStatus | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [secret, setSecret] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    lockApi
+      .status()
+      .then(setLock)
+      .catch(() => {});
+  }, []);
+
+  const apply = (mode: AppMode) => {
+    setPrefs({ mode });
+    toast(
+      "ok",
+      mode === "admin"
+        ? "Modo técnico: AdminOps completo."
+        : "Modo usuario: solo lo necesario.",
+    );
+  };
+
+  const choose = (mode: AppMode) => {
+    if (mode === prefs.mode) return;
+    // Pasar a técnico con PIN puesto hay que autorizarlo; a usuario, no.
+    if (mode === "admin" && lock?.enabled) {
+      setSecret("");
+      setError(null);
+      setAsking(true);
+      return;
+    }
+    apply(mode);
+  };
+
+  const unlock = async () => {
+    try {
+      if (await lockApi.verify(secret)) {
+        setAsking(false);
+        apply("admin");
+      } else setError("No coincide.");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const card = (id: AppMode, title: string, sub: string) => (
+    <button
+      key={id}
+      onClick={() => choose(id)}
+      className={`flex-1 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+        prefs.mode === id
+          ? "border-neon/60 bg-neon/10"
+          : "border-line hover:border-line-2"
+      }`}
+    >
+      <div
+        className={`flex items-center gap-2 text-sm font-medium ${prefs.mode === id ? "text-neon" : "text-ink"}`}
+      >
+        {id === "admin" ? <Wrench size={14} /> : <UserRound size={14} />}
+        {title}
+      </div>
+      <div className="text-[11px] text-mute">{sub}</div>
+    </button>
+  );
+
+  return (
+    <Card title="Para quién es AdminOps en este equipo">
+      <div className="flex flex-wrap gap-2">
+        {card(
+          "admin",
+          "Modo técnico",
+          "AdminOps completo: diagnóstico, ajustes, usuarios, clientes e informes.",
+        )}
+        {card(
+          "user",
+          "Modo usuario",
+          "Solo ver cómo está el equipo, resolver lo típico y dar acceso remoto.",
+        )}
+      </div>
+      <p className="mt-3 text-[11px] text-mute">
+        {prefs.mode === "user"
+          ? "En modo usuario no se ven tus clientes, contactos, tickets ni correo, ni lo que puede romper el equipo."
+          : "Si dejas AdminOps a la persona que usa el equipo, pásalo a modo usuario."}{" "}
+        Es un modo de la interfaz, no una barrera de seguridad
+        {lock?.enabled
+          ? ": con el PIN puesto, volver a modo técnico lo pide."
+          : "; pon un PIN en Seguridad para que no se pueda volver a técnico sin ti."}
+      </p>
+
+      {asking && (
+        <Modal
+          title="Volver al modo técnico"
+          onClose={() => setAsking(false)}
+          footer={
+            <>
+              {error && <p className="mr-auto text-xs text-bad">{error}</p>}
+              <Button kind="ghost" onClick={() => setAsking(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={unlock} disabled={!secret}>
+                Continuar
+              </Button>
+            </>
+          }
+        >
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">
+              {lock?.kind === "pin"
+                ? "PIN de AdminOps"
+                : "Contraseña de AdminOps"}
+            </span>
+            <input
+              autoFocus
+              type="password"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && secret && unlock()}
+              className={inputClass}
+            />
+          </label>
+        </Modal>
+      )}
     </Card>
   );
 }

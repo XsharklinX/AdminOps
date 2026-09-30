@@ -25,6 +25,7 @@ import {
   Layers,
   Lock,
   Lock as LockIcon,
+  MessagesSquare,
   Monitor,
   Network,
   Package,
@@ -46,6 +47,7 @@ import {
 
 export type PageId =
   | "dashboard"
+  | "machine"
   | "diagnostics"
   | "troubleshoot"
   | "security"
@@ -72,6 +74,7 @@ export type PageId =
   | "session"
   | "tickets"
   | "mail"
+  | "teams"
   | "agenda"
   | "clients"
   | "contacts"
@@ -110,16 +113,28 @@ interface NavItem {
 export const NAV: NavItem[] = [
   // Inicio
   { id: "dashboard", label: "Panel", tab: "Panel", help: "El equipo en vivo y lo que conviene hacer ahora, en orden de importancia." },
-  { id: "troubleshoot", label: "Solucionar problemas", tab: "Solucionar", help: "Eliges el síntoma (no hay Internet, no suena, va lento…) y AdminOps revisa las causas típicas y ofrece la reparación. Abajo, las reparaciones de Windows (SFC, DISM, red, Windows Update…)." },
-  { id: "session", label: "Sesión de servicio", tab: "Sesión", help: "Una visita de principio a fin: diagnóstico antes y después, checklist que se marca sola, presupuesto, firma e informe archivado en la ficha del cliente." },
+  {
+    id: "troubleshoot",
+    label: "Solucionar problemas",
+    tab: "Solucionar",
+    help: "Eliges el síntoma (no hay Internet, no suena, va lento…) y AdminOps revisa las causas típicas y ofrece la reparación. Abajo, las reparaciones de Windows (SFC, DISM, red, Windows Update…). Si buscas los pasos explicados, están en Soluciones.",
+  },
+  { id: "session", label: "Sesión de servicio", tab: "Sesión", help: "Una visita de principio a fin: diagnóstico antes y después, checklist que se marca sola, presupuesto y firma. En la pestaña Informe generas el PDF que entregas al cliente." },
   // Equipo
-  { id: "diagnostics", label: "Diagnóstico", tab: "Diagnóstico", help: "Revisa discos, estabilidad, drivers, batería, seguridad y actualizaciones en menos de un minuto, con lo que hay que hacer para cada problema." },
-  { id: "hardware", label: "Hardware", tab: "Hardware", help: "Ficha del equipo para el inventario, piezas, temperaturas, salud de los discos (SMART) y memoria." },
-  { id: "security", label: "Seguridad", tab: "Seguridad", help: "Nota de seguridad del equipo, antivirus, BitLocker, cuentas, elementos sospechosos que arrancan solos y extensiones del navegador." },
+  {
+    id: "machine",
+    label: "Estado del equipo",
+    tab: "Estado",
+    help: "Qué es este equipo y cómo está: el diagnóstico con lo que hay que arreglar, sus piezas y temperaturas, su seguridad, y el historial de todo lo que ha pasado en él.",
+  },
   { id: "processes", label: "Procesos", tab: "Procesos", help: "Qué está usando procesador, memoria y disco ahora mismo, y finalizar lo que se cuelga." },
-  { id: "space", label: "Espacio en disco", tab: "Espacio en disco", help: "Qué ocupa el disco, carpeta por carpeta, para liberar espacio con criterio." },
-  { id: "history", label: "Historial", tab: "Historial", help: "Línea de tiempo del equipo (cambios, avisos, actualizaciones, drivers, apagados), diario de cambios con «Deshacer» y puntos de restauración." },
-  // Mantener
+  {
+    id: "space",
+    label: "Espacio en disco",
+    tab: "Espacio en disco",
+    help: "Dónde se ha ido el espacio y qué se puede recuperar: temporales, papelera, Windows.old e hibernación medidos de verdad, el disco carpeta por carpeta, y los archivos grandes que nadie abre desde hace un año, que puedes mandar a la papelera desde aquí.",
+  },
+  // Ajustes de Windows
   {
     id: "tweaks",
     label: "Ajustes de Windows",
@@ -143,8 +158,13 @@ export const NAV: NavItem[] = [
   { id: "router", label: "Mi red", tab: "Mi red", help: "La red en la que está el equipo: router y su acceso, Wi-Fi y contraseña, y todos los dispositivos conectados." },
   { id: "network", label: "Velocidad y diagnóstico de red", tab: "Velocidad y diagnóstico", help: "Test de velocidad, estado de la conexión, reparar la red y controlar la Wi-Fi." },
   { id: "nettools", label: "Herramientas de red", tab: "Herramientas", help: "Ping, traceroute, puertos abiertos, DNS y archivo hosts." },
-  // Oficina
-  { id: "stations", label: "Puestos e inventario", tab: "Puestos", help: "Qué equipos de la oficina responden y cuáles necesitan atención (disco, reinicios, actualizaciones), y su inventario." },
+  // Administración
+  {
+    id: "stations",
+    label: "Puestos e inventario",
+    tab: "Puestos",
+    help: "Qué equipos de la oficina responden y cuáles necesitan atención (disco, reinicios, actualizaciones). Puedes actuar sobre varios a la vez: reiniciar con aviso, actualizar directivas, mandar un mensaje o conectarte. Además, el inventario propio y la web de inventario de tu empresa.",
+  },
   { id: "users", label: "Usuarios locales", tab: "Usuarios", help: "Crear usuarios, cambiar contraseñas, permisos de administrador y quitar cuentas." },
   {
     id: "accounts",
@@ -179,6 +199,12 @@ export const NAV: NavItem[] = [
     tab: "Correo",
     help: "Tu Outlook (del trabajo o personal) dentro de AdminOps, sin configurarlo en cada equipo. La cuenta se guarda cifrada y, en sesión privada, no queda nada en el equipo al salir.",
   },
+  {
+    id: "teams",
+    label: "Teams",
+    tab: "Teams",
+    help: "Tu Teams (del trabajo o personal) dentro de AdminOps: chats, equipos y reuniones sin instalarlo en el equipo del cliente. La cuenta se guarda cifrada y, en sesión privada, no queda nada en el equipo al salir.",
+  },
   { id: "clients", label: "Clientes", tab: "Clientes", help: "Fichas de clientes con sus equipos, visitas, garantías, mantenimientos y contactos." },
   { id: "contacts", label: "Contactos", tab: "Contactos", help: "A quién llamar y para qué: extensiones, correos, Teams. Viaja contigo en todos los equipos." },
   {
@@ -194,7 +220,12 @@ export const NAV: NavItem[] = [
     tab: "Datos",
     help: "Los datos del usuario: llevarlos a otro equipo, guardarlos cifrados, borrarlos sin que se puedan recuperar, recuperar los borrados y el control parental.",
   },
-  { id: "settings", label: "Ajustes", tab: "Ajustes", help: "Tus datos, apariencia, navegación, seguridad, informes y copias de seguridad." },
+  {
+    id: "settings",
+    label: "Ajustes",
+    tab: "Ajustes",
+    help: "Todo lo que se puede personalizar, con buscador: para quién es AdminOps (técnico o usuario), cómo se comporta al abrirse, apariencia, barra lateral y atajos, portales y correo, bloqueo con PIN, tu marca en los informes, y cuánto tarda la app en abrirse.",
+  },
 ];
 
 /**
@@ -220,7 +251,12 @@ export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   bloatware: ["apps", "bloatware"],
   // Herramientas y atajos
   shortcuts: ["tools", "shortcuts"],
-  // Oficina
+  // Estado del equipo
+  diagnostics: ["machine", "diagnostics"],
+  hardware: ["machine", "hardware"],
+  security: ["machine", "security"],
+  history: ["machine", "history"],
+  // Administración
   domain: ["accounts", "domain"],
   shares: ["printers", "shares"],
   // Sesión de servicio
@@ -285,21 +321,31 @@ export const AREA_ICONS: Record<string, LucideIcon> = {
   Activity,
   Building2,
   Stethoscope,
+  MessagesSquare,
 };
 
 /** Las áreas de la barra lateral; sus páginas son pestañas. */
 const DEFAULT_AREAS: Omit<Area, "icon">[] = [
   // Los id se conservan: las navegaciones personalizadas siguen funcionando.
   { id: "panel", label: "Inicio", iconName: "Home", pages: ["dashboard", "troubleshoot", "session"] },
-  { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["diagnostics", "hardware", "security", "tweaks", "processes", "space", "history"] },
-  { id: "programas", label: "Aplicaciones", iconName: "Package", pages: ["apps", "recipes"] },
+  { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["machine", "tweaks", "processes", "space"] },
+  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "mail", "teams", "agenda", "clients", "contacts", "knowledge"] },
   { id: "red", label: "Red", iconName: "Network", pages: ["router", "network", "nettools"] },
-  { id: "admin", label: "Oficina", iconName: "Building2", pages: ["stations", "users", "accounts", "printers", "remote", "tools"] },
-  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "mail", "agenda", "clients", "contacts", "knowledge"] },
+  { id: "programas", label: "Aplicaciones", iconName: "Package", pages: ["apps", "recipes"] },
+  { id: "admin", label: "Administración", iconName: "Building2", pages: ["stations", "users", "accounts", "printers", "remote", "tools"] },
   { id: "datos", label: "Datos", iconName: "Lock", pages: ["data"] },
 ];
 
 const withIcon = (a: Omit<Area, "icon">): Area => ({ ...a, icon: AREA_ICONS[a.iconName] ?? Folder });
+
+/**
+ * Lo que se ve en modo usuario: cómo está el equipo, resolver lo típico y dejar
+ * entrar al técnico. Fuera queda lo que puede romper algo y todo lo que son
+ * datos del técnico (clientes, contactos, tickets, correo, agenda).
+ */
+export const USER_MODE_PAGES: PageId[] = ["dashboard", "machine", "space", "troubleshoot", "remote", "settings"];
+
+export const allowedInMode = (page: PageId, mode: "admin" | "user") => mode === "admin" || USER_MODE_PAGES.includes(page);
 
 /** Estructura de fábrica. */
 export const AREAS: Area[] = DEFAULT_AREAS.map(withIcon);
@@ -342,7 +388,7 @@ export function visibleAreas(active: PageId): Area[] {
   const p = getPrefs();
   const hidden = new Set<string>(p.layout?.hidden ?? []);
   return effectiveAreas(p.layout)
-    .map((a) => ({ ...a, pages: a.pages.filter((x) => !hidden.has(x) || x === active) }))
+    .map((a) => ({ ...a, pages: a.pages.filter((x) => allowedInMode(x, p.mode) && (!hidden.has(x) || x === active)) }))
     .filter((a) => a.pages.length > 0);
 }
 
@@ -375,9 +421,12 @@ const MAX_W = 440;
 function useSidebarResize(position: "left" | "right") {
   const [dragW, setDragW] = useState<number | null>(null);
   const latest = useRef<number | null>(null);
+  // Solo importa si se está arrastrando, no el ancho: el efecto no debe volver a
+  // montarse con cada píxel que se mueve el ratón.
+  const dragging = dragW !== null;
 
   useEffect(() => {
-    if (dragW === null) return;
+    if (!dragging) return;
     const move = (e: PointerEvent) => {
       const raw = position === "right" ? window.innerWidth - e.clientX : e.clientX;
       const w = Math.round(Math.min(MAX_W, Math.max(MIN_W, raw)));
@@ -401,10 +450,10 @@ function useSidebarResize(position: "left" | "right") {
       window.removeEventListener("pointercancel", stop);
       [document.body.style.cursor, document.body.style.userSelect] = prev;
     };
-  }, [dragW === null, position]);
+  }, [dragging, position]);
 
   return {
-    dragging: dragW !== null,
+    dragging,
     width: dragW,
     start: (from: number) => {
       latest.current = from;

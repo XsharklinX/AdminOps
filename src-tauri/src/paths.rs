@@ -38,8 +38,13 @@ pub fn is_portable() -> bool {
 
 /// En portable, la caché de WebView2 (cookies, sesiones de Tickets…) también va
 /// al USB para no dejar rastro en el equipo del cliente.
+///
+/// La carpeta se crea y se comprueba aquí, antes de dársela a WebView2: si el
+/// USB viene protegido contra escritura (o el antivirus del cliente bloquea la
+/// primera creación), WebView2 no arrancaría y la ventana se quedaría en negro.
+/// En ese caso no se devuelve nada y se usa la carpeta del equipo.
 pub fn portable_webview_dir() -> Option<PathBuf> {
-    portable_root().map(|root| root.join("webview"))
+    portable_root().map(|root| root.join("webview")).filter(|d| is_writable(d))
 }
 
 /// ¿Se puede crear y escribir en esta carpeta? (Una carpeta heredada de otro

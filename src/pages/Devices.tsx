@@ -388,7 +388,7 @@ export function Devices() {
                           className="flex gap-1"
                           onSubmit={(e) => {
                             e.preventDefault();
-                            saveAlias(d);
+                            void saveAlias(d);
                           }}
                         >
                           <input autoFocus value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Nombre para reconocerlo" className="w-44 rounded border border-line bg-void px-2 py-0.5 text-[13px] text-ink outline-none focus:border-neon/50" />

@@ -58,7 +58,7 @@ function ProbePanel() {
       listen("net-trace-done", () => setRunning(false)),
     ];
     return () => {
-      netApi.stop();
+      void netApi.stop();
       subs.forEach((p) => p.then((un) => un()));
     };
   }, []);
@@ -157,7 +157,7 @@ function ProbePanel() {
           ))}
         </div>
       )}
-      <div className="max-h-[420px] overflow-y-auto rounded-lg border border-line">
+      <div className="max-pane-lg overflow-y-auto rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-panel">
             <tr className="text-left text-[11px] text-mute">
@@ -223,7 +223,7 @@ function DnsPanel({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(() => netApi.dnsAdapters().then(setAdapters).catch((e) => toast("error", String(e))), [toast]);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const apply = async (a: DnsAdapter, servers: string[], label: string) => {
@@ -345,7 +345,7 @@ function PortsPanel() {
     }
   }, [toast]);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const visible = useMemo(() => {
@@ -381,7 +381,7 @@ function PortsPanel() {
       {!ports ? (
         <p className="text-sm text-mute">Leyendo conexiones…</p>
       ) : (
-        <div className="max-h-[520px] overflow-y-auto rounded-lg border border-line">
+        <div className="max-pane-lg overflow-y-auto rounded-lg border border-line">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-panel">
               <tr className="text-left text-[11px] text-mute">
@@ -461,7 +461,7 @@ function HostsPanel({ isAdmin }: { isAdmin: boolean }) {
     [toast],
   );
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const entries = text.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#")).length;
@@ -514,7 +514,7 @@ function HostsPanel({ isAdmin }: { isAdmin: boolean }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         spellCheck={false}
-        className="h-[460px] w-full resize-none rounded-lg border border-line bg-void/60 p-3 font-mono text-xs leading-relaxed text-ink outline-none focus:border-neon/50"
+        className="pane-lg w-full resize-none rounded-lg border border-line bg-void/60 p-3 font-mono text-xs leading-relaxed text-ink outline-none focus:border-neon/50"
       />
       <p className="mt-2 text-[11px] text-mute">
         Formato: <span className="font-mono">IP  dominio</span> por línea (p. ej. <span className="font-mono">0.0.0.0 publicidad.com</span> para bloquear). Las

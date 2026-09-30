@@ -34,7 +34,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
   }, [toast]);
 
   useEffect(() => {
-    load();
+    void load();
     if (paused || !active) return;
     const t = window.setInterval(load, 2000);
     return () => window.clearInterval(t);
@@ -88,7 +88,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setBusy(false);
-      load();
+      void load();
     }
   };
 

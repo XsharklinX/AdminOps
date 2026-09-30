@@ -30,7 +30,7 @@ export function ProfileEditor({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    tweaksApi.list().then(setCatalog);
+    void tweaksApi.list().then(setCatalog);
   }, []);
 
   const groups = useMemo(() => {

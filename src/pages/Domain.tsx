@@ -36,7 +36,7 @@ export function Domain({ isAdmin }: { isAdmin: boolean }) {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const restart = async () => {
@@ -53,7 +53,7 @@ export function Domain({ isAdmin }: { isAdmin: boolean }) {
     try {
       await tweaksApi.run("repair.time-sync");
       toast("ok", "Hora sincronizada.");
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -170,7 +170,7 @@ export function Domain({ isAdmin }: { isAdmin: boolean }) {
           isAdmin={isAdmin}
           onJoined={(msg) => {
             setNeedsRestart(msg);
-            load();
+            void load();
           }}
         />
       )}
@@ -184,7 +184,7 @@ export function Domain({ isAdmin }: { isAdmin: boolean }) {
             setDialogKind(null);
             toast("ok", msg);
             if (restartNeeded) setNeedsRestart(msg);
-            load();
+            void load();
           }}
         />
       )}

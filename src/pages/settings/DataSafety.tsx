@@ -26,7 +26,7 @@ export function DataSafety() {
 
   const load = useCallback(() => appBackupApi.health().then(setH).catch(() => {}), []);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const close = () => {
@@ -44,7 +44,7 @@ export function DataSafety() {
       if (r) {
         toast("ok", `Copia cifrada guardada: ${r.files} archivos (${bytes(r.bytes)}). Guarda la contraseña: sin ella no se puede abrir.`);
         close();
-        load();
+        void load();
       }
     } catch (e) {
       toast("error", String(e));

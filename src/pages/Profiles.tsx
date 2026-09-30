@@ -86,7 +86,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
       toast("ok", `${n} perfil(es) importado(s).`);
       setImporting(false);
       setImportText("");
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -101,7 +101,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
     });
     if (!ok) return;
     await workApi.deleteProfile(p.id);
-    load();
+    void load();
   };
 
   const load = useCallback(async () => {
@@ -114,7 +114,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
 
   useOnJournalChange(load);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const apply = async (p: ProfileView, skipRestorePoint = false): Promise<void> => {
@@ -159,7 +159,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
       }
     } finally {
       setBusy(null);
-      load();
+      void load();
     }
   };
 
@@ -178,7 +178,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setBusy(null);
-      load();
+      void load();
     }
   };
 
@@ -337,7 +337,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
           onSaved={(saved) => {
             setEditing(undefined);
             toast("ok", `Perfil "${saved.name}" guardado.`);
-            load();
+            void load();
           }}
         />
       )}

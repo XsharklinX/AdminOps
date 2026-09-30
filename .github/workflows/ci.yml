@@ -34,9 +34,26 @@ jobs:
       - name: Tests del frontend
         run: npm test
 
+      # Reglas de hooks de React: avisan de los efectos con dependencias
+      # incompletas, que TypeScript no ve. Los avisos no rompen la CI; los errores si.
+      - name: Reglas de codigo
+        run: npm run lint
+
       - name: Clippy
         working-directory: src-tauri
-        run: cargo clippy --lib --tests -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Segunda version de Rust fijada: es la que se verifica a mano antes de
+      # publicar, y asi la CI no puede ir por delante ni por detras de ella.
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: clippy
+
+      - name: Clippy con la version de Rust fijada
+        working-directory: src-tauri
+        env:
+          CARGO_TARGET_DIR: target-ci
+        run: cargo +1.98.1 clippy --all-targets -- -D warnings
 
       - name: Tests
         working-directory: src-tauri

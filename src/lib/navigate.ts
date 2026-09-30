@@ -5,3 +5,10 @@ export const NAVIGATE_EVENT = "adminops:navigate";
 export function goToPage(page: string, focus: string | null = null) {
   window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: { page, focus } }));
 }
+
+// Volver a ver la bienvenida (Ajustes → General): el asistente vive en App.
+export const ONBOARDING_EVENT = "adminops:onboarding";
+
+export function openOnboarding() {
+  window.dispatchEvent(new Event(ONBOARDING_EVENT));
+}

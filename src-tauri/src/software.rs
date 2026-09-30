@@ -125,6 +125,35 @@ pub fn cached_or_list(max_age: Duration) -> Result<Vec<SoftwareUpdate>, String> 
     list()
 }
 
+/// ¿Hay ya una consulta a winget en marcha? (Para no lanzar dos a la vez.)
+static LISTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Lo que haya en la caché, sin esperar a winget. Si está vieja o vacía, la
+/// actualiza en segundo plano para la próxima vez.
+///
+/// winget puede tardar más de un minuto (equipos con varias fuentes o red
+/// lenta): nada que se abra solo debe quedarse esperándolo.
+pub fn cached_or_refresh(max_age: Duration) -> Result<Vec<SoftwareUpdate>, String> {
+    let cached = CACHE.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    if let Some((t, v)) = &cached {
+        if t.elapsed() < max_age {
+            return Ok(v.clone());
+        }
+    }
+    use std::sync::atomic::Ordering;
+    if !LISTING.swap(true, Ordering::SeqCst) {
+        std::thread::spawn(|| {
+            let _ = list();
+            LISTING.store(false, Ordering::SeqCst);
+        });
+    }
+    match cached {
+        // Vieja, pero sirve: mejor un dato de hace un rato que ninguno.
+        Some((_, v)) => Ok(v),
+        None => Err("Se están buscando las actualizaciones; estarán listas en un momento.".into()),
+    }
+}
+
 fn forget(id: &str) {
     if let Some((_, v)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
         v.retain(|u| u.id != id);

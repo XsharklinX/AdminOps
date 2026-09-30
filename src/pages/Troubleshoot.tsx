@@ -58,7 +58,7 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
   // Desde la búsqueda o un aviso: abre el síntoma y lo comprueba.
   useEffect(() => {
     const s = SYMPTOMS.find((x) => x.id === focus);
-    if (s) check(s.id);
+    if (s) void check(s.id);
   }, [focus, check]);
 
   const runFix = async (f: TroubleFix) => {
@@ -73,7 +73,7 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
       setFixing(null);
     }
     // Abrir Configuración no cambia nada que volver a comprobar.
-    if (symptom && !f.id.startsWith("open:")) check(symptom);
+    if (symptom && !f.id.startsWith("open:")) void check(symptom);
   };
 
   const current = SYMPTOMS.find((s) => s.id === symptom);

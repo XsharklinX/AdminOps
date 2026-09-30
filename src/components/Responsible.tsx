@@ -40,7 +40,7 @@ export function Responsible({ topic, className = "" }: { topic: string; classNam
             key={c.id}
             onClick={() => {
               if (!reach) return;
-              navigator.clipboard.writeText(c.extension || c.phone || c.mobile || c.email).then(() => toast("ok", `${c.name}: ${reach} copiado.`));
+              void navigator.clipboard.writeText(c.extension || c.phone || c.mobile || c.email).then(() => toast("ok", `${c.name}: ${reach} copiado.`));
               contactsApi.touch(c.id).catch(() => {});
             }}
             className="rounded-md border border-line px-2 py-0.5 text-dim hover:border-neon/50 hover:text-neon"

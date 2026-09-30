@@ -28,7 +28,7 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(() => {
     updateApi.history().then(setHistory).catch((e) => setHistoryError(String(e)));
-    updateApi.pauseState().then((s) => setPaused(s.pausedUntil));
+    void updateApi.pauseState().then((s) => setPaused(s.pausedUntil));
   }, []);
 
   useEffect(() => {

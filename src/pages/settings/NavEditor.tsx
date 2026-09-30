@@ -256,7 +256,15 @@ export function NavEditor() {
             <Segmented value={sb.position} onChange={s("position")} options={[["left", "Izquierda"], ["right", "Derecha"]]} />
           </Opt>
           <Opt title="Ancho">
-            <Segmented value={sb.width} onChange={s("width")} options={[["narrow", "Estrecha"], ["normal", "Normal"], ["wide", "Ancha"]]} />
+            <div className="flex items-center gap-2">
+              {/* Elegir un ancho aquí manda sobre el que se haya ajustado arrastrando. */}
+              <Segmented value={sb.width} onChange={(v) => setSidebar({ width: v, widthPx: null })} options={[["narrow", "Estrecha"], ["normal", "Normal"], ["wide", "Ancha"]]} />
+              {sb.widthPx !== null && (
+                <span className="text-[11px] text-mute" title="Lo ajustaste arrastrando el borde de la barra">
+                  ajustado a mano: {sb.widthPx} px
+                </span>
+              )}
+            </div>
           </Opt>
           <Opt title="Densidad">
             <Segmented value={sb.density} onChange={s("density")} options={[["compact", "Compacta"], ["normal", "Normal"], ["comfortable", "Espaciosa"]]} />

@@ -94,17 +94,17 @@ export function Recipes({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(() => libraryApi.list("recipes").then(setList).catch((e) => toast("error", String(e))), [toast]);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const remove = async (r: Recipe) => {
     if (!(await confirm({ title: "Borrar plantilla", body: `Se borrará «${r.name}».`, confirmLabel: "Borrar", danger: true }))) return;
     await libraryApi.remove("recipes", r.id).catch((e) => toast("error", String(e)));
-    load();
+    void load();
   };
   const duplicate = async (r: Recipe) => {
     await libraryApi.save("recipes", { ...r, id: "", name: `${r.name} (copia)` }).catch((e) => toast("error", String(e)));
-    load();
+    void load();
   };
 
   return (
@@ -262,7 +262,7 @@ function RecipeEditor({ initial, onClose, onSaved }: { initial: Recipe; onClose:
             </div>
             <input value={tweakQuery} onChange={(e) => setTweakQuery(e.target.value)} placeholder="Buscar ajuste para añadir…" className={inputClass} />
             {q && (
-              <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-line">
+              <div className="mt-1 pane-sm overflow-y-auto rounded-md border border-line">
                 {tweaks
                   .filter((t) => !s.ids.includes(t.id) && norm(t.name).includes(q))
                   .slice(0, 20)

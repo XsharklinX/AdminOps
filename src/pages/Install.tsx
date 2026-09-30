@@ -1,4 +1,5 @@
-import { CheckCircle2, Download, ListPlus, Loader2, PackagePlus, Plus, RefreshCw, Search, Trash2, X, XCircle } from "lucide-react";
+import { CheckCircle2, Download, ListPlus, Loader2, PackagePlus, Plus, RefreshCw, Search, Trash2, TriangleAlert, X, XCircle } from "lucide-react";
+import { bytes } from "../lib/format";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
@@ -15,6 +16,7 @@ const CATEGORY: Record<string, string> = {
   utils: "Utilidades",
   tech: "Herramientas del técnico",
   security: "Seguridad",
+  drivers: "Drivers y utilidades del fabricante",
   runtime: "Componentes",
   games: "Juegos",
   dev: "Desarrollo",
@@ -32,6 +34,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   const [extra, setExtra] = useState<CatalogApp[]>([]);
   const [searching, setSearching] = useState(false);
   const [running, setRunning] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [results, setResults] = useState<InstallResult[] | null>(null);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
@@ -48,7 +51,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   }, []);
 
   useEffect(() => {
-    loadCatalog();
+    void loadCatalog();
     loadInstalled();
   }, [loadCatalog, loadInstalled]);
 
@@ -80,15 +83,32 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const install = async () => {
+    // Antes de una instalación larga: red, espacio, winget y permisos. Vale más
+    // avisar ahora que dejar el equipo del cliente a medio hacer.
+    setChecking(true);
+    const pre = await appsApi.preflight(selected.length).catch(() => null);
+    setChecking(false);
     const ok = await confirm({
       title: `Instalar ${selected.length} programas`,
       body: (
         <>
+          {pre && pre.warnings.length > 0 && (
+            <ul className="mb-3 space-y-1.5 rounded-lg border border-warn/40 bg-warn/5 p-3">
+              {pre.warnings.map((w) => (
+                <li key={w} className="flex items-start gap-2 text-xs text-warn">
+                  <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+                  {w}
+                </li>
+              ))}
+            </ul>
+          )}
           Se descargarán e instalarán en silencio, uno tras otro, desde los repositorios oficiales de winget y Microsoft Store.
           {!isAdmin && " Sin administrador, algunos instaladores pedirán permiso (UAC)."}
+          {pre && !pre.lowSpace && pre.free > 0 && <span className="mt-2 block text-xs text-mute">Quedan {bytes(pre.free)} libres en el disco del sistema.</span>}
         </>
       ),
-      confirmLabel: "Instalar",
+      confirmLabel: pre && !pre.online ? "Instalar de todas formas" : "Instalar",
+      danger: !!pre && (!pre.online || !pre.winget),
     });
     if (!ok) return;
     setRunning(true);
@@ -110,7 +130,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   const deleteList = async (id: string, name: string) => {
     if (!(await confirm({ title: "Eliminar lista", body: `¿Eliminar la lista «${name}»?`, confirmLabel: "Eliminar", danger: true }))) return;
     await appsApi.deleteList(id).catch((e) => toast("error", String(e)));
-    loadCatalog();
+    void loadCatalog();
   };
 
   if (!catalog) return <p className="p-8 font-mono text-sm text-mute">Cargando catálogo…</p>;
@@ -281,10 +301,10 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
               )}
               <button
                 onClick={install}
-                disabled={running}
+                disabled={running || checking}
                 className="flex items-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-4 py-1.5 text-sm font-medium text-neon hover:bg-neon/20 disabled:opacity-50"
               >
-                <Download size={14} /> Instalar
+                {checking ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {checking ? "Comprobando…" : "Instalar"}
               </button>
             </div>
           </div>
@@ -297,7 +317,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
           onClose={() => setSaving(false)}
           onSaved={() => {
             setSaving(false);
-            loadCatalog();
+            void loadCatalog();
             toast("ok", "Lista guardada.");
           }}
         />

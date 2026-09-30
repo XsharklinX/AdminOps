@@ -48,7 +48,7 @@ export function Inventory() {
     try {
       const c = await workApi.inventoryAddThis(target);
       toast("ok", `Este equipo quedó en el inventario de ${c.name}.`);
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     } finally {
@@ -64,7 +64,7 @@ export function Inventory() {
     });
     if (!ok) return;
     await workApi.inventoryRemove(r.client.id, r.machine.host).catch((e) => toast("error", String(e)));
-    load();
+    void load();
   };
 
   const exportCsv = async () => {

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Loading } from "../components/ui";
 import { familyApi, type UserHours } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 const FILTERS: [string, string, string][] = [
   ["none", "Sin filtro", "Los DNS que da el router (lo normal)."],
@@ -97,15 +98,19 @@ function BlockedSites() {
   const [dirty, setDirty] = useState(false);
   const toast = useToast();
 
-  useEffect(() => {
-    familyApi
-      .blocked()
-      .then(setSites)
-      .catch((e) => {
-        setSites([]);
-        toast("error", String(e));
-      });
-  }, [toast]);
+  useLiveEffect(
+    (vigente) => {
+      familyApi
+        .blocked()
+        .then((s) => vigente() && setSites(s))
+        .catch((e) => {
+          if (!vigente()) return;
+          setSites([]);
+          toast("error", String(e));
+        });
+    },
+    [toast],
+  );
 
   const add = (value: string) => {
     const v = value.trim().toLowerCase();
@@ -198,7 +203,7 @@ function Schedule() {
   }, [toast]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const user = users?.find((u) => u.name === selected) ?? null;
@@ -235,7 +240,7 @@ function Schedule() {
     try {
       await familyApi.setHours(user.name, hours);
       toast("ok", `Horario de «${user.name}» guardado.`);
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }

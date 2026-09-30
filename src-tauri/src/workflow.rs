@@ -877,6 +877,116 @@ pub fn client_changes(c: &Client, live: Option<&diagnostics::Diagnostics>) -> Ve
     out
 }
 
+/// Cómo queda un equipo frente a los demás del mismo cliente.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MachineRank {
+    pub host: String,
+    /// Valor de este equipo y mediana del resto, ya con su unidad puesta.
+    pub value: String,
+    pub typical: String,
+    /// Cuántas veces peor que la mediana (1 = igual). `None` si no aplica.
+    pub factor: Option<f64>,
+    /// Este equipo está notablemente peor que el resto.
+    pub worse: bool,
+}
+
+/// Una medida comparable entre los equipos de un cliente.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Comparison {
+    /// Qué se compara: «Arranque», «RAM»…
+    pub label: String,
+    /// Frase lista para leer («PC-CONTA arranca 3 veces más lento que el resto»).
+    pub summary: String,
+    pub machines: Vec<MachineRank>,
+}
+
+/// Qué se compara: etiqueta, de dónde sale el valor, cómo se escribe, si más
+/// es peor, y a partir de cuántas veces la mediana se avisa.
+type Metric = (&'static str, fn(&VisitMetrics) -> Option<f64>, fn(f64) -> String, bool, f64);
+
+fn median(mut v: Vec<f64>) -> Option<f64> {
+    if v.is_empty() {
+        return None;
+    }
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    Some(v[v.len() / 2])
+}
+
+/// Últimas cifras conocidas de cada equipo del cliente (de su visita más reciente).
+fn latest_metrics(c: &Client) -> Vec<(String, VisitMetrics)> {
+    c.machines
+        .iter()
+        .filter_map(|m| {
+            let s = c.sessions.iter().filter(|s| s.host.eq_ignore_ascii_case(&m.host)).max_by_key(|s| s.ended)?;
+            Some((m.host.clone(), s.metrics.clone()?))
+        })
+        .collect()
+}
+
+/// Compara los equipos de un cliente entre sí. Solo cifras técnicas del propio
+/// equipo (arranque, memoria, disco, seguridad): nada del usuario ni de lo que
+/// hay dentro. Sirve para decir con datos qué equipo toca renovar.
+pub fn compare_machines(c: &Client) -> Vec<Comparison> {
+    let data = latest_metrics(c);
+    // Con menos de tres equipos la mediana no dice nada útil.
+    if data.len() < 3 {
+        return vec![];
+    }
+    let mut out = Vec::new();
+    let metrics: [Metric; 4] = [
+        ("Arranque", |m| m.boot_ms.map(|b| b as f64 / 1000.0), |v| format!("{v:.0} s"), true, 2.0),
+        ("Memoria RAM", |m| (m.ram_total > 0).then_some(m.ram_total as f64), |v| format!("{:.0} GB", v / 1024f64.powi(3)), false, 1.5),
+        ("Espacio libre", |m| m.sys_free.map(|f| f as f64), |v| format!("{:.0} GB", v / 1024f64.powi(3)), false, 2.0),
+        ("Nota de seguridad", |m| m.security.map(|s| s as f64), |v| format!("{v:.0}"), false, 1.3),
+    ];
+
+    for (label, pick, fmt, high_is_worse, threshold) in metrics {
+        let values: Vec<(String, f64)> = data.iter().filter_map(|(h, m)| pick(m).map(|v| (h.clone(), v))).collect();
+        if values.len() < 3 {
+            continue;
+        }
+        let Some(mid) = median(values.iter().map(|(_, v)| *v).collect()) else { continue };
+        if mid <= 0.0 {
+            continue;
+        }
+        let mut machines: Vec<MachineRank> = values
+            .iter()
+            .map(|(host, v)| {
+                // «Veces peor»: arriba de la mediana si más es peor, abajo si al revés.
+                let factor = if high_is_worse { v / mid } else { mid / v.max(0.001) };
+                MachineRank {
+                    host: host.clone(),
+                    value: fmt(*v),
+                    typical: fmt(mid),
+                    factor: Some((factor * 10.0).round() / 10.0),
+                    worse: factor >= threshold,
+                }
+            })
+            .collect();
+        machines.sort_by(|a, b| b.factor.partial_cmp(&a.factor).unwrap_or(std::cmp::Ordering::Equal));
+
+        let worst = machines.first().filter(|m| m.worse);
+        let summary = match worst {
+            Some(m) if label == "Arranque" => format!("{} arranca {:.1} veces más lento que el resto de la oficina ({} frente a {}).", m.host, m.factor.unwrap_or(1.0), m.value, m.typical),
+            Some(m) if label == "Memoria RAM" => format!("{} tiene menos memoria que el resto ({} frente a {}).", m.host, m.value, m.typical),
+            Some(m) if label == "Espacio libre" => format!("{} va mucho más justo de disco que el resto ({} frente a {}).", m.host, m.value, m.typical),
+            Some(m) => format!("{} está por debajo del resto en {} ({} frente a {}).", m.host, label.to_lowercase(), m.value, m.typical),
+            None => format!("Todos los equipos andan parecidos en {} (unos {}).", label.to_lowercase(), fmt(mid)),
+        };
+        out.push(Comparison { label: label.to_string(), summary, machines });
+    }
+    out
+}
+
+/// Comparación entre los equipos de un cliente (solo cifras técnicas).
+#[tauri::command(async)]
+pub fn compare_client_machines(app: tauri::AppHandle, client_id: String) -> Result<Vec<Comparison>, String> {
+    let c = find_client(&app, &client_id).ok_or("Cliente no encontrado.")?;
+    Ok(compare_machines(&c))
+}
+
 #[tauri::command(async)]
 pub fn visit_changes(app: tauri::AppHandle, client_id: String) -> Result<Vec<MachineChanges>, String> {
     let c = find_client(&app, &client_id).ok_or("Cliente no encontrado.")?;
@@ -1181,6 +1291,44 @@ pub fn import_config(app: tauri::AppHandle) -> Result<Option<serde_json::Value>,
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compares_machines_of_the_same_client() {
+        let pc = |host: &str, boot: u64, ram_gb: u64| {
+            (
+                Machine { host: host.into(), ..Default::default() },
+                SessionRecord {
+                    host: host.into(),
+                    ended: 100,
+                    metrics: Some(VisitMetrics { boot_ms: Some(boot), ram_total: ram_gb * 1024 * 1024 * 1024, ..Default::default() }),
+                    ..Default::default()
+                },
+            )
+        };
+        let rows = [pc("PC-CONTA", 120_000, 4), pc("PC-RECEP", 40_000, 8), pc("PC-DIR", 35_000, 8)];
+        let c = Client {
+            machines: rows.iter().map(|(m, _)| m.clone()).collect(),
+            sessions: rows.iter().map(|(_, s)| s.clone()).collect(),
+            ..Default::default()
+        };
+        let cmp = compare_machines(&c);
+        let boot = cmp.iter().find(|x| x.label == "Arranque").expect("falta el arranque");
+        assert_eq!(boot.machines[0].host, "PC-CONTA");
+        assert!(boot.machines[0].worse);
+        assert!(boot.summary.contains("PC-CONTA") && boot.summary.contains("más lento"), "{}", boot.summary);
+        // El que va como los demás no se marca.
+        assert!(!boot.machines.last().unwrap().worse);
+    }
+
+    #[test]
+    fn no_compara_con_menos_de_tres_equipos() {
+        let c = Client {
+            machines: vec![Machine { host: "A".into(), ..Default::default() }],
+            sessions: vec![SessionRecord { host: "A".into(), metrics: Some(VisitMetrics::default()), ..Default::default() }],
+            ..Default::default()
+        };
+        assert!(compare_machines(&c).is_empty());
+    }
 
     #[test]
     fn client_report_is_optional_and_trimmed() {

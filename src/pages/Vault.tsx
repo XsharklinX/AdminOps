@@ -1,10 +1,11 @@
 import { Copy, Eye, EyeOff, FolderLock, FolderOpen, HardDrive, KeyRound, Lock, LockOpen, Plus, Save, Trash2, Unlock } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
 import { vaultApi, type VaultStatus, type VaultSupport } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 /** Contraseña con botón de mostrar. */
 function PasswordInput({ value, onChange, placeholder, autoFocus }: { value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean }) {
@@ -73,10 +74,13 @@ export function Vault() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    vaultApi.support().then(setSupport);
-    load();
-  }, [load]);
+  useLiveEffect(
+    (vigente) => {
+      vaultApi.support().then((s) => vigente() && setSupport(s)).catch(() => {});
+      void load();
+    },
+    [load],
+  );
 
   const act = async (id: string, fn: () => Promise<unknown>, ok?: string) => {
     setBusy(id);
@@ -87,7 +91,7 @@ export function Vault() {
       toast("error", String(e));
     } finally {
       setBusy(null);
-      load();
+      void load();
     }
   };
 
@@ -109,7 +113,7 @@ export function Vault() {
       confirmLabel: "Eliminar la caja y su contenido",
       body: <p>Se borra el archivo de la caja fuerte con todo lo que tiene dentro. No se puede deshacer.</p>,
     });
-    if (ok) act(v.id, () => vaultApi.remove(v.id, true), "Caja fuerte eliminada.");
+    if (ok) void act(v.id, () => vaultApi.remove(v.id, true), "Caja fuerte eliminada.");
   };
 
   const showKey = async () => {
@@ -122,7 +126,7 @@ export function Vault() {
       toast("error", String(e));
     } finally {
       setPassword("");
-      load();
+      void load();
     }
   };
 
@@ -214,7 +218,7 @@ export function Vault() {
           onCreated={(name, key) => {
             setCreating(false);
             setRecovery({ name, key, fresh: true });
-            load();
+            void load();
           }}
         />
       )}
@@ -237,8 +241,8 @@ export function Vault() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (opening) open();
-              else showKey();
+              if (opening) void open();
+              else void showKey();
             }}
           >
             <PasswordInput value={password} onChange={setPassword} placeholder="Contraseña de la caja fuerte" autoFocus />

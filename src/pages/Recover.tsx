@@ -41,7 +41,7 @@ export function Recover() {
   }, [toast]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const install = async () => {
@@ -49,7 +49,7 @@ export function Recover() {
     try {
       await recoverApi.install();
       toast("ok", "Windows File Recovery instalado.");
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     } finally {

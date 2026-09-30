@@ -27,8 +27,6 @@ export function useLiveMetrics(intervalMs = 1500) {
   const busy = useRef(false);
 
   useEffect(() => {
-    let timer: number | undefined;
-
     const tick = async () => {
       if (busy.current || document.hidden || !activeRef.current) return;
       busy.current = true;
@@ -49,8 +47,8 @@ export function useLiveMetrics(intervalMs = 1500) {
       }
     };
 
-    tick();
-    timer = window.setInterval(tick, intervalMs);
+    void tick();
+    const timer = window.setInterval(tick, intervalMs);
     document.addEventListener("visibilitychange", tick);
     return () => {
       window.clearInterval(timer);

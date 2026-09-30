@@ -109,8 +109,9 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
 
   useEffect(() => {
     api.systemInfo().then(setInfo).catch(() => {});
-    loadLatest();
-    tweaksApi.journal().then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)));
+    void loadLatest();
+    void tweaksApi.journal().then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir el Panel; después se recarga desde los botones
   }, []);
 
   if (error && !m) return <p className="p-8 text-bad">Error leyendo métricas: {error}</p>;
@@ -122,7 +123,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     try {
       const msg = await run();
       toast("ok", msg ? `${label}: ${msg}` : `${label}: hecho.`);
-      tweaksApi.journal().then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)));
+      void tweaksApi.journal().then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)));
     } catch (e) {
       toast("error", `${label}: ${e}`);
     } finally {

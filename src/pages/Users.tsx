@@ -1,26 +1,13 @@
-import {
-  Eye,
-  EyeOff,
-  KeyRound,
-  Loader2,
-  RefreshCw,
-  ShieldCheck,
-  ShieldOff,
-  Trash2,
-  TriangleAlert,
-  UserCheck,
-  UserPlus,
-  UserRound,
-  UserX,
-} from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, Pencil, RefreshCw, ShieldCheck, ShieldOff, Trash2, TriangleAlert, UserCheck, UserPlus, UserRound, UserX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { Button, Modal, inputClass } from "../components/ui";
 import { bytes } from "../lib/format";
 import { usersApi, type LocalUser, type NewUser } from "../lib/api";
 import { WindowsTools } from "../components/WindowsTools";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
-type Action = "delete" | "disable" | "enable" | "demote" | "promote" | "password";
+type Action = "delete" | "disable" | "enable" | "demote" | "promote" | "password" | "rename";
 
 const BUILTIN_LABEL = { administrator: "Administrador integrado", guest: "Invitado", default: "Cuenta de Windows", wdag: "Cuenta de Windows" };
 const FORBIDDEN = /["/\\[\]:;|=,+*?<>@]/;
@@ -36,6 +23,9 @@ function blockReason(users: LocalUser[], u: LocalUser, action: Action): string |
   if (action === "delete" && u.builtin) return "Las cuentas integradas se pueden desactivar, no eliminar.";
   if ((action === "promote" || action === "demote") && u.builtin === "guest") return "Invitado no puede ser administrador.";
   if (action === "password" && u.microsoft) return "Cuenta de Microsoft: la contraseña se cambia en account.microsoft.com.";
+  if (action === "rename" && u.builtin) return "Las cuentas integradas de Windows no se renombran.";
+  if (action === "rename" && u.microsoft) return "Cuenta de Microsoft: el nombre se cambia en account.microsoft.com.";
+  if (action === "rename" && (u.signedIn || u.isTarget || u.isSelf)) return "Tiene la sesión iniciada: ciérrala antes de renombrarla.";
   return null;
 }
 
@@ -60,6 +50,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [password, setPassword] = useState<LocalUser | null>(null);
+  const [renaming, setRenaming] = useState<LocalUser | null>(null);
   const [deleting, setDeleting] = useState<LocalUser | null>(null);
   const toast = useToast();
 
@@ -75,7 +66,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
   }, [toast]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const visible = useMemo(
@@ -164,6 +155,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
                 <Loader2 size={16} className="animate-spin text-neon" />
               ) : (
                 <div className="flex shrink-0 items-center gap-0.5">
+                  <IconAction icon={Pencil} label="Renombrar o editar sus datos" reason={reason("rename")} onClick={() => setRenaming(u)} />
                   <IconAction icon={KeyRound} label="Cambiar contraseña" reason={reason("password")} onClick={() => setPassword(u)} />
                   {u.admin ? (
                     <IconAction
@@ -210,7 +202,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
       <WindowsTools
         className="mt-4"
         links={[
-          { id: "lusrmgr", what: "Cambiar el nombre, nombre completo y descripción; opciones de contraseña; grupos; desbloquear una cuenta." },
+          { id: "lusrmgr", what: "Opciones de contraseña, grupos y desbloquear una cuenta (renombrar y editar sus datos ya se hace aquí)." },
           { id: "netplwiz", what: "Inicio de sesión automático y grupo de cada cuenta." },
           { id: "user-profiles", what: "Perfiles guardados en el equipo: tamaño, tipo y borrar los que sobran." },
           { id: "secpol", what: "Longitud y caducidad de las contraseñas, bloqueo tras varios intentos." },
@@ -225,7 +217,18 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
           onCreated={(name) => {
             setCreating(false);
             toast("ok", `Usuario ${name} creado.`);
-            load();
+            void load();
+          }}
+        />
+      )}
+      {renaming && (
+        <RenameDialog
+          user={renaming}
+          onClose={() => setRenaming(null)}
+          onDone={(aviso) => {
+            setRenaming(null);
+            toast("ok", aviso);
+            void load();
           }}
         />
       )}
@@ -236,7 +239,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
           onDone={() => {
             toast("ok", `Contraseña de ${password.name} actualizada.`);
             setPassword(null);
-            load();
+            void load();
           }}
         />
       )}
@@ -247,7 +250,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
           onDeleted={() => {
             toast("ok", `Usuario ${deleting.name} eliminado.`);
             setDeleting(null);
-            load();
+            void load();
           }}
         />
       )}
@@ -482,9 +485,16 @@ function DeleteUser({ user, onClose, onDeleted }: { user: LocalUser; onClose: ()
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    usersApi.profileSize(user.sid).then(setProfile).catch(() => setProfile({ exists: false, size: 0, files: 0 }));
-  }, [user.sid]);
+  // Al cambiar de usuario, el tamaño del perfil anterior ya no vale.
+  useLiveEffect(
+    (vigente) => {
+      usersApi
+        .profileSize(user.sid)
+        .then((p) => vigente() && setProfile(p))
+        .catch(() => vigente() && setProfile({ exists: false, size: 0, files: 0 }));
+    },
+    [user.sid],
+  );
 
   const remove = async () => {
     setDeleting(true);
@@ -543,6 +553,74 @@ function DeleteUser({ user, onClose, onDeleted }: { user: LocalUser; onClose: ()
           </>
         ) : (
           <p className="text-xs text-mute">No tiene carpeta de perfil (nunca inició sesión).</p>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Renombrar la cuenta y editar sus datos. Hasta ahora había que salir a
+ * `lusrmgr.msc` para algo tan corriente como corregir el nombre de un usuario.
+ */
+function RenameDialog({ user, onClose, onDone }: { user: LocalUser; onClose: () => void; onDone: (aviso: string) => void }) {
+  const [name, setName] = useState(user.name);
+  const [fullName, setFullName] = useState(user.fullName);
+  const [description, setDescription] = useState(user.description);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const cambiaNombre = name.trim().toLowerCase() !== user.name.toLowerCase();
+  const problema = cambiaNombre ? nameError(name) : null;
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      onDone(await usersApi.rename(user.sid, name.trim(), fullName, description));
+    } catch (e) {
+      setError(String(e));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={`Editar «${user.name}»`}
+      onClose={onClose}
+      width="w-[460px]"
+      footer={
+        <>
+          {error && <p className="mr-auto max-w-56 text-xs text-bad">{error}</p>}
+          <Button kind="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={save} disabled={saving || !!problema || !name.trim()}>
+            {saving && <Loader2 size={14} className="animate-spin" />} Guardar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Nombre de la cuenta</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20} className={inputClass} />
+          {problema && <span className="mt-1 block text-[11px] text-bad">{problema}</span>}
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Nombre completo</span>
+          <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={256} placeholder="María Pérez" className={inputClass} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-dim">Descripción</span>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={256} placeholder="Recepción · segunda planta" className={inputClass} />
+        </label>
+        {cambiaNombre && user.hasProfile && (
+          <p className="flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 p-2.5 text-[11px] text-warn">
+            <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+            Su carpeta personal seguirá llamándose «{user.name}»: Windows no la renombra al cambiar la cuenta. Todo funciona igual, y
+            cambiarla a mano rompe el perfil.
+          </p>
         )}
       </div>
     </Modal>

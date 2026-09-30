@@ -82,7 +82,7 @@ export function TweaksPage({
   useEffect(() => {
     setTweaks(null);
     setMessages({});
-    load();
+    void load();
   }, [load]);
 
   const setBusyFor = (id: string, label?: string) =>
@@ -125,7 +125,7 @@ export function TweaksPage({
       }
     } finally {
       setBusyFor(t.id);
-      load();
+      void load();
     }
   };
 
@@ -138,7 +138,7 @@ export function TweaksPage({
         fail(t, e);
       } finally {
         setBusyFor(t.id);
-        load();
+        void load();
       }
       return;
     }
@@ -156,7 +156,7 @@ export function TweaksPage({
       });
       if (!go) return;
     }
-    apply(t);
+    void apply(t);
   };
 
   const run = async (t: TweakView) => {

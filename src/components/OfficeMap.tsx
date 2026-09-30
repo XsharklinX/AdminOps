@@ -1,8 +1,9 @@
 import { Eye, MapPinned, Phone, Save, UserRound } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useToast } from "./feedback";
 import { Button, Card, inputClass } from "./ui";
 import { contactsApi, lanApi, officeMapApi, type Contact, type DeviceMeta, type LanDevice } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 export const macKey = (mac: string) => mac.trim().toLowerCase().replace(/-/g, ":");
 
@@ -29,19 +30,18 @@ export function useOfficeMap() {
     setWatch(w);
   }, []);
 
-  useEffect(() => {
+  useLiveEffect((vigente) => {
     lanApi
       .info()
       .then((i) => {
-        if (i?.key) {
-          setKey(i.key);
-          reload(i.key);
-        }
+        if (!vigente() || !i?.key) return;
+        setKey(i.key);
+        void reload(i.key);
       })
       .catch(() => {});
     contactsApi
       .list()
-      .then((l) => setContacts(l.filter((c) => !c.deleted)))
+      .then((l) => vigente() && setContacts(l.filter((c) => !c.deleted)))
       .catch(() => {});
     // Estado de la vigilancia: se refresca cada minuto mientras la página está abierta.
     const t = window.setInterval(() => reload(), 60_000);
@@ -103,7 +103,7 @@ export function OfficeMapCard({
                     onClick={(e) => {
                       e.stopPropagation();
                       const v = contact.extension || contact.phone || contact.mobile || contact.email;
-                      if (v) navigator.clipboard.writeText(v).then(() => toast("ok", `${contact.name}: copiado.`));
+                      if (v) void navigator.clipboard.writeText(v).then(() => toast("ok", `${contact.name}: copiado.`));
                     }}
                     className="mt-0.5 flex items-center gap-1 text-[11px] text-neon hover:underline"
                     title="Copiar su extensión o teléfono"

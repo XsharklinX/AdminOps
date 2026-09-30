@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "./feedback";
 import { Button, Card } from "./ui";
 import { officeApi, sheetApi, workApi, type Client, type MachineSheet } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 const yesNo = (v: boolean | null) => (v == null ? "Desconocido (requiere administrador)" : v ? "Sí" : "No");
 
@@ -49,20 +50,24 @@ export function MachineSheetCard({ autoLoad = false }: { autoLoad?: boolean }) {
     }
   };
 
-  useEffect(() => {
-    if (autoLoad) load();
-    workApi.clients().then(setClients).catch(() => {});
-  }, [autoLoad]);
+  useLiveEffect(
+    (vigente) => {
+      if (autoLoad) void load();
+      workApi.clients().then((c) => vigente() && setClients(c)).catch(() => {});
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `load` se redefine en cada render: incluirlo repetiría la consulta sin parar
+    [autoLoad],
+  );
 
   const copyText = () => {
     if (!sheet) return;
-    navigator.clipboard.writeText(rows(sheet).map(([k, v]) => `${k}: ${v}`).join("\n")).then(() => toast("ok", "Ficha copiada."));
+    void navigator.clipboard.writeText(rows(sheet).map(([k, v]) => `${k}: ${v}`).join("\n")).then(() => toast("ok", "Ficha copiada."));
   };
   // Tabulado: se pega en Excel como una fila con su cabecera.
   const copyExcel = () => {
     if (!sheet) return;
     const r = rows(sheet);
-    navigator.clipboard.writeText(`${r.map(([k]) => k).join("\t")}\n${r.map(([, v]) => v.replace(/\t|\n/g, " ")).join("\t")}`).then(() => toast("ok", "Copiada para pegar en Excel."));
+    void navigator.clipboard.writeText(`${r.map(([k]) => k).join("\t")}\n${r.map(([, v]) => v.replace(/\t|\n/g, " ")).join("\t")}`).then(() => toast("ok", "Copiada para pegar en Excel."));
   };
   const exportCsv = () => {
     if (!sheet) return;

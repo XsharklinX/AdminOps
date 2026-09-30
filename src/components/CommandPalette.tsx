@@ -4,6 +4,7 @@ import { NAV, pageLabel, type PageId } from "./Sidebar";
 import { useToast } from "./feedback";
 import { contactsApi, libraryApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
 import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -66,22 +67,25 @@ export function CommandPalette({
   const list = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
-  useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setIndex(0);
-    window.setTimeout(() => input.current?.focus(), 0);
-    if (!toolsCache) toolboxApi.list().then((t) => setTools((toolsCache = t))).catch(() => {});
-    if (!tweaksCache) tweaksApi.index().then((t) => setTweaks((tweaksCache = t))).catch(() => {});
-    // Sin caché: la agenda cambia a menudo.
-    contactsApi.list().then((l) => setContacts(l.filter((c) => !c.deleted))).catch(() => {});
-    // Las del técnico y las que trae AdminOps: Ctrl+K encuentra ambas.
-    libraryApi
-      .list("solutions")
-      .then((l) => setSolutions([...l, ...BUILTIN_SOLUTIONS]))
-      .catch(() => setSolutions(BUILTIN_SOLUTIONS));
-    libraryApi.list("templates").then(setTemplates).catch(() => {});
-  }, [open]);
+  useLiveEffect(
+    (vigente) => {
+      if (!open) return;
+      setQuery("");
+      setIndex(0);
+      window.setTimeout(() => input.current?.focus(), 0);
+      if (!toolsCache) toolboxApi.list().then((t) => vigente() && setTools((toolsCache = t))).catch(() => {});
+      if (!tweaksCache) tweaksApi.index().then((t) => vigente() && setTweaks((tweaksCache = t))).catch(() => {});
+      // Sin caché: la agenda cambia a menudo.
+      contactsApi.list().then((l) => vigente() && setContacts(l.filter((c) => !c.deleted))).catch(() => {});
+      // Las del técnico y las que trae AdminOps: Ctrl+K encuentra ambas.
+      libraryApi
+        .list("solutions")
+        .then((l) => vigente() && setSolutions([...l, ...BUILTIN_SOLUTIONS]))
+        .catch(() => vigente() && setSolutions(BUILTIN_SOLUTIONS));
+      libraryApi.list("templates").then((t) => vigente() && setTemplates(t)).catch(() => {});
+    },
+    [open],
+  );
 
   const entries = useMemo<Entry[]>(() => {
     const out: Entry[] = NAV.map((n) => ({ key: `page:${n.id}`, kind: "page", title: pageLabel(n.id), search: norm(`${pageLabel(n.id)} ${n.label}`), run: () => onNavigate(n.id) }));

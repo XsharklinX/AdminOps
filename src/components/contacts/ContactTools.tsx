@@ -99,7 +99,7 @@ function TagManager({ contacts, colors, onChanged }: { contacts: Contact[]; colo
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") rename(t);
+                    if (e.key === "Enter") void rename(t);
                     if (e.key === "Escape") setRenaming(null);
                   }}
                   className={`${inputClass} h-8 py-1`}
@@ -247,7 +247,7 @@ function Backups({ onChanged }: { onChanged: () => void }) {
   const { confirm, dialog } = useConfirm();
   const load = () => contactsApi.backups().then(setList).catch(() => setList([]));
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const restore = async (b: { id: number; contacts: number }) => {
@@ -256,7 +256,7 @@ function Backups({ onChanged }: { onChanged: () => void }) {
       await contactsApi.restoreBackup(b.id);
       toast("ok", "Agenda restaurada.");
       onChanged();
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -273,7 +273,7 @@ function Backups({ onChanged }: { onChanged: () => void }) {
               .backupNow()
               .then(() => {
                 toast("ok", "Copia hecha.");
-                load();
+                void load();
               })
               .catch((e) => toast("error", String(e)))
           }

@@ -34,7 +34,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
 
   useOnJournalChange(load);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const filtered = useMemo(() => {
@@ -74,7 +74,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
         confirmLabel: "Quitar",
         body: (
           <>
-            <ul className="mb-3 max-h-40 overflow-y-auto rounded-md border border-line bg-void/50 px-3 py-2 text-xs">
+            <ul className="mb-3 pane-sm overflow-y-auto rounded-md border border-line bg-void/50 px-3 py-2 text-xs">
               {chosen.map((a) => (
                 <li key={a.package} className="flex justify-between gap-2 py-0.5">
                   <span className="text-ink">{a.name}</span>
@@ -120,7 +120,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
       }
     } finally {
       setRemoving(false);
-      load();
+      void load();
     }
   };
 
@@ -133,7 +133,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setReinstalling(null);
-      load();
+      void load();
     }
   };
 

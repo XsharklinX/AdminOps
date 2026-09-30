@@ -159,7 +159,7 @@ export function SpeedTest({ adapter, onResult }: { adapter: Adapter | null; onRe
   const phaseStart = useRef(0);
 
   useEffect(() => {
-    toolsApi.speedHistory().then((h) => h[0] && setResult((r) => r ?? h[0]));
+    void toolsApi.speedHistory().then((h) => h[0] && setResult((r) => r ?? h[0]));
     const a = listen<SpeedProgress>("speedtest-progress", (e) => {
       const p = e.payload;
       setProgress(p);
@@ -175,8 +175,8 @@ export function SpeedTest({ adapter, onResult }: { adapter: Adapter | null; onRe
     });
     const b = listen<SpeedMeta>("speedtest-meta", (e) => setMeta(e.payload));
     return () => {
-      a.then((f) => f());
-      b.then((f) => f());
+      void a.then((f) => f());
+      void b.then((f) => f());
     };
   }, []);
 

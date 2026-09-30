@@ -5,6 +5,7 @@ import { inventoryLines, MachineActions, VerdictChip } from "../components/inven
 import { SendReportModal } from "../components/service";
 import { Button, Card, inputClass } from "../components/ui";
 import { VisitChanges } from "../components/VisitChanges";
+import { MachineCompare } from "../components/MachineCompare";
 import { contactsApi, diagApi, EMPTY_CLIENT_REPORT, workApi, type Client, type ClientReport, type Contact, type SessionRecord, type VisitMetrics } from "../lib/api";
 import { bytes, money } from "../lib/format";
 
@@ -54,7 +55,7 @@ export function Clients() {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const pick = (c: Client | null) => {
@@ -84,7 +85,7 @@ export function Clients() {
     if (!ok) return;
     await workApi.deleteClient(form.id);
     setSelected(null);
-    load();
+    void load();
   };
 
   const reschedule = async (c: Client, date: number | null) => {
@@ -277,6 +278,7 @@ export function Clients() {
                 )}
 
                 {form.id && <VisitChanges clientId={form.id} refresh={form.sessions.length} />}
+                {form.id && <MachineCompare clientId={form.id} refresh={form.sessions.length} />}
 
                 <Card title={`Equipos · ${form.machines.length}`} icon={<Monitor size={14} />}>
                   {form.machines.length === 0 ? (

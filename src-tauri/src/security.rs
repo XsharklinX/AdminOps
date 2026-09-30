@@ -190,6 +190,9 @@ pub fn extra() -> Result<Extra, String> {
 /// al arrancar la app, en un hilo aparte, sin bloquear nada.
 pub fn warm_up() {
     std::thread::spawn(|| {
+        // Primero que abra la app: estas consultas son de las más pesadas y, en
+        // un equipo justo de recursos, retrasaban la primera pantalla.
+        std::thread::sleep(std::time::Duration::from_secs(12));
         let _ = query::<DefenderExtra>(DEFENDER_SCRIPT, 60);
         let _ = bitlocker_for_audit();
     });

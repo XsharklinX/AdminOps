@@ -25,6 +25,36 @@ pub fn open(uri: &str) -> Result<(), String> {
     }
 }
 
+/// ¿Hay un programa registrado para este protocolo (msteams:, ms-quick-assist:…)?
+///
+/// Se comprueba antes de abrirlo: si no lo hay, Windows saca su propio aviso en
+/// inglés («This file does not have an app associated with it») en vez de dejar
+/// que AdminOps explique qué pasa.
+///
+/// No basta con que exista la clave del protocolo. En Windows 11 queda la clave
+/// de la Asistencia rápida, con su valor `URL Protocol`, **sin ninguna subclave**
+/// cuando la app de la Store no está: para Windows el protocolo «existe» pero no
+/// hay nada que lo abra. Por eso se exige además el `shell\open\command`, que es
+/// lo que de verdad lanza el programa.
+pub fn protocol_registered(scheme: &str) -> bool {
+    #[cfg(windows)]
+    {
+        let hkcr = winreg::RegKey::predef(winreg::enums::HKEY_CLASSES_ROOT);
+        let Ok(key) = hkcr.open_subkey(scheme) else { return false };
+        if key.get_raw_value("URL Protocol").is_err() {
+            return false;
+        }
+        // Las apps de la Store usan `DelegateExecute` y dejan el valor por
+        // defecto vacío, así que lo que se mira es que la clave exista.
+        key.open_subkey(r"shell\open\command").is_ok()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = scheme;
+        false
+    }
+}
+
 #[cfg(windows)]
 fn shell_execute(uri: &str) -> Result<(), String> {
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
@@ -112,5 +142,13 @@ mod tests {
     #[ignore]
     fn desktop_shell_reachable() {
         super::with_com(super::desktop_shell).unwrap();
+    }
+
+    /// Un protocolo sin programa que lo abra no cuenta como registrado.
+    /// `https` siempre lo está; `adminops-inventado` nunca.
+    #[test]
+    fn protocol_needs_a_real_handler() {
+        assert!(super::protocol_registered("https"), "https debería tener programa asociado");
+        assert!(!super::protocol_registered("adminops-protocolo-inventado"));
     }
 }

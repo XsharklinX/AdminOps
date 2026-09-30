@@ -1,8 +1,109 @@
 # AdminOps — Hoja de ruta
 
-Estado actual: **v1.1.2**. Este documento recoge lo que ya está hecho, la deuda técnica
-conocida y las próximas fases en orden de prioridad. Cada fase tiene un criterio de
-"terminado" para saber cuándo cerrarla.
+Estado actual: **v1.1.6**. Este documento recoge el plan en curso, lo que ya está hecho y
+la deuda técnica conocida. Cada fase tiene un criterio de "terminado" para saber cuándo
+cerrarla.
+
+---
+
+## Plan actual — Profesionalizar lo que hay (v1.2)
+
+**Nada de funciones nuevas hasta cerrar esto.** AdminOps ya hace mucho; lo que le falta es hacerlo
+siempre bien. Este plan sale de lo que pasó entre la 1.1.5 y la 1.1.6, no de una lista de ideas:
+
+- **Cinco fallos graves pasaron todas las pruebas** (240 entre Rust e interfaz) y rompieron la app
+  al usarla: portales colgados en «Abriendo…», Ajustes sin poder pulsar nada, el MFA de Microsoft
+  rechazado, el modo claro con el fondo negro y la ventana del portable en negro. Las pruebas miran
+  las piezas por separado; **nada comprueba la aplicación en marcha**.
+- **La 1.1.6 se compiló cinco veces** con contenido distinto y el mismo número de versión.
+- **127 archivos sin guardar en Git**: el último commit es la 1.1.4. Todo lo de la 1.1.5 y la 1.1.6
+  vive solo en este disco.
+- Cada cambio de un dato (la red, una visita, una carpeta compartida) había que hacerlo **a mano en
+  Rust y en TypeScript**, y el cruce de comandos se hacía a mano hasta hace poco.
+
+Cada fase cierra un tipo de fallo de los que ya han pasado. Van en orden: la 30 es la que más
+problemas evita, y conviene hacerla antes que ninguna otra.
+
+### Fase 30 — Probar la aplicación en marcha
+
+**Prioridad: máxima.** Es lo que habría parado los cinco fallos de arriba antes de llegarte.
+
+- **Pruebas de humo sobre el `.exe` compilado**, con WebDriver (`tauri-driver` + `msedgedriver`):
+  arranca, pinta la primera página en menos de N segundos, recorre las 34 pestañas sin errores en la
+  consola, y cierra limpio.
+- **Portal de pruebas propio**: un servidor web mínimo que levanta la propia prueba, para comprobar
+  que un portal carga, se oculta, se vuelve a mostrar y conserva la sesión, sin depender de Microsoft
+  ni de la intranet.
+- **«¿Se puede pulsar?»**: después de abrir un portal, ir a Ajustes y pulsar un botón. Es exactamente
+  el fallo de la capa invisible.
+- **Capturas de las páginas clave en los dos temas**, comparadas con las de referencia. Es el fallo
+  del modo claro. `scripts/bench.ps1 -Page` ya sabe sacar capturas; se aprovecha.
+- **Arranque en frío del portable** en Windows Sandbox (`tests/sandbox` ya lo hace para la prueba de
+  ida y vuelta): carpeta nueva, primera vez, sin nada guardado.
+- Todo en la CI, que falla si algo de esto falla.
+
+**Terminado cuando:** la CI no deja pasar una versión que no arranca, en la que un portal no carga, en
+la que algo tapa los clics, o en la que un tema se ve roto.
+
+### Fase 31 — Publicar con disciplina
+
+**Prioridad: alta, y la primera parte es de hoy mismo.**
+
+- **Guardar en Git lo que ya existe** y, a partir de ahí, un commit por cambio y una etiqueta por
+  versión publicada.
+- **Una versión, un contenido**: cualquier build que salga de este equipo sube el número de versión
+  sola. Nunca se sobrescribe una carpeta de `release\` que ya exista.
+- **Novedades de cada versión** escritas para el técnico (qué cambia para él, no qué función se tocó),
+  visibles en «Acerca de» y junto al instalador.
+- **Canal de prueba**: cada versión pasa un día en tu equipo antes de llegar a nadie más.
+
+**Terminado cuando:** de cualquier AdminOps instalado se puede saber exactamente qué código lleva, y
+volver a la versión anterior es copiar una carpeta.
+
+### Fase 32 — Un solo contrato entre la interfaz y el programa
+
+**Prioridad: alta.** Quita de raíz una clase entera de fallos.
+
+- **Tipos generados desde Rust** (`tauri-specta`): los datos y los comandos se definen una sola vez y
+  la interfaz los recibe generados. Cambiar un campo en Rust sin actualizar la interfaz deja de
+  compilar, en vez de fallar en el equipo del cliente.
+- **Partir los archivos enormes**, que es donde más fácil es romper algo sin darse cuenta:
+  `api.ts` (2.256 líneas), `portals.rs` (1.511), `SettingsPage.tsx` (1.447), `Tickets.tsx` (893).
+- **Los 9 avisos de promesas sin capturar** que quedan: decidir en cada uno qué hacer con el error.
+
+**Terminado cuando:** no hay ningún tipo escrito dos veces y ningún archivo pasa de ~600 líneas.
+
+### Fase 33 — Pulido de la interfaz
+
+**Prioridad: media.** Lo que hace que parezca un producto y no un proyecto.
+
+- **Los dos temas revisados pantalla por pantalla**, con contraste suficiente para leer sin esfuerzo.
+- **Los mismos estados en todas partes**: cargando, vacío, error y «necesita administrador», con el
+  mismo aspecto y el mismo tono en las 34 pestañas.
+- **Cada error dice qué hacer**, no solo qué pasó. Revisar los que todavía llegan en crudo de Windows.
+- **Todo se puede hacer con el teclado**, con el foco siempre visible.
+
+**Terminado cuando:** una lista de comprobación de las 34 pestañas en los dos temas pasa entera.
+
+### Fase 34 — Listo para que lo use el equipo
+
+**Prioridad: media**, y es lo que pide la presentación al supervisor.
+
+- **Manual corto del técnico**, con capturas: lo que hace cada sección y los cinco usos más comunes.
+- **Guía de instalación para IT**: requisitos, qué pide permisos y por qué, qué conexiones hace
+  (sección 4.6 de `docs/PRESENTACION.md`), cómo añadirlo a la lista de confianza del antivirus.
+- **Revisión de dependencias en la CI** (`cargo audit`, `npm audit`) y la lista de componentes de
+  terceros, que IT va a pedir.
+- **Paquete de soporte más útil**: versión, equipo, últimos errores y los tiempos de arranque, en un
+  clic, para que un problema en otro equipo se pueda diagnosticar sin ir hasta él.
+
+**Terminado cuando:** otro técnico lo instala y lo usa una semana sin tener que preguntarte nada.
+
+### Después, cuando lo anterior esté cerrado
+
+Funciones nuevas que siguen teniendo sentido, en este orden: **avisar cuando un ajuste lo controla la
+directiva del dominio** (y el cambio no va a durar), **comparar un equipo con el equipo patrón**, y
+**una carpeta de red compartida como base común** de clientes, contactos y visitas entre técnicos.
 
 ---
 
@@ -92,6 +193,214 @@ Medido con `scripts/bench.ps1` y `cargo test --release bench -- --ignored --noca
 - **Notificaciones en portable**: sin instalador, Windows puede mostrarlas con otro nombre de app.
 - **Tickets incrustados** usan la API "unstable" de Tauri (vistas hijas); si una versión futura la
   cambia, queda la ventana aparte como alternativa.
+
+### v1.1.6 (segunda parte) — Portales: la raíz, no los síntomas ✅
+
+**⚠ Diagnóstico equivocado, corregido en la cuarta parte.** Lo que sigue explica un cambio que rompió los portales; se deja escrito para que no se repita. **El fallo de Tickets en la oficina tenía causa, y era grave.** La ventana principal arranca WebView2
+con `--auth-server-allowlist` cuando hay una intranet configurada; las vistas de los portales
+arrancaban solo con los argumentos del archivo de configuración. WebView2 **no admite dos
+configuraciones distintas en la misma carpeta de datos**, así que la vista del portal no llegaba a
+crearse y la página no abría. Se daba únicamente donde hay un portal de intranet: en el trabajo, y en
+ningún otro sitio. Ahora los portales leen los argumentos con los que arrancó de verdad el navegador
+(`ARGS_ENV`), no una parte de ellos. Con prueba.
+
+**La sesión ya no se pierde al salir.** Los portales de Correo y Teams se creaban con «sesión
+privada» activada de fábrica, que es exactamente lo que borra la sesión al cerrar AdminOps y obliga a
+repetir el inicio de sesión y la verificación del móvil cada vez. Se creaba así pensando en el equipo
+del cliente, pero el caso normal es el equipo del técnico. Ahora se crean con la sesión guardada, y la
+privada se marca a mano cuando toca. Los textos dicen lo que cuesta cada opción, no solo su ventaja.
+De paso, con perfil persistente Teams y Outlook cachean sus archivos: la segunda carga es mucho más
+rápida que la primera.
+
+**Los portales dejan de tirarse a la basura.**
+- Una vista sin usar se cerraba a la media hora, y volver a entrar costaba una carga completa de
+  Teams o de Outlook. Media hora no es nada en una jornada. Ahora **4 horas** en el equipo del
+  técnico; se mantienen los 30 minutos en equipos justos de recursos, que es donde la memoria pesa.
+- Dormir la vista al ocultarla hacía que **ir y volver** entre el Correo y otra página costara un
+  despertar cada vez. Ahora se duerme solo tras **3 minutos** sin verse: el ir y venir normal es
+  instantáneo y solo se aparca lo que de verdad se dejó aparcado.
+
+**Arranque**
+- **La ventana se enseña cuando hay algo pintado, no antes.** Enseñarla a los 2,5 s pasara lo que
+  pasara era lo que producía el rectángulo negro del portable: si WebView2 aún no ha pintado, lo
+  único que se ve es una ventana vacía, y eso parece una aplicación colgada. Red de seguridad a los
+  20 s para no quedarse nunca sin ventana, y recarga solo si WebView2 no cargó nada en 30 s.
+- El registro anota ahora **cómo y cuándo se cierra la ventana**. Una aplicación que desaparece sola
+  no dejaba ni rastro y no había forma de saber si la cerró el usuario, Windows, o se cayó ella.
+
+### v1.1.6 (quinta parte) — El MFA de Microsoft vuelve a funcionar ✅
+
+**«Sorry, we're having trouble verifying your account» al iniciar sesión en Teams o el Correo.** Lo
+introdujo la 1.1.5: para ahorrar procesador, los portales ocultos se **congelaban** (`TrySuspend` de
+WebView2), y uno precargado se congelaba nada más terminar su primera carga si todavía no se había
+abierto. Sin sesión iniciada, esa primera carga termina en la página de inicio de sesión de
+Microsoft, que se quedaba congelada ahí minutos. Esa página lleva un contexto de inicio de sesión que
+se renueva mientras está viva; congelada, caduca, y al pedir el código Microsoft rechaza la
+verificación.
+
+**Se ha quitado la congelación entera**, no parcheado: los portales ocultos siguen vivos, como en la
+1.1.4, que es cuando el MFA funcionaba. El propio WebView2 ya frena lo que no se ve. Se mantienen el
+resto de mejoras de los portales, revisadas una a una para que ninguna toque el inicio de sesión.
+
+**Aviso**: tras muchos inicios de sesión seguidos en poco tiempo (cada build, más la sesión privada
+del Correo), Microsoft limita durante un rato el envío de códigos por SMS o llamada. Si justo después
+de actualizar sigue fallando, es eso: esperar o usar Microsoft Authenticator.
+
+### v1.1.6 (cuarta parte) — Corrección de los portales ✅
+
+**Los portales se quedaban para siempre en «Abriendo…» (Correo, Teams y Tickets a la vez).** Lo
+introdujo la propia 1.1.6. WebView2 exige que todas las vistas que comparten carpeta de datos se creen
+con **opciones idénticas**. La ventana principal se crea con los argumentos del archivo de
+configuración; la lista de dominios de la intranet va aparte, en una variable de entorno que WebView2
+aplica por igual a todas las vistas. En la 1.1.6 se añadió esa lista también a las opciones de cada
+portal, creyendo que faltaba: los portales quedaban distintos de la ventana principal y WebView2 se
+negaba a crearlos, sin ningún error a la vista. Pasaba en cuanto había una intranet configurada.
+El diseño original era el correcto y se ha restaurado, con una prueba de regresión que lo fija.
+
+Además:
+- **Un portal que no arranca ya no gira para siempre**: a los 25 s sin señal de vida lo dice, con
+  Reintentar (que vuelve a crear la vista). Un fallo así no puede volver a pasar en silencio.
+- **Ajustes no dejaba tocar nada (ni hacer scroll).** Consecuencia del mismo fallo: las vistas de los
+  portales son ventanas del sistema que van por encima de la interfaz, y una vista que WebView2 no
+  llegó a iniciar no pinta nada ni responde a «ocultar». Se quedaba invisible encima de la zona de
+  contenido tragándose clics y scroll, y se notaba en la siguiente página que se abría. Ahora una
+  vista que nunca arrancó **se destruye** al salir de su página o a los 25 s (`portal_reset`), en vez
+  de intentar ocultarla. Distinguir «no arrancó» de «arrancó pero va lenta» es seguro: una vista sana
+  avisa de que empieza a cargar en menos de un segundo.
+- **AdminOps abre en el Panel.** «La última página que usé» venía de fábrica y quedaba guardada al
+  tocar cualquier ajuste, aunque nadie la hubiera elegido. Ahora solo se respeta si el técnico la
+  elige a propósito en Ajustes.
+
+### v1.1.6 (tercera parte) — Agenda, Usuarios, Impresoras y Carpetas ✅
+
+Cuatro apartados que se habían quedado cortos.
+
+**Agenda** — era una lista de citas y poco más.
+- **Visitas que se repiten** (semanal, quincenal, mensual, trimestral, semestral, anual). Al marcar
+  una como hecha, **la siguiente se planifica sola**, contada desde la fecha prevista para que
+  atender con retraso no desplace toda la serie. El mantenimiento periódico deja de depender de que
+  alguien se acuerde de volver a apuntarlo.
+- **Aviso de visitas que se pisan**: no impide guardar (a veces se solapan a propósito), pero se dice
+  al guardar y no el día de la visita.
+- **Aplazar en un clic** desde la propia fila, sin abrir el editor. Es lo que más se hace.
+- **Dónde es** (sede, planta, sala) y **tipo de visita**, enlazado con los tipos de Ajustes.
+
+**Usuarios** — **renombrar la cuenta** y editar su nombre completo y descripción, sin salir a
+`lusrmgr.msc`. Con las mismas reglas de seguridad que el resto: no se renombran cuentas integradas ni
+de Microsoft, ni una con la sesión abierta. Y avisa de lo que despista a todo el mundo: **Windows no
+renombra la carpeta del perfil**, y cambiarla a mano lo rompe.
+
+**Impresoras**
+- **«Revisar»**: dice por qué no imprime, señalando el primer eslabón roto de la cadena (cola de
+  Windows → impresora encendida y en red → estado del aparato → atascos). Distingue «Windows la tiene
+  marcada como sin conexión» de «la impresora no responde en 192.168.1.30», que se arreglan de forma
+  muy distinta. Con siete casos cubiertos por pruebas.
+- **Buscar impresoras en la red**: prueba los puertos de impresión (RAW, IPP, LPD) sobre los equipos
+  que ya responden, y marca cuáles no están instaladas aquí. Antes, saber qué impresoras había en una
+  oficina era preguntar o ir mirando aparato por aparato.
+
+**Carpetas compartidas**
+- **Qué archivos están abiertos ahora mismo y quién los tiene**, con aviso de los bloqueados. Un
+  archivo abierto no se puede mover, renombrar ni borrar.
+- **Carpetas rotas**: se comparte una ruta que ya no existe y quien entra ve un error de Windows.
+- **La trampa de los permisos**: compartida con «Todos» pero con los permisos del disco cerrados. El
+  acceso real es lo que dejen los dos a la vez, y es la causa clásica de «acceso denegado» que nadie
+  entiende.
+
+**Deuda técnica**: de 178 avisos de promesas sin capturar a **9**. Los 169 arreglados eran llamadas
+de usar y tirar que ya capturan por dentro; los 9 que quedan son cadenas `.then(…)` que hay que mirar
+una a una y decidir qué hacer con el error.
+
+### v1.1.6 — Que funcione en el equipo del cliente ✅
+
+Todo esto sale de usar la 1.1.5 de verdad, en equipos que no son el de desarrollo.
+
+**Consumo y cuelgues**
+- **La precarga de portales era lo que más pesaba, y estaba mal planteada**: precargaba el último
+  portal de *cada* tipo, hasta cuatro navegadores Chromium completos por detrás sin que el técnico
+  hubiera pedido ninguno (y Outlook y Teams son de las webs más pesadas que existen). Ahora precarga
+  **uno solo**, el de la última página usada, **ninguno en equipos justos de recursos**, y a los 8 s
+  en vez de a los 4.
+- **El Panel recorría los ~250 procesos del equipo cada 2 segundos** para enseñar los 10 que más
+  consumen. Esa parte pasa a cada 6 s; CPU, memoria y red —lo que se ve moverse— siguen en cada tic.
+- **El vigilante del arranque recargaba la interfaz a los 12 s**, y en un equipo lento la primera
+  pantalla tarda más que eso: se recargaba sola y volvía a empezar. Era la causa de «deja de
+  funcionar». Ahora la interfaz avisa en cuanto su código arranca (`ui_booting`) y **solo se recarga
+  si WebView2 no ha cargado nada** en 25 s.
+- **PowerShell**: de 5 procesos a 2 en equipos de 4 GB o ≤4 núcleos (60-100 MB cada uno).
+- Criterio único de «equipo justo de recursos» (4 GB o menos, o 4 núcleos o menos) en
+  `src/lib/machine.ts` y su gemelo en `pspool.rs`. El arranque lo deja en el registro.
+
+**Asistencia rápida**
+- Seguía saliendo el cuadro en inglés de Windows. La causa: en Windows 11 queda la clave del
+  protocolo `ms-quick-assist` con su `URL Protocol` pero **sin ninguna subclave**, o sea sin programa
+  que lo abra, y la comprobación la daba por buena. Ahora se exige `shell\open\command`, y se
+  prueba primero `quickassist.exe`, que es el que nunca falla. El mismo arreglo cubre `msteams:`.
+
+**Texto**
+- **Se puede leer el texto cortado**: al pasar el ratón por algo recortado con «…» se enseña entero.
+  Resuelto de una vez para toda la aplicación (`src/lib/fullTextOnHover.ts`) en lugar de añadir el
+  `title` en los casi cien sitios donde pasa y olvidarlo en los siguientes.
+- **Las cajas con su propio scroll crecen con la ventana** (`pane-sm`, `pane-md`, `pane-lg`). Con un
+  alto fijo en píxeles, en una pantalla grande sobraba sitio y en un portátil el contenido quedaba
+  metido en una rendija con dos barras compitiendo.
+
+**Reparar la red**
+- Deja de ser una lista de pasos y **dice qué pasa y qué hacer**. Señala el primer eslabón roto de la
+  cadena (tarjeta → IP → router → Internet → DNS), que es distinto del último síntoma: «el router no
+  te está dando dirección, reinícialo» en vez de «no hay Internet». Con botón a lo siguiente (panel
+  del router, cambiar DNS, velocidad) y los datos de la conexión a la vista (IP, router, DNS, proxy,
+  VPN), para no ir a buscarlos a otra página.
+- Dos pasos nuevos: **vaciar la tabla ARP** (el equipo tiene IP y no llega al router porque guarda la
+  MAC vieja, típico al cambiar o reiniciar el router) y, en la reparación a fondo, **quitar el proxy
+  de las descargas del sistema**, que heredado de otra red deja el equipo «conectado sin Internet».
+
+**Diagnóstico**
+- Un portal que no carga deja en el registro la dirección exacta y el código de WebView2. Antes
+  «No se pudo abrir la página» no se podía diagnosticar a distancia.
+
+### Auditoría de v1.1.5: resuelto ✅
+
+**Redes de seguridad nuevas**
+
+1. **El cruce de comandos es una prueba**, no una comprobación a mano
+   (`src/lib/commands.test.ts`): cada `invoke("x")` de la interfaz tiene que estar en
+   `generate_handler![…]`. Falla nombrando el comando y el archivo. Ya había dejado pasar dos
+   comandos inexistentes a producción.
+2. **El modo auditoría no se puede escapar por olvido.** `audit.rs` tiene ahora las dos listas
+   completas —`BLOCKED` (78 comandos que cambian el equipo) y `SAFE` (246 revisados uno a uno)— y
+   tres pruebas: que todo comando registrado esté clasificado, que ninguno esté en las dos listas ni
+   sobre de una, y que los bloqueados existan. Añadir un comando obliga a decidir en cuál va.
+   Comprobado a mano que las pruebas fallan de verdad al quitar una entrada.
+3. **ESLint con las reglas de hooks como error** (`eslint.config.js`, `npm run lint`, en la CI).
+   `react-hooks/exhaustive-deps` es la regla que habría avisado del portal que se recolocaba en cada
+   recarga de la lista. Las 10 excepciones que había eran todas a propósito y ahora llevan el motivo
+   escrito en la línea. Las reglas del compilador de React se apagan a conciencia: dan por malos
+   patrones correctos aquí.
+
+**Fallos latentes corregidos**
+
+4. **Respuestas que llegan tarde** (`src/lib/useLiveEffect.ts`): 21 efectos que guardaban en el
+   estado el resultado de una consulta ya no pisan al nuevo cuando cambia lo que se está mirando.
+   Los que se notaban: el tamaño del perfil de otro usuario (Usuarios), los datos del perfil anterior
+   al cambiar de usuario en Migrar, y la cuenta guardada de otro portal en el editor de portales.
+5. **Las descargas de los portales ya no crecen sin límite**: cada una lleva su número propio (antes
+   era su posición en la lista, que impedía podarla) y se recuerdan las últimas 200.
+6. **Los datos de un portal se olvidan al cerrarlo o borrarlo** (rectángulo, última vez visto, cuándo
+   se creó y a dónde iba). Además, una primera carga que se cancele ya no deja la vista sin poder
+   dormirse nunca: a los 90 segundos se da por terminada.
+
+**Alineación de la CI**
+
+7. La CI usa ahora `cargo clippy --all-targets` (antes `--lib --tests`, más flojo que la verificación
+   local), pasa ESLint y repite clippy con la versión de Rust fijada que se verifica a mano. Ya no
+   puede pasar en verde algo que falle en local.
+
+**Pendiente**
+
+- **178 avisos de `@typescript-eslint/no-floating-promises`**: promesas sin `await` ni `.catch()`.
+  99 son llamadas a un `load()` que ya captura por dentro; el resto hay que mirarlas una a una. Queda
+  como aviso (no rompe la CI) para limpiarlas por páginas, no de golpe.
 
 ---
 
@@ -708,6 +1017,104 @@ Pulido para el uso diario.
   cuando la única vista era la interfaz; con los portales y el Correo dentro, hacía que todo el
   trabajo gráfico pasara por el proceso principal y provocaba tirones con webs pesadas.
 
+- **Arreglos y rendimiento con datos reales** (medido en un equipo de trabajo):
+  - El arranque (1,6 s) resultó ser casi todo de WebView2: los pasos propios suman 65 ms, así que
+    **no** se partió `api.ts`; no habría ganado nada.
+  - **El diagnóstico esperaba a winget** (84 s en ese equipo) y por eso tardaba 82 s. Ahora usa lo
+    que tenga en caché y actualiza detrás: el diagnóstico deja de depender de winget.
+  - **La información de la red** (19,9 s) sale del PowerShell compartido a su propio proceso.
+  - **Las temperaturas** se comparten entre el Panel y Hardware (eran 39 lecturas de 300 ms).
+  - Las **vistas web sin usarse 30 minutos se cierran** (cada una es un proceso).
+  - Los **portales se recargan solos al volver la red** (VPN, cable, Wi-Fi).
+  - Elegir un ancho de barra lateral en Ajustes ahora manda sobre el ajustado arrastrando.
+  - `npm run setversion 1.1.5` cambia la versión en los cuatro sitios a la vez.
+- **Avisos de Windows que llevan a su sitio**: Windows no dice qué aviso se ha pulsado, pero al
+  pulsarlo pone AdminOps delante; si el aviso es reciente, la app abre la campana con lo pendiente.
+- **Barras de pestañas sin barra de desplazamiento** y barra general discreta (solo al pasar por
+  encima).
+- **Etiquetas plegables** (Soluciones y Contactos): con muchas, se ve una fila y «Ver todas».
+- **Diagnóstico: se pliega lo que está bien.** Las tarjetas sin problemas se quedan en una línea con
+  «Sin problemas» y el detalle a un clic. Se puede desactivar con «Plegar lo que está bien».
+- **Redactar un correo**: sin datos que rellenar se pulsa el botón propio de Outlook (aspecto de
+  siempre); con destinatario o asunto, su enlace de redactar abre en una ventana propia.
+
+- **Estado del equipo**: Diagnóstico, Hardware, Seguridad e Historial en una página con pestañas.
+  Con ello «Equipo» queda en cuatro entradas y la barra lateral en 7 secciones, en este orden:
+  Inicio, Equipo, Soporte, Red, Aplicaciones, Administración (antes «Oficina») y Datos.
+- **Cada pestaña sabe si se ve**: antes una página con pestañas se creía visible entera, así que lo
+  que hubiera en marcha en una pestaña oculta (temperaturas, métricas) seguía trabajando. Arreglado
+  en `TabPanels`, así que vale para todas las páginas con pestañas.
+- **Catálogo de programas**: de 72 a 113, con categoría **Drivers y utilidades del fabricante**
+  (Intel, Dell, Lenovo, MSI, ASUS, DisplayLink, Logitech, Corsair, Razer y Snappy Driver Installer)
+  y dos listas nuevas. Los 74 ids añadidos se comprobaron uno a uno contra winget: 7 no existían y
+  se corrigieron o se quitaron. winget no distribuye drivers sueltos: lo que se instala son las
+  utilidades oficiales que los buscan.
+- **Espacio en disco, para soporte**:
+  - **«Qué puedes liberar»**: temporales de Windows y del usuario, caché de Windows Update,
+    papelera, `Windows.old`, hibernación y Descargas, medidos de verdad, con verde (se puede borrar)
+    o naranja (míralo antes).
+  - **Archivos grandes sin usar en más de un año**, con cuánto hace que se tocaron.
+  - **Enviar a la papelera** lo que marques, sin salir de la app y pudiendo recuperarlo; queda en el
+    Historial y el modo auditoría lo bloquea.
+
+- **Las soluciones se ejecutan, no solo se leen.** Cada paso de las 24 soluciones que trae AdminOps
+  lleva su botón cuando la app sabe hacerlo: vaciar la cola de impresión, reparar Windows Update,
+  limpiar el DNS, SFC y DISM, reiniciar el audio, reparar un perfil temporal, sincronizar la hora,
+  analizar con Defender… También abre la herramienta de Windows o la página donde se hace. Un test
+  comprueba que los 24 juegos de botones apuntan a ids que existen de verdad.
+- **El diagnóstico lleva a la solución**: cada hallazgo ofrece «Cómo se arregla» y abre los pasos.
+  También en «Qué hacer ahora» del Panel, para los hallazgos sin acción directa.
+- **Comparar los equipos de un cliente**: «PC-CONTA arranca 3 veces más lento que el resto de la
+  oficina». Compara arranque, memoria, espacio libre y nota de seguridad con la mediana de los demás
+  equipos, a partir de las cifras que ya guardaba cada visita. Solo datos técnicos del equipo, y hacen
+  falta al menos tres para que la mediana signifique algo.
+- **Dos modos, elegidos en la bienvenida y cambiables en Ajustes**:
+  - **Modo técnico**: AdminOps completo, con el aviso de que toca registro, servicios, usuarios y
+    arranque, y de que para cambiar el equipo hay que abrirlo como administrador.
+  - **Modo usuario**: solo Panel, Estado del equipo, Espacio, Solucionar problemas, Acceso remoto y
+    Ajustes. No se ven clientes, contactos, tickets ni correo del técnico. Con PIN puesto, volver al
+    modo técnico lo pide. Es un modo de la interfaz, no una barrera de seguridad, y así se dice.
+- **Bienvenida nueva**: modo, datos del técnico, tickets, correo (Outlook en un clic) y dominio, con
+  atrás, saltar y un resumen final de lo que conviene saber.
+- **Ayuda al día**: los textos del «?» que quedaron desfasados tras las fusiones, corregidos, y
+  **ayuda propia en cada una de las 34 pestañas**, que antes no tenían ninguna.
+- **Comprobación antes de instalar**: red, espacio libre, winget y permisos. Avisa antes en vez de
+  dejar el equipo a medio hacer.
+- **Arranque instrumentado**: se mide la carpeta de datos de WebView2 y el momento justo antes de
+  crear la ventana, para saber con datos cuánto es de AdminOps y cuánto de WebView2.
+
+### v1.1.5 — Teams, arranque y portales que no estorban ✅
+
+- **Teams dentro de AdminOps** (Soporte → Teams): chats, equipos y reuniones sin instalar Teams en el
+  equipo del cliente. Se usa Teams en la web, que es la versión que funciona en cualquier equipo y no
+  deja nada instalado; la cuenta se guarda cifrada como la del Correo y el inicio de sesión se rellena
+  solo. Del trabajo (Microsoft 365) o personal, con sesión privada recomendada en equipos ajenos.
+  Solo navega por los dominios de Teams y de Microsoft: cualquier otro enlace se abre en el navegador.
+  Para hablar en una reunión, Windows pide permiso de micrófono y cámara la primera vez.
+  Desde **Contactos**, «Teams» abre el chat aquí dentro si hay Teams configurado; si no, en la
+  aplicación de Teams del equipo, como antes.
+- **Los portales dejan de estorbar cuando no se ven.** Un portal oculto (o precargado) se duerme:
+  deja de consumir procesador y batería, igual que una pestaña de fondo del navegador. Era el motivo
+  de que el Correo, con Outlook abierto, pusiera lenta toda la aplicación aunque estuvieras en otra
+  página. Se despierta solo al volver a él.
+- **Portales más ligeros al moverse**: colocar la vista hay que pedírselo al hilo de la ventana, y al
+  arrastrar el borde se mandaban decenas de peticiones por segundo. Ahora va una por fotograma como
+  mucho y las que no cambian nada no se mandan. Además, el estado de la página (título, historial)
+  solo repinta la interfaz cuando cambia de verdad: Outlook lo repetía sin parar.
+- **La ventana ya no se abre en negro.** Se enseña cuando la interfaz tiene algo pintado, con un
+  «Abriendo AdminOps…» mientras tanto, y si WebView2 no arranca en 12 segundos se recarga la vista
+  sola, en vez de tener que cerrar y volver a abrir.
+- **Portable: primer arranque arreglado.** La carpeta de datos de WebView2 del USB se crea y se
+  comprueba antes de dársela a WebView2; si el USB viene protegido contra escritura o el antivirus
+  del cliente bloquea la primera creación, se usa la del equipo en lugar de quedarse la ventana en
+  negro. Era la causa de que la primera vez hubiera que cerrar y volver a abrir.
+- **Arranque más despejado**: las consultas pesadas de Defender y BitLocker, la limpieza automática y
+  el calentamiento de PowerShell se apartan unos segundos para no competir con la primera pantalla.
+- **Asistencia rápida sin el aviso en inglés de Windows**: se comprueba antes si el equipo la tiene
+  (app de la Store en Windows 11, `quickassist.exe` en Windows 10). Si no está, se abre su ficha de la
+  Microsoft Store y se explica en español, en vez del «This file does not have an app associated…».
+- **«Volver a ver la bienvenida»** en Ajustes → General, junto a la página de inicio.
+
 ### Ideas nuevas (propuestas, sin fecha)
 
 **Taller y órdenes de trabajo**
@@ -737,7 +1144,9 @@ Pulido para el uso diario.
 - **Pantalla de entrega**: una vista limpia para enseñar al cliente en su propio equipo el antes y
   el después (espacio, arranque, seguridad) y que firme ahí mismo.
 
-### Fase 26 — Negocio (más adelante)
+### Fase 26 — Negocio (aparcada)
+
+> **Aparcada**: cobrar no es el plan ahora. Se deja escrita por si algún día lo es.
 
 **Prioridad: media.** Lo que ayuda a cobrar y a que el cliente vuelva.
 
@@ -765,7 +1174,9 @@ Pulido para el uso diario.
 - **Inglés** completo (interfaz, catálogos e informe) y selector de idioma.
 - **Página de descarga** en GitHub Pages con capturas, novedades y la nota sobre SmartScreen.
 
-### Fase 29 — Preparación comercial (más adelante)
+### Fase 29 — Preparación comercial (aparcada)
+
+> **Aparcada**: cobrar no es el plan ahora. Se deja escrita por si algún día lo es.
 
 **Prioridad: a decidir** según cómo se quiera vender.
 

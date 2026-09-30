@@ -14,7 +14,7 @@ use tauri::State;
 
 const CATALOG: &str = include_str!("../tools/apps.toml");
 #[cfg(test)]
-const CATEGORIES: &[&str] = &["browser", "compress", "media", "chat", "remote", "office", "utils", "tech", "security", "runtime", "games", "dev"];
+const CATEGORIES: &[&str] = &["browser", "compress", "media", "chat", "remote", "office", "utils", "tech", "security", "runtime", "games", "dev", "drivers"];
 
 /// El paquete ya estaba instalado y al día (winget intenta actualizar y no hay nada nuevo).
 const UPDATE_NOT_APPLICABLE: i64 = 0x8A15002Bu32 as i32 as i64;
@@ -187,6 +187,68 @@ pub struct InstallResult {
 }
 
 /// Instala los programas uno tras otro (winget no admite instalaciones en paralelo).
+/// Lo que conviene mirar antes de lanzar una instalación larga.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Preflight {
+    /// Hay conexión a Internet (winget descarga todo de la red).
+    pub online: bool,
+    /// Espacio libre en el disco del sistema, en bytes.
+    pub free: u64,
+    /// Por debajo de esto, instalar varios programas se queda a medias.
+    pub low_space: bool,
+    /// winget está en el equipo.
+    pub winget: bool,
+    /// AdminOps se está ejecutando como administrador.
+    pub elevated: bool,
+    /// Avisos en claro, listos para mostrar.
+    pub warnings: Vec<String>,
+}
+
+/// Espacio por debajo del cual una instalación en lote se queda a medias.
+const LOW_SPACE: u64 = 5 * 1024 * 1024 * 1024;
+
+/// Comprueba antes de instalar: red, espacio, winget y permisos. Así se avisa
+/// antes en lugar de fallar a mitad, con el equipo del cliente a medio hacer.
+#[tauri::command(async)]
+pub fn install_preflight(count: usize) -> Preflight {
+    // Las tres comprobaciones a la vez: ninguna depende de las otras.
+    let (online, winget, free) = std::thread::scope(|sc| {
+        let online = sc.spawn(|| crate::network::diag::ping("preflight", "1.1.1.1", 2).received > 0);
+        let winget = sc.spawn(|| crate::ps::powershell("if (Get-Command winget -ErrorAction SilentlyContinue) { 1 } else { 0 }").map(|o| o.trim() == "1").unwrap_or(false));
+        let free = sc.spawn(|| {
+            let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+            sysinfo::Disks::new_with_refreshed_list()
+                .iter()
+                .find(|d| d.mount_point().to_string_lossy().to_uppercase().starts_with(&drive.to_uppercase()))
+                .map(|d| d.available_space())
+                .unwrap_or(0)
+        });
+        (online.join().unwrap_or(false), winget.join().unwrap_or(false), free.join().unwrap_or(0))
+    });
+
+    let elevated = crate::elevation::is_elevated();
+    let low_space = free > 0 && free < LOW_SPACE;
+    let gb = free as f64 / 1024f64.powi(3);
+    let mut warnings = Vec::new();
+    if !online {
+        warnings.push("Este equipo no tiene Internet: winget descarga los programas de la red y fallarían todos.".into());
+    }
+    if !winget {
+        warnings.push("winget no está en este equipo. Se instala con «Instalador de aplicación» desde Microsoft Store.".into());
+    }
+    if low_space {
+        warnings.push(format!("Quedan {gb:.1} GB libres en el disco del sistema: instalar varios programas puede quedarse a medias."));
+    }
+    if !elevated {
+        warnings.push("Sin administrador, los programas que lo necesiten pedirán permiso uno a uno.".into());
+    }
+    if count > 15 {
+        warnings.push(format!("Son {count} programas: puede tardar bastante. Déjalo terminar antes de apagar el equipo."));
+    }
+    Preflight { online, free, low_space, winget, elevated, warnings }
+}
+
 #[tauri::command(async)]
 pub fn install_apps(app: tauri::AppHandle, apps: Vec<CatalogApp>, state: State<'_, TweakState>) -> Result<Vec<InstallResult>, String> {
     let task = Task::new(&app, "install-apps");

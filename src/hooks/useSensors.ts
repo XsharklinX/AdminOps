@@ -28,7 +28,7 @@ export function useSensors(intervalMs = 5000) {
         busy.current = false;
       }
     };
-    tick();
+    void tick();
     const t = window.setInterval(tick, intervalMs);
     return () => window.clearInterval(t);
   }, [intervalMs]);

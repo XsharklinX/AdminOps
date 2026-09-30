@@ -49,6 +49,13 @@ struct Catalog {
 static TOOLS: LazyLock<Vec<ToolDef>> =
     LazyLock::new(|| toml::from_str::<Catalog>(CATALOG).expect("tools/shortcuts.toml inválido").tool);
 
+/// Los ids del catálogo de herramientas (lo usan los tests que comprueban que
+/// los botones de las soluciones apuntan a algo que existe).
+#[cfg(test)]
+pub fn catalog_ids() -> Vec<String> {
+    TOOLS.iter().map(|t| t.id.clone()).collect()
+}
+
 // ---------- Variables y disponibilidad ----------
 
 /// Sustituye `{System32}`, `{UserTemp}`… por las rutas de este equipo y del

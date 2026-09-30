@@ -3,7 +3,7 @@
 # `apps::tests::catalog_ids_exist`, ignorado por defecto porque usa la red).
 # source = "msstore" para las apps de Microsoft Store (por defecto "winget").
 #
-# Categorías: browser compress media chat remote office utils tech security runtime games dev
+# Categorías: browser compress media chat remote office utils tech security runtime games dev drivers
 
 # ---------- Navegadores ----------
 [[app]]
@@ -320,6 +320,201 @@ category = "dev"
 
 # ---------- Listas predefinidas ----------
 
+# ---------- Ampliación del catálogo ----------
+# Los ids se comprueban con `cargo test catalog_ids_exist -- --ignored`.
+
+# ---------- Navegadores ----------
+[[app]]
+id = "Microsoft.Edge"
+name = "Microsoft Edge"
+category = "browser"
+[[app]]
+id = "Opera.OperaGX"
+name = "Opera GX"
+category = "browser"
+[[app]]
+id = "TorProject.TorBrowser"
+name = "Tor Browser"
+category = "browser"
+
+# ---------- Compresión ----------
+[[app]]
+id = "M2Team.NanaZip"
+name = "NanaZip"
+category = "compress"
+
+# ---------- Multimedia ----------
+[[app]]
+id = "Gyan.FFmpeg"
+name = "FFmpeg"
+category = "media"
+[[app]]
+id = "GIMP.GIMP"
+name = "GIMP"
+category = "media"
+[[app]]
+id = "Inkscape.Inkscape"
+name = "Inkscape"
+category = "media"
+[[app]]
+id = "BlenderFoundation.Blender"
+name = "Blender"
+category = "media"
+[[app]]
+id = "KDE.Krita"
+name = "Krita"
+category = "media"
+[[app]]
+id = "Daum.PotPlayer"
+name = "PotPlayer"
+category = "media"
+
+# ---------- Comunicación ----------
+[[app]]
+id = "Mozilla.Thunderbird"
+name = "Thunderbird"
+category = "chat"
+
+# ---------- Control remoto ----------
+[[app]]
+id = "RealVNC.VNCViewer"
+name = "VNC Viewer"
+category = "remote"
+[[app]]
+id = "Microsoft.RemoteDesktopClient"
+name = "Escritorio remoto (cliente)"
+category = "remote"
+
+# ---------- Oficina, PDF y nube ----------
+[[app]]
+id = "Apache.OpenOffice"
+name = "Apache OpenOffice"
+category = "office"
+[[app]]
+id = "Foxit.FoxitReader"
+name = "Foxit PDF Reader"
+category = "office"
+
+# ---------- Utilidades ----------
+[[app]]
+id = "Balena.Etcher"
+name = "balenaEtcher"
+category = "utils"
+[[app]]
+id = "JAMSoftware.TreeSize.Free"
+name = "TreeSize Free"
+category = "utils"
+[[app]]
+id = "AutoHotkey.AutoHotkey"
+name = "AutoHotkey"
+category = "utils"
+
+# ---------- Herramientas del técnico ----------
+[[app]]
+id = "Microsoft.Sysinternals.ProcessMonitor"
+name = "Process Monitor"
+category = "tech"
+[[app]]
+id = "CPUID.HWMonitor"
+name = "HWMonitor"
+category = "tech"
+[[app]]
+id = "Insecure.Nmap"
+name = "Nmap"
+category = "tech"
+[[app]]
+id = "WinMerge.WinMerge"
+name = "WinMerge"
+category = "tech"
+[[app]]
+id = "Famatech.AdvancedIPScanner"
+name = "Advanced IP Scanner"
+category = "tech"
+
+# ---------- Seguridad ----------
+
+# ---------- Componentes ----------
+[[app]]
+id = "Microsoft.DotNet.DesktopRuntime.6"
+name = ".NET Desktop Runtime 6"
+category = "runtime"
+[[app]]
+id = "Microsoft.EdgeWebView2Runtime"
+name = "WebView2 Runtime"
+category = "runtime"
+
+# ---------- Juegos ----------
+[[app]]
+id = "ElectronicArts.EADesktop"
+name = "EA app"
+category = "games"
+[[app]]
+id = "Ubisoft.Connect"
+name = "Ubisoft Connect"
+category = "games"
+[[app]]
+id = "GOG.Galaxy"
+name = "GOG Galaxy"
+category = "games"
+
+# ---------- Desarrollo ----------
+[[app]]
+id = "OpenJS.NodeJS.LTS"
+name = "Node.js LTS"
+category = "dev"
+[[app]]
+id = "Python.Python.3.12"
+name = "Python 3.12"
+category = "dev"
+[[app]]
+id = "DBeaver.DBeaver.Community"
+name = "DBeaver"
+category = "dev"
+
+# ---------- Drivers y utilidades del fabricante ----------
+# winget no distribuye drivers sueltos: lo que se instala aquí son las
+# utilidades oficiales que buscan e instalan los drivers de cada marca.
+[[app]]
+id = "Intel.IntelDriverAndSupportAssistant"
+name = "Intel Driver & Support Assistant"
+category = "drivers"
+[[app]]
+id = "Dell.CommandUpdate"
+name = "Dell Command Update"
+category = "drivers"
+[[app]]
+id = "Lenovo.SystemUpdate"
+name = "Lenovo System Update"
+category = "drivers"
+[[app]]
+id = "DisplayLink.GraphicsDriver"
+name = "DisplayLink (adaptadores de vídeo USB)"
+category = "drivers"
+[[app]]
+id = "Logitech.OptionsPlus"
+name = "Logi Options+"
+category = "drivers"
+[[app]]
+id = "Corsair.iCUE.5"
+name = "Corsair iCUE"
+category = "drivers"
+[[app]]
+id = "RazerInc.RazerInstaller.Synapse4"
+name = "Razer Synapse"
+category = "drivers"
+[[app]]
+id = "MSI.MSICenter"
+name = "MSI Center"
+category = "drivers"
+[[app]]
+id = "Asus.ArmouryCrate"
+name = "ASUS Armoury Crate"
+category = "drivers"
+[[app]]
+id = "GlennDelahoy.SnappyDriverInstallerOrigin"
+name = "Snappy Driver Installer Origin"
+category = "drivers"
+
 [[list]]
 id = "basic"
 name = "Básico"
@@ -343,3 +538,15 @@ id = "tech"
 name = "Kit del técnico"
 description = "Diagnóstico de hardware y utilidades de soporte."
 apps = ["CPUID.CPU-Z", "REALiX.HWiNFO", "CrystalDewWorld.CrystalDiskInfo", "voidtools.Everything", "Microsoft.Sysinternals.Autoruns", "AnyDesk.AnyDesk"]
+
+[[list]]
+id = "drivers"
+name = "Drivers del fabricante"
+description = "Las utilidades oficiales que buscan e instalan los drivers de cada marca."
+apps = ["Intel.IntelDriverAndSupportAssistant", "GlennDelahoy.SnappyDriverInstallerOrigin", "DisplayLink.GraphicsDriver"]
+
+[[list]]
+id = "multimedia"
+name = "Multimedia y diseño"
+description = "Ver, editar y grabar: vídeo, imagen y sonido."
+apps = ["VideoLAN.VLC", "GIMP.GIMP", "Inkscape.Inkscape", "Audacity.Audacity", "OBSProject.OBSStudio", "HandBrake.HandBrake", "CodecGuide.K-LiteCodecPack.Standard"]

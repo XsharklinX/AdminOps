@@ -472,10 +472,8 @@ fn open(uri: &str) -> Result<(), String> {
     crate::shellopen::open(uri)
 }
 
-/// ¿Hay un programa registrado para este protocolo (msteams:, tel:…)?
-fn protocol_registered(scheme: &str) -> bool {
-    winreg::RegKey::predef(winreg::enums::HKEY_CLASSES_ROOT).open_subkey(scheme).is_ok_and(|k| k.get_raw_value("URL Protocol").is_ok())
-}
+// ¿Hay un programa registrado para este protocolo (msteams:, tel:…)?
+use crate::shellopen::protocol_registered;
 
 /// Enlace de Teams: la app si está instalada; si no, Teams en el navegador.
 /// La «@» va codificada: sin codificar, el Explorador no lo reconoce como

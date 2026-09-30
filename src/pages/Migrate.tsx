@@ -6,6 +6,7 @@ import { TaskStatus } from "../components/TaskStatus";
 import { Bar, Button, Card } from "../components/ui";
 import { bytes } from "../lib/format";
 import { migrateApi, type BackupManifest, type MigrateEstimate, type MigrateSummary } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 /** Carpetas que se marcan por defecto (Descargas, Música y Vídeos suelen ser enormes y prescindibles). */
 const DEFAULT_ON = new Set(["desktop", "documents", "pictures", "browsers", "wifi"]);
@@ -17,7 +18,7 @@ function useMigrateProgress(active: boolean) {
     setP(null);
     const un = listen<{ item: string; doneBytes: number; totalBytes: number; files: number }>("migrate-progress", (e) => setP(e.payload));
     return () => {
-      un.then((f) => f());
+      void un.then((f) => f());
     };
   }, [active]);
   return p;
@@ -89,7 +90,7 @@ function Summary({ s, restore }: { s: MigrateSummary; restore?: boolean }) {
       {s.errors.length > 0 && (
         <details className="mt-2 text-xs">
           <summary className="cursor-pointer text-warn">Ver archivos que no se pudieron copiar</summary>
-          <ul className="mt-1 max-h-40 overflow-y-auto font-mono text-[11px] text-mute">
+          <ul className="mt-1 pane-sm overflow-y-auto font-mono text-[11px] text-mute">
             {s.errors.map((e) => (
               <li key={e} className="truncate" title={e}>
                 {e}
@@ -119,17 +120,23 @@ function Backup() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!sid) return;
-    setItems(null);
-    migrateApi
-      .estimate(sid)
-      .then((e) => {
-        setItems(e);
-        setSelected(new Set(e.filter((i) => i.available && DEFAULT_ON.has(i.id)).map((i) => i.id)));
-      })
-      .catch((e) => toast("error", String(e)));
-  }, [sid, toast]);
+  // Al cambiar de usuario, lo que tarde en llegar del anterior se descarta:
+  // si no, se verían los datos de un perfil que ya no está seleccionado.
+  useLiveEffect(
+    (vigente) => {
+      if (!sid) return;
+      setItems(null);
+      migrateApi
+        .estimate(sid)
+        .then((e) => {
+          if (!vigente()) return;
+          setItems(e);
+          setSelected(new Set(e.filter((i) => i.available && DEFAULT_ON.has(i.id)).map((i) => i.id)));
+        })
+        .catch((e) => vigente() && toast("error", String(e)));
+    },
+    [sid, toast],
+  );
 
   const total = useMemo(() => (items ?? []).filter((i) => selected.has(i.id)).reduce((a, i) => a + i.bytes, 0), [items, selected]);
 
@@ -243,7 +250,7 @@ function Restore() {
   const toast = useToast();
 
   useEffect(() => {
-    migrateApi.profiles().then((p) => setTarget(p.find((x) => x.isTarget)?.name ?? null));
+    void migrateApi.profiles().then((p) => setTarget(p.find((x) => x.isTarget)?.name ?? null));
   }, []);
 
   const pick = async () => {

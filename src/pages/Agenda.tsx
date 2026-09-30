@@ -1,9 +1,10 @@
-import { BellRing, CalendarCheck, CalendarDays, CalendarPlus, Check, Mail, Monitor, Pencil, Phone, Play, Trash2, X } from "lucide-react";
+import { BellRing, CalendarCheck, CalendarDays, CalendarPlus, Check, Mail, MapPin, Monitor, Pencil, Phone, Play, Repeat, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
+import { useLiveEffect } from "../lib/useLiveEffect";
 import type { PageId } from "../components/Sidebar";
 import { Button, Card, EmptyState, inputClass, Loading, Modal } from "../components/ui";
-import { agendaApi, portalsApi, workApi, type Client, type DueClient, type Visit } from "../lib/api";
+import { agendaApi, portalsApi, REPEATS, workApi, type Client, type DueClient, type Settings, type Visit } from "../lib/api";
 
 const DAY_MS = 86_400_000;
 
@@ -59,7 +60,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
     }
   }, [toast]);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const byId = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
@@ -84,13 +85,38 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
     notes: "",
     status: "planned",
     reminded: false,
+    visitType: "",
+    repeatEvery: "",
+    place: "",
   });
 
   const setStatus = async (v: Visit, status: Visit["status"]) => {
     try {
-      await agendaApi.setStatus(v.id, status);
-      toast("ok", status === "done" ? `Visita a ${v.clientName} marcada como hecha.` : status === "cancelled" ? "Visita cancelada." : "Visita planificada.");
-      load();
+      const siguiente = await agendaApi.setStatus(v.id, status);
+      // Una visita que se repite deja ya puesta la próxima: el ciclo no depende
+      // de que alguien se acuerde de volver a apuntarlo.
+      toast(
+        "ok",
+        siguiente
+          ? `Visita a ${v.clientName} hecha. La próxima queda planificada para el ${shortDate(siguiente.start)}.`
+          : status === "done"
+            ? `Visita a ${v.clientName} marcada como hecha.`
+            : status === "cancelled"
+              ? "Visita cancelada."
+              : "Visita planificada.",
+      );
+      void load();
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+
+  /** Aplazar o adelantar sin abrir el editor: es lo que más se hace. */
+  const postpone = async (v: Visit, days: number) => {
+    try {
+      await agendaApi.postpone(v.id, days);
+      toast("ok", days > 0 ? `Aplazada ${days === 1 ? "un día" : `${days} días`}.` : "Adelantada un día.");
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -99,7 +125,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
   const remove = async (v: Visit) => {
     if (!(await confirm({ title: "Borrar visita", body: `Se borrará la visita a «${v.clientName}» del ${shortDate(v.start)}.`, confirmLabel: "Borrar", danger: true }))) return;
     await agendaApi.remove(v.id).catch((e) => toast("error", String(e)));
-    load();
+    void load();
   };
 
   // Recordatorio al cliente por correo (en el Correo de AdminOps si está configurado).
@@ -219,6 +245,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
                     onCancel={() => setStatus(v, "cancelled")}
                     onEdit={() => setEditing(v)}
                     onRemind={() => remind(v)}
+                    onPostpone={(d) => postpone(v, d)}
                   />
                 ))}
               </ul>
@@ -263,14 +290,15 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
             editing.id
               ? () => {
                   setEditing(null);
-                  remove(editing);
+                  void remove(editing);
                 }
               : undefined
           }
-          onSaved={() => {
+          onSaved={(conflict: string) => {
             setEditing(null);
-            toast("ok", "Visita guardada.");
-            load();
+            // Se guarda igual (a veces se solapan a propósito), pero hay que saberlo.
+            toast(conflict ? "info" : "ok", conflict ? `Visita guardada, pero se pisa con la de ${conflict}.` : "Visita guardada.");
+            void load();
           }}
         />
       )}
@@ -287,6 +315,7 @@ function VisitRow({
   onCancel,
   onEdit,
   onRemind,
+  onPostpone,
 }: {
   v: Visit;
   client?: Client;
@@ -295,6 +324,7 @@ function VisitRow({
   onCancel: () => void;
   onEdit: () => void;
   onRemind: () => void;
+  onPostpone: (days: number) => void;
 }) {
   const btn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink";
   return (
@@ -311,7 +341,16 @@ function VisitRow({
               <Monitor size={11} /> {equipos(v.machines)}
             </span>
           )}
-          {client?.address && <span className="truncate">{client.address}</span>}
+          {(v.place || client?.address) && (
+            <span className="flex items-center gap-1 truncate">
+              <MapPin size={11} className="shrink-0" /> {v.place || client?.address}
+            </span>
+          )}
+          {v.repeatEvery && (
+            <span className="flex items-center gap-1 text-mute">
+              <Repeat size={11} /> {REPEATS.find((r) => r.value === v.repeatEvery)?.label.toLowerCase()}
+            </span>
+          )}
           {client?.phone && (
             <span className="flex items-center gap-1">
               <Phone size={11} /> {client.phone}
@@ -332,7 +371,10 @@ function VisitRow({
         <button onClick={onDone} className={btn} title="Marcar como hecha">
           <Check size={14} />
         </button>
-        <button onClick={onEdit} className={btn} title="Cambiar día, hora o notas">
+        <button onClick={() => onPostpone(1)} className={btn} title="Aplazar un día (sin abrir el editor)">
+          <CalendarPlus size={14} />
+        </button>
+        <button onClick={onEdit} className={btn} title="Cambiar día, hora, sitio o repetición">
           <Pencil size={14} />
         </button>
         <button onClick={onCancel} className={`${btn} hover:text-bad`} title="Cancelar visita">
@@ -343,20 +385,25 @@ function VisitRow({
   );
 }
 
-function VisitEditor({ visit, clients, onClose, onSaved, onDelete }: { visit: Visit; clients: Client[]; onClose: () => void; onSaved: () => void; onDelete?: () => void }) {
+function VisitEditor({ visit, clients, onClose, onSaved, onDelete }: { visit: Visit; clients: Client[]; onClose: () => void; onSaved: (conflict: string) => void; onDelete?: () => void }) {
   const [v, setV] = useState(visit);
   const initial = toInputs(visit.start);
   const [date, setDate] = useState(initial.date);
   const [t, setT] = useState(initial.time);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Los tipos de visita se configuran en Ajustes y traen su propia checklist.
+  const [types, setTypes] = useState<Settings["visitTypes"]>([]);
+  useLiveEffect((vigente) => {
+    workApi.settings().then((s) => vigente() && setTypes(s.visitTypes ?? [])).catch(() => {});
+  }, []);
 
   const save = async () => {
     setSaving(true);
     setError(null);
     try {
-      await agendaApi.save({ ...v, start: fromInputs(date, t) });
-      onSaved();
+      const r = await agendaApi.save({ ...v, start: fromInputs(date, t) });
+      onSaved(r.conflict);
     } catch (e) {
       setError(String(e));
       setSaving(false);
@@ -419,10 +466,42 @@ function VisitEditor({ visit, clients, onClose, onSaved, onDelete }: { visit: Vi
             </select>
           </label>
         </div>
-        <label className="block">
-          <span className="mb-1 block text-xs text-dim">Equipos a revisar</span>
-          <input type="number" min={0} max={500} value={v.machines} onChange={(e) => setV({ ...v, machines: Math.max(0, Number(e.target.value) || 0) })} className={inputClass} />
-        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Equipos a revisar</span>
+            <input type="number" min={0} max={500} value={v.machines} onChange={(e) => setV({ ...v, machines: Math.max(0, Number(e.target.value) || 0) })} className={inputClass} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Se repite</span>
+            <select value={v.repeatEvery} onChange={(e) => setV({ ...v, repeatEvery: e.target.value })} className={inputClass}>
+              {REPEATS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {v.repeatEvery && (
+          <p className="-mt-1 text-[11px] text-mute">Al marcarla como hecha, la siguiente se planifica sola. No hay que volver a apuntarla.</p>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Dónde</span>
+            <input value={v.place} onChange={(e) => setV({ ...v, place: e.target.value.slice(0, 120) })} placeholder="Sede central, planta 2" className={inputClass} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Tipo de visita</span>
+            <select value={v.visitType} onChange={(e) => setV({ ...v, visitType: e.target.value })} className={inputClass}>
+              <option value="">Sin tipo</option>
+              {types.map((x) => (
+                <option key={x.name} value={x.name}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <label className="block">
           <span className="mb-1 block text-xs text-dim">Notas</span>
           <textarea value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value.slice(0, 500) })} rows={3} placeholder="Traer disco de repuesto, preguntar por la impresora…" className={inputClass} />

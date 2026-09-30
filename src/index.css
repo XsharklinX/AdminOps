@@ -71,14 +71,26 @@
     background: color-mix(in srgb, var(--color-neon) 30%, transparent);
   }
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
+  /* Discreta: solo se ve al pasar por encima de lo que se desplaza. */
   ::-webkit-scrollbar-thumb {
-    background: var(--color-line-2);
+    background: transparent;
+    border: 3px solid transparent;
     border-radius: 8px;
+    background-clip: content-box;
   }
-  ::-webkit-scrollbar-track {
+  :hover::-webkit-scrollbar-thumb {
+    background: var(--color-line-2);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-mute);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
     background: transparent;
   }
   :focus-visible {
@@ -117,5 +129,33 @@
   }
   100% {
     transform: translateX(300%);
+  }
+}
+
+/* Paneles con su propio desplazamiento dentro de una página que también se
+   desplaza. Con un alto fijo en píxeles quedaban dos barras compitiendo: en una
+   pantalla grande sobraba sitio sin usar y en un portátil pequeño el contenido
+   quedaba metido en una rendija. Ahora crecen con la ventana, con un mínimo para
+   que sigan siendo usables y un máximo para que no se coman la página entera. */
+@utility pane-sm {
+  max-height: clamp(8rem, 26vh, 18rem);
+}
+
+@utility pane-md {
+  max-height: clamp(12rem, 44vh, 32rem);
+}
+
+@utility pane-lg {
+  height: clamp(16rem, 56vh, 44rem);
+}
+
+/* Se desplaza con la rueda o arrastrando, pero sin barra a la vista: para
+   tiras de pestañas y de etiquetas, donde la barra solo ensucia. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 }

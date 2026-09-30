@@ -9,6 +9,7 @@ import { contactsApi, diagApi, tweaksApi, workApi, type ActiveSession, type Clie
 import { usePageActive } from "../lib/pageActive";
 import { autoDone } from "../lib/visits";
 import { SolutionEditor } from "./Knowledge";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 const since = (ts: number) => {
   const m = Math.floor((Date.now() / 1000 - ts) / 60);
@@ -70,22 +71,25 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
     setSession(s);
   }, [onSessionChange]);
 
-  useEffect(() => {
-    load();
-    workApi.settings().then(setSettings);
-    contactsApi
-      .list()
-      .then((l) => setContacts(l.filter((c) => !c.deleted)))
-      .catch(() => {});
-  }, [load]);
+  useLiveEffect(
+    (vigente) => {
+      void load();
+      workApi.settings().then((s) => vigente() && setSettings(s)).catch(() => {});
+      contactsApi
+        .list()
+        .then((l) => vigente() && setContacts(l.filter((c) => !c.deleted)))
+        .catch(() => {});
+    },
+    [load],
+  );
 
   // Mientras la página está a la vista: reloj y checklist automática al día.
   useEffect(() => {
     if (!active) return;
-    load();
+    void load();
     const t = window.setInterval(() => {
       tick((n) => n + 1);
-      load();
+      void load();
     }, 30000);
     return () => window.clearInterval(t);
   }, [active, load]);
@@ -110,7 +114,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
       toast("error", String(e));
     } finally {
       setBusy(null);
-      load();
+      void load();
     }
   };
 
@@ -138,7 +142,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
       toast("error", String(e));
     } finally {
       setBusy(null);
-      load();
+      void load();
     }
   };
 
@@ -151,7 +155,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
     });
     if (!ok) return;
     await workApi.cancelSession();
-    load();
+    void load();
   };
 
   if (session === undefined) return <Loading page />;

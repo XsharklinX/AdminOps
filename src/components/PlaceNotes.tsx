@@ -21,7 +21,7 @@ export function PlaceNotes({ onChanged, compact }: { onChanged?: () => void; com
     setNotes(p ? all.filter((n) => n.key === p.machine || (p.network && n.key === p.network)) : []);
   }, []);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const add = async () => {
@@ -36,7 +36,7 @@ export function PlaceNotes({ onChanged, compact }: { onChanged?: () => void; com
       });
       setText("");
       setAdding(null);
-      load();
+      void load();
       onChanged?.();
     } catch (e) {
       toast("error", String(e));
@@ -44,7 +44,7 @@ export function PlaceNotes({ onChanged, compact }: { onChanged?: () => void; com
   };
   const remove = async (n: PlaceNote) => {
     await libraryApi.remove("notes", n.id).catch(() => {});
-    load();
+    void load();
     onChanged?.();
   };
 
@@ -89,7 +89,7 @@ export function PlaceNotes({ onChanged, compact }: { onChanged?: () => void; com
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                add();
+                void add();
               }
               if (e.key === "Escape") setAdding(null);
             }}

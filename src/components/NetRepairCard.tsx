@@ -1,8 +1,9 @@
-import { ArrowRight, CheckCircle2, Loader2, Wrench, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleAlert, Gauge, Globe, Loader2, Router, ShieldOff, Wifi, Wrench, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { Button, Card } from "./ui";
-import { troubleshootApi, type NetCheck, type NetRepair } from "../lib/api";
+import { goToPage } from "../lib/navigate";
+import { troubleshootApi, type NetCheck, type NetRepair, type NetVerdict } from "../lib/api";
 
 const ROWS: { label: string; get: (c: NetCheck) => boolean | null }[] = [
   { label: "Conectado con IP válida", get: (c) => c.connected },
@@ -14,6 +15,76 @@ const ROWS: { label: string; get: (c: NetCheck) => boolean | null }[] = [
 function Mark({ v }: { v: boolean | null }) {
   if (v === null) return <span className="text-mute">—</span>;
   return v ? <CheckCircle2 size={14} className="text-ok" /> : <XCircle size={14} className="text-bad" />;
+}
+
+/** Lo que conviene hacer después, según dónde se haya cortado la cadena. */
+const NEXT: Record<string, { label: string; icon: typeof Router; run: (deep: () => void) => void }> = {
+  router: { label: "Abrir el panel del router", icon: Router, run: () => goToPage("router") },
+  dns: { label: "Cambiar los DNS", icon: Globe, run: () => goToPage("nettools", "dns") },
+  wifi: { label: "Estado de la Wi-Fi", icon: Wifi, run: () => goToPage("network") },
+  proxy: { label: "Ver el proxy de Windows", icon: ShieldOff, run: () => goToPage("nettools", "dns") },
+  speed: { label: "Probar la velocidad", icon: Gauge, run: () => goToPage("network") },
+  deep: { label: "Reparación a fondo", icon: Wrench, run: (deep) => deep() },
+};
+
+const TONE = {
+  ok: { box: "border-ok/40 bg-ok/10", text: "text-ok", Icon: CheckCircle2 },
+  warn: { box: "border-warn/40 bg-warn/10", text: "text-warn", Icon: CircleAlert },
+  bad: { box: "border-bad/40 bg-bad/10", text: "text-bad", Icon: XCircle },
+} as const;
+
+/**
+ * El resultado en una frase: qué pasa y qué hacer. Marcar cuatro casillas sirve
+ * para ver si mejoró; esto es lo que dice dónde está el problema, que es lo que
+ * el técnico necesita cuando la reparación no lo arregla sola.
+ */
+function VerdictBox({ v, onDeep }: { v: NetVerdict; onDeep: () => void }) {
+  const tone = TONE[v.level] ?? TONE.warn;
+  const { Icon } = tone;
+  return (
+    <div className={`mt-4 rounded-lg border p-3 ${tone.box}`}>
+      <div className={`flex items-center gap-2 text-sm font-medium ${tone.text}`}>
+        <Icon size={15} className="shrink-0" /> {v.title}
+      </div>
+      <p className="mt-1.5 text-xs leading-relaxed text-dim">{v.text}</p>
+      {v.next.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {v.next.map((id) => {
+            const a = NEXT[id];
+            if (!a) return null;
+            const { icon: I } = a;
+            return (
+              <Button key={id} kind="ghost" onClick={() => a.run(onDeep)}>
+                <I size={13} /> {a.label}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Los datos de la conexión, para no tener que ir a buscarlos a otra página. */
+function Details({ c }: { c: NetCheck }) {
+  const rows: [string, string][] = [
+    ["Adaptador", c.adapter ? `${c.adapter}${c.wifi ? " (Wi-Fi)" : ""}` : "—"],
+    ["Dirección IP", c.ip ? `${c.ip}${c.dhcp ? " (la da el router)" : " (puesta a mano)"}` : "—"],
+    ["Router", c.gatewayIp || "—"],
+    ["DNS", c.dnsServers.length ? c.dnsServers.join(", ") : "—"],
+  ];
+  if (c.proxy) rows.push(["Proxy", c.proxy]);
+  if (c.vpn.length) rows.push(["VPN activa", c.vpn.join(", ")]);
+  return (
+    <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      {rows.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-mute">{k}</dt>
+          <dd className="font-mono text-ink select-text">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 /** Reparación de red en un clic, con el estado antes y después. */
@@ -38,8 +109,8 @@ export function NetRepairCard({ isAdmin }: { isAdmin: boolean }) {
     try {
       const r = await troubleshootApi.repairNetwork(deep);
       setResult(r);
-      const fine = r.after.internet && r.after.dns;
-      toast(fine ? "ok" : "info", fine ? (r.reboot ? "Red reparada. Reinicia para completar." : "Red reparada: hay Internet.") : "Hecho, pero sigue sin Internet: reinicia el router o prueba la reparación a fondo.");
+      // El detalle va en el diagnóstico de abajo; el aviso solo dice cómo quedó.
+      toast(r.verdict.level === "ok" ? "ok" : "info", r.verdict.title);
     } catch (e) {
       toast("error", String(e));
     } finally {
@@ -61,6 +132,7 @@ export function NetRepairCard({ isAdmin }: { isAdmin: boolean }) {
         </Button>
       </div>
       {busy && <p className="mt-3 text-xs text-mute">Reparando y esperando a que vuelva la conexión (hasta medio minuto)…</p>}
+      {result && <VerdictBox v={result.verdict} onDeep={() => run(true)} />}
       {result && (
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <table className="w-full text-sm">
@@ -105,6 +177,10 @@ export function NetRepairCard({ isAdmin }: { isAdmin: boolean }) {
             ))}
             {result.reboot && <li className="pt-1 text-warn">Reinicia el equipo para completar el restablecimiento.</li>}
           </ul>
+          <div className="md:col-span-2">
+            <div className="text-[11px] text-mute">Cómo quedó la conexión</div>
+            <Details c={result.after} />
+          </div>
         </div>
       )}
       {dialog}

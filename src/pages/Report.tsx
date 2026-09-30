@@ -46,8 +46,8 @@ export function Report() {
     });
 
   useEffect(() => {
-    loadSnapshots();
-    workApi.clients().then(setClients);
+    void loadSnapshots();
+    void workApi.clients().then(setClients);
     workApi.settings().then((s) => {
       setSettings(s);
       setTechnician((t) => t || s.technician);
@@ -58,6 +58,7 @@ export function Report() {
   // Al elegir un cliente se propone el formato de su plantilla.
   useEffect(() => {
     if (picked) setTemplate(picked.report?.template ?? "client");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de cliente: `picked` sale de ese mismo id
   }, [picked?.id]);
 
   // Entrega rápida: lo hecho hoy con AdminOps pasa a las observaciones.
@@ -101,7 +102,7 @@ export function Report() {
       setLastPath(path);
       const pdf = path.toLowerCase().endsWith(".pdf");
       toast(pdf ? "ok" : "info", pdf ? "Informe PDF generado." : "No se pudo crear el PDF (falta Microsoft Edge): se guardó como HTML.");
-      loadSnapshots();
+      void loadSnapshots();
     } catch (e) {
       toast("error", String(e));
     } finally {
@@ -175,7 +176,7 @@ export function Report() {
         ) : snapshots.length === 0 ? (
           <p className="text-xs text-warn">Aún no hay análisis guardados. Ejecuta un diagnóstico antes de empezar a trabajar para tener el "antes".</p>
         ) : (
-          <div className="max-h-[430px] space-y-1 overflow-y-auto">
+          <div className="max-pane-lg space-y-1 overflow-y-auto">
             <label className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm ${baseline === null ? "bg-neon/10 text-neon" : "text-dim hover:bg-panel-2"}`}>
               <input type="radio" checked={baseline === null} onChange={() => setBaseline(null)} className="accent-[var(--color-neon)]" />
               Sin comparación (trabajo de hoy)

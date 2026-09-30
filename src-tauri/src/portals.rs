@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent};
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, Url, WebviewUrl};
 
@@ -31,7 +31,7 @@ pub struct Portal {
     /// Dominios adicionales por los que puede navegar (p. ej. el del inicio de sesión).
     #[serde(default)]
     pub extra_domains: Vec<String>,
-    /// "": Tickets · "inventory": inventario web · "mail": correo · "router": panel de un router (Mi red).
+    /// "": Tickets · "inventory": inventario web · "mail": correo · "teams": Teams · "router": panel de un router (Mi red).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub kind: String,
     /// Zoom de la página (1 = 100 %; 0 también es 100 %).
@@ -115,10 +115,10 @@ fn open_external(url: &str) {
     }
 }
 
-// ---------- Correo (Outlook) ----------
+// ---------- Correo (Outlook) y Teams ----------
 
-/// Dominios por los que navega Outlook en la web: el correo, el inicio de sesión
-/// de Microsoft y los visores de adjuntos.
+/// Dominios por los que navegan las webs de Microsoft dentro de AdminOps: el
+/// correo, el inicio de sesión de Microsoft y los visores de adjuntos.
 pub const MAIL_DOMAINS: &[&str] = &[
     "outlook.office.com",
     "outlook.office365.com",
@@ -143,6 +143,28 @@ pub const MAIL_DOMAINS: &[&str] = &[
     "windows.net",
     "microsoftazuread-sso.com",
 ];
+
+/// Lo propio de Teams en la web, además de los dominios de Microsoft: la web en
+/// sí, los servidores de chat y llamadas, y los archivos que se comparten.
+pub const TEAMS_DOMAINS: &[&str] = &[
+    "teams.microsoft.com",
+    "teams.live.com",
+    "teams.cloud.microsoft",
+    "teams.microsoft.us",
+    "skype.com",
+    "skypeforbusiness.com",
+    "lync.com",
+    "trouter.io",
+    "trafficmanager.net",
+    "asm.skype.com",
+    "svc.ms",
+];
+
+/// Portales de Microsoft: el Correo y Teams comparten inicio de sesión, ventanas
+/// emergentes propias y la misma lista de dominios permitidos.
+fn is_microsoft_kind(kind: &str) -> bool {
+    kind == "mail" || kind == "teams"
+}
 
 /// Páginas de inicio de sesión de Microsoft (donde se rellena la cuenta guardada).
 fn is_microsoft_login(host: &str) -> bool {
@@ -204,10 +226,11 @@ fn compose_click_script(fallback: &Url) -> String {
 }
 
 fn sign_out_url(p: &Portal) -> &'static str {
-    if is_personal_outlook(p) {
-        "https://login.live.com/logout.srf"
-    } else {
-        "https://outlook.office.com/owa/logoff.owa"
+    match (p.kind.as_str(), is_personal_outlook(p)) {
+        // Teams no tiene una página propia de salida: se cierra la sesión de Microsoft.
+        ("teams", _) => "https://login.microsoftonline.com/common/oauth2/v2.0/logout",
+        (_, true) => "https://login.live.com/logout.srf",
+        (_, false) => "https://outlook.office.com/owa/logoff.owa",
     }
 }
 
@@ -377,20 +400,59 @@ struct TitleEvent {
 #[serde(rename_all = "camelCase")]
 struct DownloadInfo {
     id: String,
-    /// Número de la descarga (para abrirla sin pasar su ruta a la interfaz).
-    index: usize,
+    /// Número propio de la descarga (para abrirla sin pasar su ruta a la interfaz).
+    download: u64,
     /// Solo el nombre del archivo: la ruta lleva el nombre del usuario.
     name: String,
     /// "running" | "done" | "failed"
     state: String,
 }
 
-/// Descargas de esta sesión: dónde quedó cada archivo.
-static DOWNLOADS: LazyLock<Mutex<Vec<(Url, PathBuf, bool)>>> = LazyLock::new(Default::default);
+/// Una descarga de esta sesión: dónde quedó el archivo y si terminó.
+struct Download {
+    /// Número propio, que no cambia aunque se poden las viejas.
+    number: u64,
+    url: Url,
+    path: PathBuf,
+    done: bool,
+}
+
+/// Descargas de esta sesión. Se podan las más viejas: antes la lista crecía sin
+/// límite mientras AdminOps estuviera abierto, porque el número de cada descarga
+/// era su posición en ella y quitar una habría descolocado a todas las demás.
+static DOWNLOADS: LazyLock<Mutex<Vec<Download>>> = LazyLock::new(Default::default);
+/// Cuántas descargas se recuerdan (la interfaz enseña 20 por portal).
+const MAX_DOWNLOADS: usize = 200;
+/// Número de la siguiente descarga.
+static NEXT_DOWNLOAD: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 /// Cuándo se creó cada vista, para medir cuánto tarda en cargar la primera vez.
 static CREATED: LazyLock<Mutex<HashMap<String, Instant>>> = LazyLock::new(Default::default);
 /// Dirección a la que ir al crear la vista (p. ej. «Redactar» con el correo aún cerrado).
 static PENDING: LazyLock<Mutex<HashMap<String, Url>>> = LazyLock::new(Default::default);
+/// Cuándo se vio por última vez cada portal incrustado.
+static LAST_SEEN: LazyLock<Mutex<HashMap<String, Instant>>> = LazyLock::new(Default::default);
+/// Último rectángulo aplicado a cada vista. Colocar una vista hay que pedírselo
+/// al hilo de la ventana y eso espera: al redimensionar llegaban decenas de
+/// peticiones iguales y la interfaz se quedaba tiesa. Si no ha cambiado, no se toca.
+/// Rectángulo de una vista: x, y, ancho y alto en píxeles lógicos.
+type Rect = (f64, f64, f64, f64);
+static BOUNDS: LazyLock<Mutex<HashMap<String, Rect>>> = LazyLock::new(Default::default);
+/// Una vista sin usarse este tiempo se cierra (vuelve a abrirse al entrar).
+///
+/// Cerrarla libera un proceso de navegador entero, pero **volver a entrar cuesta
+/// una carga completa**: Teams y Outlook tardan lo suyo en arrancar, y media hora
+/// es poquísimo para una jornada de trabajo. En el equipo del técnico se aguantan
+/// vivas casi toda la sesión; en uno justo de recursos se sigue cerrando pronto,
+/// que es donde la memoria importa de verdad.
+fn idle_close() -> Duration {
+    if crate::pspool::modest_machine() {
+        Duration::from_secs(30 * 60)
+    } else {
+        Duration::from_secs(4 * 60 * 60)
+    }
+}
+
+
 
 fn file_name(p: &std::path::Path, url: &Url) -> String {
     p.file_name()
@@ -409,7 +471,9 @@ fn explain_web_error(status: i32) -> Option<String> {
         let m = match s {
             COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED => return None,
             COREWEBVIEW2_WEB_ERROR_STATUS_HOST_NAME_NOT_RESOLVED => "No se encuentra el servidor: el nombre no existe o este equipo no está en la red de la empresa (¿falta la VPN?).",
-            COREWEBVIEW2_WEB_ERROR_STATUS_SERVER_UNREACHABLE | COREWEBVIEW2_WEB_ERROR_STATUS_CANNOT_CONNECT => "El servidor no responde. Puede estar apagado o bloqueado por el firewall.",
+            COREWEBVIEW2_WEB_ERROR_STATUS_SERVER_UNREACHABLE | COREWEBVIEW2_WEB_ERROR_STATUS_CANNOT_CONNECT => {
+                "El servidor no responde. Puede estar apagado, bloqueado por el firewall, o ser una intranet que solo funciona por http:// y esté guardada como https:// (compruébalo en «Editar portal»)."
+            }
             COREWEBVIEW2_WEB_ERROR_STATUS_TIMEOUT => "El servidor tarda demasiado en responder.",
             COREWEBVIEW2_WEB_ERROR_STATUS_DISCONNECTED => "Este equipo no tiene conexión a Internet ni a la red.",
             COREWEBVIEW2_WEB_ERROR_STATUS_CONNECTION_RESET | COREWEBVIEW2_WEB_ERROR_STATUS_CONNECTION_ABORTED => "La conexión se cortó mientras cargaba.",
@@ -421,13 +485,15 @@ fn explain_web_error(status: i32) -> Option<String> {
             }
             COREWEBVIEW2_WEB_ERROR_STATUS_VALID_AUTHENTICATION_CREDENTIALS_REQUIRED => "La web pide un usuario y contraseña que no se aceptaron.",
             COREWEBVIEW2_WEB_ERROR_STATUS_VALID_PROXY_AUTHENTICATION_REQUIRED => "El proxy de la red pide usuario y contraseña.",
-            _ => "No se pudo abrir la página.",
+            // Un código sin traducir sirve de poco al técnico, pero es justo lo
+            // que hace falta para saber qué pasó: va en el mensaje y al registro.
+            _ => return Some(format!("No se pudo abrir la página (código {status} de WebView2). Está en el registro técnico: Ajustes → Datos de AdminOps.")),
         };
         Some(m.to_string())
     }
     #[cfg(not(windows))]
     {
-        (status != 0).then(|| "No se pudo abrir la página.".to_string())
+        (status != 0).then(|| format!("No se pudo abrir la página (código {status})."))
     }
 }
 
@@ -450,7 +516,7 @@ fn watch_navigation<R: tauri::Runtime>(webview: &tauri::Webview<R>, app: &tauri:
             }));
             let mut token = 0i64;
             let _ = core.add_HistoryChanged(&history, &mut token);
-            let completed = NavigationCompletedEventHandler::create(Box::new(move |_, args| {
+            let completed = NavigationCompletedEventHandler::create(Box::new(move |sender, args| {
                 if let Some(args) = args {
                     let mut ok = windows_core::BOOL(0);
                     let _ = args.IsSuccess(&mut ok);
@@ -467,6 +533,20 @@ fn watch_navigation<R: tauri::Runtime>(webview: &tauri::Webview<R>, app: &tauri:
                     // Primera carga completa: cuánto tardó desde que se creó la vista.
                     if let Some(t) = CREATED.lock().unwrap_or_else(|e| e.into_inner()).remove(&id_n) {
                         log::info!("Portal {id_n}: primera carga en {} ms{}", t.elapsed().as_millis(), if message.is_empty() { "" } else { " (con error)" });
+                    }
+                    // Cada fallo, al registro con su código y su dirección: sin esto,
+                    // «no se pudo abrir la página» no se puede diagnosticar a distancia.
+                    if !message.is_empty() {
+                        let url = sender
+                            .as_ref()
+                            .and_then(|c| {
+                                let mut uri = windows_core::PWSTR::null();
+                                c.Source(&mut uri).ok().map(|()| webview2_com::take_pwstr(uri))
+                            })
+                            .unwrap_or_default();
+                        let mut status = Default::default();
+                        let _ = args.WebErrorStatus(&mut status);
+                        log::warn!("Portal {id_n}: no cargó «{url}» (código {} de WebView2)", status.0);
                     }
                     let _ = app_n.emit("portal-error", ErrorEvent { id: id_n.clone(), message });
                 }
@@ -491,6 +571,23 @@ fn enable_autofill<R: tauri::Runtime>(webview: &tauri::Webview<R>) {
             }
         }
     });
+}
+
+// Los portales ocultos NO se congelan (TrySuspend). Se hizo en la 1.1.5 para
+// ahorrar CPU y rompió el inicio de sesión de Microsoft: un portal precargado
+// quedaba congelado en la página de inicio de sesión, su contexto caducaba y
+// al pedir el código Microsoft rechazaba la verificación («Sorry, we're having
+// trouble verifying your account»). Una vista oculta se queda viva, como antes;
+// el propio WebView2 ya frena los temporizadores de lo que no se ve.
+
+/// Olvida todo lo que se recordaba de un portal: su rectángulo, cuándo se vio,
+/// cuándo se creó y a dónde tenía que ir. Se llama al cerrar o borrar su vista,
+/// para que nada quede colgando de un portal que ya no existe.
+fn forget(id: &str) {
+    BOUNDS.lock().unwrap_or_else(|e| e.into_inner()).remove(id);
+    LAST_SEEN.lock().unwrap_or_else(|e| e.into_inner()).remove(id);
+    CREATED.lock().unwrap_or_else(|e| e.into_inner()).remove(id);
+    PENDING.lock().unwrap_or_else(|e| e.into_inner()).remove(id);
 }
 
 /// Los routers usan un certificado propio que el navegador no reconoce: en el
@@ -534,8 +631,8 @@ pub fn integrated_auth_domains(portals: &[Portal], default_domain: &str) -> Vec<
             out.push(d);
         }
     };
-    // El correo es de Microsoft: no se le envía la cuenta de Windows.
-    for p in portals.iter().filter(|p| p.kind != "router" && p.kind != "mail") {
+    // El correo y Teams son de Microsoft: no se les envía la cuenta de Windows.
+    for p in portals.iter().filter(|p| p.kind != "router" && !is_microsoft_kind(&p.kind)) {
         let Some(host) = Url::parse(&p.url).ok().and_then(|u| u.host_str().map(str::to_ascii_lowercase)) else { continue };
         if host.parse::<std::net::IpAddr>().is_ok() || !host.contains('.') {
             continue;
@@ -564,10 +661,41 @@ pub fn integrated_auth_arg() -> Option<String> {
     (!domains.is_empty()).then(|| format!("--auth-server-allowlist={}", domains.join(",")))
 }
 
-/// Los argumentos del navegador deben coincidir con los de la ventana principal:
-/// WebView2 no admite dos configuraciones distintas en la misma carpeta de datos.
+/// Variable que lee el propio WebView2 al arrancar. `run()` la deja puesta con
+/// los argumentos definitivos de la ventana principal.
+pub const ARGS_ENV: &str = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+
+/// Los argumentos de la ventana principal más, si hay intranets de empresa, la
+/// lista de dominios con los que entrar usando la cuenta de Windows.
+pub fn merged_browser_args(base: &str, auth: Option<&str>) -> String {
+    match auth {
+        Some(a) if !a.is_empty() => format!("{base} {a}").trim().to_string(),
+        _ => base.trim().to_string(),
+    }
+}
+
+/// Los argumentos del navegador de un portal.
+///
+/// **Tienen que ser exactamente las mismas opciones con las que se creó la
+/// ventana principal**, que son las del archivo de configuración. WebView2 no
+/// admite dos configuraciones distintas en la misma carpeta de datos: si no
+/// coinciden, se niega a crear la vista del portal y la página se queda para
+/// siempre en «Abriendo…», sin ningún error a la vista.
+///
+/// La lista de dominios de la intranet (`--auth-server-allowlist`) **no** va
+/// aquí. Va en la variable de entorno `ARGS_ENV`, que WebView2 aplica por igual a
+/// todas las vistas por su cuenta. Añadirla también en las opciones del portal
+/// (se hizo en la 1.1.6 creyendo que faltaba) dejaba al portal distinto de la
+/// ventana principal y rompía el Correo, Teams y Tickets a la vez en cuanto
+/// había una intranet configurada.
 fn browser_args(app: &tauri::AppHandle) -> Option<String> {
-    app.config().app.windows.first().and_then(|w| w.additional_browser_args.clone())
+    portal_browser_args(app.config().app.windows.first().and_then(|w| w.additional_browser_args.clone()))
+}
+
+/// Las opciones del portal a partir de las de la ventana principal: las mismas,
+/// sin mirar la variable de entorno. Separado para poder probarlo.
+fn portal_browser_args(main_window: Option<String>) -> Option<String> {
+    main_window
 }
 
 macro_rules! configure {
@@ -611,17 +739,23 @@ macro_rules! configure {
                 let mut list = DOWNLOADS.lock().unwrap_or_else(|e| e.into_inner());
                 let info = match event {
                     DownloadEvent::Requested { url, destination } => {
-                        list.push((url.clone(), destination.clone(), false));
-                        DownloadInfo { id: id_dl.clone(), index: list.len() - 1, name: file_name(destination, &url), state: "running".into() }
+                        let number = NEXT_DOWNLOAD.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        list.push(Download { number, url: url.clone(), path: destination.clone(), done: false });
+                        // Las más viejas se olvidan; su número no se reutiliza.
+                        if list.len() > MAX_DOWNLOADS {
+                            let sobran = list.len() - MAX_DOWNLOADS;
+                            list.drain(..sobran);
+                        }
+                        DownloadInfo { id: id_dl.clone(), download: number, name: file_name(destination, &url), state: "running".into() }
                     }
                     DownloadEvent::Finished { url, path, success } => {
-                        let Some(index) = list.iter().rposition(|(u, _, done)| *u == url && !done) else { return true };
+                        let Some(i) = list.iter().rposition(|d| d.url == url && !d.done) else { return true };
                         if let Some(p) = path {
-                            list[index].1 = p;
+                            list[i].path = p;
                         }
-                        list[index].2 = true;
-                        let name = file_name(&list[index].1, &url);
-                        DownloadInfo { id: id_dl.clone(), index, name, state: if success { "done" } else { "failed" }.into() }
+                        list[i].done = true;
+                        let name = file_name(&list[i].path, &url);
+                        DownloadInfo { id: id_dl.clone(), download: list[i].number, name, state: if success { "done" } else { "failed" }.into() }
                     }
                     _ => return true,
                 };
@@ -655,9 +789,12 @@ fn main_window(app: &tauri::AppHandle) -> Result<tauri::Window, String> {
 fn hide_embedded(app: &tauri::AppHandle, except: Option<&str>) {
     if let Ok(w) = main_window(app) {
         for v in w.webviews() {
-            if v.label().starts_with("portal-") && Some(v.label()) != except {
-                let _ = v.hide();
+            let Some(id) = v.label().strip_prefix("portal-") else { continue };
+            if Some(v.label()) == except {
+                continue;
             }
+            let _ = v.hide();
+            LAST_SEEN.lock().unwrap_or_else(|e| e.into_inner()).insert(id.to_string(), Instant::now());
         }
     }
 }
@@ -709,6 +846,7 @@ pub fn router_portal(app: tauri::AppHandle, key: String, name: String, url: Stri
         None => list.push(p.clone()),
     }
     // Cambió la dirección: la vista abierta se recrea con la nueva.
+    forget(&id);
     if let Some(v) = app.get_webview(&embedded_label(&id)) {
         let _ = v.close();
     }
@@ -718,6 +856,7 @@ pub fn router_portal(app: tauri::AppHandle, key: String, name: String, url: Stri
 
 /// Cierra las vistas de un portal (se recrean con la configuración nueva al volver a mostrarlo).
 fn close_views(app: &tauri::AppHandle, id: &str) {
+    forget(id);
     if let Some(v) = app.get_webview(&embedded_label(id)) {
         let _ = v.close();
     }
@@ -729,13 +868,17 @@ fn close_views(app: &tauri::AppHandle, id: &str) {
 #[tauri::command]
 pub fn save_portal(app: tauri::AppHandle, portal: Portal) -> Result<Portal, String> {
     let mut p = validate(portal)?;
-    // Desde aquí solo Tickets, inventario o correo (los routers tienen sus propias reglas).
-    if !["inventory", "mail"].contains(&p.kind.as_str()) {
+    // Desde aquí solo Tickets, inventario, correo o Teams (los routers tienen sus propias reglas).
+    if !["inventory", "mail", "teams"].contains(&p.kind.as_str()) {
         p.kind = String::new();
     }
-    if p.kind == "mail" {
-        // Outlook necesita sus dominios y abrir mensajes y adjuntos en ventana propia.
+    if is_microsoft_kind(&p.kind) {
+        // Outlook y Teams necesitan sus dominios y abrir mensajes, adjuntos y
+        // reuniones en ventana propia.
         let mut domains: Vec<String> = MAIL_DOMAINS.iter().map(|d| d.to_string()).collect();
+        if p.kind == "teams" {
+            domains.extend(TEAMS_DOMAINS.iter().map(|d| d.to_string()));
+        }
         // Empresas con su propia página de inicio de sesión (p. ej. sts.pgr.gob.do).
         let company = crate::workflow::settings(&app).default_domain;
         if !company.trim().is_empty() {
@@ -787,11 +930,15 @@ pub fn portal_show(app: tauri::AppHandle, id: String, x: f64, y: f64, width: f64
     let label = embedded_label(&id);
     hide_embedded(&app, Some(&label));
     let (pos, size) = (LogicalPosition::new(x, y), LogicalSize::new(width.max(50.0), height.max(50.0)));
+    LAST_SEEN.lock().unwrap_or_else(|e| e.into_inner()).insert(id.clone(), Instant::now());
     if let Some(v) = app.get_webview(&label) {
-        let _ = v.set_position(pos);
-        let _ = v.set_size(size);
+        if remember_bounds(&id, x, y, size.width, size.height) {
+            let _ = v.set_position(pos);
+            let _ = v.set_size(size);
+        }
         return v.show().map_err(|e| e.to_string());
     }
+    remember_bounds(&id, x, y, size.width, size.height);
     let p = find(&app, &id)?;
     create_embedded(&app, &p, pos, size, true)?;
     Ok(())
@@ -813,20 +960,51 @@ pub fn portal_preload(app: tauri::AppHandle, id: String, width: f64, height: f64
     Ok(())
 }
 
+/// Apunta el rectángulo de una vista. Devuelve `true` si cambió (y hay que
+/// aplicarlo); `false` si es el mismo de antes y no hace falta molestar a la ventana.
+fn remember_bounds(id: &str, x: f64, y: f64, width: f64, height: f64) -> bool {
+    let r = (x, y, width, height);
+    let mut map = BOUNDS.lock().unwrap_or_else(|e| e.into_inner());
+    if map.get(id) == Some(&r) {
+        return false;
+    }
+    map.insert(id.to_string(), r);
+    true
+}
+
 #[tauri::command(async)]
 pub fn portal_bounds(app: tauri::AppHandle, id: String, x: f64, y: f64, width: f64, height: f64) {
+    let (w, h) = (width.max(50.0), height.max(50.0));
+    if !remember_bounds(&id, x, y, w, h) {
+        return;
+    }
     if let Some(v) = app.get_webview(&embedded_label(&id)) {
         let _ = v.set_position(LogicalPosition::new(x, y));
-        let _ = v.set_size(LogicalSize::new(width.max(50.0), height.max(50.0)));
+        let _ = v.set_size(LogicalSize::new(w, h));
     }
 }
 
-/// Oculta un portal incrustado (su página se tapa o deja de estar visible).
+/// Oculta un portal incrustado (su página se tapa o deja de estar visible). La
+/// vista sigue viva: al volver está donde se dejó, con la sesión intacta.
 #[tauri::command(async)]
 pub fn portal_hide(app: tauri::AppHandle, id: String) {
     if let Some(v) = app.get_webview(&embedded_label(&id)) {
         let _ = v.hide();
+        LAST_SEEN.lock().unwrap_or_else(|e| e.into_inner()).insert(id, Instant::now());
     }
+}
+
+/// Destruye la vista de un portal (se vuelve a crear al mostrarlo).
+///
+/// Para las vistas que no llegaron a arrancar. Una vista de WebView2 es una
+/// ventana del sistema que va por encima de la interfaz; si WebView2 no llega a
+/// iniciarla, no pinta nada ni responde a «ocultar», y se queda invisible encima
+/// de la página tragándose los clics y el scroll de lo que haya debajo. Pasó con
+/// la página de Ajustes en la 1.1.6. Destruirla es lo único que la quita seguro.
+#[tauri::command(async)]
+pub fn portal_reset(app: tauri::AppHandle, id: String) {
+    close_views(&app, &id);
+    log::warn!("Portal {id}: vista destruida porque no llegó a arrancar");
 }
 
 /// Oculta los portales incrustados (al salir de Tickets o al abrir un diálogo encima).
@@ -835,9 +1013,38 @@ pub fn portal_hide_all(app: tauri::AppHandle) {
     hide_embedded(&app, None);
 }
 
+/// Cierra las vistas de portales que llevan mucho rato sin verse. Cada una es un
+/// proceso de WebView2: con Tickets, inventario y correo abiertos son tres para
+/// toda la sesión. Al volver a entrar se crean de nuevo (y la sesión web sigue).
+#[tauri::command(async)]
+pub fn portal_close_idle(app: tauri::AppHandle) -> usize {
+    let Ok(w) = main_window(&app) else { return 0 };
+    let limite = idle_close();
+    let idle_ids: Vec<String> = {
+        let seen = LAST_SEEN.lock().unwrap_or_else(|e| e.into_inner());
+        w.webviews()
+            .iter()
+            .filter_map(|v| v.label().strip_prefix("portal-").map(String::from))
+            // Sin marca de uso o vista hace mucho: fuera. La visible se marca al mostrarla.
+            .filter(|id| seen.get(id).is_none_or(|t| t.elapsed() > limite))
+            .collect()
+    };
+    let mut closed = 0;
+    for id in idle_ids {
+        let Some(v) = app.get_webview(&embedded_label(&id)) else { continue };
+        forget(&id);
+        if v.close().is_ok() {
+            log::info!("Portal {id}: vista cerrada por inactividad");
+            closed += 1;
+        }
+    }
+    closed
+}
+
 #[tauri::command(async)]
 pub fn portal_nav(app: tauri::AppHandle, id: String, action: String) -> Result<(), String> {
     let Some(v) = app.get_webview(&embedded_label(&id)) else { return Ok(()) };
+
     match action.as_str() {
         "back" => v.eval("history.back()"),
         "forward" => v.eval("history.forward()"),
@@ -935,6 +1142,12 @@ pub fn portal_login_set(app: tauri::AppHandle, id: String, user: String, passwor
 
 /// Escribir un correo nuevo en el Correo de AdminOps. `false` si no hay correo
 /// configurado (la interfaz usa entonces el programa de correo de Windows).
+///
+/// Sin nada que rellenar, se pulsa el botón de correo nuevo del propio Outlook:
+/// abre el borrador al instante y con su aspecto de siempre. Con destinatario o
+/// asunto hay que usar su enlace de «redactar», que abre el editor suelto (el de
+/// la cinta completa); dentro del buzón se ve como una página a medio vestir, así
+/// que ese va en una ventana propia, que es para lo que está hecho.
 #[tauri::command(async)]
 pub fn portal_compose(app: tauri::AppHandle, to: String, subject: Option<String>, body: Option<String>) -> Result<bool, String> {
     let Some(p) = load(&app).into_iter().find(|p| p.kind == "mail") else { return Ok(false) };
@@ -947,9 +1160,55 @@ pub fn portal_compose(app: tauri::AppHandle, to: String, subject: Option<String>
     let url = compose_url(&p, to, &subject, &body);
     // Sin datos que rellenar, con el correo abierto: su propio botón (instantáneo).
     let blank = to.is_empty() && subject.is_empty() && body.is_empty();
+    if blank {
+        if let Some(v) = app.get_webview(&embedded_label(&p.id)) {
+            return v.eval(compose_click_script(&url)).map(|()| true).map_err(|e| e.to_string());
+        }
+    }
+    let label = format!("portalcompose-{}", p.id);
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.unminimize();
+        w.navigate(url).map_err(|e| e.to_string())?;
+        w.set_focus().map_err(|e| e.to_string())?;
+        return Ok(true);
+    }
+    let builder = configure!(tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url)), &app, p, label, get_webview_window)
+        .title("Mensaje nuevo · AdminOps")
+        .inner_size(1040.0, 720.0)
+        .min_inner_size(520.0, 400.0)
+        .theme(Some(tauri::Theme::Dark));
+    let w = builder.build().map_err(|e| format!("No se pudo abrir el mensaje: {e}"))?;
+    enable_autofill(w.as_ref());
+    if p.zoom_factor() != 1.0 {
+        let _ = w.set_zoom(p.zoom_factor());
+    }
+    Ok(true)
+}
+
+/// ¿Es el Teams personal (teams.live.com) y no el del trabajo?
+fn is_personal_teams(p: &Portal) -> bool {
+    Url::parse(&p.url).ok().and_then(|u| u.host_str().map(|h| host_matches(h, "teams.live.com"))).unwrap_or(false)
+}
+
+/// Abre un chat o una llamada de Teams con esa persona dentro de AdminOps.
+/// `false` si no hay Teams configurado (la interfaz usa entonces la aplicación
+/// de Teams del equipo, o Teams en el navegador).
+#[tauri::command(async)]
+pub fn portal_teams(app: tauri::AppHandle, email: String, call: bool) -> Result<bool, String> {
+    let Some(p) = load(&app).into_iter().find(|p| p.kind == "teams") else { return Ok(false) };
+    let e = email.trim();
+    if e.len() > 254 || !e.contains('@') || e.chars().any(|c| c.is_whitespace() || "<>\"".contains(c)) {
+        return Err("El correo no es válido.".into());
+    }
+    let base = if is_personal_teams(&p) { "https://teams.live.com/l" } else { "https://teams.microsoft.com/l" };
+    let kind = if call { "call" } else { "chat" };
+    let mut url: Url = format!("{base}/{kind}/0/0").parse().map_err(|_| "Dirección no válida.".to_string())?;
+    url.query_pairs_mut().append_pair("users", e);
     match app.get_webview(&embedded_label(&p.id)) {
-        Some(v) if blank => v.eval(compose_click_script(&url)).or_else(|_| v.navigate(url)).map_err(|e| e.to_string())?,
-        Some(v) => v.navigate(url).map_err(|e| e.to_string())?,
+        Some(v) => {
+            v.navigate(url).map_err(|e| e.to_string())?;
+        }
+        // Aún sin abrir: la vista se creará directamente en ese chat.
         None => {
             PENDING.lock().unwrap_or_else(|e| e.into_inner()).insert(p.id.clone(), url);
         }
@@ -966,7 +1225,7 @@ pub fn portal_sign_out(app: tauri::AppHandle, id: String) -> Result<(), String> 
         close_views(&app, &id);
         return Ok(());
     }
-    if p.kind == "mail" {
+    if is_microsoft_kind(&p.kind) {
         if let Some(v) = app.get_webview(&embedded_label(&id)) {
             v.navigate(sign_out_url(&p).parse().map_err(|_| "Dirección no válida.".to_string())?).map_err(|e| e.to_string())?;
             return Ok(());
@@ -976,23 +1235,23 @@ pub fn portal_sign_out(app: tauri::AppHandle, id: String) -> Result<(), String> 
     Ok(())
 }
 
-fn download_path(index: usize) -> Result<PathBuf, String> {
+fn download_path(download: u64) -> Result<PathBuf, String> {
     let list = DOWNLOADS.lock().unwrap_or_else(|e| e.into_inner());
-    let (_, p, done) = list.get(index).ok_or("Esa descarga ya no está.")?;
-    if !done || !p.exists() {
+    let d = list.iter().find(|d| d.number == download).ok_or("Esa descarga ya no está.")?;
+    if !d.done || !d.path.exists() {
         return Err("El archivo ya no está en su carpeta.".into());
     }
-    Ok(p.clone())
+    Ok(d.path.clone())
 }
 
 #[tauri::command]
-pub fn portal_download_open(index: usize) -> Result<(), String> {
-    crate::shellopen::open(&download_path(index)?.to_string_lossy())
+pub fn portal_download_open(download: u64) -> Result<(), String> {
+    crate::shellopen::open(&download_path(download)?.to_string_lossy())
 }
 
 #[tauri::command]
-pub fn portal_download_reveal(index: usize) -> Result<(), String> {
-    let p = download_path(index)?;
+pub fn portal_download_reveal(download: u64) -> Result<(), String> {
+    let p = download_path(download)?;
     crate::ps::hidden("explorer.exe").arg(format!("/select,{}", p.display())).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
@@ -1073,6 +1332,69 @@ mod tests {
 
     fn portal() -> Portal {
         Portal { id: "p1".into(), name: "Intranet".into(), url: "https://intranet.pgr.gob.do/tickets".into(), extra_domains: vec!["login.microsoftonline.com".into()], ..Default::default() }
+    }
+
+    /// Teams navega por sus dominios y por los de Microsoft, y por nada más.
+    #[test]
+    fn teams_navigates_its_own_domains() {
+        let mut domains: Vec<String> = MAIL_DOMAINS.iter().chain(TEAMS_DOMAINS.iter()).map(|d| d.to_string()).collect();
+        domains = clean_domains(&domains).unwrap();
+        let p = Portal { id: "t1".into(), name: "Teams".into(), url: "https://teams.microsoft.com/v2/".into(), extra_domains: domains, kind: "teams".into(), ..Default::default() };
+        let ok = |u: &str| allowed(&p, &u.parse().unwrap());
+        assert!(ok("https://teams.microsoft.com/v2/"));
+        assert!(ok("https://login.microsoftonline.com/common/oauth2/v2.0/authorize"));
+        assert!(ok("https://statics.teams.cdn.office.net/x.js"));
+        assert!(ok("https://empresa.sharepoint.com/archivo.docx"));
+        assert!(!ok("https://teams.microsoft.com.evil.com/"));
+        assert!(!ok("https://google.com/"));
+        assert!(!ok("javascript:alert(1)"));
+    }
+
+    /// La variable de entorno lleva los argumentos de siempre más, si hay
+    /// intranets, la lista de dominios. (Los portales NO la copian en sus
+    /// opciones: ver `browser_args`.)
+    #[test]
+    fn merged_args_add_the_allowlist_only_when_there_is_one() {
+        let base = "--disable-features=msWebOOUI";
+        let auth = "--auth-server-allowlist=*.pgr.gob.do";
+        assert_eq!(merged_browser_args(base, Some(auth)), format!("{base} {auth}"));
+        // Sin intranets configuradas, los argumentos son solo los de siempre.
+        assert_eq!(merged_browser_args(base, None), base);
+        assert_eq!(merged_browser_args(base, Some("")), base);
+    }
+
+    /// **Regresión de la 1.1.6**: los portales copiaban en sus opciones la lista
+    /// de dominios de la intranet, quedaban distintos de la ventana principal y
+    /// WebView2 no los creaba: Correo, Teams y Tickets se quedaban en «Abriendo…».
+    /// Las opciones del portal tienen que ser las de la ventana principal, tal
+    /// cual, aunque la variable de entorno lleve más cosas.
+    #[test]
+    fn portal_options_never_include_the_environment_args() {
+        let base = Some("--disable-features=msWebOOUI".to_string());
+        std::env::set_var(ARGS_ENV, "--disable-features=msWebOOUI --auth-server-allowlist=*.pgr.gob.do");
+        assert_eq!(portal_browser_args(base.clone()), base);
+        std::env::remove_var(ARGS_ENV);
+    }
+
+    /// Cada portal de Microsoft cierra sesión donde le corresponde.
+    #[test]
+    fn sign_out_goes_to_the_right_page() {
+        let p = |url: &str, kind: &str| Portal { name: "x".into(), url: url.into(), kind: kind.into(), ..Default::default() };
+        assert!(sign_out_url(&p("https://teams.microsoft.com/v2/", "teams")).contains("logout"));
+        assert_eq!(sign_out_url(&p("https://outlook.live.com/mail/", "mail")), "https://login.live.com/logout.srf");
+        assert_eq!(sign_out_url(&p("https://outlook.office.com/mail/", "mail")), "https://outlook.office.com/owa/logoff.owa");
+        assert!(is_microsoft_kind("mail") && is_microsoft_kind("teams") && !is_microsoft_kind("inventory"));
+    }
+
+    /// Colocar la vista solo se le pide a la ventana cuando el rectángulo cambia.
+    #[test]
+    fn repeated_bounds_are_ignored() {
+        let id = "prueba-bounds";
+        BOUNDS.lock().unwrap().remove(id);
+        assert!(remember_bounds(id, 0.0, 0.0, 800.0, 600.0));
+        assert!(!remember_bounds(id, 0.0, 0.0, 800.0, 600.0));
+        assert!(remember_bounds(id, 0.0, 0.0, 801.0, 600.0));
+        BOUNDS.lock().unwrap().remove(id);
     }
 
     #[test]

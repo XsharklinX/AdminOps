@@ -25,7 +25,10 @@ fn visible_on(monitors: &[(i32, i32, u32, u32)], s: &Saved) -> bool {
     monitors.iter().any(|&(mx, my, mw, mh)| px >= mx && py >= my && px < mx + mw as i32 && py < my + mh as i32)
 }
 
-/// Aplica el estado guardado y muestra la ventana (se crea oculta para no parpadear).
+/// ¿Se ha enseñado ya la ventana? (se enseña una sola vez, desde donde llegue antes).
+static SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Aplica el tamaño y la posición guardados, sin enseñar la ventana todavía.
 pub fn restore(app: &tauri::AppHandle) {
     let Some(w) = app.get_webview_window("main") else { return };
     let saved: Option<Saved> = std::fs::read_to_string(path(app)).ok().and_then(|t| serde_json::from_str(&t).ok());
@@ -47,8 +50,100 @@ pub fn restore(app: &tauri::AppHandle) {
             let _ = w.maximize();
         }
     }
+}
+
+/// ¿Ha dado señales de vida la interfaz? (la ventana puede estar ya visible sin
+/// que WebView2 haya cargado nada: es justo lo que se quiere detectar).
+static READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// ¿Ha empezado siquiera a ejecutarse el código de la interfaz? Se avisa antes
+/// de pintar nada: en un equipo lento puede tardar bastante en llegar de aquí a
+/// la primera pantalla, y eso **no** es un fallo.
+static BOOTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Enseña la ventana (una sola vez). Se llama cuando la interfaz ya está
+/// pintada, o pasado el margen del vigilante si tarda más de la cuenta.
+pub fn reveal(app: &tauri::AppHandle) {
+    use std::sync::atomic::Ordering::SeqCst;
+    if SHOWN.swap(true, SeqCst) {
+        return;
+    }
+    let Some(w) = app.get_webview_window("main") else { return };
     let _ = w.show();
-    let _ = w.set_focus();
+    // Arrancada con Windows va minimizada: no se le roba el foco al usuario.
+    if !std::env::args().any(|a| a == "--minimized") {
+        let _ = w.set_focus();
+    }
+    log::info!("Ventana visible a los {} ms", crate::boottime::since_start_ms());
+}
+
+/// La interfaz ya pintó su primera página: se enseña la ventana con contenido,
+/// nunca vacía.
+#[tauri::command]
+pub fn ui_ready(app: tauri::AppHandle) {
+    READY.store(true, std::sync::atomic::Ordering::SeqCst);
+    BOOTING.store(true, std::sync::atomic::Ordering::SeqCst);
+    reveal(&app);
+}
+
+/// El código de la interfaz ha empezado a ejecutarse. Todavía no hay nada
+/// pintado, pero WebView2 está vivo y cargando: a partir de aquí, por mucho que
+/// tarde, no hay que recargar nada.
+#[tauri::command]
+pub fn ui_booting() {
+    BOOTING.store(true, std::sync::atomic::Ordering::SeqCst);
+    log::info!("La interfaz empezó a cargar a los {} ms", crate::boottime::since_start_ms());
+}
+
+/// Tope de espera antes de enseñar la ventana aunque la interfaz no haya
+/// avisado. Es una red de seguridad, no el camino normal: existe para que un
+/// equipo donde algo va muy mal no se quede sin ninguna ventana.
+const REVEAL_ANYWAY: std::time::Duration = std::time::Duration::from_secs(20);
+/// Cada cuánto se comprueba si la interfaz ya pintó.
+const CHECK_EVERY: std::time::Duration = std::time::Duration::from_millis(250);
+/// Sin **ninguna** señal de la interfaz pasado este tiempo, se recarga la vista
+/// una vez. Generoso a propósito: en un equipo viejo el código de la interfaz
+/// puede tardar diez segundos largos en arrancar, y recargar entonces sería
+/// empezar de cero y dejarlo peor de lo que estaba.
+const RELOAD_AFTER: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Vigilante del arranque de la interfaz.
+///
+/// **La ventana se enseña cuando hay algo pintado, no antes.** Enseñarla a los
+/// dos segundos y medio pasara lo que pasara era lo que producía el rectángulo
+/// negro del que se quejaban los técnicos: si WebView2 aún no ha pintado nada,
+/// lo único que se ve es el color de fondo de una ventana vacía, y eso parece
+/// una aplicación colgada. Mejor tardar un segundo más y aparecer entera.
+///
+/// Dos redes de seguridad, las dos generosas a propósito:
+/// - a los 20 s se enseña igualmente, para que nunca se quede sin ventana;
+/// - a los 25 s se recarga la vista **solo si WebView2 no ha cargado nada**. Si
+///   el código de la interfaz llegó a arrancar (`ui_booting`), por lento que vaya
+///   el equipo se le deja terminar: recargar a un equipo viejo que solo iba
+///   despacio es tirar el trabajo hecho y empezar otra vez.
+pub fn watch_first_paint(app: tauri::AppHandle) {
+    use std::sync::atomic::Ordering::SeqCst;
+    std::thread::spawn(move || {
+        let inicio = std::time::Instant::now();
+        while inicio.elapsed() < REVEAL_ANYWAY {
+            if READY.load(SeqCst) {
+                return; // la enseñó `ui_ready`, ya dibujada
+            }
+            std::thread::sleep(CHECK_EVERY);
+        }
+        log::warn!("La interfaz no avisó en {} s: se enseña la ventana igualmente.", REVEAL_ANYWAY.as_secs());
+        reveal(&app);
+        if BOOTING.load(SeqCst) {
+            return;
+        }
+        std::thread::sleep(RELOAD_AFTER - REVEAL_ANYWAY);
+        if BOOTING.load(SeqCst) {
+            return;
+        }
+        log::warn!("WebView2 no cargó nada en {} s: se recarga la vista una vez.", RELOAD_AFTER.as_secs());
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.reload();
+        }
+    });
 }
 
 /// Guarda el estado al cerrar. Maximizada o minimizada se conserva el último tamaño normal.

@@ -391,6 +391,10 @@ export const appApi = {
   /** Pasos del arranque del programa (Ajustes → Rendimiento). */
   startupTiming: () => invoke<StartupTiming>("startup_timing"),
   logTiming: (summary: string) => invoke<void>("log_timing", { summary }),
+  /** La interfaz ya está pintada: el programa enseña la ventana. */
+  uiReady: () => invoke<void>("ui_ready").catch(() => {}),
+  /** El código de la interfaz arrancó (aún sin pintar): WebView2 está vivo. */
+  uiBooting: () => invoke<void>("ui_booting").catch(() => {}),
   cancelTask: (task: string) => invoke<boolean>("cancel_task", { task }),
   readLog: (lines = 400) => invoke<string>("read_log", { lines }),
   supportPackage: () => invoke<string>("support_package"),
@@ -490,12 +494,24 @@ export interface SoftwareUpdate {
   source: string;
 }
 
+export interface Freeable {
+  /** Clave del sitio: temporales, papelera, Windows.old… */
+  key: string;
+  name: string;
+  detail: string;
+  size: number;
+  /** Se puede borrar sin consecuencias para el usuario. */
+  safe: boolean;
+}
+
 export interface SpaceEntry {
   name: string;
   path: string;
   size: number;
   files: number;
   hasChildren: boolean;
+  /** Última modificación en segundos (solo archivos). */
+  modified?: number;
 }
 
 export interface SpaceView {
@@ -506,6 +522,8 @@ export interface SpaceView {
   seconds: number;
   children: SpaceEntry[];
   largestFiles: SpaceEntry[];
+  /** Grandes y sin tocar en más de un año. */
+  oldFiles: SpaceEntry[];
 }
 
 export const toolsApi = {
@@ -526,6 +544,10 @@ export const toolsApi = {
   cancelSpaceScan: () => invoke<void>("cancel_space_scan"),
   spaceChildren: (path: string) => invoke<SpaceEntry[]>("space_children", { path }),
   revealInExplorer: (path: string) => invoke<void>("reveal_in_explorer", { path }),
+  /** Dónde se puede recuperar espacio en este equipo, medido de verdad. */
+  spaceFreeable: () => invoke<Freeable[]>("space_freeable"),
+  /** Manda a la papelera lo marcado en el análisis; devuelve los bytes liberados. */
+  spaceRecycle: (paths: string[]) => invoke<number>("space_recycle", { paths }),
   backupDrivers: () => invoke<string>("backup_drivers"),
 };
 
@@ -699,7 +721,24 @@ export interface Visit {
   notes: string;
   status: "planned" | "done" | "cancelled";
   reminded: boolean;
+  /** Tipo de visita configurado en Ajustes (trae su checklist a la sesión). */
+  visitType: string;
+  /** "" no se repite · weekly · biweekly · monthly · quarterly · semiannual · yearly */
+  repeatEvery: string;
+  /** Dónde es: sede, planta, sala. */
+  place: string;
 }
+
+/** Cada cuánto se repite una visita, para el desplegable. */
+export const REPEATS: { value: string; label: string }[] = [
+  { value: "", label: "No se repite" },
+  { value: "weekly", label: "Cada semana" },
+  { value: "biweekly", label: "Cada 2 semanas" },
+  { value: "monthly", label: "Cada mes" },
+  { value: "quarterly", label: "Cada 3 meses" },
+  { value: "semiannual", label: "Cada 6 meses" },
+  { value: "yearly", label: "Cada año" },
+];
 
 export interface DueClient {
   clientId: string;
@@ -712,9 +751,13 @@ export interface DueClient {
 
 export const agendaApi = {
   list: () => invoke<{ visits: Visit[]; due: DueClient[] }>("list_agenda"),
-  save: (visit: Visit) => invoke<Visit>("save_visit", { visit }),
-  setStatus: (id: string, status: Visit["status"]) => invoke<void>("set_visit_status", { id, status }),
+  /** `conflict`: cliente de la visita con la que se pisa ("" si ninguna). */
+  save: (visit: Visit) => invoke<{ visit: Visit; conflict: string }>("save_visit", { visit }),
+  /** Al darla por hecha devuelve la siguiente de la serie, si se repite. */
+  setStatus: (id: string, status: Visit["status"]) => invoke<Visit | null>("set_visit_status", { id, status }),
   remove: (id: string) => invoke<void>("delete_visit", { id }),
+  /** Aplaza (o adelanta, con días negativos) una visita. */
+  postpone: (id: string, days: number) => invoke<void>("postpone_visit", { id, days }),
 };
 
 export interface Client {
@@ -805,7 +848,25 @@ export interface MachineChanges {
   changes: VisitChange[];
 }
 
+export interface MachineRank {
+  host: string;
+  value: string;
+  typical: string;
+  /** Cuántas veces peor que la mediana (1 = igual que el resto). */
+  factor: number | null;
+  worse: boolean;
+}
+
+export interface Comparison {
+  label: string;
+  /** Frase lista para leer. */
+  summary: string;
+  machines: MachineRank[];
+}
+
 export const workApi = {
+  /** Cómo queda cada equipo del cliente frente a los demás (solo cifras técnicas). */
+  compareMachines: (clientId: string) => invoke<Comparison[]>("compare_client_machines", { clientId }),
   /** Qué cambió en los equipos de un cliente desde la última visita. */
   visitChanges: (clientId: string) => invoke<MachineChanges[]>("visit_changes", { clientId }),
   settings: () => invoke<Settings>("get_settings"),
@@ -1003,6 +1064,8 @@ export const usersApi = {
   setAdmin: (sid: string, admin: boolean) => invoke<void>("set_user_admin", { sid, admin }),
   profileSize: (sid: string) => invoke<{ exists: boolean; size: number; files: number }>("user_profile_size", { sid }),
   remove: (sid: string, deleteProfile: boolean) => invoke<void>("delete_user", { sid, deleteProfile }),
+  /** Renombra la cuenta y edita su nombre completo y descripción. Devuelve el aviso a mostrar. */
+  rename: (sid: string, name: string, fullName: string, description: string) => invoke<string>("rename_user", { sid, name, fullName, description }),
 };
 
 export interface WifiAdapter {
@@ -1063,7 +1126,19 @@ export interface InstallResult {
   message: string;
 }
 
+export interface Preflight {
+  online: boolean;
+  free: number;
+  lowSpace: boolean;
+  winget: boolean;
+  elevated: boolean;
+  /** Avisos en claro, listos para mostrar. */
+  warnings: string[];
+}
+
 export const appsApi = {
+  /** Red, espacio, winget y permisos antes de una instalación larga. */
+  preflight: (count: number) => invoke<Preflight>("install_preflight", { count }),
   catalog: () => invoke<AppCatalog>("app_catalog"),
   installed: () => invoke<string[]>("installed_apps"),
   search: (query: string) => invoke<(CatalogApp & { version: string })[]>("search_apps", { query }),
@@ -1125,8 +1200,32 @@ export interface PrinterInfo {
   virtual: boolean;
 }
 
+/** Qué le pasa a una impresora y qué hacer. */
+export interface PrinterCheck {
+  level: "ok" | "warn" | "bad";
+  title: string;
+  text: string;
+  spooler: boolean;
+  /** Dirección del puerto TCP/IP, si es de red. */
+  host: string;
+  /** Responde en la red (null: no es de red). */
+  reachable: boolean | null;
+  jobs: number;
+  oldestJobMin: number;
+}
+
+/** Impresora vista en la red. */
+export interface FoundPrinter {
+  ip: string;
+  /** Puertos de impresión abiertos: 9100 RAW, 631 IPP, 515 LPD. */
+  ports: number[];
+  installed: boolean;
+}
+
 export const printersApi = {
   list: () => invoke<PrinterInfo[]>("list_printers"),
+  check: (name: string) => invoke<PrinterCheck>("check_printer", { name }),
+  findOnNetwork: () => invoke<FoundPrinter[]>("find_network_printers"),
   clearQueue: (name: string) => invoke<void>("clear_printer_queue", { name }),
   testPage: (name: string) => invoke<void>("print_test_page", { name }),
   setDefault: (name: string) => invoke<void>("set_default_printer", { name }),
@@ -1179,7 +1278,7 @@ export interface Portal {
   name: string;
   url: string;
   extraDomains: string[];
-  /** "" Tickets · "inventory" inventario web · "mail" correo. */
+  /** "" Tickets · "inventory" inventario web · "mail" correo · "teams" Teams. */
   kind?: string;
   /** 1 = 100 % (0 o ausente también). */
   zoom?: number;
@@ -1202,7 +1301,11 @@ export const portalsApi = {
   preload: (id: string, width: number, height: number) => invoke<void>("portal_preload", { id, width, height }),
   bounds: (id: string, r: { x: number; y: number; width: number; height: number }) => invoke<void>("portal_bounds", { id, ...r }),
   hideAll: () => invoke<void>("portal_hide_all"),
+  /** Cierra las vistas que llevan mucho sin usarse (cada una es un proceso). */
+  closeIdle: () => invoke<number>("portal_close_idle"),
   hide: (id: string) => invoke<void>("portal_hide", { id }),
+  /** Destruye la vista (para las que no arrancaron: ocultarlas no las quita de encima). */
+  reset: (id: string) => invoke<void>("portal_reset", { id }),
   nav: (id: string, action: PortalAction) => invoke<void>("portal_nav", { id, action }),
   /** `false`: la dirección está fuera del portal y se abrió en el navegador. */
   go: (id: string, url: string) => invoke<boolean>("portal_go", { id, url }),
@@ -1213,9 +1316,11 @@ export const portalsApi = {
   setLogin: (id: string, user: string, password?: string) => invoke<void>("portal_login_set", { id, user, password: password ?? null }),
   /** Mensaje nuevo en el Correo de AdminOps; `false` si no hay correo configurado. */
   compose: (to: string, subject?: string, body?: string) => invoke<boolean>("portal_compose", { to, subject: subject ?? null, body: body ?? null }),
+  /** Chat o llamada de Teams dentro de AdminOps. `false`: no hay Teams configurado. */
+  teams: (email: string, call: boolean) => invoke<boolean>("portal_teams", { email, call }),
   signOut: (id: string) => invoke<void>("portal_sign_out", { id }),
-  openDownload: (index: number) => invoke<void>("portal_download_open", { index }),
-  revealDownload: (index: number) => invoke<void>("portal_download_reveal", { index }),
+  openDownload: (download: number) => invoke<void>("portal_download_open", { download }),
+  revealDownload: (download: number) => invoke<void>("portal_download_reveal", { download }),
   openWindow: (id: string) => invoke<void>("portal_open_window", { id }),
   openExternal: (id: string) => invoke<void>("portal_open_external", { id }),
 };
@@ -1611,6 +1716,17 @@ export interface Share {
   description: string;
   access: { account: string; right: string; allow: boolean }[];
   openFiles: number;
+  /** La carpeta compartida ya no existe en el disco. */
+  missingPath: boolean;
+  /** Se comparte con «Todos» pero los permisos del disco no dejan entrar. */
+  ntfsBlocks: boolean;
+}
+
+/** Archivo que alguien tiene abierto ahora mismo desde otro equipo. */
+export interface OpenFile {
+  name: string;
+  user: string;
+  locked: boolean;
 }
 
 export interface SharingStatus {
@@ -1619,6 +1735,7 @@ export interface SharingStatus {
   fileSharing: boolean;
   discovery: boolean;
   sessions: string[];
+  open: OpenFile[];
 }
 
 export interface IpConflict {
@@ -1813,6 +1930,26 @@ export interface NetCheck {
   gateway: boolean | null;
   internet: boolean;
   dns: boolean;
+  /** IPv4 del adaptador activo. */
+  ip: string;
+  /** Puerta de enlace (el router). */
+  gatewayIp: string;
+  dnsServers: string[];
+  /** La IP la da el router (DHCP) o está puesta a mano. */
+  dhcp: boolean;
+  wifi: boolean;
+  /** Proxy configurado en Windows (vacío si no hay). */
+  proxy: string;
+  vpn: string[];
+}
+
+/** Qué pasa con la red y qué hacer ahora. */
+export interface NetVerdict {
+  level: "ok" | "warn" | "bad";
+  title: string;
+  text: string;
+  /** Botones a ofrecer: router · dns · deep · wifi · proxy · speed. */
+  next: string[];
 }
 
 export interface NetRepair {
@@ -1820,6 +1957,7 @@ export interface NetRepair {
   after: NetCheck;
   steps: { title: string; ok: boolean; detail: string }[];
   reboot: boolean;
+  verdict: NetVerdict;
 }
 
 export const troubleshootApi = {

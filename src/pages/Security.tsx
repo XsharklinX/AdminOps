@@ -20,6 +20,7 @@ import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Modal } from "../components/ui";
 import { TweaksPage } from "./TweaksPage";
 import { securityApi, toolboxApi, toolsApi, type BitlockerVolume, type SecurityAudit, type SecurityCheck, type SuspiciousItem } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 const STATUS = {
   ok: { icon: CircleCheck, color: "text-ok" },
@@ -52,7 +53,7 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const fix = (c: SecurityCheck) => {
@@ -70,7 +71,7 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
       const r = await toolsApi.upgradeSoftware(audit.vulnerable.map((v) => v.id));
       const ok = r.filter((x) => x.ok).length;
       toast(ok === r.length ? "ok" : "info", `${ok} de ${r.length} programas actualizados.`);
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     } finally {
@@ -175,9 +176,12 @@ function BitlockerCard({ isAdmin }: { isAdmin: boolean }) {
   const [keys, setKeys] = useState<{ drive: string; id: string; key: string }[] | null>(null);
   const toast = useToast();
 
-  useEffect(() => {
-    if (isAdmin) securityApi.bitlocker().then(setVols).catch((e) => setError(String(e)));
-  }, [isAdmin]);
+  useLiveEffect(
+    (vigente) => {
+      if (isAdmin) securityApi.bitlocker().then((v) => vigente() && setVols(v)).catch((e) => vigente() && setError(String(e)));
+    },
+    [isAdmin],
+  );
 
   const showKeys = () => securityApi.keys().then(setKeys).catch((e) => toast("error", String(e)));
   const exportKeys = () =>

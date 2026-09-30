@@ -1,8 +1,9 @@
 import { BellOff, CheckCircle2, Download, Eye, Loader2, RefreshCw, Search, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { toolsApi, type SoftwareUpdate } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 type Result = { id: string; name: string; ok: boolean; message: string };
 
@@ -31,10 +32,13 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-    toolsApi.ignoredUpdates().then(setIgnored).catch(() => {});
-  }, [load]);
+  useLiveEffect(
+    (vigente) => {
+      void load();
+      toolsApi.ignoredUpdates().then((i) => vigente() && setIgnored(i)).catch(() => {});
+    },
+    [load],
+  );
 
   const setIgnore = async (id: string, on: boolean) => {
     try {
@@ -77,7 +81,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setRunning(false);
-      load();
+      void load();
     }
   };
 
@@ -168,7 +172,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  setIgnore(u.id, !ignored.includes(u.id));
+                  void setIgnore(u.id, !ignored.includes(u.id));
                 }}
                 className="shrink-0 rounded p-1 text-mute hover:text-ink"
                 title={ignored.includes(u.id) ? "Volver a proponer esta actualización" : "No actualizar este programa (se recuerda en todos los equipos)"}

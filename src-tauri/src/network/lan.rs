@@ -82,7 +82,8 @@ fn network_key(gateway: &str, gateway_mac: &str) -> String {
 }
 
 pub fn current() -> Result<Option<LanInfo>, String> {
-    let out = crate::ps::powershell(INFO_SCRIPT)?;
+    // Proceso propio: tarda y no debe ocupar el PowerShell compartido de la app.
+    let out = crate::ps::powershell_opts(INFO_SCRIPT, crate::ps::Opts { timeout: Some(std::time::Duration::from_secs(60)), task: Some("lan-info") })?;
     let mut info: Option<LanInfo> = serde_json::from_str(out.trim()).map_err(|e| format!("Respuesta inesperada: {e}"))?;
     if let Some(i) = info.as_mut() {
         i.gateway_mac = norm_mac(&i.gateway_mac);

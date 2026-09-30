@@ -22,6 +22,7 @@ import { useToast } from "../components/feedback";
 import { Button, Card, inputClass, Modal } from "../components/ui";
 import { lanApi, portalsApi, type LanInfo, type PublicIp, type RouterCheck, type RouterProfile } from "../lib/api";
 import { windowRect } from "../lib/prefs";
+import { stowPortal } from "../lib/portalState";
 
 // Con el zoom de la interfaz aplicado: la vista web va en píxeles de la ventana.
 const rectOf = windowRect;
@@ -110,13 +111,13 @@ export function Router({ covered = false }: { covered?: boolean }) {
   }, [toast]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   // Al cerrar la página, la vista del router (nativa, por encima de todo) se oculta.
   const panelRef = useRef<string | null>(null);
   panelRef.current = panel;
-  useEffect(() => () => void (panelRef.current && portalsApi.hide(panelRef.current)), []);
+  useEffect(() => () => void (panelRef.current && stowPortal(panelRef.current)), []);
 
   useEffect(() => {
     if (!panel) return;
@@ -124,7 +125,7 @@ export function Router({ covered = false }: { covered?: boolean }) {
       if (e.payload.id === panel) setLoading(e.payload.loading);
     });
     return () => {
-      un.then((f) => f());
+      void un.then((f) => f());
     };
   }, [panel]);
 
@@ -133,7 +134,7 @@ export function Router({ covered = false }: { covered?: boolean }) {
     const el = area.current;
     // Solo la vista de esta página: la de Tickets puede estar viva en otra.
     if (!panel || !el || overlay) {
-      if (panel) portalsApi.hide(panel);
+      if (panel) stowPortal(panel);
       return;
     }
     portalsApi.show(panel, rectOf(el)).catch((e) => toast("error", String(e)));
@@ -247,7 +248,7 @@ export function Router({ covered = false }: { covered?: boolean }) {
           </button>
           <button
             onClick={() => {
-              portalsApi.hide(panel);
+              stowPortal(panel);
               setPanel(null);
             }}
             className={iconBtn}

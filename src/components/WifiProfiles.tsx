@@ -38,7 +38,7 @@ export function WifiProfiles({ isAdmin }: { isAdmin: boolean }) {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const toggle = (name: string) =>
@@ -60,7 +60,7 @@ export function WifiProfiles({ isAdmin }: { isAdmin: boolean }) {
     try {
       await wifiApi.forget(p.name);
       toast("ok", `Red «${p.name}» olvidada.`);
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }

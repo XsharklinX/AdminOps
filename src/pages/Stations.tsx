@@ -39,7 +39,7 @@ export function Stations() {
 
   const load = useCallback(() => libraryApi.list("stations").then(setLists).catch(() => {}), []);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const hosts = useMemo(() => parseHosts(text), [text]);
@@ -57,7 +57,7 @@ export function Stations() {
       const saved = await libraryApi.save("stations", { id: current?.id ?? "", name: name.trim(), hosts });
       setCurrent(saved);
       toast("ok", "Lista guardada.");
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -67,7 +67,7 @@ export function Stations() {
     if (!(await confirm({ title: "Borrar lista", body: `Se borrará la lista «${l.name}».`, confirmLabel: "Borrar", danger: true }))) return;
     await libraryApi.remove("stations", l.id).catch(() => {});
     if (current?.id === l.id) setCurrent(null);
-    load();
+    void load();
   };
 
   const check = async (deep: boolean) => {
@@ -149,7 +149,7 @@ export function Stations() {
       confirmLabel: "Reiniciar",
       danger: true,
     });
-    if (go) act("restart");
+    if (go) void act("restart");
   };
 
   const rdpPicked = () => {

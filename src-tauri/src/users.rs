@@ -189,6 +189,7 @@ enum Action {
     Demote,
     Promote,
     Password,
+    Rename,
 }
 
 /// Comprueba si la acción se puede hacer sin dejar el equipo inaccesible.
@@ -214,6 +215,14 @@ fn guard(users: &[LocalUser], sid: &str, action: Action) -> Result<(), String> {
         Action::Password if u.microsoft => Err(format!(
             "«{who}» es una cuenta de Microsoft: su contraseña se cambia en account.microsoft.com."
         )),
+        // Renombrar una cuenta integrada rompe scripts y directivas que la
+        // buscan por nombre; y con la sesión abierta, Windows deja el perfil
+        // apuntando al nombre viejo.
+        Action::Rename if u.builtin.is_some() => Err(format!("«{who}» es una cuenta integrada de Windows: no se puede renombrar.")),
+        Action::Rename if u.microsoft => Err(format!("«{who}» es una cuenta de Microsoft: el nombre se cambia en account.microsoft.com.")),
+        Action::Rename if u.signed_in || u.is_target || u.is_self => {
+            Err(format!("«{who}» tiene la sesión iniciada. Cierra su sesión antes de renombrarla."))
+        }
         _ => Ok(()),
     }
 }
@@ -381,6 +390,57 @@ pub fn set_user_admin(sid: String, admin: bool, tweaks: State<'_, TweakState>) -
     let what = if admin { "hacer administrador a" } else { "quitar administrador a" };
     tweaks.record(Op::Run, &format!("Usuarios: {what} «{name}»"), &result);
     result.map_err(friendly)
+}
+
+/// Renombra la cuenta y actualiza su nombre completo y su descripción.
+///
+/// Windows **no cambia la carpeta del perfil** al renombrar: el SID sigue siendo
+/// el mismo y todo funciona, pero la carpeta personal conserva el nombre
+/// anterior. Se avisa, porque es lo que confunde la primera vez (y cambiarla a
+/// mano rompe el perfil).
+#[tauri::command(async)]
+pub fn rename_user(sid: String, name: String, full_name: String, description: String, tweaks: State<'_, TweakState>) -> Result<String, String> {
+    need_admin()?;
+    check_sid(&sid)?;
+    let users = list()?;
+    let before = find(&users, &sid)?.clone();
+    let nuevo = validate_name(&name)?;
+    let cambia_nombre = !nuevo.eq_ignore_ascii_case(&before.name);
+    if cambia_nombre {
+        guard(&users, &sid, Action::Rename)?;
+        if users.iter().any(|u| u.sid != sid && u.name.eq_ignore_ascii_case(&nuevo)) {
+            return Err(format!("Ya hay una cuenta llamada «{nuevo}»."));
+        }
+    }
+    let full_name = clean_field(&full_name, 256);
+    let description = clean_field(&description, 256);
+    let mut script = String::new();
+    if cambia_nombre {
+        script.push_str(&format!("Rename-LocalUser -SID '{sid}' -NewName '{}'\n", ps_quote(&nuevo)));
+    }
+    script.push_str(&format!("Set-LocalUser -SID '{sid}' -FullName '{}' -Description '{}'\n'ok'", ps_quote(&full_name), ps_quote(&description)));
+    let result = run(&script, &format!("usuarios locales: editar «{}»", before.name), 60).map(|_| ());
+    let que = if cambia_nombre { format!("renombrar «{}» a «{nuevo}»", before.name) } else { format!("editar los datos de «{}»", before.name) };
+    tweaks.record(Op::Run, &format!("Usuarios: {que}"), &result);
+    result.map_err(friendly)?;
+    Ok(if cambia_nombre && before.has_profile {
+        format!("Cuenta renombrada a «{nuevo}». Su carpeta personal sigue llamándose «{}»: Windows no la renombra, y cambiarla a mano rompe el perfil.", before.name)
+    } else if cambia_nombre {
+        format!("Cuenta renombrada a «{nuevo}».")
+    } else {
+        "Datos de la cuenta guardados.".into()
+    })
+}
+
+/// Texto libre de una cuenta (nombre completo, descripción): sin caracteres de
+/// control y recortado a lo que admite Windows.
+fn clean_field(v: &str, max: usize) -> String {
+    v.trim().chars().filter(|c| !c.is_control()).take(max).collect()
+}
+
+/// Escapa una cadena para ir entre comillas simples de PowerShell.
+fn ps_quote(v: &str) -> String {
+    v.replace('\'', "''")
 }
 
 #[derive(Serialize)]

@@ -64,7 +64,7 @@ export function ContactEditor({
         onKeyDown={(e) => {
           if (e.key === "Enter" && e.ctrlKey) {
             e.preventDefault();
-            save();
+            void save();
           }
         }}
       >

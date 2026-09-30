@@ -431,6 +431,10 @@ fn notify(app: &tauri::AppHandle, a: &Alert) {
     }
     let body = if a.detail.is_empty() { a.explanation.clone() } else { format!("{} · {}", a.detail, a.explanation) };
     let _ = app.notification().builder().title(&a.title).body(body.chars().take(240).collect::<String>()).show();
+    // Windows no avisa de si se pulsa el aviso, pero al pulsarlo pone AdminOps
+    // delante: la interfaz abre entonces este aviso (ver App.tsx).
+    use tauri::Emitter;
+    let _ = app.emit("alert-notified", &a.key);
 }
 
 /// Una pasada: eventos nuevos desde la última vez y espacio libre.

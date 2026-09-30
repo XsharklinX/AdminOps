@@ -14,7 +14,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode; onHome?: () 
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    appApi.logError(`${error.name}: ${error.message}\n${error.stack ?? ""}\n${info.componentStack ?? ""}`);
+    void appApi.logError(`${error.name}: ${error.message}\n${error.stack ?? ""}\n${info.componentStack ?? ""}`);
   }
 
   render() {
@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode; onHome?: () 
           <p className="text-sm text-dim">
             El error quedó guardado en el registro técnico (Historial → Registro técnico). El resto de AdminOps sigue funcionando.
           </p>
-          <pre className="mt-3 max-h-40 overflow-auto rounded-md bg-void/60 p-3 font-mono text-[11px] whitespace-pre-wrap text-mute select-text">
+          <pre className="mt-3 pane-sm overflow-auto rounded-md bg-void/60 p-3 font-mono text-[11px] whitespace-pre-wrap text-mute select-text">
             {error.name}: {error.message}
           </pre>
           <div className="mt-4 flex gap-2">

@@ -1,4 +1,4 @@
-import { Globe, Mail, Ticket, TriangleAlert } from "lucide-react";
+import { Globe, Mail, MessagesSquare, Ticket, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
 import { Button, Card, inputClass } from "../../components/ui";
@@ -10,11 +10,12 @@ const KIND = {
   "": { label: "Tickets", icon: Ticket, page: "tickets" as PageId },
   inventory: { label: "Inventario web", icon: Globe, page: "stations" as PageId },
   mail: { label: "Correo", icon: Mail, page: "mail" as PageId },
+  teams: { label: "Teams", icon: MessagesSquare, page: "teams" as PageId },
 };
 
 const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.5];
 
-/** Ajustes de los portales (Tickets, inventario web y Correo) en un solo sitio. */
+/** Ajustes de los portales (Tickets, inventario web, Correo y Teams) en un solo sitio. */
 export function PortalSettings({
   s,
   set,
@@ -32,13 +33,13 @@ export function PortalSettings({
 
   const load = () => portalsApi.list().then(setPortals).catch(() => setPortals([]));
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const patch = async (p: Portal, change: Partial<Portal>) => {
     try {
       await portalsApi.save({ ...p, ...change });
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     }
@@ -51,7 +52,7 @@ export function PortalSettings({
       <Card title="Cómo se abren los portales">
         <Row
           title="Precargar el último portal"
-          sub="Carga en segundo plano el último portal usado de Tickets, Inventario web y Correo unos segundos después de abrir AdminOps, para que al entrar ya esté listo. Los de sesión privada nunca se precargan."
+          sub="Carga en segundo plano el último portal usado de Tickets, Inventario web, Correo y Teams unos segundos después de abrir AdminOps, para que al entrar ya esté listo. Los de sesión privada nunca se precargan."
         >
           <input
             type="checkbox"
@@ -94,7 +95,7 @@ export function PortalSettings({
           <p className="text-sm text-mute">Leyendo…</p>
         ) : portals.length === 0 ? (
           <p className="text-sm text-mute">
-            Todavía no hay ninguno. Añádelos desde Soporte → Tickets, Soporte → Correo u Oficina → Puestos → Inventario web.
+            Todavía no hay ninguno. Añádelos desde Soporte → Tickets, Soporte → Correo, Soporte → Teams u Oficina → Puestos → Inventario web.
           </p>
         ) : (
           <ul className="divide-y divide-line/60">

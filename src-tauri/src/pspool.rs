@@ -23,8 +23,31 @@ const KEEP_IDLE: usize = 2;
 const IDLE_TTL: Duration = Duration::from_secs(180);
 
 /// Tamaño del pool (se puede forzar con ADMINOPS_PS_HOSTS para medir).
+///
+/// Cada proceso de PowerShell ronda los 60-100 MB. En el portátil del técnico
+/// cinco a la vez hacen el diagnóstico más rápido; en el equipo de un cliente
+/// con 4 GB son medio giga dedicado a esperar, y encima con menos núcleos no
+/// hay dónde ejecutarlos en paralelo. Ahí se baja a dos.
 fn max_hosts() -> usize {
-    std::env::var("ADMINOPS_PS_HOSTS").ok().and_then(|v| v.parse().ok()).filter(|n| (1..=8).contains(n)).unwrap_or(MAX_HOSTS)
+    if let Some(n) = std::env::var("ADMINOPS_PS_HOSTS").ok().and_then(|v| v.parse().ok()).filter(|n| (1..=8).contains(n)) {
+        return n;
+    }
+    if modest_machine() { 2 } else { MAX_HOSTS }
+}
+
+/// ¿Equipo justo de recursos? Mismo criterio que la interfaz (src/lib/machine.ts):
+/// 4 GB de RAM o menos, o 4 núcleos o menos.
+pub fn modest_machine() -> bool {
+    static MODEST: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *MODEST.get_or_init(|| {
+        let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
+        let mut sys = sysinfo::System::new();
+        sys.refresh_memory();
+        let gb = sys.total_memory() / 1_073_741_824;
+        let modest = gb <= 4 || cores <= 4;
+        log::info!("Equipo: {cores} núcleos · {gb} GB{}", if modest { " · justo de recursos" } else { "" });
+        modest
+    })
 }
 const MARKER: &str = "\u{1e}ADMINOPS ";
 
@@ -265,6 +288,9 @@ pub fn query(script: &str, timeout: Option<Duration>, detail: &str) -> Result<St
 /// Arranca un proceso en segundo plano para que la primera consulta no espere.
 pub fn warm_up() {
     std::thread::spawn(|| {
+        // Un respiro para que WebView2 tenga la máquina para él mientras crea la
+        // ventana: aun así la consola queda lista mucho antes del primer clic.
+        std::thread::sleep(Duration::from_secs(3));
         let _ = query("1", Some(Duration::from_secs(30)), "calentamiento");
         loop {
             std::thread::sleep(Duration::from_secs(60));

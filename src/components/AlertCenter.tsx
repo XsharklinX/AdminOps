@@ -19,10 +19,26 @@ function when(ts: number) {
 }
 
 /** Campana de la cabecera: errores de Windows detectados mientras AdminOps está abierta. */
-export function AlertCenter({ onNavigate, onOpenChange }: { onNavigate: (p: PageId) => void; onOpenChange?: (open: boolean) => void }) {
+export function AlertCenter({
+  onNavigate,
+  onOpenChange,
+  openSignal = 0,
+}: {
+  onNavigate: (p: PageId) => void;
+  onOpenChange?: (open: boolean) => void;
+  /** Al cambiar (y no ser 0), abre el panel: lo usa el aviso de Windows. */
+  openSignal?: number;
+}) {
   const [alerts, setAlerts] = useState<WindowsAlert[]>([]);
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
+
+  // Vuelta desde un aviso de Windows: se abre el panel con lo que hay pendiente.
+  useEffect(() => {
+    if (openSignal) show(true);
+    // `show` cambia en cada render: solo interesa la señal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal]);
   const toast = useToast();
 
   const load = useCallback(() => {
@@ -47,14 +63,14 @@ export function AlertCenter({ onNavigate, onOpenChange }: { onNavigate: (p: Page
     });
     return () => {
       window.clearTimeout(timer);
-      un.then((f) => f());
+      void un.then((f) => f());
     };
   }, [load, toast]);
 
   const show = (v: boolean) => {
     setOpen(v);
     onOpenChange?.(v);
-    if (!v && alerts.some((a) => !a.read)) alertsApi.markRead().then(load);
+    if (!v && alerts.some((a) => !a.read)) void alertsApi.markRead().then(load);
   };
 
   const unread = alerts.filter((a) => !a.read).length;

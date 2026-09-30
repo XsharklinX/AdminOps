@@ -31,7 +31,7 @@ export function WifiControl({ isAdmin }: { isAdmin: boolean }) {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
@@ -43,7 +43,7 @@ export function WifiControl({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setBusy(null);
-      load();
+      void load();
     }
   };
 

@@ -6,6 +6,7 @@ import { diagApi, portalsApi, workApi, type Billing, type ClientReport, type Doc
 import { money } from "../lib/format";
 import { useToast } from "./feedback";
 import { Button, inputClass, Modal } from "./ui";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 /** Importes igual que en el backend (se redondea a céntimos en cada paso). */
 export function totals(b: Billing, taxRate: number) {
@@ -237,6 +238,7 @@ export function SignaturePad({ value, onChange, height = 150 }: { value: string 
       img.src = value;
     }
     // Solo al montar: después, el lienzo es la fuente de verdad.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `value` y `height` solo se leen al preparar el lienzo
   }, []);
 
   const point = (e: React.PointerEvent) => {
@@ -314,12 +316,13 @@ export function SendReportModal({
   const [busy, setBusy] = useState(false);
   const [hasMail, setHasMail] = useState(false);
 
-  useEffect(() => {
+  useLiveEffect((vigente) => {
     portalsApi
       .list()
-      .then((l) => setHasMail(l.some((p) => p.kind === "mail")))
+      .then((l) => vigente() && setHasMail(l.some((p) => p.kind === "mail")))
       .catch(() => {});
     workApi.settings().then((s) => {
+      if (!vigente()) return;
       const brand = s.company.trim() || s.technician.trim();
       const number = reportNumber(path);
       const who = client?.contact?.trim() || client?.name?.trim();
@@ -344,6 +347,7 @@ export function SendReportModal({
       );
     });
     // Solo al abrir: después el texto es del usuario.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- los datos del cliente solo se leen al preparar el mensaje
   }, [path]);
 
   // Con el Correo de AdminOps: el mensaje queda escrito y se abre la carpeta del

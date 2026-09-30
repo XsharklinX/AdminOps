@@ -29,7 +29,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
 
   useOnJournalChange(load);
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const visible = useMemo(() => {

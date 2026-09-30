@@ -17,13 +17,14 @@ import {
   Wrench,
   XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Modal } from "../components/ui";
 import { bytes, friendlyPath } from "../lib/format";
 import { programKey as key, norm } from "../lib/programs";
 import { officeApi, programsApi, toolsApi, type InstalledProgram, type Leftover, type SoftwareUpdate } from "../lib/api";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 type Sort = "name" | "size" | "date" | "publisher";
 type Filter = "all" | "updates" | "big" | "recent" | "user" | "wizard" | "orphans";
@@ -71,14 +72,17 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [toast]);
 
-  useEffect(() => {
-    load();
-    // Actualizaciones de winget en segundo plano (se reutiliza la última lista si es reciente).
-    toolsApi
-      .softwareUpdates()
-      .then(setUpdates)
-      .catch(() => setUpdates([]));
-  }, [load]);
+  useLiveEffect(
+    (vigente) => {
+      void load();
+      // Actualizaciones de winget en segundo plano (se reutiliza la última lista si es reciente).
+      toolsApi
+        .softwareUpdates()
+        .then((u) => vigente() && setUpdates(u))
+        .catch(() => vigente() && setUpdates([]));
+    },
+    [load],
+  );
 
   const updateOf = useMemo(() => {
     const m = new Map<string, SoftwareUpdate>();
@@ -180,7 +184,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
       await programsApi.removeOrphan(p.id);
       toast("ok", `«${p.name}» quitado de la lista.`);
       if (items.length) setLeftovers([{ program: p, items }]);
-      load();
+      void load();
     } catch (e) {
       toast("error", String(e));
     } finally {
@@ -395,7 +399,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
           onClose={(found) => {
             setBatch(null);
             setSelected(new Set());
-            load();
+            void load();
             if (found.length) setLeftovers(found);
           }}
         />

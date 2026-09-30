@@ -63,7 +63,7 @@ export function TaskStatus({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            cancel();
+            void cancel();
           }}
           className="flex shrink-0 items-center gap-1 rounded border border-bad/40 px-1.5 py-px text-[11px] text-bad transition-colors hover:bg-bad/10"
           title="Detener la operación. Lo que ya se hubiera cambiado se deshace."

@@ -5,8 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
     <title>AdminOps</title>
+    <style>
+      /* Lo que se ve mientras carga el código de la interfaz: así la ventana
+         nunca aparece vacía ni en negro. Se quita al pintar la primera pantalla.
+
+         El fondo oscuro va SOLO en #boot, nunca en html ni body: este estilo va
+         fuera de las capas de Tailwind y manda sobre el fondo del tema, así que
+         puesto en body dejaba el modo claro con el fondo negro y los títulos
+         invisibles (pasó en la 1.1.5 y la 1.1.6). */
+      #boot {
+        background: #111315;
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: #6b7280;
+        font: 13px system-ui, "Segoe UI", sans-serif;
+      }
+      #boot i {
+        width: 14px;
+        height: 14px;
+        border: 2px solid #2a2f35;
+        border-top-color: #6b7280;
+        border-radius: 50%;
+        animation: boot-spin 0.9s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot"><i></i>Abriendo AdminOps…</div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

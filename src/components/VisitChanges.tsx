@@ -1,7 +1,8 @@
 import { ArrowRight, History } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { workApi, type MachineChanges } from "../lib/api";
 import { Card } from "./ui";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 const date = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
 const daysAgo = (ts: number) => Math.max(0, Math.round((Date.now() / 1000 - ts) / 86_400));
@@ -13,16 +14,15 @@ const daysAgo = (ts: number) => Math.max(0, Math.round((Date.now() / 1000 - ts) 
  */
 export function VisitChanges({ clientId, host, refresh = 0 }: { clientId: string; host?: string; refresh?: number }) {
   const [list, setList] = useState<MachineChanges[] | null>(null);
-  useEffect(() => {
-    let alive = true;
-    workApi
-      .visitChanges(clientId)
-      .then((l) => alive && setList(host ? l.filter((m) => m.host.toLowerCase() === host.toLowerCase()) : l))
-      .catch(() => alive && setList([]));
-    return () => {
-      alive = false;
-    };
-  }, [clientId, host, refresh]);
+  useLiveEffect(
+    (vigente) => {
+      workApi
+        .visitChanges(clientId)
+        .then((l) => vigente() && setList(host ? l.filter((m) => m.host.toLowerCase() === host.toLowerCase()) : l))
+        .catch(() => vigente() && setList([]));
+    },
+    [clientId, host, refresh],
+  );
 
   if (!list?.length) return null;
   return (

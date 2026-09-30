@@ -180,10 +180,32 @@ pub fn open_remote_desktop(host: String) -> Result<(), String> {
     std::process::Command::new(format!("{system}\\System32\\mstsc.exe")).arg(format!("/v:{host}")).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// Página de la Asistencia rápida en la Microsoft Store.
+const QUICK_ASSIST_STORE: &str = "ms-windows-store://pdp/?productid=9P7BP5VNPTZ9";
+
+/// Abre la Asistencia rápida de Windows.
+///
+/// En Windows 11 es una app de la Store con su propio protocolo; en Windows 10
+/// (y en equipos donde esa app se quitó) sigue estando `quickassist.exe`. Si no
+/// hay ninguna de las dos, Windows sacaba su propio aviso en inglés: ahora se
+/// abre su ficha de la Store y se explica en español qué hacer.
 #[tauri::command]
 pub fn open_quick_assist() -> Result<(), String> {
-    // La versión actual es una app de la Store con su propio protocolo.
-    crate::shellopen::open("ms-quick-assist:")
+    // Primero el programa de Windows, si está: es el que nunca falla ni saca
+    // cuadros de diálogo raros. En Windows 10 y en buena parte de los Windows 11
+    // sigue ahí.
+    let system = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+    let exe = std::path::PathBuf::from(system).join("System32").join("quickassist.exe");
+    if exe.is_file() {
+        return crate::shellopen::open(&exe.to_string_lossy());
+    }
+    // Si no, el protocolo de la app de la Store, pero solo si de verdad hay algo
+    // que lo abra (ver `protocol_registered`).
+    if crate::shellopen::protocol_registered("ms-quick-assist") {
+        return crate::shellopen::open("ms-quick-assist:");
+    }
+    let _ = crate::shellopen::open(QUICK_ASSIST_STORE);
+    Err("Este equipo no tiene la Asistencia rápida de Windows. Te he abierto su ficha en la Microsoft Store para instalarla; mientras tanto puedes usar AnyDesk, RustDesk o TeamViewer, aquí abajo.".into())
 }
 
 // ---------- Carpetas compartidas ----------
@@ -206,6 +228,26 @@ pub struct Share {
     access: Vec<ShareAccess>,
     /// Archivos abiertos ahora mismo desde otros equipos.
     open_files: u32,
+    /// La carpeta que se comparte ya no existe: la compartición está rota y
+    /// quien entre verá un error raro de Windows en vez de una explicación.
+    missing_path: bool,
+    /// Se comparte con «Todos», pero los permisos del disco (NTFS) no dejan
+    /// entrar a todos. Es la trampa clásica: el recurso parece abierto y la
+    /// gente recibe «acceso denegado» sin que nadie entienda por qué, porque el
+    /// acceso real es la intersección de los dos permisos.
+    ntfs_blocks: bool,
+}
+
+/// Un archivo que alguien tiene abierto ahora mismo desde otro equipo.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenFile {
+    /// Solo el nombre del archivo: la ruta llevaría el nombre del usuario.
+    name: String,
+    /// Quién lo tiene abierto.
+    user: String,
+    /// Está bloqueado para escritura por ese usuario.
+    locked: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -218,25 +260,47 @@ pub struct SharingStatus {
     discovery: bool,
     /// Equipos conectados ahora a las carpetas de este (usuario@equipo).
     sessions: Vec<String>,
+    /// Qué archivos están abiertos ahora mismo, y por quién.
+    open: Vec<OpenFile>,
 }
 
 const SHARES_SCRIPT: &str = r#"
 $open = @(Get-SmbOpenFile -ErrorAction SilentlyContinue)
 $shares = @(Get-SmbShare -ErrorAction SilentlyContinue | Where-Object { -not $_.Special -and $_.Name -notmatch '\$$' -and $_.ShareType -eq 'FileSystemDirectory' } | ForEach-Object {
   $s = $_
+  $acc = @(Get-SmbShareAccess -Name $s.Name -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ account = "$($_.AccountName)"; right = "$($_.AccessRight)"; allow = "$($_.AccessControlType)" -eq 'Allow' } })
+  $existe = Test-Path -LiteralPath "$($s.Path)"
+  # ¿Se comparte con Todos pero el disco no deja entrar a Todos?
+  $paraTodos = @($acc | Where-Object { $_.allow -and "$($_.account)" -match 'Everyone|Todos' }).Count -gt 0
+  $ntfsBloquea = $false
+  if ($paraTodos -and $existe) {
+    try {
+      $acl = (Get-Acl -LiteralPath "$($s.Path)").Access
+      $abierto = @($acl | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and "$($_.IdentityReference)" -match 'Everyone|Todos|Users|Usuarios|Authenticated' }).Count -gt 0
+      $ntfsBloquea = -not $abierto
+    } catch {}
+  }
   [pscustomobject]@{
     name = "$($s.Name)"; path = "$($s.Path)"; description = "$($s.Description)"
-    access = @(Get-SmbShareAccess -Name $s.Name -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ account = "$($_.AccountName)"; right = "$($_.AccessRight)"; allow = "$($_.AccessControlType)" -eq 'Allow' } })
+    access = $acc
     openFiles = @($open | Where-Object { "$($_.ShareRelativePath)" -and "$($_.Path)".StartsWith("$($s.Path)", 'OrdinalIgnoreCase') }).Count
+    missingPath = -not $existe
+    ntfsBlocks = [bool]$ntfsBloquea
   }
 })
+$abiertos = @($open | Where-Object { "$($_.ShareRelativePath)" } | ForEach-Object {
+  [pscustomobject]@{
+    name = (Split-Path "$($_.ShareRelativePath)" -Leaf)
+    user = "$($_.ClientUserName)"
+    locked = [bool]("$($_.Locks)" -ne '0' -and "$($_.Locks)")
+  }
+} | Select-Object -First 50)
 $profile = Get-NetConnectionProfile -ErrorAction SilentlyContinue | Select-Object -First 1
 $fs = @(Get-NetFirewallRule -Group '@FirewallAPI.dll,-28502' -Direction Inbound -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -eq 'True' }).Count -gt 0
 $nd = @(Get-NetFirewallRule -Group '@FirewallAPI.dll,-32752' -Direction Inbound -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -eq 'True' }).Count -gt 0
-$sessions = @(Get-SmbSession -ErrorAction SilentlyContinue | ForEach-Object { "$($_.ClientUserName) desde $($_.ClientComputerName)" })
-[pscustomobject]@{ shares = $shares; category = if ($profile) { "$($profile.NetworkCategory)" } else { '' }; fileSharing = $fs; discovery = $nd; sessions = $sessions } | ConvertTo-Json -Depth 4 -Compress
+$sessions = @(Get-SmbSession -ErrorAction SilentlyContinue | ForEach-Object { "$($_.ClientUserName) desde $($_.ClientComputerName)" } | Sort-Object -Unique)
+[pscustomobject]@{ shares = $shares; category = if ($profile) { "$($profile.NetworkCategory)" } else { '' }; fileSharing = $fs; discovery = $nd; sessions = $sessions; open = $abiertos } | ConvertTo-Json -Depth 4 -Compress
 "#;
-
 #[tauri::command(async)]
 pub fn list_shares() -> Result<SharingStatus, String> {
     let out = crate::pspool::query(SHARES_SCRIPT, Some(Duration::from_secs(40)), "Carpetas compartidas")?;

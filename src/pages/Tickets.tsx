@@ -17,6 +17,7 @@ import {
   LockOpen,
   LogOut,
   Mail,
+  MessagesSquare,
   Minus,
   Pencil,
   Plus,
@@ -38,13 +39,14 @@ import { useConfirm, useToast } from "../components/feedback";
 import { SheetPanel } from "../components/MachineSheetCard";
 import { Button, inputClass, Loading, Modal } from "../components/ui";
 import { lockApi, portalsApi, type Portal, type PortalAction } from "../lib/api";
-import { clearPortalError, lastPortalKey, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
+import { clearPortalError, failPortal, lastPortalKey, stowPortal, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
 import { getPrefs, windowRect } from "../lib/prefs";
+import { useLiveEffect } from "../lib/useLiveEffect";
 
 // Con el zoom de la interfaz aplicado: la vista web va en píxeles de la ventana.
 const rectOf = windowRect;
 
-export type PortalKind = "" | "inventory" | "mail";
+export type PortalKind = "" | "inventory" | "mail" | "teams";
 
 const ZOOMS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
@@ -53,6 +55,15 @@ const MAIL_PRESETS = {
   work: { name: "Correo", url: "https://outlook.office.com/mail/" },
   personal: { name: "Correo", url: "https://outlook.live.com/mail/" },
 };
+
+/** Teams en la web, listo para usar: la cuenta del trabajo o la personal. */
+const TEAMS_PRESETS = {
+  work: { name: "Teams", url: "https://teams.microsoft.com/v2/" },
+  personal: { name: "Teams", url: "https://teams.live.com/v2/" },
+};
+
+/** Portales de Microsoft: comparten cuenta, ventanas propias y botón de salir. */
+const isMicrosoft = (kind: PortalKind) => kind === "mail" || kind === "teams";
 
 /**
  * Portales de cada tipo ya leídos: al volver a la página la vista se muestra al
@@ -73,9 +84,9 @@ function pickActive(list: Portal[], current: string | null, lastKey: string): st
 }
 
 /**
- * Portales web dentro de AdminOps. `kind`: "" Tickets, "inventory" el inventario web
- * de la empresa, "mail" el correo de Outlook. `covered`: hay un diálogo de la app
- * encima (la vista web nativa lo taparía).
+ * Portales web dentro de AdminOps. `kind`: "" Tickets, "inventory" el inventario
+ * web de la empresa, "mail" el correo de Outlook, "teams" Teams. `covered`: hay
+ * un diálogo de la app encima (la vista web nativa lo taparía).
  */
 export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kind?: PortalKind }) {
   const lastKey = lastPortalKey(kind);
@@ -113,9 +124,40 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
     load().catch((e) => toast("error", String(e)));
   }, [load, toast]);
 
+  // Si falló por falta de red, al volver la conexión se reintenta solo: es lo
+  // que pasa a diario al conectar la VPN con Tickets ya abierto.
+  const errored = view.error;
+  useEffect(() => {
+    if (!active || !errored) return;
+    const retry = () => {
+      clearPortalError(active);
+      portalsApi.nav(active, "reload").catch(() => {});
+    };
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [active, errored]);
+
+  // Si la vista nativa no da ninguna señal de vida (ni empezó a cargar), no se
+  // deja al técnico mirando «Abriendo…» para siempre: a los 25 s se dice que no
+  // arrancó, con Reintentar. Pasó en la 1.1.6 cuando WebView2 se negaba a crear
+  // las vistas y la app no enseñaba ningún error.
+  const sinVida = !!active && !view.url && !view.loading && !view.error;
+  useEffect(() => {
+    if (!sinVida || !active) return;
+    const t = window.setTimeout(() => {
+      // Primero quitarla de encima: si no arrancó, es una capa invisible que no deja tocar nada.
+      void portalsApi.reset(active).catch(() => {});
+      failPortal(
+          active,
+          "La vista del portal no llegó a abrirse. Pulsa Reintentar; si se repite, cierra y vuelve a abrir AdminOps, y si sigue igual, el motivo está en el registro técnico (Ajustes → Datos de AdminOps).",
+      );
+    }, 25_000);
+    return () => window.clearTimeout(t);
+  }, [sinVida, active]);
+
   // Al cerrar la página, su vista nativa (que va por encima de la interfaz) se oculta.
   const shownRef = useRef<string | null>(null);
-  useEffect(() => () => void (shownRef.current && portalsApi.hide(shownRef.current)), []);
+  useEffect(() => () => void (shownRef.current && stowPortal(shownRef.current)), []);
 
   // La vista nativa se pinta por encima de todo: se oculta si algo de la app va
   // encima (diálogos, menús) o si la página no cargó (se enseña el aviso en su lugar).
@@ -125,7 +167,7 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
     const el = area.current;
     // Solo la vista de esta página: la del router puede estar viva en otra.
     if (!active || !el || hidden) {
-      if (shownRef.current) portalsApi.hide(shownRef.current);
+      if (shownRef.current) stowPortal(shownRef.current);
       return;
     }
     shownRef.current = active;
@@ -135,16 +177,27 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
       /* sin almacenamiento */
     }
     portalsApi.show(active, rectOf(el)).catch((e) => toast("error", String(e)));
-    const sync = () => portalsApi.bounds(active, rectOf(el));
+    // Colocar la vista hay que pedírselo al hilo de la ventana, así que al
+    // arrastrar el borde llegaban decenas de peticiones por segundo y la app se
+    // atascaba: se manda una por fotograma como mucho.
+    let frame = 0;
+    const sync = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        void portalsApi.bounds(active, rectOf(el));
+      });
+    };
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     window.addEventListener("resize", sync);
     return () => {
+      if (frame) cancelAnimationFrame(frame);
       ro.disconnect();
       window.removeEventListener("resize", sync);
     };
     // `findOpen`: la barra de búsqueda cambia el alto del área.
-  }, [active, hidden, portals, toast, lastKey, findOpen]);
+  }, [active, hidden, toast, lastKey, findOpen]);
 
   const remove = async (p: Portal) => {
     setConfirming(true);
@@ -153,7 +206,7 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
     if (!ok) return;
     await portalsApi.remove(p.id).catch((e) => toast("error", String(e)));
     setActive(null);
-    load();
+    void load();
   };
 
   const signOut = async (p: Portal) => {
@@ -188,13 +241,14 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
     portalsApi.nav(active, a).catch((e) => toast("error", String(e)));
   };
   const iconBtn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
-  const unread = kind === "mail" ? unreadFromTitle(view.title) : null;
+  // El Correo y Teams ponen los pendientes en el título de la página («(3) …»).
+  const unread = isMicrosoft(kind) ? unreadFromTitle(view.title) : null;
 
   return (
     <div className="flex h-full flex-col">
       {/* Portales y acciones del portal */}
       <div className="flex items-center gap-2 border-b border-line px-4 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {portals.map((p) => (
             <button
               key={p.id}
@@ -203,13 +257,13 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
                 p.id === active ? "bg-neon/10 text-neon" : "text-dim hover:bg-panel-2 hover:text-ink"
               }`}
             >
-              {kind === "mail" ? <Mail size={13} /> : <Globe size={13} />} {p.name}
+              {kind === "mail" ? <Mail size={13} /> : kind === "teams" ? <MessagesSquare size={13} /> : <Globe size={13} />} {p.name}
               {p.id === active && unread !== null && unread > 0 && <span className="rounded-full bg-neon px-1.5 text-[10px] font-semibold text-void">{unread}</span>}
-              {p.private && <span title="Sesión privada: se cierra al salir de AdminOps" className="text-[10px] text-mute">· privada</span>}
+              {p.private && <span title="Sesión privada: al salir de AdminOps se cierra la sesión y habrá que volver a entrar (y repetir la verificación del móvil)" className="text-[10px] text-mute">· privada</span>}
             </button>
           ))}
-          {/* Un solo correo: basta con uno configurado. */}
-          {!(kind === "mail" && portals.length > 0) && (
+          {/* Un solo correo y un solo Teams: basta con uno configurado. */}
+          {!(isMicrosoft(kind) && portals.length > 0) && (
             <button onClick={() => setEditing("new")} className={iconBtn} title={kind === "inventory" ? "Añadir web de inventario" : "Añadir portal"}>
               <Plus size={15} />
             </button>
@@ -225,18 +279,18 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
           </button>
         )}
         {kind === "mail" && portal && (
-          <>
-            <button onClick={compose} className="flex shrink-0 items-center gap-1.5 rounded-md bg-neon/10 px-2.5 py-1.5 text-xs text-neon hover:bg-neon/20">
-              <SquarePen size={13} /> Redactar
-            </button>
-            <button
-              onClick={() => signOut(portal)}
-              className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-dim hover:bg-panel-2 hover:text-ink"
-              title="Cerrar la sesión del correo en este equipo"
-            >
-              <LogOut size={13} /> Cerrar sesión
-            </button>
-          </>
+          <button onClick={compose} className="flex shrink-0 items-center gap-1.5 rounded-md bg-neon/10 px-2.5 py-1.5 text-xs text-neon hover:bg-neon/20">
+            <SquarePen size={13} /> Redactar
+          </button>
+        )}
+        {isMicrosoft(kind) && portal && (
+          <button
+            onClick={() => signOut(portal)}
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-dim hover:bg-panel-2 hover:text-ink"
+            title={kind === "mail" ? "Cerrar la sesión del correo en este equipo" : "Cerrar la sesión de Teams en este equipo"}
+          >
+            <LogOut size={13} /> Cerrar sesión
+          </button>
         )}
         {portal && (
           <div className="flex shrink-0 items-center gap-0.5">
@@ -312,7 +366,7 @@ export function Tickets({ covered = false, kind = "" }: { covered?: boolean; kin
             setEditing(null);
             clearPortalError(p.id);
             setActive(p.id);
-            load();
+            void load();
           }}
         />
       )}
@@ -544,17 +598,17 @@ function DownloadsMenu({ downloads, onClose }: { downloads: PortalDownload[]; on
       ) : (
         <ul className="divide-y divide-line/60">
           {downloads.map((d) => (
-            <li key={d.index} className="flex items-center gap-3 py-2">
+            <li key={d.download} className="flex items-center gap-3 py-2">
               {d.state === "running" ? <Loader2 size={14} className="animate-spin text-neon" /> : d.state === "done" ? <FileDown size={14} className="text-ok" /> : <XCircle size={14} className="text-bad" />}
               <span className="min-w-0 flex-1 truncate text-sm text-ink" title={d.name}>
                 {d.name}
               </span>
               {d.state === "done" && (
                 <>
-                  <button onClick={() => run(portalsApi.openDownload(d.index))} className="text-xs text-neon hover:underline">
+                  <button onClick={() => run(portalsApi.openDownload(d.download))} className="text-xs text-neon hover:underline">
                     Abrir
                   </button>
-                  <button onClick={() => run(portalsApi.revealDownload(d.index))} className="flex items-center gap-1 text-xs text-dim hover:text-ink" title="Mostrar en la carpeta">
+                  <button onClick={() => run(portalsApi.revealDownload(d.download))} className="flex items-center gap-1 text-xs text-dim hover:text-ink" title="Mostrar en la carpeta">
                     <FolderOpen size={12} />
                   </button>
                 </>
@@ -610,7 +664,7 @@ function ErrorPanel({
 
 function Empty({ kind, onAdd }: { kind: PortalKind; onAdd: (preset?: Portal) => void }) {
   if (kind === "mail") {
-    const preset = (which: keyof typeof MAIL_PRESETS): Portal => ({ id: "", ...MAIL_PRESETS[which], extraDomains: [], kind: "mail", private: true, autofill: true });
+    const preset = (which: keyof typeof MAIL_PRESETS): Portal => ({ id: "", ...MAIL_PRESETS[which], extraDomains: [], kind: "mail", private: false, autofill: true });
     return (
       <div className="mx-auto max-w-xl p-10 text-center">
         <Mail size={36} className="mx-auto mb-4 text-neon" />
@@ -628,7 +682,33 @@ function Empty({ kind, onAdd }: { kind: PortalKind; onAdd: (preset?: Portal) => 
         </div>
         <p className="mt-6 flex items-start gap-2 text-left text-xs text-mute">
           <ShieldCheck size={14} className="mt-0.5 shrink-0 text-neon" />
-          Con «sesión privada» (recomendado en equipos de clientes) no se guarda nada en el equipo y la sesión se cierra al salir de AdminOps.
+          La sesión queda guardada en este equipo, así que no hay que volver a entrar ni repetir la verificación del móvil cada vez. En el PC de un cliente, marca «sesión privada» al editarlo y no quedará nada al salir.
+        </p>
+      </div>
+    );
+  }
+  if (kind === "teams") {
+    const preset = (which: keyof typeof TEAMS_PRESETS): Portal => ({ id: "", ...TEAMS_PRESETS[which], extraDomains: [], kind: "teams", private: false, autofill: true });
+    return (
+      <div className="mx-auto max-w-xl p-10 text-center">
+        <MessagesSquare size={36} className="mx-auto mb-4 text-neon" />
+        <h2 className="mb-2 text-lg font-semibold">Teams dentro de AdminOps</h2>
+        <p className="mb-5 text-sm text-dim">
+          Chats, equipos y reuniones sin instalar Teams en el equipo del cliente ni salir de la aplicación. Se usa Teams en la web, que es la versión que
+          funciona en cualquier equipo; la cuenta se guarda cifrada y el inicio de sesión se rellena solo.
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button onClick={() => onAdd(preset("work"))}>
+            <MessagesSquare size={14} /> Teams del trabajo (Microsoft 365)
+          </Button>
+          <Button kind="ghost" onClick={() => onAdd(preset("personal"))}>
+            Teams personal
+          </Button>
+        </div>
+        <p className="mt-6 flex items-start gap-2 text-left text-xs text-mute">
+          <ShieldCheck size={14} className="mt-0.5 shrink-0 text-neon" />
+          La sesión queda guardada, así que no hay que volver a entrar cada vez. En el PC de un cliente, marca «sesión privada» al editarlo y no quedará nada al salir. Para
+          hablar en una reunión, Windows pedirá permiso de micrófono y cámara la primera vez.
         </p>
       </div>
     );
@@ -657,9 +737,13 @@ function Empty({ kind, onAdd }: { kind: PortalKind; onAdd: (preset?: Portal) => 
 
 function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; initial: Portal | null; onClose: () => void; onSaved: (p: Portal) => void }) {
   const mail = kind === "mail";
+  // Correo y Teams: los dominios de Microsoft y las ventanas propias los pone AdminOps.
+  const ms = isMicrosoft(kind);
   const [p, setP] = useState<Portal>(initial ?? { id: "", name: "", url: "", extraDomains: [], kind, zoom: getPrefs().portalZoom });
-  // En el correo los dominios de Microsoft se añaden solos: aquí solo los propios.
-  const [extra, setExtra] = useState((initial?.extraDomains ?? []).filter((d) => !mail || !/(microsoft|office|outlook|live|msauth|msftauth|sharepoint)/.test(d)).join(", "));
+  // En el correo y en Teams los dominios de Microsoft se añaden solos: aquí solo los propios.
+  const [extra, setExtra] = useState(
+    (initial?.extraDomains ?? []).filter((d) => !ms || !/(microsoft|office|outlook|live|msauth|msftauth|sharepoint|teams|skype|lync|trouter|svc\.ms)/.test(d)).join(", "),
+  );
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const [hasPassword, setHasPassword] = useState(false);
@@ -667,20 +751,25 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
   const [lockOn, setLockOn] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (initial?.id)
-      portalsApi
-        .login(initial.id)
-        .then((l) => {
-          setUser(l?.user ?? "");
-          setHasPassword(!!l?.hasPassword);
-        })
+  // Al pasar de un portal a otro, la cuenta del anterior no debe quedarse escrita.
+  useLiveEffect(
+    (vigente) => {
+      if (initial?.id)
+        portalsApi
+          .login(initial.id)
+          .then((l) => {
+            if (!vigente()) return;
+            setUser(l?.user ?? "");
+            setHasPassword(!!l?.hasPassword);
+          })
+          .catch(() => {});
+      lockApi
+        .status()
+        .then((s) => vigente() && setLockOn(s.enabled))
         .catch(() => {});
-    lockApi
-      .status()
-      .then((s) => setLockOn(s.enabled))
-      .catch(() => {});
-  }, [initial?.id]);
+    },
+    [initial?.id],
+  );
 
   const save = async () => {
     setError(null);
@@ -707,7 +796,7 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
 
   return (
     <Modal
-      title={initial?.id ? (mail ? "Editar correo" : "Editar portal") : mail ? "Configurar el correo" : "Nuevo portal"}
+      title={ms ? `${initial?.id ? "Editar" : "Configurar"} ${mail ? "el correo" : "Teams"}` : initial?.id ? "Editar portal" : "Nuevo portal"}
       onClose={onClose}
       width="w-[560px]"
       footer={
@@ -726,7 +815,7 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
         <div className="grid grid-cols-5 gap-3">
           <label className="col-span-2 block">
             <span className="mb-1 block text-xs text-dim">Nombre</span>
-            <input autoFocus value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} maxLength={40} placeholder={mail ? "Correo" : "Intranet PGR"} className={inputClass} />
+            <input autoFocus value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} maxLength={40} placeholder={ms ? (mail ? "Correo" : "Teams") : "Intranet PGR"} className={inputClass} />
           </label>
           <label className="col-span-3 block">
             <span className="mb-1 block text-xs text-dim">Dirección</span>
@@ -735,9 +824,9 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
         </div>
 
         <fieldset className="rounded-lg border border-line p-3">
-          <legend className="px-1 text-xs text-dim">Inicio de sesión guardado {mail ? "" : "(opcional)"}</legend>
+          <legend className="px-1 text-xs text-dim">Inicio de sesión guardado {ms ? "" : "(opcional)"}</legend>
           <div className="grid grid-cols-2 gap-3">
-            <input value={user} onChange={(e) => setUser(e.target.value)} placeholder={mail ? "tu.correo@empresa.com" : "Usuario"} autoComplete="off" className={inputClass} />
+            <input value={user} onChange={(e) => setUser(e.target.value)} placeholder={ms ? "tu.correo@empresa.com" : "Usuario"} autoComplete="off" className={inputClass} />
             <input
               type="password"
               value={password}
@@ -757,14 +846,14 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
           )}
           <p className="mt-2 text-[11px] text-mute">
             Se guarda cifrada con AdminOps (en el USB si usas la versión portable, para llevarla a cualquier equipo). Nunca se muestra ni sale de AdminOps.
-            {mail && " Si la cuenta tiene verificación en dos pasos, solo tendrás que confirmarla en el móvil."}
+            {ms && " Si la cuenta tiene verificación en dos pasos, solo tendrás que confirmarla en el móvil."}
           </p>
           {!lockOn && (user || password) && (
             <p className="mt-2 flex items-start gap-1.5 text-[11px] text-warn">
               <TriangleAlert size={12} className="mt-0.5 shrink-0" /> AdminOps no tiene bloqueo con PIN: quien use este equipo (o tenga el USB) podría entrar con tu cuenta. Actívalo en Ajustes → Seguridad.
             </p>
           )}
-          <div className="mt-3">{check(!!p.autofill, (v) => setP({ ...p, autofill: v }), "Rellenar el inicio de sesión automáticamente", mail ? "Escribe la cuenta y la contraseña en la página de Microsoft y pulsa Siguiente." : "Rellena usuario y contraseña cuando la página los pida (no envía el formulario).")}</div>
+          <div className="mt-3">{check(!!p.autofill, (v) => setP({ ...p, autofill: v }), "Rellenar el inicio de sesión automáticamente", ms ? "Escribe la cuenta y la contraseña en la página de Microsoft y pulsa Siguiente." : "Rellena usuario y contraseña cuando la página los pida (no envía el formulario).")}</div>
         </fieldset>
 
         <div className="space-y-2.5">
@@ -772,9 +861,9 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
             !!p.private,
             (v) => setP({ ...p, private: v }),
             "Sesión privada: cerrar la sesión al salir de AdminOps",
-            "No se guardan cookies ni historial en este equipo. Recomendado en equipos de clientes. Con la cuenta guardada, volver a entrar es un clic.",
+            "No se guarda nada en este equipo: para el PC de un cliente. En el tuyo déjalo apagado, o tendrás que iniciar sesión y repetir la verificación del móvil cada vez que abras AdminOps.",
           )}
-          {!mail &&
+          {!ms &&
             check(
               p.popups === "window",
               (v) => setP({ ...p, popups: v ? "window" : "" }),
@@ -784,15 +873,15 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-xs text-dim">{mail ? "Página de inicio de sesión de tu empresa (opcional)" : "Otros dominios permitidos (opcional)"}</span>
-          <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={mail ? "sts.pgr.gob.do" : "login.empresa.com, archivos.empresa.com"} className={`${inputClass} font-mono text-xs`} />
+          <span className="mb-1 block text-xs text-dim">{ms ? "Página de inicio de sesión de tu empresa (opcional)" : "Otros dominios permitidos (opcional)"}</span>
+          <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={ms ? "sts.pgr.gob.do" : "login.empresa.com, archivos.empresa.com"} className={`${inputClass} font-mono text-xs`} />
           <span className="mt-1 block text-[11px] text-mute">
-            {mail
+            {ms
               ? "Solo si al iniciar sesión Microsoft te lleva a una página de tu empresa. Los dominios de Microsoft y el de tu dominio habitual ya se permiten."
               : "Solo si el inicio de sesión o los archivos del portal están en otro dominio. Los subdominios del portal ya se permiten."}
           </span>
         </label>
-        {!mail && (
+        {!ms && (
           <p className="text-[11px] text-mute">
             Webs de la empresa con la cuenta de Windows (dominio, como *.pgr.gob.do): tras guardar, cierra y vuelve a abrir AdminOps y entrará sola con tu usuario de Windows, sin
             pedir contraseña.

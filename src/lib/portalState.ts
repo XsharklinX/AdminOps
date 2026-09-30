@@ -10,7 +10,8 @@ import { useSyncExternalStore } from "react";
 import { portalsApi } from "./api";
 
 export interface PortalDownload {
-  index: number;
+  /** Número propio de la descarga (no es su posición en la lista). */
+  download: number;
   name: string;
   state: "running" | "done" | "failed";
 }
@@ -37,11 +38,21 @@ const slowTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let subs: (() => void)[] = [];
 
 const get = (id: string) => views.get(id) ?? EMPTY;
+/**
+ * Cambia el estado de una vista y avisa a quien lo esté mirando. Si el valor es
+ * el mismo de antes no se avisa: webs como Outlook repiten el título y el estado
+ * del historial constantemente, y cada aviso repintaba la página entera.
+ */
 function patch(id: string, p: Partial<PortalView> | ((v: PortalView) => Partial<PortalView>)) {
   const cur = get(id);
-  views.set(id, { ...cur, ...(typeof p === "function" ? p(cur) : p) });
+  const next = { ...cur, ...(typeof p === "function" ? p(cur) : p) };
+  if (same(cur, next)) return;
+  views.set(id, next);
   subs.forEach((s) => s());
 }
+
+/** ¿Son iguales dos estados? (las descargas, por referencia: solo cambian al llegar una). */
+const same = (a: PortalView, b: PortalView) => (Object.keys(b) as (keyof PortalView)[]).every((k) => a[k] === b[k]);
 
 const subscribe = (cb: () => void) => {
   subs.push(cb);
@@ -52,9 +63,22 @@ const subscribe = (cb: () => void) => {
 
 export const portalView = get;
 
+/**
+ * Quita de la vista un portal al salir de su página. Normalmente basta con
+ * ocultarlo (se conserva su sesión y vuelve al instante). Pero si nunca llegó a
+ * arrancar, ocultarlo no sirve: su ventana nativa se queda invisible encima de
+ * la interfaz tragándose los clics. Esa se destruye.
+ */
+export function stowPortal(id: string) {
+  if (get(id).url === null) void portalsApi.reset(id).catch(() => {});
+  else void portalsApi.hide(id).catch(() => {});
+}
+
 /** Clave donde se recuerda el último portal usado de cada tipo (también para precargarlo). */
-export const lastPortalKey = (kind: "" | "inventory" | "mail") => (kind ? `adminops.lastPortal.${kind}` : "adminops.lastPortal");
+export const lastPortalKey = (kind: "" | "inventory" | "mail" | "teams") => (kind ? `adminops.lastPortal.${kind}` : "adminops.lastPortal");
 export const clearPortalError = (id: string) => patch(id, { error: null });
+/** Marca un portal como fallido desde la interfaz (p. ej. la vista no llegó a crearse). */
+export const failPortal = (id: string, message: string) => patch(id, { error: message, loading: false, slow: false });
 
 /** Mensajes nuevos según el título de la página («(3) Correo…»); null si no lo dice. */
 export function unreadFromTitle(title: string): number | null {
@@ -105,8 +129,8 @@ export function watchPortals() {
   });
   void listen<{ id: string } & PortalDownload>("portal-download", ({ payload: p }) =>
     patch(p.id, (v) => {
-      const d = { index: p.index, name: p.name, state: p.state };
-      const rest = v.downloads.filter((x) => x.index !== p.index);
+      const d = { download: p.download, name: p.name, state: p.state };
+      const rest = v.downloads.filter((x) => x.download !== p.download);
       return { downloads: [d, ...rest].slice(0, 20) };
     }),
   );

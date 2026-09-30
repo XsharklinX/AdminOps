@@ -82,6 +82,7 @@ struct NetAdapter {
     ipv4: Vec<String>,
     gateway: Vec<String>,
     dhcp: bool,
+    dns: Vec<String>,
 }
 
 #[derive(Deserialize, Default, Debug)]
@@ -105,6 +106,7 @@ $ad = @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | ForEach-Object 
     ipv4 = @($cfg.IPv4Address | ForEach-Object { "$($_.IPAddress)" } | Where-Object { $_ })
     gateway = @($cfg.IPv4DefaultGateway | ForEach-Object { "$($_.NextHop)" } | Where-Object { $_ })
     dhcp = [bool]($ifc -and "$($ifc.Dhcp)" -eq 'Enabled')
+    dns = @($cfg.DNSServer | Where-Object { $_.AddressFamily -eq 2 } | ForEach-Object { $_.ServerAddresses } | Where-Object { $_ })
   }
 })
 $vpn = @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { "$($_.Status)" -eq 'Up' -and "$($_.InterfaceDescription)" -match 'VPN|TAP-|WireGuard|Fortinet|AnyConnect|OpenVPN|Tailscale|ZeroTier|PANGP|GlobalProtect' } | ForEach-Object { "$($_.InterfaceDescription)" })
@@ -129,6 +131,20 @@ pub struct NetCheck {
     pub gateway: Option<bool>,
     pub internet: bool,
     pub dns: bool,
+    // Lo que hace falta para explicar el resultado, no solo para marcarlo.
+    /// IPv4 del adaptador activo.
+    pub ip: String,
+    /// Puerta de enlace (el router).
+    pub gateway_ip: String,
+    /// Servidores DNS en uso.
+    pub dns_servers: Vec<String>,
+    /// La IP la da el router (DHCP) o está puesta a mano.
+    pub dhcp: bool,
+    pub wifi: bool,
+    /// Proxy configurado en Windows (vacío si no hay).
+    pub proxy: String,
+    /// Adaptadores de VPN activos.
+    pub vpn: Vec<String>,
 }
 
 fn tcp_ok(addr: &str) -> bool {
@@ -153,6 +169,13 @@ fn net_check_from(raw: &NetRaw) -> NetCheck {
         let d = s.spawn(dns_ok);
         (i.join().unwrap_or(false), d.join().unwrap_or(false))
     });
+    let proxy = if raw.proxy_enable == 1 && !raw.proxy_server.is_empty() {
+        raw.proxy_server.clone()
+    } else if !raw.auto_config.is_empty() {
+        raw.auto_config.clone()
+    } else {
+        String::new()
+    };
     NetCheck {
         connected: valid_ip,
         no_dhcp_address: a.is_some_and(|a| !a.ipv4.is_empty() && a.ipv4.iter().all(|ip| ip.starts_with("169.254."))),
@@ -160,6 +183,13 @@ fn net_check_from(raw: &NetRaw) -> NetCheck {
         gateway,
         internet,
         dns,
+        ip: a.and_then(|a| a.ipv4.first().cloned()).unwrap_or_default(),
+        gateway_ip: a.and_then(|a| a.gateway.first().cloned()).unwrap_or_default(),
+        dns_servers: a.map(|a| a.dns.clone()).unwrap_or_default(),
+        dhcp: a.is_some_and(|a| a.dhcp),
+        wifi: a.is_some_and(|a| a.wifi),
+        proxy,
+        vpn: raw.vpn.clone(),
     }
 }
 
@@ -262,6 +292,92 @@ pub struct NetRepair {
     pub after: NetCheck,
     pub steps: Vec<Step>,
     pub reboot: bool,
+    /// Qué pasa y qué hacer ahora. Lo importante del resultado: marcar cuatro
+    /// casillas está bien para ver si mejoró, pero no dice dónde está el problema.
+    pub verdict: Verdict,
+}
+
+/// Diagnóstico en cristiano de cómo quedó la red.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Verdict {
+    /// "ok" | "warn" | "bad"
+    pub level: String,
+    pub title: String,
+    /// Qué pasa y, sobre todo, qué hacer a continuación.
+    pub text: String,
+    /// Qué botones ofrecer: "router" | "dns" | "deep" | "wifi" | "proxy" | "speed".
+    pub next: Vec<String>,
+}
+
+/// Dónde se corta la cadena: adaptador → IP → router → Internet → DNS. Se mira
+/// en ese orden porque cada eslabón depende del anterior, y así el técnico sabe
+/// a qué atenerse en vez de volver a probar a ciegas.
+fn verdict_for(c: &NetCheck, deep_done: bool) -> Verdict {
+    let v = |level: &str, title: &str, text: String, next: &[&str]| Verdict {
+        level: level.into(),
+        title: title.into(),
+        text,
+        next: next.iter().map(|s| s.to_string()).collect(),
+    };
+    let equipo = if c.adapter.is_empty() { "este equipo".to_string() } else { format!("«{}»", c.adapter) };
+
+    if c.adapter.is_empty() {
+        return v("bad", "No hay ninguna tarjeta de red conectada", "Ni cable ni Wi-Fi. Revisa que el cable esté puesto en los dos extremos y con la luz encendida, o que la Wi-Fi esté activada. Si la tarjeta no aparece, mírala en Estado del equipo → Piezas.".into(), &["wifi"]);
+    }
+    if c.no_dhcp_address {
+        return v(
+            "bad",
+            "El router no le está dando dirección",
+            format!("{equipo} se ha puesto una dirección 169.254.x.x, que es lo que hace Windows cuando nadie le contesta. Casi siempre es el cable, el puerto del switch o que el router está colgado: apágalo 30 segundos y vuelve a encenderlo. Si hay varios equipos igual, es el router."),
+            &["router"],
+        );
+    }
+    if !c.connected {
+        return v("bad", "Sin dirección IP válida", format!("{equipo} no tiene una IPv4 utilizable. Revisa el cable o la Wi-Fi y, si la dirección está puesta a mano, compruébala."), &["wifi", "router"]);
+    }
+    if c.gateway == Some(false) {
+        return v(
+            "bad",
+            "El equipo tiene IP pero el router no responde",
+            format!("Tiene la dirección {} y su puerta de enlace es {}, pero esa dirección no contesta. El router puede estar apagado o colgado, el cable en un puerto que no toca, o {equipo} en otra red distinta de la del router.{}",
+                c.ip, c.gateway_ip,
+                if c.dhcp { "" } else { " Ojo: la IP está puesta a mano, no la da el router; si la red cambió, ya no vale." }),
+            &["router"],
+        );
+    }
+    if !c.internet {
+        let vpn = if c.vpn.is_empty() { String::new() } else { format!(" Hay una VPN activa ({}): pruébalo también con la VPN desconectada.", c.vpn.join(", ")) };
+        return v(
+            "warn",
+            "Llega al router, pero no sale a Internet",
+            format!("La red local funciona: el problema está del router hacia fuera, así que no es de este equipo. Entra en el panel del router y mira si tiene línea; si no la tiene, es del proveedor. Comprueba también si la red pide aceptar unas condiciones en el navegador (hoteles, wifis públicas).{vpn}"),
+            &["router", "speed"],
+        );
+    }
+    if !c.dns {
+        let actuales = if c.dns_servers.is_empty() { "ninguno configurado".to_string() } else { c.dns_servers.join(", ") };
+        return v(
+            "warn",
+            "Hay Internet, pero no resuelve nombres",
+            format!("Se llega a las direcciones pero no se traducen los nombres: por eso «no carga ninguna web» aunque la conexión esté bien. Los DNS en uso son {actuales}. Cámbialos a 1.1.1.1 y 8.8.8.8 y vuelve a probar."),
+            &["dns"],
+        );
+    }
+    if !c.proxy.is_empty() {
+        return v(
+            "warn",
+            "La red funciona, pero hay un proxy configurado",
+            format!("Todo responde, pero Windows tiene un proxy puesto ({}). Si el equipo ya no está en la red donde hacía falta, las webs seguirán sin cargar aunque la conexión esté bien.", c.proxy),
+            &["proxy"],
+        );
+    }
+    v(
+        "ok",
+        "La red funciona",
+        format!("{equipo} tiene dirección {}, llega al router {} y resuelve nombres.{}", c.ip, c.gateway_ip, if deep_done { " Reinicia el equipo para terminar de aplicar el restablecimiento." } else { "" }),
+        &["speed"],
+    )
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -291,9 +407,15 @@ pub fn network_repair(deep: bool) -> Result<NetRepair, String> {
     let mut steps = Vec::new();
     let opts = || crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: None };
     steps.push(step("Vaciar la caché de DNS", crate::ps::exec_opts("ipconfig.exe", &["/flushdns"], opts())));
+    // La tabla ARP se queda con la MAC vieja del router cuando lo cambian o se
+    // reinicia: el equipo tiene IP, ve la red y aun así no llega a la puerta de
+    // enlace. Vaciarla es inofensivo y se rehace sola.
+    steps.push(step("Vaciar la tabla de direcciones de la red (ARP)", crate::ps::exec_opts("netsh.exe", &["interface", "ip", "delete", "arpcache"], opts())));
     if deep {
         steps.push(step("Restablecer Winsock", crate::ps::exec_opts("netsh.exe", &["winsock", "reset"], opts())));
         steps.push(step("Restablecer la pila TCP/IP", crate::ps::exec_opts("netsh.exe", &["int", "ip", "reset"], opts())));
+        // Un proxy heredado de otra red deja el equipo «conectado sin Internet».
+        steps.push(step("Quitar el proxy de las descargas del sistema", crate::ps::exec_opts("netsh.exe", &["winhttp", "reset", "proxy"], opts())));
     }
     steps.push(step("Reiniciar los adaptadores de red", crate::ps::powershell_opts(RESTART_ADAPTERS, opts())));
     // Tras reiniciar el adaptador, esperar a que vuelva la conexión antes de renovar.
@@ -310,7 +432,8 @@ pub fn network_repair(deep: bool) -> Result<NetRepair, String> {
         std::thread::sleep(Duration::from_secs(3));
         after = quick_net_check()?;
     }
-    Ok(NetRepair { before, after, steps, reboot: deep })
+    let verdict = verdict_for(&after, deep);
+    Ok(NetRepair { before, after, steps, reboot: deep, verdict })
 }
 
 #[tauri::command(async)]
@@ -924,6 +1047,59 @@ mod tests {
     use super::*;
 
     const SYMPTOMS: &[&str] = &["internet", "wifi", "audio", "bluetooth", "display", "printer", "slow", "winupdate"];
+
+    /// El diagnóstico de la red señala el primer eslabón roto de la cadena, no
+    /// el último síntoma: es la diferencia entre «no hay Internet» y «el router
+    /// no te está dando dirección, reinícialo».
+    #[test]
+    fn network_verdict_points_at_the_broken_link() {
+        let base = NetCheck {
+            connected: true,
+            adapter: "Ethernet".into(),
+            gateway: Some(true),
+            internet: true,
+            dns: true,
+            ip: "192.168.1.50".into(),
+            gateway_ip: "192.168.1.1".into(),
+            dhcp: true,
+            ..Default::default()
+        };
+        // Todo bien.
+        assert_eq!(verdict_for(&base, false).level, "ok");
+
+        // Sin tarjeta: ni se mira el resto.
+        let v = verdict_for(&NetCheck::default(), false);
+        assert_eq!(v.level, "bad");
+        assert!(v.title.contains("tarjeta"), "{}", v.title);
+
+        // 169.254: lo dice el router, no el equipo.
+        let v = verdict_for(&NetCheck { no_dhcp_address: true, connected: false, ..base.clone() }, false);
+        assert!(v.title.contains("router"), "{}", v.title);
+        assert_eq!(v.next, vec!["router"]);
+
+        // Con IP pero el router no contesta.
+        let v = verdict_for(&NetCheck { gateway: Some(false), ..base.clone() }, false);
+        assert_eq!(v.level, "bad");
+        assert!(v.text.contains("192.168.1.1"), "debe decir cuál es la puerta de enlace: {}", v.text);
+
+        // Llega al router pero no sale: el problema no es del equipo.
+        let v = verdict_for(&NetCheck { internet: false, ..base.clone() }, false);
+        assert_eq!(v.level, "warn");
+        assert!(v.text.contains("no es de este equipo"), "{}", v.text);
+
+        // Hay Internet pero no resuelve nombres: se proponen otros DNS.
+        let v = verdict_for(&NetCheck { dns: false, dns_servers: vec!["10.0.0.9".into()], ..base.clone() }, false);
+        assert_eq!(v.next, vec!["dns"]);
+        assert!(v.text.contains("10.0.0.9"), "debe decir qué DNS se están usando: {}", v.text);
+
+        // Todo responde pero queda un proxy de otra red.
+        let v = verdict_for(&NetCheck { proxy: "proxy.empresa.local:8080".into(), ..base.clone() }, false);
+        assert_eq!(v.level, "warn");
+        assert!(v.text.contains("proxy.empresa.local:8080"), "{}", v.text);
+
+        // Tras la reparación a fondo se avisa del reinicio.
+        assert!(verdict_for(&base, true).text.contains("Reinicia"));
+    }
 
     #[test]
     fn scripts_parse() {

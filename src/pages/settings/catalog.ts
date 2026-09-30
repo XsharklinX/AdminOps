@@ -10,7 +10,7 @@ export const SECTIONS = [
   { id: "general", label: "General", icon: Settings2, hint: "Cómo se comporta AdminOps al abrirse y mientras trabajas." },
   { id: "appearance", label: "Apariencia", icon: Palette, hint: "Tema, color, tamaño de la interfaz y animaciones." },
   { id: "navigation", label: "Navegación", icon: SlidersHorizontal, hint: "La barra lateral, las secciones y tus atajos de teclado." },
-  { id: "portals", label: "Portales y correo", icon: Ticket, hint: "Tickets, inventario web y el Correo: cómo se cargan y se cierran." },
+  { id: "portals", label: "Portales y correo", icon: Ticket, hint: "Tickets, inventario web, el Correo y Teams: cómo se cargan y se cierran." },
   { id: "security", label: "Seguridad", icon: Lock, hint: "Bloqueo con PIN o contraseña y modo solo mirar." },
   { id: "reports", label: "Informes y cobros", icon: Building2, hint: "Tu marca, firma, checklist, garantías e impuestos." },
   { id: "performance", label: "Rendimiento", icon: Gauge, hint: "Cuánto tarda AdminOps en abrirse y cada página en cargar." },
@@ -30,8 +30,9 @@ export interface SettingEntry {
 export const SETTINGS_INDEX: SettingEntry[] = [
   // General
   { section: "general", title: "Página al abrir AdminOps", keywords: "inicio arranque primera pagina" },
+  { section: "general", title: "Volver a ver la bienvenida", keywords: "asistente inicio primera vez tutorial modo bienvenida" },
   { section: "general", title: "Actualización del Panel", keywords: "refresco segundos cpu memoria" },
-  { section: "general", title: "Precargar los portales", keywords: "tickets inventario correo rapido" },
+  { section: "general", title: "Precargar los portales", keywords: "tickets inventario correo teams rapido" },
   { section: "general", title: "Diagnosticar al abrir AdminOps", keywords: "diagnostico automatico analisis" },
   { section: "general", title: "Vigilar errores de Windows", keywords: "avisos eventos campana pantallazos" },
   { section: "general", title: "Avisar al terminar tareas largas", keywords: "notificacion tareas" },
@@ -52,11 +53,11 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { section: "navigation", title: "Barra lateral", keywords: "ancho posicion iconos densidad acoplar" },
   { section: "navigation", title: "Secciones y páginas", keywords: "ocultar ordenar areas favoritos" },
   // Portales
-  { section: "portals", title: "Precargar el último portal", keywords: "rapido tickets correo inventario" },
+  { section: "portals", title: "Precargar el último portal", keywords: "rapido tickets correo teams inventario" },
   { section: "portals", title: "Cerrar las sesiones privadas al salir", keywords: "correo outlook privacidad cliente" },
   { section: "portals", title: "Zoom de los portales", keywords: "tamaño letra web" },
   { section: "portals", title: "Dominio de la empresa", keywords: "intranet cuenta windows autenticacion integrada" },
-  { section: "portals", title: "Portales configurados", keywords: "tickets inventario correo web" },
+  { section: "portals", title: "Portales configurados", keywords: "tickets inventario correo teams web" },
   // Seguridad
   { section: "security", title: "Bloqueo de AdminOps", keywords: "pin contraseña bloquear inactividad" },
   { section: "security", title: "Modo solo mirar", keywords: "auditoria sin cambios" },

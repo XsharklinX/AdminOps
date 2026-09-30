@@ -36,7 +36,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const run = async (key: string, fn: () => Promise<unknown>) => {
@@ -48,7 +48,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setBusy(null);
-      load();
+      void load();
     }
   };
 
@@ -79,12 +79,12 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
       confirmLabel: "Sacar el equipo",
       danger: true,
     });
-    if (ok) run("leave", accountsApi.leaveAzureAd);
+    if (ok) void run("leave", accountsApi.leaveAzureAd);
   };
 
   const signOut = async () => {
     const ok = await confirm({ title: "Cerrar la sesión de Windows", body: "Se cerrará la sesión ahora (guarda lo que tengas abierto). Después entra con la otra cuenta.", confirmLabel: "Cerrar sesión", danger: true });
-    if (ok) run("signout", accountsApi.signOut);
+    if (ok) void run("signout", accountsApi.signOut);
   };
 
   const step = (done: boolean, n: number) => (done ? <CheckCircle2 size={16} className="shrink-0 text-ok" /> : <span className="grid size-4 shrink-0 place-items-center rounded-full border border-line-2 text-[10px] text-mute">{n}</span>);
@@ -207,7 +207,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
                   <button
                     onClick={async () => {
                       if (await confirm({ title: "Desconectar cuenta", body: `Windows dejará de usar ${a.email} (Outlook, Teams, OneDrive de empresa pedirán iniciar sesión otra vez).`, confirmLabel: "Desconectar", danger: true }))
-                        run(a.id, () => accountsApi.removeWorkAccount(a.id));
+                        void run(a.id, () => accountsApi.removeWorkAccount(a.id));
                     }}
                     disabled={!!busy}
                     className="rounded px-2 py-0.5 text-xs text-bad hover:bg-bad/10 disabled:opacity-40"
@@ -284,7 +284,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
               <Search size={14} className="absolute top-2.5 left-3 text-mute" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar servidor, carpeta o usuario…" className={`${inputClass} pl-9`} />
             </div>
-            <ul className="mt-2 max-h-96 overflow-y-auto">
+            <ul className="mt-2 pane-md overflow-y-auto">
               {creds.map((c) => (
                 <li key={c.target} className="flex items-center gap-2 border-t border-line/60 py-1.5 text-xs">
                   <span className="min-w-0 flex-1">

@@ -779,7 +779,8 @@ fn collect(app: &tauri::AppHandle, state: &TweakState, force: bool) -> Diagnosti
         let system = collect_emit!("system", collect::system());
         let startup = collect_emit!("startupEnabled", crate::tweaks::startup::enabled_names());
         let bloat = collect_emit!("bloatInstalled", crate::tweaks::appx::recommended_installed());
-        let updates = collect_emit!("softwareUpdates", crate::software::cached_or_list(updates_max_age));
+        // Sin esperar a winget: lo que haya, y si hace falta se actualiza detrás.
+        let updates = collect_emit!("softwareUpdates", crate::software::cached_or_refresh(updates_max_age));
         let hw = s.spawn(|| {
             let hw = hardware_bundle(force);
             let inventory: Section<_> = hw.0.into();

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "./feedback";
+import { solutionForFinding } from "../lib/solutionsCatalog";
 import type { PageId } from "./Sidebar";
 import { agendaApi, alertsApi, appBackupApi, diagApi, toolsApi, tweaksApi, workApi, type Finding, type FindingAction } from "../lib/api";
 
@@ -135,7 +136,13 @@ export function ActionPlan({
         source: "Diagnóstico",
         title: f.title,
         detail: f.detail ?? undefined,
-        action: f.actions[0] ? { label: f.actions[0].label, run: act(f.actions[0]) } : undefined,
+        action: f.actions[0]
+          ? { label: f.actions[0].label, run: act(f.actions[0]) }
+          : // Sin acción directa, al menos los pasos para arreglarlo.
+            (() => {
+              const sol = solutionForFinding(f);
+              return sol ? { label: "Cómo se arregla", run: () => onNavigate("knowledge", `solution:${sol}`) } : undefined;
+            })(),
       }));
     // Espacio en vivo: por si el diagnóstico es antiguo o no lo hay.
     const live: PlanItem[] = [];

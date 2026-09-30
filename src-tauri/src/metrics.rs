@@ -20,10 +20,22 @@ struct Collector {
     last_net: Instant,
     /// Los discos cambian poco: se releen cada pocos segundos, no en cada lectura.
     last_disks: Instant,
+    /// Última vez que se recorrió la lista de procesos, y lo que se sacó de ella.
+    last_procs: Option<Instant>,
+    top_processes: Vec<ProcessInfo>,
+    process_count: usize,
 }
 
 /// Cada cuánto se vuelve a leer el espacio de los discos.
 const DISKS_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
+/// Cada cuánto se recorre la lista de procesos.
+///
+/// Es, de largo, la parte cara de esta lectura: recorre los 250 procesos del
+/// equipo para enseñar los 10 que más consumen. Hacerlo en cada tic (cada 2 s
+/// por defecto) era un coste fijo permanente que en un equipo viejo se notaba
+/// en el propio Administrador de tareas. CPU, memoria y red —que son lo que se
+/// ve moverse en la gráfica— se siguen leyendo en cada tic, que es barato.
+const PROCS_EVERY: std::time::Duration = std::time::Duration::from_secs(6);
 
 impl MetricsState {
     pub fn new() -> Self {
@@ -37,6 +49,9 @@ impl MetricsState {
                 networks: Networks::new_with_refreshed_list(),
                 last_net: Instant::now(),
                 last_disks: Instant::now(),
+                last_procs: None,
+                top_processes: Vec::new(),
+                process_count: 0,
             }),
         }
     }
@@ -68,7 +83,7 @@ pub struct DiskInfo {
     removable: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessInfo {
     pid: u32,
@@ -123,9 +138,14 @@ pub fn get_live_metrics(state: tauri::State<MetricsState>) -> LiveMetrics {
 fn collect(c: &mut Collector) -> LiveMetrics {
     c.sys.refresh_cpu_usage();
     c.sys.refresh_memory();
-    // Solo CPU y memoria de cada proceso: el nombre se lee una vez (la ruta y la
-    // línea de comandos, que son lo caro, no se usan aquí).
-    c.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_cpu().with_memory().with_exe(UpdateKind::Never));
+    // La lista de procesos, solo de vez en cuando (ver PROCS_EVERY). Y de cada
+    // uno solo CPU y memoria: el nombre se lee una vez, y la ruta y la línea de
+    // comandos, que son lo caro, no se usan aquí.
+    if c.last_procs.is_none_or(|t| t.elapsed() >= PROCS_EVERY) {
+        c.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_cpu().with_memory().with_exe(UpdateKind::Never));
+        c.last_procs = Some(Instant::now());
+        (c.top_processes, c.process_count) = top_processes(&c.sys);
+    }
     if c.last_disks.elapsed() >= DISKS_EVERY {
         c.disks.refresh(true);
         c.last_disks = Instant::now();
@@ -139,30 +159,6 @@ fn collect(c: &mut Collector) -> LiveMetrics {
         .iter()
         .fold((0u64, 0u64), |(rx, tx), (_, n)| (rx + n.received(), tx + n.transmitted()));
 
-    // El % de CPU por proceso de sysinfo es relativo a un núcleo (puede pasar de
-    // 100), lo normalizamos al total de la máquina como hace el Administrador de tareas.
-    let cores = c.sys.cpus().len().max(1) as f32;
-    let mut procs: Vec<ProcessInfo> = c
-        .sys
-        .processes()
-        .iter()
-        .filter(|(pid, _)| pid.as_u32() != 0) // "System Idle Process"
-        .map(|(pid, p)| ProcessInfo {
-            pid: pid.as_u32(),
-            name: p.name().to_string_lossy().into_owned(),
-            cpu: p.cpu_usage() / cores,
-            memory: p.memory(),
-        })
-        .collect();
-    let process_count = procs.len();
-    procs.sort_by(|a, b| {
-        b.cpu
-            .partial_cmp(&a.cpu)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(b.memory.cmp(&a.memory))
-    });
-    procs.truncate(10);
-
     LiveMetrics {
         cpu_total: c.sys.global_cpu_usage(),
         cpu_per_core: c.sys.cpus().iter().map(|c| c.cpu_usage()).collect(),
@@ -171,7 +167,7 @@ fn collect(c: &mut Collector) -> LiveMetrics {
         swap_used: c.sys.used_swap(),
         swap_total: c.sys.total_swap(),
         uptime: System::uptime(),
-        process_count,
+        process_count: c.process_count,
         net_rx_per_sec: (rx as f64 / elapsed) as u64,
         net_tx_per_sec: (tx as f64 / elapsed) as u64,
         disks: c
@@ -187,8 +183,25 @@ fn collect(c: &mut Collector) -> LiveMetrics {
                 removable: d.is_removable(),
             })
             .collect(),
-        top_processes: procs,
+        top_processes: c.top_processes.clone(),
     }
+}
+
+/// Los 10 procesos que más consumen, y cuántos hay en total.
+fn top_processes(sys: &System) -> (Vec<ProcessInfo>, usize) {
+    // El % de CPU por proceso de sysinfo es relativo a un núcleo (puede pasar de
+    // 100), lo normalizamos al total de la máquina como hace el Administrador de tareas.
+    let cores = sys.cpus().len().max(1) as f32;
+    let mut procs: Vec<ProcessInfo> = sys
+        .processes()
+        .iter()
+        .filter(|(pid, _)| pid.as_u32() != 0) // "System Idle Process"
+        .map(|(pid, p)| ProcessInfo { pid: pid.as_u32(), name: p.name().to_string_lossy().into_owned(), cpu: p.cpu_usage() / cores, memory: p.memory() })
+        .collect();
+    let total = procs.len();
+    procs.sort_by(|a, b| b.cpu.partial_cmp(&a.cpu).unwrap_or(std::cmp::Ordering::Equal).then(b.memory.cmp(&a.memory)));
+    procs.truncate(10);
+    (procs, total)
 }
 
 #[cfg(test)]

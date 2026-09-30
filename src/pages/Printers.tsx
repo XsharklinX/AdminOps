@@ -1,8 +1,8 @@
-import { CircleAlert, FileCheck2, Loader2, Printer, RefreshCw, Star, Trash2, Wrench, XCircle } from "lucide-react";
+import { CheckCircle2, CircleAlert, ExternalLink, FileCheck2, Loader2, Printer, RefreshCw, Search, Star, Stethoscope, Trash2, Wrench, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button } from "../components/ui";
-import { printersApi, tweaksApi, type PrinterInfo } from "../lib/api";
+import { printersApi, tweaksApi, type FoundPrinter, type PrinterCheck, type PrinterInfo } from "../lib/api";
 
 const STATUS: Record<number, string> = { 1: "Otro", 2: "Desconocido", 3: "Lista", 4: "Imprimiendo", 5: "Calentando", 6: "Detenida", 7: "Sin conexión" };
 
@@ -10,6 +10,8 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
   const [list, setList] = useState<PrinterInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // Resultado de «Revisar» por impresora.
+  const [checks, setChecks] = useState<Record<string, PrinterCheck>>({});
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
@@ -25,7 +27,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
   }, [toast]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const run = async (key: string, ok: string, op: () => Promise<void>) => {
@@ -48,7 +50,20 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
       confirmLabel: "Reiniciar cola",
       danger: true,
     });
-    if (yes) run("spooler", "Cola de impresión reiniciada.", () => tweaksApi.run("repair.print-queue").then(() => {}));
+    if (yes) void run("spooler", "Cola de impresión reiniciada.", () => tweaksApi.run("repair.print-queue").then(() => {}));
+  };
+
+  /** Revisa una impresora y deja el resultado bajo su fila. */
+  const check = async (p: PrinterInfo) => {
+    setBusy(p.name);
+    try {
+      const c = await printersApi.check(p.name);
+      setChecks((m) => ({ ...m, [p.name]: c }));
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setBusy(null);
+    }
   };
 
   const remove = async (p: PrinterInfo) => {
@@ -58,7 +73,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
       confirmLabel: "Quitar",
       danger: true,
     });
-    if (yes) run(p.name, `${p.name} quitada.`, () => printersApi.remove(p.name));
+    if (yes) void run(p.name, `${p.name} quitada.`, () => printersApi.remove(p.name));
   };
 
   if (!list) return <p className="p-8 font-mono text-sm text-mute">Leyendo impresoras…</p>;
@@ -69,7 +84,8 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
     const working = busy === p.name;
     const problem = p.error ?? (p.offline ? "Sin conexión" : null);
     return (
-      <div key={p.name} className={`flex items-center gap-4 px-4 py-3 ${i ? "border-t border-line/70" : ""}`}>
+      <div key={p.name} className={i ? "border-t border-line/70" : ""}>
+      <div className="flex items-center gap-4 px-4 py-3">
         <Printer size={18} className={problem ? "text-warn" : "text-neon"} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -105,6 +121,9 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
             >
               <XCircle size={15} />
             </IconBtn>
+            <IconBtn title="Revisar: por qué no imprime y qué hacer" disabled={busy !== null} onClick={() => check(p)}>
+              <Stethoscope size={15} />
+            </IconBtn>
             <IconBtn title="Imprimir página de prueba" disabled={busy !== null} onClick={() => run(p.name, `Página de prueba enviada a ${p.name}.`, () => printersApi.testPage(p.name))}>
               <FileCheck2 size={15} />
             </IconBtn>
@@ -120,6 +139,8 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
             </IconBtn>
           </div>
         )}
+      </div>
+      {checks[p.name] && <CheckBox c={checks[p.name]} onClose={() => setChecks(({ [p.name]: _quitada, ...resto }) => resto)} />}
       </div>
     );
   };
@@ -144,6 +165,8 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
       <div className="overflow-hidden rounded-xl border border-line bg-panel">
         {real.length ? real.map(row) : <p className="px-4 py-8 text-center text-sm text-mute">No hay impresoras físicas instaladas.</p>}
       </div>
+
+      <NetworkPrinters isAdmin={isAdmin} />
 
       {virtual.length > 0 && (
         <>
@@ -170,5 +193,117 @@ function IconBtn({ children, title, disabled, danger, onClick }: { children: Rea
     >
       {children}
     </button>
+  );
+}
+
+/** El resultado de revisar una impresora: qué le pasa y qué hacer. */
+function CheckBox({ c, onClose }: { c: PrinterCheck; onClose: () => void }) {
+  const tono =
+    c.level === "ok"
+      ? { box: "border-ok/40 bg-ok/10", text: "text-ok", Icon: CheckCircle2 }
+      : c.level === "warn"
+        ? { box: "border-warn/40 bg-warn/10", text: "text-warn", Icon: CircleAlert }
+        : { box: "border-bad/40 bg-bad/10", text: "text-bad", Icon: XCircle };
+  const { Icon } = tono;
+  return (
+    <div className={`mx-4 mb-3 rounded-lg border p-3 ${tono.box}`}>
+      <div className="flex items-start gap-2">
+        <Icon size={15} className={`mt-0.5 shrink-0 ${tono.text}`} />
+        <div className="min-w-0 flex-1">
+          <div className={`text-sm font-medium ${tono.text}`}>{c.title}</div>
+          <p className="mt-1 text-xs leading-relaxed text-dim">{c.text}</p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-mute">
+            <span>Cola de Windows: {c.spooler ? "en marcha" : "parada"}</span>
+            {c.host && (
+              <span>
+                Dirección: <span className="font-mono text-dim select-text">{c.host}</span>
+                {c.reachable !== null && ` · ${c.reachable ? "responde" : "no responde"}`}
+              </span>
+            )}
+            {c.jobs > 0 && <span>{c.jobs} en cola, el más viejo de hace {c.oldestJobMin} min</span>}
+          </div>
+        </div>
+        <button onClick={onClose} className="shrink-0 text-mute hover:text-ink" title="Cerrar">
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Impresoras que hay en la red y no están instaladas aquí.
+ *
+ * Hasta ahora, saber qué impresoras hay en una oficina era preguntar o ir
+ * mirando aparato por aparato.
+ */
+function NetworkPrinters({ isAdmin }: { isAdmin: boolean }) {
+  const [found, setFound] = useState<FoundPrinter[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  const buscar = async () => {
+    setBusy(true);
+    try {
+      setFound(await printersApi.findOnNetwork());
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const nuevas = (found ?? []).filter((f) => !f.installed);
+  return (
+    <section className="mt-4 rounded-xl border border-line bg-panel">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <Search size={16} className="text-neon" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm text-ink">Buscar impresoras en la red</div>
+          <div className="text-[11px] text-mute">Prueba los puertos de impresión en los equipos que ya responden en esta red. No instala nada.</div>
+        </div>
+        <Button kind="ghost" onClick={buscar} disabled={busy}>
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} {busy ? "Buscando…" : "Buscar"}
+        </Button>
+      </div>
+      {found !== null && !busy && (
+        <div className="border-t border-line/70 px-4 py-3">
+          {found.length === 0 ? (
+            <p className="text-xs text-mute">No se ha visto ninguna impresora en esta red. Enciéndelas y vuelve a buscar.</p>
+          ) : (
+            <>
+              <p className="mb-2 text-xs text-dim">
+                {nuevas.length > 0 ? `${nuevas.length} sin instalar en este equipo` : "Todas las que se ven ya están instaladas aquí"}
+              </p>
+              <ul className="space-y-1">
+                {found.map((f) => (
+                  <li key={f.ip} className="flex items-center gap-3 text-xs">
+                    <span className="w-32 font-mono text-ink select-text">{f.ip}</span>
+                    <span className="flex-1 text-mute">{f.ports.map((p) => (p === 9100 ? "RAW" : p === 631 ? "IPP" : "LPD")).join(" · ")}</span>
+                    {f.installed ? (
+                      <span className="text-mute">ya instalada</span>
+                    ) : (
+                      <button
+                        onClick={() => navigator.clipboard.writeText(f.ip).then(() => toast("ok", "Dirección copiada: pégala en el asistente de Windows."))}
+                        className="text-neon hover:underline"
+                      >
+                        Copiar dirección
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {nuevas.length > 0 && (
+                <div className="mt-3">
+                  <Button kind="ghost" onClick={() => tweaksApi.run("open:ms-settings:printers").catch(() => {})} disabled={!isAdmin}>
+                    <ExternalLink size={13} /> Abrir «Añadir impresora» de Windows
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

@@ -66,7 +66,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       pending.current = { entry: payload.id, title: payload.title, count, timer };
     });
     return () => {
-      off.then((f) => f());
+      void off.then((f) => f());
     };
   }, [add]);
 

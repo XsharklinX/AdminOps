@@ -52,8 +52,8 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
 
   useOnJournalChange(loadJournal);
   useEffect(() => {
-    loadJournal();
-    loadPoints();
+    void loadJournal();
+    void loadPoints();
   }, [loadJournal, loadPoints]);
 
   const createPoint = async () => {
@@ -65,8 +65,8 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
       toast("error", `No se pudo crear el punto: ${e}`);
     } finally {
       setCreating(false);
-      loadJournal();
-      loadPoints();
+      void loadJournal();
+      void loadPoints();
     }
   };
 
@@ -79,7 +79,7 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
       toast("error", `${e.title}: ${err}`);
     } finally {
       setReverting(null);
-      loadJournal();
+      void loadJournal();
     }
   };
 
@@ -122,7 +122,7 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
         ) : points.length === 0 ? (
           <p className="text-xs text-mute">No hay puntos de restauración en este equipo.</p>
         ) : (
-          <ul className="max-h-80 space-y-1.5 overflow-y-auto">
+          <ul className="pane-md space-y-1.5 overflow-y-auto">
             {points.map((p) => (
               <li key={p.sequence} className="rounded-md border border-line bg-void/40 px-3 py-2">
                 <div className="truncate text-sm text-ink">{p.description}</div>
@@ -223,7 +223,7 @@ function LogViewer() {
       }
     >
       {open ? (
-        <pre className="max-h-96 overflow-auto rounded-md border border-line bg-void/60 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-dim select-text">
+        <pre className="pane-md overflow-auto rounded-md border border-line bg-void/60 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-dim select-text">
           {text === null ? "Cargando…" : text || "El registro está vacío."}
         </pre>
       ) : (

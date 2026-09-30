@@ -1,4 +1,4 @@
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, ChevronDown} from "lucide-react";
 import type { ReactNode } from "react";
 import { loadColor } from "../lib/format";
 
@@ -9,6 +9,7 @@ export function Card({
   right,
   children,
   className = "",
+  fold,
 }: {
   id?: string;
   title?: string;
@@ -16,19 +17,35 @@ export function Card({
   right?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Tarjeta plegada: se ve el título y una nota, y el detalle a un clic. */
+  fold?: { collapsed: boolean; note: string; onToggle: () => void };
 }) {
+  const collapsed = !!fold?.collapsed;
   return (
-    <section id={id} className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 [contain:layout_paint] ${className}`}>
+    <section
+      id={id}
+      className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 [contain:layout_paint] ${
+        collapsed ? "py-3" : ""
+      } ${className}`}
+    >
       {title && (
-        <header className="mb-3 flex items-center justify-between">
+        <header className={`flex items-center justify-between ${collapsed ? "" : "mb-3"}`}>
           <h2 className="flex items-center gap-2 text-[13px] font-semibold text-ink">
             {icon && <span className="text-mute">{icon}</span>}
             {title}
           </h2>
-          {right}
+          {fold ? (
+            <button onClick={fold.onToggle} className="flex items-center gap-1.5 text-[11px] text-mute transition-colors hover:text-ink">
+              {collapsed && <span className="text-ok">{fold.note}</span>}
+              {collapsed ? "Ver detalles" : "Ocultar"}
+              <ChevronDown size={11} className={`transition-transform ${collapsed ? "" : "rotate-180"}`} />
+            </button>
+          ) : (
+            right
+          )}
         </header>
       )}
-      {children}
+      {!collapsed && children}
     </section>
   );
 }

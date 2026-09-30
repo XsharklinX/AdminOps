@@ -45,7 +45,7 @@ export function Timeline({ onNavigate }: { onNavigate?: (p: PageId) => void }) {
   }, [days]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const shown = useMemo(() => (events ?? []).filter((e) => kinds.has(e.kind) && (boots || !isBoot(e))), [events, kinds, boots]);
@@ -122,7 +122,7 @@ export function Timeline({ onNavigate }: { onNavigate?: (p: PageId) => void }) {
       ) : shown.length === 0 ? (
         <p className="py-6 text-center text-sm text-mute">Nada en este periodo con estos filtros.</p>
       ) : (
-        <div className="max-h-[560px] space-y-4 overflow-y-auto pr-1">
+        <div className="max-pane-lg space-y-4 overflow-y-auto pr-1">
           {groups.map((g) => (
             <div key={g.day}>
               <h4 className="sticky top-0 z-10 mb-1 bg-panel py-1 text-[11px] font-medium tracking-wide text-mute uppercase">{g.day}</h4>

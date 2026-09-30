@@ -82,7 +82,7 @@ pub fn run() {
     // va al USB; instalado, una carpeta propia y escribible por este usuario, para
     // no depender de la de por defecto (que puede quedar de otro usuario y hacer
     // que WebView2 no abra: «can't read and write to its data directory»).
-    if let Some(dir) = paths::portable_webview_dir().or_else(paths::installed_webview_dir) {
+    if let Some(dir) = boottime::step("Carpeta de datos de WebView2", || paths::portable_webview_dir().or_else(paths::installed_webview_dir)) {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", dir);
     }
 
@@ -93,9 +93,15 @@ pub fn run() {
     // no admite dos configuraciones distintas en la misma carpeta de datos.
     if let Some(auth) = boottime::step("Portales con la cuenta de Windows", portals::integrated_auth_arg) {
         let base = context.config().app.windows.first().and_then(|w| w.additional_browser_args.clone()).unwrap_or_default();
-        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", format!("{base} {auth}").trim());
+        // Los portales leen esta misma variable, para arrancar con argumentos
+        // idénticos a los de la ventana principal (ver portals::browser_args).
+        std::env::set_var(portals::ARGS_ENV, portals::merged_browser_args(&base, Some(&auth)));
     }
 
+    // A partir de aquí manda Tauri: crear la ventana y arrancar WebView2. Esa
+    // parte no se puede medir desde dentro, pero sí cuándo empieza: la
+    // diferencia con «Preparar PowerShell» (ya en setup) es lo que cuesta.
+    boottime::step("Listo para crear la ventana", || ());
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -112,10 +118,19 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                if window.label() == "main" {
+            if window.label() != "main" {
+                return;
+            }
+            // Queda por escrito cómo y cuándo se cierra. Sin esto, una app que
+            // desaparece sola no deja ni rastro en el registro y no hay forma de
+            // saber si la cerró el usuario, Windows, o se murió ella.
+            match event {
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    log::info!("Cierre pedido a los {} ms", boottime::since_start_ms());
                     window_state::save(window);
                 }
+                tauri::WindowEvent::Destroyed => log::info!("Ventana destruida a los {} ms", boottime::since_start_ms()),
+                _ => {}
             }
         })
         .manage(metrics::MetricsState::new())
@@ -131,6 +146,9 @@ pub fn run() {
             let state = boottime::step("Catálogo de ajustes e historial", || tweaks::TweakState::new(app.handle()));
             app.manage(state);
             boottime::step("Tamaño y posición de la ventana", || window_state::restore(app.handle()));
+            // La ventana se crea oculta y se enseña cuando la interfaz ya tiene
+            // algo pintado, para que nunca se vea un rectángulo negro.
+            window_state::watch_first_paint(app.handle().clone());
             let settings = boottime::step("Ajustes", || workflow::settings(app.handle()));
             tweaks::set_restore_point_policy(&settings.restore_points);
             // Arranque con Windows: minimizada en la barra de tareas.
@@ -155,6 +173,8 @@ pub fn run() {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 use tauri::Manager;
+                // Recorre carpetas: se deja para cuando la app ya esté abierta.
+                std::thread::sleep(std::time::Duration::from_secs(20));
                 let state = handle.state::<tweaks::TweakState>();
                 appcare::auto_cleanup(&handle, &state);
             });
@@ -208,16 +228,19 @@ pub fn run() {
             portals::portal_show,
             portals::portal_bounds,
             portals::portal_hide_all,
+            portals::portal_reset,
             portals::portal_nav,
             portals::portal_open_window,
             portals::portal_open_external,
             portals::portal_preload,
+            portals::portal_close_idle,
             portals::portal_go,
             portals::portal_zoom,
             portals::portal_find,
             portals::portal_login_get,
             portals::portal_login_set,
             portals::portal_compose,
+            portals::portal_teams,
             portals::portal_sign_out,
             portals::portal_download_open,
             portals::portal_download_reveal,
@@ -238,10 +261,12 @@ pub fn run() {
             workflow::save_settings,
             workflow::list_clients,
             workflow::visit_changes,
+            workflow::compare_client_machines,
             agenda::list_agenda,
             agenda::save_visit,
             agenda::set_visit_status,
             agenda::delete_visit,
+            agenda::postpone_visit,
             workflow::save_client,
             workflow::delete_client,
             workflow::get_session,
@@ -252,6 +277,8 @@ pub fn run() {
             workflow::set_next_maintenance,
             space::scan_space,
             space::cancel_space_scan,
+            space::space_freeable,
+            space::space_recycle,
             space::space_children,
             space::reveal_in_explorer,
             software::list_software_updates,
@@ -262,6 +289,7 @@ pub fn run() {
             apps::app_catalog,
             apps::installed_apps,
             apps::search_apps,
+            apps::install_preflight,
             apps::install_apps,
             apps::save_app_list,
             apps::delete_app_list,
@@ -272,6 +300,8 @@ pub fn run() {
             migrate::migrate_read_backup,
             migrate::migrate_restore,
             printers::list_printers,
+            printers::check_printer,
+            printers::find_network_printers,
             printers::clear_printer_queue,
             printers::print_test_page,
             printers::set_default_printer,
@@ -375,6 +405,8 @@ pub fn run() {
             applock::lock_disable,
             applock::lock_verify_windows,
             window_state::set_ui_zoom,
+            window_state::ui_ready,
+            window_state::ui_booting,
             appcare::autostart_enabled,
             appcare::set_autostart,
             appcare::data_usage,
@@ -449,6 +481,7 @@ pub fn run() {
             users::set_user_admin,
             users::user_profile_size,
             users::delete_user,
+            users::rename_user,
             tweaks::profiles::list_profiles,
             tweaks::profiles::apply_profile,
             tweaks::profiles::revert_profile,
