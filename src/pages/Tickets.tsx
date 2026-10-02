@@ -40,7 +40,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import { SheetPanel } from "../components/MachineSheetCard";
 import { Button, inputClass, Loading, Modal } from "../components/ui";
 import { lockApi, portalsApi, type Portal, type PortalAction } from "../lib/api";
-import { clearPortalError, failPortal, lastPortalKey, stowPortal, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
+import { clearPortalBlocked, clearPortalError, failPortal, lastPortalKey, stowPortal, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
 import { getPrefs, windowRect } from "../lib/prefs";
 import { pageLabel, type PageId } from "../components/Sidebar";
 import { SPLIT_RIGHT } from "../lib/split";
@@ -152,9 +152,11 @@ export function Tickets({
   }, [active, errored]);
 
   // Si la vista nativa no da ninguna señal de vida (ni empezó a cargar), no se
-  // deja al técnico mirando «Abriendo…» para siempre: a los 25 s se dice que no
+  // deja al técnico mirando «Abriendo…» para siempre: al minuto se dice que no
   // arrancó, con Reintentar. Pasó en la 1.1.6 cuando WebView2 se negaba a crear
-  // las vistas y la app no enseñaba ningún error.
+  // las vistas y la app no enseñaba ningún error. Antes eran 25 s, y en un
+  // equipo cargado la primera vista tarda más: se destruía cuando estaba a punto
+  // de arrancar y así nunca llegaba (1.1.8).
   const sinVida = !!active && !view.url && !view.loading && !view.error;
   useEffect(() => {
     if (!sinVida || !active) return;
@@ -163,9 +165,9 @@ export function Tickets({
       void portalsApi.reset(active).catch(() => {});
       failPortal(
           active,
-          "La vista del portal no llegó a abrirse. Pulsa Reintentar; si se repite, cierra y vuelve a abrir AdminOps, y si sigue igual, el motivo está en el registro técnico (Ajustes → Datos de AdminOps).",
+          "La vista del portal no llegó a abrirse en un minuto. Pulsa Reintentar; si se repite, cierra y vuelve a abrir AdminOps (al abrirse cierra lo que quedara atascado de la sesión anterior), y si sigue igual, el motivo está en el registro técnico (Ajustes → Datos de AdminOps).",
       );
-    }, 25_000);
+    }, 60_000);
     return () => window.clearTimeout(t);
   }, [sinVida, active]);
 
@@ -360,6 +362,7 @@ export function Tickets({
       )}
 
       {portal && <NetworkNotice portal={portal} onReload={() => nav("reload")} />}
+      {portal && <BlockedNotice portal={portal} />}
 
       {portal ? (
         // Área que ocupa la vista web nativa (se pinta por encima de este div).
@@ -578,6 +581,40 @@ const hostOf = (url: string) => {
     return url;
   }
 };
+
+/**
+ * Algo del portal se abrió en el navegador de fuera por no ser uno de sus
+ * sitios. Si era parte de entrar (un inicio de sesión en otro dominio), aquí se
+ * permite con un clic y queda guardado en el portal.
+ */
+function BlockedNotice({ portal }: { portal: Portal }) {
+  const view = usePortalView(portal.id);
+  const toast = useToast();
+  if (!view.blocked) return null;
+  const host = view.blocked;
+  const allow = () =>
+    portalsApi.allowDomain(portal.id, host).then(
+      () => {
+        clearPortalBlocked(portal.id);
+        toast("ok", `«${host}» ya se abre dentro de ${portal.name}. Vuelve a intentarlo.`);
+      },
+      (e) => toast("error", String(e)),
+    );
+  return (
+    <div className="flex items-center gap-2 border-b border-line bg-panel-2/60 px-4 py-1.5 text-xs text-dim">
+      <SquareArrowOutUpRight size={13} className="shrink-0 text-neon" />
+      <span className="min-w-0 flex-1">
+        «{host}» se abrió en tu navegador porque no es uno de los sitios de {portal.name}. Si es parte de entrar o de usar el portal, permítelo aquí.
+      </span>
+      <button onClick={() => void allow()} className="shrink-0 text-neon hover:underline">
+        Permitir en este portal
+      </button>
+      <button onClick={() => clearPortalBlocked(portal.id)} className="shrink-0 text-dim hover:text-ink">
+        Cerrar
+      </button>
+    </div>
+  );
+}
 
 /**
  * Aviso cuando la culpa es de la red y no de AdminOps: el equipo está sin

@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowRight, CalendarClock, Loader2, MonitorCog, RefreshCw, Stethoscope, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Card } from "./ui";
+import { Card, EmptyLine } from "./ui";
 import { isPageId, pageLabel, type PageId } from "./Sidebar";
 import { timelineApi, type TimelineEvent } from "../lib/api";
 
@@ -120,7 +120,7 @@ export function Timeline({ onNavigate }: { onNavigate?: (p: PageId) => void }) {
           <Loader2 size={13} className="animate-spin" /> Reuniendo lo que pasó en el equipo…
         </p>
       ) : shown.length === 0 ? (
-        <p className="py-6 text-center text-sm text-mute">Nada en este periodo con estos filtros.</p>
+        <EmptyLine>Nada en este periodo con estos filtros.</EmptyLine>
       ) : (
         <div className="max-pane-lg space-y-4 overflow-y-auto pr-1">
           {groups.map((g) => (

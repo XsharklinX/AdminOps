@@ -1,4 +1,4 @@
-import { X, Loader2, ChevronDown} from "lucide-react";
+import { ChevronDown, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { loadColor } from "../lib/format";
 
@@ -24,6 +24,7 @@ export function Card({
   return (
     <section
       id={id}
+      data-setting={title}
       className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 [contain:layout_paint] ${
         collapsed ? "py-3" : ""
       } ${className}`}
@@ -214,6 +215,65 @@ export function Loading({ text = "Cargando…", page = false }: { text?: string;
     <p className={`flex items-center gap-2 text-sm text-mute ${page ? "p-8" : "py-2"}`}>
       <Loader2 size={14} className="animate-spin" /> {text}
     </p>
+  );
+}
+
+/**
+ * La lectura falló: se dice qué pasó y se ofrece reintentar. Sin esto, una
+ * página cuya primera lectura fallaba se quedaba en «Cargando…» para siempre.
+ */
+export function ErrorState({ message, onRetry, page = false }: { message: string; onRetry?: () => void; page?: boolean }) {
+  return (
+    <div className={page ? "p-8" : ""}>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-bad/30 bg-bad/5 px-4 py-3">
+        <TriangleAlert size={16} className="shrink-0 text-bad" />
+        <p className="min-w-0 flex-1 text-sm text-ink">
+          No se pudo leer.
+          <span className="block text-xs break-words text-dim">{message}</span>
+        </p>
+        {onRetry && (
+          <Button kind="ghost" onClick={onRetry}>
+            <RotateCw size={14} /> Reintentar
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Lista sin nada que enseñar (o búsqueda sin resultados), dentro de una tarjeta. */
+export function EmptyLine({ children }: { children: ReactNode }) {
+  return <p className="px-4 py-8 text-center text-sm text-mute">{children}</p>;
+}
+
+/** Cifra de resumen arriba de una página. Con `onClick` filtra la lista. */
+export function Tile({
+  label,
+  value,
+  warn = false,
+  active = false,
+  onClick,
+}: {
+  label: string;
+  value: ReactNode;
+  /** En ámbar cuando no es cero. */
+  warn?: boolean;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const cls = `rounded-xl border px-3 py-2.5 text-left ${active ? "border-neon/50 bg-neon/10" : "border-line bg-panel"} ${onClick ? "transition-colors hover:border-line-2" : ""}`;
+  const body = (
+    <>
+      <div className={`font-mono text-xl leading-none font-semibold ${warn && value !== 0 && value !== "0" ? "text-warn" : "text-ink"}`}>{value}</div>
+      <div className="mt-1 truncate text-[11px] text-mute">{label}</div>
+    </>
+  );
+  return onClick ? (
+    <button onClick={onClick} className={cls}>
+      {body}
+    </button>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }
 

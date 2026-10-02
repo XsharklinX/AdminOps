@@ -194,11 +194,12 @@ async fn access_token(app: &tauri::AppHandle) -> Result<String, String> {
     Ok(t.access_token)
 }
 
-/// Llamada a Graph. Con un 401 renueva una vez y reintenta.
-async fn call(app: &tauri::AppHandle, method: reqwest::Method, path: &str, body: Option<Value>) -> Result<Value, String> {
+/// Llamada a Graph que devuelve el estado y el cuerpo en bruto. Con un 401
+/// renueva una vez y reintenta. Las fechas del calendario, siempre en UTC.
+async fn raw_call(app: &tauri::AppHandle, method: reqwest::Method, path: &str, body: Option<Value>) -> Result<(u16, bytes::Bytes), String> {
     for intento in 0..2 {
         let token = access_token(app).await?;
-        let mut req = client()?.request(method.clone(), format!("{GRAPH}{path}")).bearer_auth(&token);
+        let mut req = client()?.request(method.clone(), format!("{GRAPH}{path}")).bearer_auth(&token).header("Prefer", "outlook.timezone=\"UTC\"");
         if let Some(b) = &body {
             req = req.json(b);
         }
@@ -208,17 +209,31 @@ async fn call(app: &tauri::AppHandle, method: reqwest::Method, path: &str, body:
             *ACCESS.lock().unwrap_or_else(|e| e.into_inner()) = None;
             continue;
         }
-        let text = r.text().await.unwrap_or_default();
-        let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
-        if (200..300).contains(&status) {
-            return Ok(v);
-        }
-        let code = v["error"]["code"].as_str().unwrap_or("");
-        let msg = v["error"]["message"].as_str().unwrap_or("");
-        log::warn!("Graph {path}: {status} {code}");
-        return Err(explain(status, code, msg));
+        return Ok((status, r.bytes().await.unwrap_or_default()));
     }
     Err(explain(401, "", ""))
+}
+
+fn as_error(path: &str, status: u16, body: &[u8]) -> String {
+    let v: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
+    let code = v["error"]["code"].as_str().unwrap_or("");
+    log::warn!("Graph {path}: {status} {code}");
+    explain(status, code, v["error"]["message"].as_str().unwrap_or(""))
+}
+
+/// Llamada a Graph con respuesta JSON.
+async fn call(app: &tauri::AppHandle, method: reqwest::Method, path: &str, body: Option<Value>) -> Result<Value, String> {
+    let (status, bytes) = raw_call(app, method, path, body).await?;
+    if (200..300).contains(&status) {
+        return Ok(serde_json::from_slice(&bytes).unwrap_or(Value::Null));
+    }
+    Err(as_error(path, status, &bytes))
+}
+
+/// Correo o UPN válido para usarlo en una ruta (sin barras, ?, # ni espacios).
+fn email_ok(e: &str) -> bool {
+    let e = e.trim();
+    e.len() <= 120 && e.contains('@') && e.chars().all(|c| c.is_ascii_alphanumeric() || "@.-_+'".contains(c))
 }
 
 /// Usuario para una ruta de Graph: su UPN (normalmente el correo), sin nada raro.
@@ -659,9 +674,212 @@ pub async fn graph_teams_send(app: tauri::AppHandle, upn: String, text: String) 
     r
 }
 
+// ---------- Outlook en los dos sentidos ----------
+
+/// Fecha de Graph («2026-09-30T13:00:00.0000000», en UTC) a segundos.
+pub fn parse_utc(s: &str) -> Option<u64> {
+    let s = s.trim().trim_end_matches('Z');
+    let s = s.split('.').next()?;
+    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").ok().map(|d| d.and_utc().timestamp().max(0) as u64)
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PullResult {
+    /// Visitas que cambiaron porque se movieron en Outlook.
+    pub updated: Vec<String>,
+    /// Visitas cuyo evento se borró en Outlook (se quedan en la Agenda, sin enlace).
+    pub unlinked: Vec<String>,
+}
+
+/// Trae a la Agenda lo que se cambió en Outlook de los eventos que se crearon
+/// desde ella: hora, duración y sitio. Si se borró en Outlook, la visita se
+/// queda (no se pierde nada) pero sin enlace, y se dice.
+#[tauri::command]
+pub async fn graph_calendar_pull(app: tauri::AppHandle) -> Result<PullResult, String> {
+    let mut out = PullResult::default();
+    for v in crate::agenda::linked_visits(&app) {
+        let path = format!("/me/events/{}?$select=subject,start,end,location,isCancelled", v.outlook_event);
+        let (status, body) = raw_call(&app, reqwest::Method::GET, &path, None).await?;
+        if status == 404 {
+            crate::agenda::apply_outlook(&app, &v.id, None, None, None, true)?;
+            out.unlinked.push(v.label().to_string());
+            continue;
+        }
+        if !(200..300).contains(&status) {
+            return Err(as_error("/me/events", status, &body));
+        }
+        let e: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+        if e["isCancelled"].as_bool() == Some(true) {
+            crate::agenda::apply_outlook(&app, &v.id, None, None, None, true)?;
+            out.unlinked.push(v.label().to_string());
+            continue;
+        }
+        let (Some(start), Some(end)) = (e["start"]["dateTime"].as_str().and_then(parse_utc), e["end"]["dateTime"].as_str().and_then(parse_utc)) else { continue };
+        let minutes = (end.saturating_sub(start) / 60).clamp(15, 12 * 60) as u32;
+        let place = e["location"]["displayName"].as_str().unwrap_or("").to_string();
+        if start != v.start || minutes != v.minutes || place != v.place {
+            crate::agenda::apply_outlook(&app, &v.id, Some(start), Some(minutes), Some(place), false)?;
+            out.updated.push(v.label().to_string());
+        }
+    }
+    if !out.updated.is_empty() || !out.unlinked.is_empty() {
+        log::info!("Outlook → Agenda: {} cambiadas, {} borradas en Outlook", out.updated.len(), out.unlinked.len());
+    }
+    Ok(out)
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OutlookEvent {
+    pub id: String,
+    pub subject: String,
+    pub start: u64,
+    pub end: u64,
+    pub location: String,
+    pub all_day: bool,
+}
+
+/// Lo que hay en el calendario de Outlook entre dos fechas (para verlo en la
+/// Agenda junto a lo propio: un solo calendario). Sin los eventos que ya son
+/// visitas de la Agenda.
+#[tauri::command]
+pub async fn graph_calendar_view(app: tauri::AppHandle, from: u64, to: u64) -> Result<Vec<OutlookEvent>, String> {
+    if to <= from || to - from > 100 * 86_400 {
+        return Err("Rango de fechas no válido.".into());
+    }
+    let iso = |t: u64| chrono::DateTime::from_timestamp(t as i64, 0).map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string()).unwrap_or_default();
+    let q = form(&[("startDateTime", &iso(from)), ("endDateTime", &iso(to)), ("$select", "subject,start,end,location,isAllDay,isCancelled"), ("$top", "250"), ("$orderby", "start/dateTime")]).replace('+', "%20");
+    let v = call(&app, reqwest::Method::GET, &format!("/me/calendarView?{q}"), None).await?;
+    let linked: Vec<String> = crate::agenda::linked_visits(&app).into_iter().map(|v| v.outlook_event).collect();
+    Ok(v["value"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|e| e["isCancelled"].as_bool() != Some(true))
+        .filter_map(|e| {
+            let id = e["id"].as_str()?.to_string();
+            if linked.contains(&id) {
+                return None;
+            }
+            Some(OutlookEvent {
+                subject: e["subject"].as_str().unwrap_or("(sin asunto)").chars().take(120).collect(),
+                start: e["start"]["dateTime"].as_str().and_then(parse_utc)?,
+                end: e["end"]["dateTime"].as_str().and_then(parse_utc)?,
+                location: e["location"]["displayName"].as_str().unwrap_or("").chars().take(120).collect(),
+                all_day: e["isAllDay"].as_bool().unwrap_or(false),
+                id,
+            })
+        })
+        .collect())
+}
+
+// ---------- Presencia y fotos de Teams ----------
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Presence {
+    /// Available · Busy · DoNotDisturb · Away · BeRightBack · Offline · PresenceUnknown…
+    pub availability: String,
+    /// InACall · InAMeeting · Presenting · OutOfOffice…
+    pub activity: String,
+}
+
+/// Peticiones de un $batch (máximo 20 por lote, lo que admite Graph).
+pub fn batch_requests(emails: &[String], url: impl Fn(&str) -> String) -> Vec<Value> {
+    emails.iter().enumerate().map(|(i, e)| json!({ "id": i.to_string(), "method": "GET", "url": url(e) })).collect()
+}
+
+/// Presencia de Teams de varias personas por su correo (o UPN).
+#[tauri::command]
+pub async fn graph_presence(app: tauri::AppHandle, emails: Vec<String>) -> Result<std::collections::HashMap<String, Presence>, String> {
+    let emails: Vec<String> = emails.into_iter().map(|e| e.trim().to_lowercase()).filter(|e| email_ok(e)).take(200).collect();
+    let mut out = std::collections::HashMap::new();
+    for chunk in emails.chunks(20) {
+        let reqs = batch_requests(chunk, |e| format!("/users/{e}/presence"));
+        let r = call(&app, reqwest::Method::POST, "/$batch", Some(json!({ "requests": reqs }))).await?;
+        for resp in r["responses"].as_array().into_iter().flatten() {
+            let Some(i) = resp["id"].as_str().and_then(|i| i.parse::<usize>().ok()) else { continue };
+            if resp["status"].as_u64() == Some(200) {
+                let b = &resp["body"];
+                out.insert(
+                    chunk[i].clone(),
+                    Presence { availability: b["availability"].as_str().unwrap_or("PresenceUnknown").into(), activity: b["activity"].as_str().unwrap_or("").into() },
+                );
+            } else if resp["status"].as_u64() == Some(403) {
+                return Err("IT no ha dado a AdminOps el permiso para ver la presencia de Teams (Presence.Read.All).".into());
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn photo_dir(app: &tauri::AppHandle) -> PathBuf {
+    crate::paths::shared_data_dir(app).join("fotos")
+}
+
+/// Nombre de archivo de la foto de un correo (sin el correo en claro).
+pub fn photo_key(email: &str) -> String {
+    use sha2::Digest;
+    sha2::Sha256::digest(email.trim().to_lowercase().as_bytes()).iter().take(12).map(|b| format!("{b:02x}")).collect()
+}
+
+/// Fotos de Microsoft 365 (como data URL) de varias personas. Se guardan una
+/// semana; quien no tiene foto, también se recuerda para no volver a pedirla.
+#[tauri::command]
+pub async fn graph_photos(app: tauri::AppHandle, emails: Vec<String>) -> Result<std::collections::HashMap<String, String>, String> {
+    use base64::Engine;
+    const WEEK: u64 = 7 * 86_400;
+    let dir = photo_dir(&app);
+    let _ = std::fs::create_dir_all(&dir);
+    let fresh = |p: &std::path::Path| p.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|e| e.as_secs() < WEEK);
+    let mut out = std::collections::HashMap::new();
+    let mut asked = 0;
+    for e in emails.iter().map(|e| e.trim().to_lowercase()).filter(|e| email_ok(e)) {
+        let key = photo_key(&e);
+        let (jpg, none) = (dir.join(format!("{key}.jpg")), dir.join(format!("{key}.none")));
+        if fresh(&jpg) {
+            if let Ok(b) = std::fs::read(&jpg) {
+                out.insert(e, format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(b)));
+            }
+            continue;
+        }
+        if fresh(&none) || asked >= 30 {
+            continue;
+        }
+        asked += 1;
+        let (status, body) = raw_call(&app, reqwest::Method::GET, &format!("/users/{e}/photos/64x64/$value"), None).await?;
+        match status {
+            200..=299 if !body.is_empty() => {
+                let _ = std::fs::write(&jpg, &body);
+                out.insert(e, format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&body)));
+            }
+            403 => return Err("IT no ha dado a AdminOps el permiso para ver las fotos (User.ReadBasic.All).".into()),
+            _ => {
+                let _ = std::fs::write(&none, b"");
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn outlook_dates_and_batches() {
+        assert_eq!(parse_utc("2026-09-30T13:00:00.0000000"), Some(1_790_773_200));
+        assert_eq!(parse_utc("2026-09-30T13:00:00Z"), Some(1_790_773_200));
+        assert_eq!(parse_utc("mañana"), None);
+        let r = batch_requests(&["a@x.com".into(), "b@x.com".into()], |e| format!("/users/{e}/presence"));
+        assert_eq!(r[1]["id"], "1");
+        assert_eq!(r[1]["url"], "/users/b@x.com/presence");
+        assert!(email_ok("ana.perez+it@empresa.com"));
+        assert!(!email_ok("x@y.com/../me") && !email_ok("x@y.com?a=1") && !email_ok("sin-arroba"));
+        assert_eq!(photo_key("Ana@X.com"), photo_key(" ana@x.com"));
+        assert!(!photo_key("ana@x.com").contains("ana"));
+    }
 
     #[test]
     fn tenants_and_app_ids_are_validated() {

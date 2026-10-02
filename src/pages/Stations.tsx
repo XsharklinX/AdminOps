@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Modal } from "../components/ui";
 import { libraryApi, officeApi, remoteApi, stationsApi, type Station, type StationAction, type StationActionResult, type StationList } from "../lib/api";
+import { DataTable } from "../components/DataTable";
 
 const ACTION_LABEL: Record<StationAction, string> = {
   restart: "Reiniciar",
@@ -280,33 +281,36 @@ export function Stations() {
               </div>
             )}
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-[11px] text-mute">
-                    <th className="w-6 pb-2">
-                      <input type="checkbox" checked={allPicked} onChange={pickAll} title="Elegir todos" className="accent-[var(--color-neon)]" />
-                    </th>
-                    <th className="pb-2 font-medium">Equipo</th>
-                    <th className="pb-2 font-medium">Estado</th>
-                    <th className="pb-2 font-medium">Windows · usuario</th>
-                    <th className="pb-2 text-right font-medium">Libre</th>
-                    <th className="pb-2 text-right font-medium">Sin reiniciar</th>
-                    <th className="pb-2 text-right font-medium">Sin actualizar</th>
-                    <th className="pb-2 font-medium">Avisos</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((r) => (
-                    <tr key={r.host} className={`border-t border-line/60 align-top ${picked.has(r.host) ? "bg-neon/5" : ""}`}>
-                      <td className="py-2.5">
-                        <input type="checkbox" checked={picked.has(r.host)} onChange={() => togglePick(r.host)} className="accent-[var(--color-neon)]" />
-                      </td>
-                      <td className="py-2">
+              <DataTable
+                size="xs"
+                alignTop
+                rows={shown}
+                rowKey={(r) => r.host}
+                rowClass={(r) => (picked.has(r.host) ? "bg-neon/5" : "")}
+                columns={[
+                  {
+                    id: "pick",
+                    header: <input type="checkbox" checked={allPicked} onChange={pickAll} title="Elegir todos" className="accent-[var(--color-neon)]" />,
+                    headClass: "w-6",
+                    cell: (r) => <input type="checkbox" checked={picked.has(r.host)} onChange={() => togglePick(r.host)} className="mt-1 accent-[var(--color-neon)]" />,
+                  },
+                  {
+                    id: "host",
+                    header: "Equipo",
+                    sortBy: (r) => r.host,
+                    cell: (r) => (
+                      <>
                         <span className="block text-sm text-ink">{r.host}</span>
                         <span className="font-mono text-[11px] text-mute">{r.ip}</span>
-                      </td>
-                      <td className="py-2">
+                      </>
+                    ),
+                  },
+                  {
+                    id: "state",
+                    header: "Estado",
+                    sortBy: (r) => (r.online ? (r.ms ?? 0) : null),
+                    cell: (r) => (
+                      <>
                         {r.online ? (
                           <span className="flex items-center gap-1 text-ok">
                             <CheckCircle2 size={12} /> {r.ms != null ? `${r.ms} ms` : "Responde"}
@@ -323,32 +327,41 @@ export function Stations() {
                             </span>
                           ))}
                         </span>
-                      </td>
-                      <td className="py-2 text-dim">
-                        {r.remote ? (
-                          <>
-                            <span className="block">{r.remote.os}</span>
-                            <span className="text-mute">{r.remote.user || "Nadie conectado"}</span>
-                          </>
-                        ) : (
-                          <span className="text-mute">{r.remoteError || "—"}</span>
-                        )}
-                      </td>
-                      <td className="py-2 text-right font-mono text-dim">{r.remote?.freeGb != null ? `${r.remote.freeGb.toFixed(0)} GB` : "—"}</td>
-                      <td className="py-2 text-right font-mono text-dim">{days(r.remote?.bootDays)}</td>
-                      <td className="py-2 text-right font-mono text-dim">{days(r.remote?.updateDays)}</td>
-                      <td className="py-2 text-warn">{r.warnings.join(" · ")}</td>
-                      <td className="py-2 text-right">
-                        {r.ports.includes(3389) && (
-                          <button onClick={() => rdp(r.host)} className="rounded px-1.5 py-0.5 text-[11px] text-neon hover:bg-neon/10" title="Conectar por Escritorio remoto">
-                            Conectar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </>
+                    ),
+                  },
+                  {
+                    id: "windows",
+                    header: "Windows · usuario",
+                    sortBy: (r) => r.remote?.os ?? "",
+                    className: "text-dim",
+                    cell: (r) =>
+                      r.remote ? (
+                        <>
+                          <span className="block">{r.remote.os}</span>
+                          <span className="text-mute">{r.remote.user || "Nadie conectado"}</span>
+                        </>
+                      ) : (
+                        <span className="text-mute">{r.remoteError || "—"}</span>
+                      ),
+                  },
+                  { id: "free", header: "Libre", align: "right", sortBy: (r) => r.remote?.freeGb, cell: (r) => (r.remote?.freeGb != null ? `${r.remote.freeGb.toFixed(0)} GB` : "—"), className: "font-mono text-dim" },
+                  { id: "boot", header: "Sin reiniciar", align: "right", sortBy: (r) => r.remote?.bootDays, cell: (r) => days(r.remote?.bootDays), className: "font-mono text-dim" },
+                  { id: "update", header: "Sin actualizar", align: "right", sortBy: (r) => r.remote?.updateDays, cell: (r) => days(r.remote?.updateDays), className: "font-mono text-dim" },
+                  { id: "warnings", header: "Avisos", sortBy: (r) => r.warnings.length, cell: (r) => r.warnings.join(" · "), className: "text-warn" },
+                  {
+                    id: "actions",
+                    header: "",
+                    align: "right",
+                    cell: (r) =>
+                      r.ports.includes(3389) && (
+                        <button onClick={() => rdp(r.host)} className="rounded px-1.5 py-0.5 text-[11px] text-neon hover:bg-neon/10" title="Conectar por Escritorio remoto">
+                          Conectar
+                        </button>
+                      ),
+                  },
+                ]}
+              />
             </div>
           </Card>
         )}

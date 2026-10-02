@@ -1,7 +1,7 @@
 import { CheckCircle2, CircleAlert, ExternalLink, FileCheck2, Loader2, Printer, RefreshCw, Search, Star, Stethoscope, Trash2, Wrench, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button } from "../components/ui";
+import { Button, ErrorState, Loading, EmptyLine } from "../components/ui";
 import { printersApi, tweaksApi, type FoundPrinter, type PrinterCheck, type PrinterInfo, type PrinterSupply } from "../lib/api";
 
 const STATUS: Record<number, string> = { 1: "Otro", 2: "Desconocido", 3: "Lista", 4: "Imprimiendo", 5: "Calentando", 6: "Detenida", 7: "Sin conexión" };
@@ -15,11 +15,14 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
+  const [failed, setFailed] = useState<string | null>(null);
   const load = useCallback(async () => {
+    setFailed(null);
     setLoading(true);
     try {
       setList(await printersApi.list());
     } catch (e) {
+      setFailed(String(e));
       toast("error", String(e));
     } finally {
       setLoading(false);
@@ -76,7 +79,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
     if (yes) void run(p.name, `${p.name} quitada.`, () => printersApi.remove(p.name));
   };
 
-  if (!list) return <p className="p-8 font-mono text-sm text-mute">Leyendo impresoras…</p>;
+  if (!list) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Leyendo impresoras…" />;
   const real = list.filter((p) => !p.virtual);
   const virtual = list.filter((p) => p.virtual);
 
@@ -163,7 +166,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-line bg-panel">
-        {real.length ? real.map(row) : <p className="px-4 py-8 text-center text-sm text-mute">No hay impresoras físicas instaladas.</p>}
+        {real.length ? real.map(row) : <EmptyLine>No hay impresoras físicas instaladas.</EmptyLine>}
       </div>
 
       <NetworkPrinters isAdmin={isAdmin} />

@@ -31,6 +31,9 @@ const BLOCKED: &[&str] = &[
     "disk_repair",
     "disk_surface_scan",
     "disk_rescue",
+    "disk_capacity_test",
+    "disk_format",
+    "disk_eject",
     // Programas y Windows
     "remove_apps",
     "reinstall_app",
@@ -89,6 +92,14 @@ const BLOCKED: &[&str] = &[
     "create_share",
     "remove_share",
     "enable_file_sharing",
+    "share_grant",
+    "share_revoke",
+    "map_network_drive",
+    "unmap_network_drive",
+    "reconnect_network_drive",
+    "set_share_backup",
+    "remove_share_backup",
+    "run_share_backup",
     // Impresoras
     "clear_printer_queue",
     "set_default_printer",
@@ -160,7 +171,7 @@ const SAFE: &[&str] = &[
     // hardware::sensors
     "read_sensors", "open_third_party_notices",
     // hardware::smart
-    "smart_status", "disks_status", "disk_check", "disk_pick_folder", "storage_info", "storage_make_portable",
+    "smart_status", "disks_status", "disk_check", "disk_pick_folder", "bitlocker_local_key", "disk_speed_test", "autobackup_info", "autobackup_set", "autobackup_run_now", "storage_info", "storage_make_portable", "storage_set_browser_on_usb", "company_export", "company_import_preview", "company_import_apply",
     // keys
     "try_shortcut",
     // library
@@ -186,6 +197,8 @@ const SAFE: &[&str] = &[
     "wifi_state",
     // office
     "wake_on_lan", "remote_status", "open_remote_desktop", "open_remote_assistance", "list_shares", "ip_conflicts", "export_csv",
+    // shares (consultas; abrir una ruta de red en el Explorador no cambia nada)
+    "share_explain", "network_drives", "open_network_path", "remote_shares", "share_sizes", "share_backups",
     // officemap
     "office_map", "save_device_meta", "refresh_device_ips", "watch_status",
     // followups y nota de llamada (datos y ventanas del propio técnico)
@@ -193,7 +206,7 @@ const SAFE: &[&str] = &[
     "open_quick_note", "close_quick_note", "open_screen_clip", "redact_clipboard_image",
     // graph (consultas, conexión del propio técnico, su calendario y sus mensajes)
     "graph_status", "graph_configure", "graph_login_start", "graph_login_poll", "graph_logout", "graph_open_devicelogin",
-    "graph_signins", "graph_mfa_methods", "graph_service_health", "graph_calendar_sync", "graph_teams_send",
+    "graph_signins", "graph_mfa_methods", "graph_service_health", "graph_calendar_sync", "graph_teams_send", "graph_calendar_pull", "graph_calendar_view", "graph_presence", "graph_photos",
     // cases
     "case_current", "case_open", "case_update", "case_actions", "case_draft", "case_close", "case_discard", "cases_for_person",
     // people
@@ -202,7 +215,7 @@ const SAFE: &[&str] = &[
     "get_app_info", "read_log", "log_frontend_error", "open_logs_folder", "open_app_folder",
     // portals
     "list_portals", "save_portal", "delete_portal", "portal_show", "portal_bounds", "portal_hide_all", "portal_reset", "portal_insert_text", "portal_nav", "portal_open_window",
-    "portal_open_external", "portal_preload", "portal_close_idle", "portal_go", "portal_zoom", "portal_find", "portal_login_get", "portal_login_set",
+    "portal_open_external", "portal_preload", "portal_close_idle", "portal_go", "portal_allow_domain", "portal_zoom", "portal_find", "portal_login_get", "portal_login_set",
     "portal_compose", "portal_teams", "portal_sign_out", "portal_download_open", "portal_download_reveal", "router_portal", "portal_hide",
     // printers
     "list_printers", "print_test_page", "check_printer", "find_network_printers",

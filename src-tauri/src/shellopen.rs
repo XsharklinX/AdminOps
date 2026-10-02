@@ -25,6 +25,15 @@ pub fn open(uri: &str) -> Result<(), String> {
     }
 }
 
+/// Ejecuta un programa de Windows (`net.exe`…) sin ventana y como el usuario con
+/// la sesión abierta. Lo que es de la sesión —las unidades de red— no lo ve el
+/// Explorador si lo crea un programa elevado: por eso se le pide al escritorio.
+/// No espera a que termine ni devuelve su salida.
+pub fn run_as_user(program: &str, args: &str) -> Result<(), String> {
+    let (program, args) = (program.to_string(), args.to_string());
+    std::thread::spawn(move || via_desktop_run(&program, &args)).join().unwrap_or_else(|_| Err("fallo interno".into()))
+}
+
 /// ¿Hay un programa registrado para este protocolo (msteams:, ms-settings:…)?
 ///
 /// Se comprueba antes de abrirlo: si no lo hay, Windows saca su propio aviso en
@@ -123,6 +132,26 @@ fn via_desktop(uri: &str) -> Result<(), String> {
                 .map_err(|e| format!("abrir: {e}"))
         }
     })
+}
+
+#[cfg(windows)]
+fn via_desktop_run(program: &str, args: &str) -> Result<(), String> {
+    use windows::core::BSTR;
+    use windows::Win32::System::Variant::VARIANT;
+    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
+    with_com(|| {
+        let shell = desktop_shell()?;
+        unsafe {
+            shell
+                .ShellExecute(&BSTR::from(program), &VARIANT::from(BSTR::from(args)), &VARIANT::default(), &VARIANT::from(BSTR::from("open")), &VARIANT::from(SW_HIDE.0))
+                .map_err(|e| format!("ejecutar: {e}"))
+        }
+    })
+}
+
+#[cfg(not(windows))]
+fn via_desktop_run(_: &str, _: &str) -> Result<(), String> {
+    Err("Solo disponible en Windows.".into())
 }
 
 #[cfg(not(windows))]

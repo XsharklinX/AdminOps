@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AdminOps. Documento del sistema</title>
+<style>
+  @page { size: A4; margin: 24mm 22mm 22mm 22mm; @bottom-center { content: counter(page); font-family: "Segoe UI", sans-serif; font-size: 9pt; color: #666; } }
+  @page :first { @bottom-center { content: ""; } }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, "Times New Roman", serif; font-size: 11pt; line-height: 1.5; color: #1c1c1c; margin: 0; }
+  h1, h2, h3, th, .portada, .pie, .caja h4, figcaption, .matriz h4 { font-family: "Segoe UI", Arial, sans-serif; }
+  h1 { font-size: 30pt; margin: 0 0 4mm; letter-spacing: -0.5px; }
+  h2 { font-size: 15pt; margin: 9mm 0 3mm; padding-bottom: 1.5mm; border-bottom: 1.2px solid #1c1c1c; break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 6mm 0 1.5mm; break-after: avoid; }
+  p { margin: 0 0 3mm; text-align: justify; hyphens: auto; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  .portada { height: 245mm; display: flex; flex-direction: column; justify-content: space-between; break-after: page; }
+  .portada .arriba { margin-top: 55mm; }
+  .portada .sub { font-size: 14pt; color: #444; margin: 0 0 12mm; }
+  .portada .lema { font-family: Georgia, serif; font-size: 12pt; color: #333; max-width: 120mm; border-left: 3px solid #1c1c1c; padding-left: 5mm; text-align: left; }
+  .portada .datos { font-size: 10pt; color: #333; line-height: 1.7; }
+  .indice { break-after: page; }
+  .indice ol { list-style: none; padding: 0; font-family: "Segoe UI", sans-serif; font-size: 10.5pt; }
+  .indice li { display: flex; gap: 3mm; padding: 1.6mm 0; border-bottom: 1px dotted #bbb; }
+  .indice li span:first-child { width: 8mm; color: #666; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 5mm; font-size: 9.8pt; break-inside: auto; }
+  th { text-align: left; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.4px; color: #444; border-bottom: 1.2px solid #1c1c1c; padding: 1.5mm 2mm; }
+  td { vertical-align: top; padding: 1.8mm 2mm; border-bottom: 0.6px solid #ccc; }
+  tr { break-inside: avoid; }
+  td:first-child { font-family: "Segoe UI", sans-serif; font-weight: 600; width: 34mm; }
+  .matriz { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.2px solid #1c1c1c; margin: 3mm 0 5mm; break-inside: avoid; }
+  .matriz > div { padding: 3.5mm 4mm; font-size: 9.6pt; line-height: 1.4; }
+  .matriz > div:nth-child(1), .matriz > div:nth-child(2) { border-bottom: 1.2px solid #1c1c1c; }
+  .matriz > div:nth-child(odd) { border-right: 1.2px solid #1c1c1c; }
+  .matriz h4 { margin: 0 0 2mm; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; }
+  .matriz ul { padding-left: 4.5mm; margin: 0; }
+  .matriz .tipo { font-family: "Segoe UI", sans-serif; font-size: 8pt; color: #666; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .caja { border: 0.8px solid #999; background: #f6f6f4; padding: 3.5mm 4.5mm; margin: 3mm 0 5mm; font-size: 10pt; break-inside: avoid; }
+  .caja h4 { margin: 0 0 1.5mm; font-size: 9.5pt; text-transform: uppercase; letter-spacing: 0.4px; }
+  .caja p:last-child { margin-bottom: 0; }
+  figure { margin: 4mm 0 5mm; break-inside: avoid; }
+  figcaption { font-size: 8.8pt; color: #555; margin-top: 2mm; }
+  .capas { font-family: "Segoe UI", sans-serif; font-size: 9.3pt; }
+  .capa { border: 1px solid #1c1c1c; padding: 1.6mm 4mm; line-height: 1.35; }
+  .capa b { display: block; font-size: 10pt; }
+  .flecha { text-align: center; font-size: 8.5pt; color: #555; padding: 0.4mm 0; line-height: 1.3; }
+  .gris { background: #efefec; }
+  .cifras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin: 3mm 0 5mm; font-family: "Segoe UI", sans-serif; break-inside: avoid; }
+  .cifras div { border-top: 2px solid #1c1c1c; padding-top: 1.5mm; font-size: 8.8pt; color: #444; }
+  .cifras b { display: block; font-size: 16pt; color: #1c1c1c; }
+  .nota { font-size: 9.5pt; color: #444; }
+  code { font-family: Consolas, monospace; font-size: 9.5pt; }
+</style>
+</head>
+<body>
+
+<section class="portada">
+  <div class="arriba">
+    <h1>AdminOps</h1>
+    <p class="sub">Documento del sistema</p>
+    <p class="lema">Qué hace, cómo funciona, cómo está construido, qué prioriza y dónde están sus puntos fuertes y débiles.</p>
+  </div>
+  <div class="datos">
+    Versión descrita: 1.1.9<br>
+    Fecha: octubre de 2026<br>
+    Autor del sistema: David Bonilla
+  </div>
+</section>
+
+<section class="indice">
+  <h2 style="margin-top:0">Contenido</h2>
+  <ol>
+    <li><span>1</span> Qué es AdminOps y para quién</li>
+    <li><span>2</span> El problema que resuelve</li>
+    <li><span>3</span> Qué hace</li>
+    <li><span>4</span> Cómo funciona</li>
+    <li><span>5</span> Cómo está hecho</li>
+    <li><span>6</span> Qué prioriza</li>
+    <li><span>7</span> Ciclo de vida: cómo se ha construido y en qué punto está</li>
+    <li><span>8</span> La forma de trabajo, comparada con la metodología ágil</li>
+    <li><span>9</span> Análisis FODA</li>
+    <li><span>10</span> Qué hacer con el FODA</li>
+    <li><span>11</span> Limitaciones que conviene conocer antes de usarlo</li>
+    <li><span>12</span> Lo que viene</li>
+    <li><span>A</span> Anexo: cifras y glosario</li>
+  </ol>
+</section>
+
+<h2 style="margin-top:0">1. Qué es AdminOps y para quién</h2>
+<p>AdminOps es un programa de escritorio para Windows 10 y 11 pensado para la persona que da soporte técnico: quien llega a un equipo que «va lento», que no imprime o que no entra a la red, y tiene que averiguar qué pasa, arreglarlo y dejar constancia de lo que hizo.</p>
+<p>Reúne en una sola ventana tareas que normalmente se reparten entre el Administrador de tareas, el Visor de eventos, una docena de consolas de Windows, tres o cuatro utilidades de terceros y una libreta. No sustituye a Windows: lo ordena, lo explica en español claro y añade lo que Windows no trae, que es sobre todo memoria (qué se cambió, cuándo, en qué equipo y para qué cliente).</p>
+<p>Tiene dos formas de presentarse. El <b>modo técnico</b> enseña todo. El <b>modo usuario</b> enseña solo el estado del equipo, la solución de problemas comunes y el acceso remoto, para dejarlo instalado en el equipo de alguien que no es técnico. Hay que decirlo con precisión: es un modo de interfaz, que esconde opciones; no es una barrera de seguridad.</p>
+<p>Se puede instalar o llevar en un pendrive. En el pendrive guarda sus datos junto al programa, separados por equipo, y no deja nada en el ordenador del cliente.</p>
+
+<h2>2. El problema que resuelve</h2>
+<p>El trabajo de soporte tiene tres dificultades que se repiten y que no son técnicas en sentido estricto.</p>
+<p>La primera es la dispersión. La información para diagnosticar un equipo existe, pero está repartida: la salud del disco en un sitio, los pantallazos azules en otro, lo que arranca con Windows en otro. Cada técnico termina con su propia colección de herramientas y con su propio orden para usarlas.</p>
+<p>La segunda es el riesgo. Muchos «trucos» de optimización cambian el registro o desactivan servicios sin guardar cómo estaba antes. Si algo sale mal, no hay forma limpia de volver atrás, y el que responde ante el cliente es el técnico.</p>
+<p>La tercera es que el trabajo no queda escrito. Se arregla el equipo y se va uno. Semanas después nadie recuerda qué se tocó, y el cliente no tiene nada que le muestre por qué pagó.</p>
+<p>AdminOps responde a las tres: junta la información, registra cada cambio con su valor anterior para poder deshacerlo, y convierte la visita en un informe en PDF.</p>
+
+<h2>3. Qué hace</h2>
+<p>Las funciones se agrupan en siete áreas, que son las secciones de la barra lateral. La tabla resume lo principal de cada una; el manual del técnico (<code>docs/MANUAL.md</code>) las recorre con detalle.</p>
+<table>
+  <tr><th>Área</th><th>Para qué sirve</th></tr>
+  <tr><td>Inicio</td><td>Panel con el equipo en vivo (procesador, memoria, discos, red, temperaturas). Solución guiada de problemas comunes. Sesión de servicio: una visita de principio a fin, con diagnóstico antes y después, lista de comprobación, presupuesto o recibo, firma del cliente e informe.</td></tr>
+  <tr><td>Equipo</td><td>Diagnóstico con hallazgos ordenados por gravedad y un botón para resolver cada uno. Inventario de hardware y sensores. Salud y reparación de discos. Seguridad con una nota de 0 a 100. Ajustes de Windows (limpieza, rendimiento, privacidad, servicios, inicio), todos reversibles. Procesos. Espacio en disco.</td></tr>
+  <tr><td>Soporte</td><td>El sistema de tickets, el correo y Teams de la empresa dentro de la aplicación. Personas del dominio (cuenta bloqueada, contraseña caducada) y clientes con sus equipos, visitas y garantías. Agenda. Contactos. Base de conocimiento con soluciones y plantillas de texto.</td></tr>
+  <tr><td>Red</td><td>El router y la Wi‑Fi, los dispositivos conectados, prueba de velocidad, reparación de la red y herramientas (ping, traza de ruta, puertos, DNS, archivo hosts).</td></tr>
+  <tr><td>Aplicaciones</td><td>Actualizar, instalar en lote y desinstalar programas; Windows Update; quitar aplicaciones preinstaladas; recetas que encadenan varios pasos.</td></tr>
+  <tr><td>Administración</td><td>Estaciones de la oficina e inventario. Usuarios locales. Cuentas de Microsoft. Impresoras y carpetas compartidas. Acceso remoto. Accesos directos a las herramientas de Windows.</td></tr>
+  <tr><td>Datos</td><td>Caja fuerte cifrada, borrado seguro, recuperación de archivos borrados y copia de los datos de un usuario a otro equipo.</td></tr>
+</table>
+<p>Dos piezas atraviesan todas las áreas. El <b>diario de cambios</b> anota todo lo que el programa modifica en el equipo y permite deshacerlo. Y el <b>modo auditoría</b> bloquea en un único punto cualquier acción que cambie el equipo, para poder mirar sin tocar.</p>
+
+<h2 style="break-before: page; margin-top: 0">4. Cómo funciona</h2>
+<p>El programa tiene dos mitades que se hablan por un canal estrecho y controlado.</p>
+<figure>
+  <div class="capas">
+    <div class="capa"><b>Interfaz</b>Lo que se ve. Páginas, botones, tablas. No puede tocar el sistema por sí misma: solo puede pedir.</div>
+    <div class="flecha">▼ pide por nombre una de las 406 operaciones permitidas ▲ recibe datos o un error explicado</div>
+    <div class="capa gris"><b>Punto de control</b>Comprueba que la operación existe, que el modo auditoría no la bloquea y si hace falta ser administrador.</div>
+    <div class="flecha">▼</div>
+    <div class="capa"><b>Motor</b>Hace el trabajo: lee sensores, consulta a Windows, cambia un ajuste, lanza una reparación. Guarda el valor anterior antes de cambiar nada.</div>
+    <div class="flecha">▼</div>
+    <div class="capa gris"><b>Windows</b>Sus interfaces nativas, PowerShell, el registro, los servicios y sus propias herramientas (copia de archivos, comprobación de disco, programador de tareas).</div>
+  </div>
+  <figcaption>Figura 1. Las cuatro capas. La interfaz nunca llega a Windows sin pasar por el punto de control.</figcaption>
+</figure>
+<h3>Recorrido de una acción</h3>
+<p>Sirve de ejemplo desactivar un servicio innecesario. El técnico pulsa «Aplicar». La interfaz pide al motor la operación correspondiente. El punto de control mira si el modo auditoría está activo; si lo está, la rechaza con un mensaje. Si no, el motor lee cómo está el servicio ahora, lo anota, y si el ajuste es de riesgo medio o alto crea antes un punto de restauración de Windows. Después hace el cambio, comprueba el resultado y lo escribe en el diario. Si el técnico pulsa «Deshacer» una semana más tarde, el programa devuelve el servicio exactamente al estado anotado.</p>
+<h3>Dónde se guardan los datos</h3>
+<p>Todo se guarda en archivos locales: en la carpeta de datos del usuario si está instalado, o junto al ejecutable si es portable. No hay servidor, ni cuenta, ni telemetría. Las contraseñas que el técnico decide guardar (routers, portales) se cifran con el mecanismo de Windows para ese usuario; en el pendrive, con una clave propia que además puede protegerse con un PIN.</p>
+<h3>Las webs de la empresa</h3>
+<p>Tickets, correo y Teams son páginas web que se abren dentro de la ventana, cada una limitada a los sitios de su portal. Esas páginas no tienen acceso a las operaciones del programa: están aisladas de él.</p>
+
+<h2>5. Cómo está hecho</h2>
+<p>AdminOps está construido con <b>Tauri 2</b>. El motor está escrito en <b>Rust</b> y la interfaz en <b>React con TypeScript</b>, y se muestra con WebView2, el componente de Microsoft Edge que Windows ya trae. Esa combinación explica dos características del resultado: el instalador pesa unos 11 MB y el programa consume poca memoria, porque no carga un navegador propio.</p>
+<table>
+  <tr><th>Parte</th><th>Tecnología</th></tr>
+  <tr><td>Motor</td><td>Rust, con las interfaces nativas de Windows (Win32, WinRT, COM), el registro y el cifrado del sistema.</td></tr>
+  <tr><td>Interfaz</td><td>React 19, TypeScript, Vite y Tailwind CSS 4. Iconos Lucide y tipografía IBM Plex.</td></tr>
+  <tr><td>Consultas a Windows</td><td>PowerShell y WMI/CIM, mediante un proceso que se mantiene abierto para no pagar el arranque en cada consulta.</td></tr>
+  <tr><td>Sensores</td><td>LibreHardwareMonitor, de código abierto.</td></tr>
+  <tr><td>Informes</td><td>Se componen en HTML y se convierten a PDF con Edge.</td></tr>
+  <tr><td>Instalación</td><td>Instalador propio, instalador clásico NSIS para despliegues en silencio y un zip portable.</td></tr>
+  <tr><td>Calidad</td><td>Pruebas automáticas en Rust y en la interfaz, dos analizadores de código y una integración continua en GitHub que además revisa vulnerabilidades conocidas en las dependencias.</td></tr>
+</table>
+<div class="cifras">
+  <div><b>≈ 38.000</b>líneas de Rust en 97 archivos</div>
+  <div><b>≈ 42.000</b>líneas de interfaz en 157 archivos</div>
+  <div><b>406</b>operaciones que la interfaz puede pedir</div>
+  <div><b>343</b>pruebas automáticas (279 + 64)</div>
+</div>
+<p class="nota">Cifras de la versión 1.1.9. Otras 41 pruebas existen pero solo se ejecutan a mano, porque necesitan un equipo real o permisos de administrador.</p>
+
+<h2>6. Qué prioriza</h2>
+<p>Cuando dos cosas chocan, estas son las que ganan. Están en orden.</p>
+<ol>
+  <li><b>Que se pueda deshacer.</b> Ningún ajuste se aplica sin guardar antes el valor que había. Lo que no se puede deshacer (borrar un usuario con sus archivos, formatear) pide una confirmación explícita y lo dice.</li>
+  <li><b>Que los datos no salgan del equipo.</b> Sin cuentas, sin telemetría y sin servidor. Las rutas con el nombre del usuario no se muestran en pantalla.</li>
+  <li><b>Que el técnico no dependa de terceros.</b> El programa trabaja con los permisos que el técnico ya tiene. No exige que otro departamento registre aplicaciones o conceda accesos para funcionar.</li>
+  <li><b>Explicar, no solo informar.</b> Un error dice qué pasó y qué hacer. Un hallazgo del diagnóstico trae el botón que lo resuelve.</li>
+  <li><b>Usar los mecanismos de Windows.</b> Para compartir una carpeta, conectar una unidad o programar una copia se usan las herramientas del sistema, no sustitutos propios. Lo que el programa hace, el técnico lo puede comprobar después en Windows.</li>
+  <li><b>No comportarse como algo sospechoso.</b> No evita antivirus, no ejecuta nada en otros equipos y no interviene en sesiones ajenas. Cuando una tarea cae fuera de eso, abre la herramienta de Windows correspondiente.</li>
+</ol>
+
+<h2>7. Ciclo de vida: cómo se ha construido y en qué punto está</h2>
+<p>El ciclo de vida de un software suele describirse en seis etapas. Lo que sigue no es la teoría, sino cómo ha ido cada una en este proyecto, incluido lo que no se ha hecho bien.</p>
+<table>
+  <tr><th>Etapa</th><th>Cómo se ha hecho en AdminOps</th></tr>
+  <tr><td>Requisitos</td><td>Salen del trabajo diario de soporte del autor. No hay un documento formal de requisitos: hay un archivo de ruta (<code>ROADMAP.md</code>) que hace de lista de pendientes y de historial. La ventaja es que cada función responde a una necesidad real; la desventaja, que solo recoge la experiencia de una persona.</td></tr>
+  <tr><td>Diseño</td><td>La arquitectura de dos mitades se fijó al principio y se ha mantenido. El diseño de cada pantalla, en cambio, se ha hecho sobre la marcha, y por eso ha habido que rehacer varias (la versión 0.18 y la 1.1.9 son rediseños).</td></tr>
+  <tr><td>Construcción</td><td>Por fases cortas. Cada fase es una versión con un objetivo y un criterio de «terminado cuando…». Van 34 fases.</td></tr>
+  <tr><td>Pruebas</td><td>Automáticas para las piezas, y una lista de comprobación manual (<code>docs/PRUEBAS.md</code>) para lo que hay que ver funcionando. Es la etapa más floja: se explica en la sección 9.</td></tr>
+  <tr><td>Despliegue</td><td>Un solo comando genera el instalador, el instalador clásico y el portable. No hay actualización automática ni firma digital.</td></tr>
+  <tr><td>Mantenimiento</td><td>Es donde está hoy el proyecto. Las últimas versiones corrigen fallos encontrados al usarlo y repasan pantallas, más que añadir funciones.</td></tr>
+</table>
+<p>En el ciclo de vida del producto, AdminOps está al final de la introducción: funciona, lo usa su autor en trabajo real, y todavía no tiene otros usuarios. El siguiente paso natural no es añadirle más, sino ponerlo en manos de otras personas.</p>
+
+<h2>8. La forma de trabajo, comparada con la metodología ágil</h2>
+<p>El proyecto no nació siguiendo un método con nombre. Mirado ahora, se parece bastante a un desarrollo ágil en algunas cosas y se aparta en otras que importan.</p>
+<table>
+  <tr><th>Práctica ágil</th><th>Situación en AdminOps</th></tr>
+  <tr><td>Entregas cortas y frecuentes</td><td>Se cumple. Cada fase termina en una versión que funciona.</td></tr>
+  <tr><td>Lista de pendientes priorizada</td><td>Se cumple. El archivo de ruta ordena lo pendiente por prioridad y marca lo aparcado.</td></tr>
+  <tr><td>Responder al cambio</td><td>Se cumple. Varias fases se han reordenado o abandonado a partir de lo que pasó al usar el programa.</td></tr>
+  <tr><td>Software que funciona por encima de la documentación</td><td>Se cumple, y además hay documentación: manual, guía de instalación para sistemas, lista de pruebas.</td></tr>
+  <tr><td>Definición de «terminado»</td><td>A medias. Cada fase tiene su criterio, pero varias se han dado por hechas «sin probar en un entorno real».</td></tr>
+  <tr><td>Retroalimentación de usuarios</td><td>No se cumple. El único usuario es el autor. Es la carencia más seria frente al método.</td></tr>
+  <tr><td>Retrospectiva</td><td>Se hizo una, tras los fallos de las versiones 1.1.5 y 1.1.6, y de ella salió el plan actual. No es una costumbre.</td></tr>
+  <tr><td>Integración continua</td><td>Existe, pero buena parte del trabajo reciente no está guardado en el control de versiones, así que no pasa por ella.</td></tr>
+  <tr><td>Ritmo sostenible y alcance limitado</td><td>No se cumple. Se han abierto muchas funciones a la vez y algunas han salido sin madurar.</td></tr>
+</table>
+
+<h2 style="break-before: page; margin-top: 0">9. Análisis FODA</h2>
+<p>Las fortalezas y debilidades son internas: dependen del proyecto. Las oportunidades y amenazas vienen de fuera.</p>
+<div class="matriz">
+  <div>
+    <h4>Fortalezas <span class="tipo">· internas, a favor</span></h4>
+    <ul>
+      <li>Una sola herramienta donde antes había una docena.</li>
+      <li>Todo cambio se registra y se puede deshacer.</li>
+      <li>Privacidad real: sin cuentas, sin telemetría, sin servidor.</li>
+      <li>Portable: trabaja desde un pendrive sin dejar rastro.</li>
+      <li>Ligero: instalador de 11 MB, arranque rápido.</li>
+      <li>En español claro, hecho por alguien que hace ese trabajo.</li>
+      <li>El informe en PDF convierte la visita en algo que se entrega.</li>
+      <li>Base técnica cuidada: pruebas, análisis de código y revisión de vulnerabilidades automáticos.</li>
+    </ul>
+  </div>
+  <div>
+    <h4>Debilidades <span class="tipo">· internas, en contra</span></h4>
+    <ul>
+      <li>Un solo desarrollador. Si él falta, el proyecto se para.</li>
+      <li>Sin firma digital: Windows avisa al instalarlo.</li>
+      <li>Las pruebas revisan piezas sueltas, no el programa en marcha.</li>
+      <li>Trabajo reciente sin guardar en el control de versiones.</li>
+      <li>Demasiado ancho para una persona: 406 operaciones, más de treinta pantallas.</li>
+      <li>Funciones sin probar en un entorno real (dominio, Microsoft 365).</li>
+      <li>Varios archivos de código enormes y datos definidos dos veces.</li>
+      <li>Solo Windows y solo en español. Sin actualización automática.</li>
+      <li>Ningún usuario aparte del autor.</li>
+    </ul>
+  </div>
+  <div>
+    <h4>Oportunidades <span class="tipo">· externas, a favor</span></h4>
+    <ul>
+      <li>Técnicos independientes y oficinas pequeñas que no pueden pagar una plataforma de gestión remota.</li>
+      <li>Pocas herramientas de este tipo pensadas en español.</li>
+      <li>El equipo de soporte donde trabaja el autor, como primeros usuarios.</li>
+      <li>El informe como argumento para cobrar el servicio.</li>
+      <li>Traducción al inglés: el mercado se multiplica.</li>
+      <li>Un modelo gratuito con una versión de pago, ya esbozado.</li>
+    </ul>
+  </div>
+  <div>
+    <h4>Amenazas <span class="tipo">· externas, en contra</span></h4>
+    <ul>
+      <li>Antivirus y políticas de empresa que bloquean un programa sin firmar que toca el sistema.</li>
+      <li>Cambios de Windows que rompan lo que el programa usa.</li>
+      <li>Herramientas gratuitas consolidadas y plataformas de gestión remota con mucho más respaldo.</li>
+      <li>Responsabilidad ante un cliente si un cambio daña su equipo.</li>
+      <li>Dependencia de componentes ajenos (sensores, instalador de programas de Windows).</li>
+      <li>Pérdida del código: hoy vive, sobre todo, en un disco.</li>
+    </ul>
+  </div>
+</div>
+<h3>Lo que hay detrás de las debilidades principales</h3>
+<p><b>Las pruebas.</b> Entre las versiones 1.1.5 y 1.1.6, cinco fallos graves pasaron todas las pruebas automáticas y aparecieron al usar el programa: portales que no terminaban de abrir, una pantalla de ajustes en la que no se podía pulsar nada, el segundo factor de Microsoft rechazado, el tema claro con el fondo negro y la ventana del portable en negro. Ninguna prueba arranca el programa y lo recorre como lo haría una persona. Mientras eso no exista, cada versión depende de que el autor pruebe a mano.</p>
+<p><b>El alcance.</b> El programa hace muchas cosas, y eso es a la vez su atractivo y su carga. Cada función añadida es una función que mantener cuando Windows cambie. Con una sola persona, la anchura se paga en profundidad: hay partes hechas con cuidado y partes que funcionan en el equipo del autor y no se han visto en otro.</p>
+<p><b>La firma digital.</b> Sin ella, Windows muestra «Windows protegió su PC» al instalar, y un antivirus corporativo puede desconfiar de un programa que cambia el registro y los servicios. Para un técnico que conoce el aviso es una molestia; para un cliente o un departamento de sistemas es un motivo para decir que no.</p>
+
+<h2>10. Qué hacer con el FODA</h2>
+<p>El análisis sirve si termina en decisiones. Cruzando los cuatro cuadrantes salen estas líneas.</p>
+<table>
+  <tr><th>Cruce</th><th>Línea de acción</th></tr>
+  <tr><td>Fortaleza + oportunidad</td><td>Llevar el programa portable al equipo de soporte más cercano y recoger sus impresiones durante dos semanas. La fortaleza (no hay que instalar ni pedir permisos) hace que probarlo no cueste nada.</td></tr>
+  <tr><td>Fortaleza + oportunidad</td><td>Presentar el informe en PDF y el «se puede deshacer» como lo que distingue a AdminOps, en vez de la lista de funciones, que cualquiera puede igualar.</td></tr>
+  <tr><td>Debilidad + oportunidad</td><td>Antes de buscar más usuarios, construir la prueba que arranca el programa y recorre sus pantallas. Sin ella, cada usuario nuevo es alguien más que puede encontrarse un fallo grave.</td></tr>
+  <tr><td>Debilidad + oportunidad</td><td>Decidir cuál es el núcleo (diagnóstico, ajustes reversibles, sesión e informe) y congelar el resto: se mantiene, pero no crece.</td></tr>
+  <tr><td>Fortaleza + amenaza</td><td>Usar la transparencia como defensa ante los departamentos de sistemas: la guía de instalación ya explica qué permisos pide el programa y qué conexiones hace. Mantenerla al día.</td></tr>
+  <tr><td>Debilidad + amenaza</td><td>Guardar todo el código en el repositorio remoto y hacer una copia aparte. Es la acción más barata de todas y la que evita la pérdida más grave.</td></tr>
+  <tr><td>Debilidad + amenaza</td><td>Añadir términos de uso que delimiten la responsabilidad, y presupuestar la firma digital para cuando el programa salga del entorno del autor.</td></tr>
+</table>
+
+<h2>11. Limitaciones que conviene conocer antes de usarlo</h2>
+<ul>
+  <li>Funciona solo en Windows 10 y 11 de 64 bits, y necesita WebView2 (viene con Windows 11 y con las actualizaciones de Windows 10).</li>
+  <li>Muchas acciones requieren abrirlo como administrador. Sin eso, el programa lee pero no cambia.</li>
+  <li>Al instalarlo, Windows muestra un aviso por no estar firmado.</li>
+  <li>Las funciones de Microsoft 365 necesitan que la organización registre antes una aplicación; sin ese paso no hacen nada.</li>
+  <li>Las funciones de dominio, de Microsoft 365 y de carpetas compartidas no se han probado en una red de empresa distinta de la del autor.</li>
+  <li>El modo usuario oculta opciones, pero no impide a alguien con conocimientos volver al modo técnico.</li>
+  <li>El programa no vigila los equipos a distancia ni actúa sobre otros equipos de la red: trabaja sobre el equipo en el que está abierto.</li>
+</ul>
+
+<h2>12. Lo que viene</h2>
+<p>El plan vigente tiene una regla escrita en su primera línea: nada de funciones nuevas hasta cerrarlo. Son cinco fases, en este orden.</p>
+<table>
+  <tr><th>Fase</th><th>Objetivo y criterio de cierre</th></tr>
+  <tr><td>30. Probar la aplicación en marcha</td><td>Una prueba automática que arranca el programa compilado, recorre todas las pantallas y falla si algo no carga, tapa los clics o se ve roto. Prioridad máxima.</td></tr>
+  <tr><td>31. Publicar con disciplina</td><td>Todo en el control de versiones, una etiqueta por versión, notas de novedades y un día de prueba antes de entregar cada versión.</td></tr>
+  <tr><td>32. Un solo contrato</td><td>Que los datos se definan una vez y la interfaz los reciba generados, y partir los archivos demasiado grandes.</td></tr>
+  <tr><td>33. Pulido de la interfaz</td><td>Los dos temas revisados pantalla por pantalla y los mismos estados en todas partes. Empezado en la 1.1.9.</td></tr>
+  <tr><td>34. Listo para el equipo</td><td>Manual, guía para sistemas y paquete de soporte. En buena parte hecho.</td></tr>
+</table>
+<p>Quedan aparcadas, por decisión del autor, las fases de negocio (estadísticas de ingresos, licencias, versión de pago) y la de distribución (actualización automática, inglés, página de descarga).</p>
+
+<h2>Anexo: cifras y glosario</h2>
+<table>
+  <tr><th>Dato</th><th>Valor en la versión 1.1.9</th></tr>
+  <tr><td>Código del motor</td><td>Unas 38.000 líneas de Rust en 97 archivos.</td></tr>
+  <tr><td>Código de la interfaz</td><td>Unas 42.000 líneas de TypeScript en 157 archivos.</td></tr>
+  <tr><td>Operaciones</td><td>406, cada una clasificada como «cambia el equipo» o «solo consulta».</td></tr>
+  <tr><td>Pruebas automáticas</td><td>279 del motor y 64 de la interfaz; 41 más que se ejecutan a mano.</td></tr>
+  <tr><td>Tamaño</td><td>Instalador de 10,9 MB; portable de 10,4 MB.</td></tr>
+  <tr><td>Documentación</td><td>Manual del técnico, guía de instalación para sistemas, lista de pruebas, licencias de terceros, guía de desarrollo y archivo de ruta.</td></tr>
+</table>
+<table>
+  <tr><th>Término</th><th>Significado</th></tr>
+  <tr><td>Diario de cambios</td><td>Registro de todo lo que el programa ha modificado en un equipo, con el valor anterior de cada cosa.</td></tr>
+  <tr><td>Modo auditoría</td><td>Estado en el que el programa solo mira: cualquier operación que cambie el equipo queda bloqueada.</td></tr>
+  <tr><td>Portable</td><td>Versión que no se instala. Se ejecuta desde una carpeta o un pendrive y guarda ahí sus datos.</td></tr>
+  <tr><td>Portal</td><td>Una web de la empresa (tickets, correo, Teams) abierta dentro de la ventana del programa.</td></tr>
+  <tr><td>Punto de restauración</td><td>Copia que hace Windows del estado del sistema, a la que se puede volver si algo sale mal.</td></tr>
+  <tr><td>Sesión de servicio</td><td>Una visita registrada de principio a fin, que termina en un informe.</td></tr>
+  <tr><td>FODA</td><td>Fortalezas, Oportunidades, Debilidades y Amenazas. Método para ordenar la situación de un proyecto.</td></tr>
+  <tr><td>WebView2</td><td>Componente de Microsoft Edge incluido en Windows que permite mostrar una interfaz web dentro de un programa.</td></tr>
+</table>
+
+</body>
+</html>

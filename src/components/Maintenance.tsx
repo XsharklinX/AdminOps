@@ -2,7 +2,7 @@ import { CalendarClock, HardDriveUpload, Loader2, Timer, Trash2 } from "lucide-r
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
-import { Button, Card, Modal } from "./ui";
+import { Button, Card, Modal, Loading } from "./ui";
 import { bytes } from "../lib/format";
 import { maintenanceApi, type BootAnalysis, type MaintenanceSchedule } from "../lib/api";
 
@@ -26,7 +26,7 @@ export function BootCard() {
       {error ? (
         <p className="text-sm text-mute">{error}</p>
       ) : !data ? (
-        <p className="text-sm text-mute">Analizando los últimos arranques…</p>
+        <Loading text="Analizando los últimos arranques…" />
       ) : (
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-12 md:col-span-4">
@@ -123,7 +123,10 @@ export function DriverRestoreButton() {
 
   const show = () => {
     setOpen(true);
-    void maintenanceApi.driverBackups().then(setList);
+    void maintenanceApi
+      .driverBackups()
+      .then(setList)
+      .catch(() => setList([]));
   };
 
   const restore = async (name: string) => {
@@ -148,7 +151,7 @@ export function DriverRestoreButton() {
           {running ? (
             <TaskStatus task="drivers-restore" active fallback="Instalando drivers…" cancellable={false} />
           ) : !list ? (
-            <p className="text-sm text-mute">Buscando copias…</p>
+            <Loading text="Buscando copias…" />
           ) : list.length === 0 ? (
             <p className="text-sm text-mute">No hay copias de drivers. Haz una con «Copia de drivers» antes de formatear.</p>
           ) : (

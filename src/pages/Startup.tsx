@@ -5,6 +5,7 @@ import { Switch } from "../components/TweakCard";
 import { systemApi, type StartupItem } from "../lib/api";
 import { BootCard } from "../components/Maintenance";
 import { useOnJournalChange } from "../lib/journalEvents";
+import { ErrorState, Loading, EmptyLine } from "../components/ui";
 
 const SOURCE_LABEL = { registry: "Registro", folder: "Carpeta", task: "Tarea" };
 
@@ -16,11 +17,14 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
   const [hideMicrosoft, setHideMicrosoft] = useState(false);
   const toast = useToast();
 
+  const [failed, setFailed] = useState<string | null>(null);
   const load = useCallback(async () => {
+    setFailed(null);
     setLoading(true);
     try {
       setItems(await systemApi.listStartup());
     } catch (e) {
+      setFailed(String(e));
       toast("error", String(e));
     } finally {
       setLoading(false);
@@ -55,7 +59,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  if (!items) return <p className="p-8 font-mono text-sm text-mute">Leyendo programas de inicio…</p>;
+  if (!items) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Leyendo programas de inicio…" />;
 
   const enabled = items.filter((i) => i.enabled).length;
 
@@ -136,7 +140,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
             </div>
           );
         })}
-        {visible.length === 0 && <p className="px-4 py-8 text-center text-sm text-mute">Sin resultados.</p>}
+        {visible.length === 0 && <EmptyLine>{query ? `Nada coincide con «${query}».` : "No hay programas de inicio que enseñar."}</EmptyLine>}
       </div>
       <p className="mt-3 text-xs text-mute">
         Desactivar no borra nada: usa el mismo mecanismo que el Administrador de tareas y se puede deshacer desde el

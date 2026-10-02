@@ -25,12 +25,13 @@ import {
   UserRound,
   UserX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "../components/feedback";
 import { Button, Card, EmptyState, inputClass, Modal } from "../components/ui";
 import { casesApi, contactsApi, officeApi, peopleApi, portalsApi, type Case, type LapsPassword, type Person, type PersonHit, type RecoveryKey } from "../lib/api";
 import { openCase } from "../lib/currentCase";
 import { M365Person } from "../components/M365";
+import { Avatar, presenceText, useTeamsPresence } from "../components/contacts/Avatar";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 const DAY = 86_400;
@@ -51,6 +52,31 @@ function useCopy() {
     );
 }
 
+/** Las últimas personas abiertas: la mayoría de las veces se vuelve a las mismas. */
+const RECENT_KEY = "adminops.people.recent";
+interface Recent {
+  sam: string;
+  name: string;
+  detail: string;
+}
+function readRecent(): Recent[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(v) ? (v as Recent[]).filter((x) => x && typeof x.sam === "string").slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+function pushRecent(r: Recent): Recent[] {
+  const next = [r, ...readRecent().filter((x) => x.sam.toLowerCase() !== r.sam.toLowerCase())].slice(0, 8);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    /* sin almacenamiento */
+  }
+  return next;
+}
+
 export function People({ focus }: { focus: string | null }) {
   // Desde Ctrl+K llega o lo que buscar, o «pc:NOMBRE» para ver las contraseñas de un equipo.
   const pc = focus?.startsWith("pc:") ? focus.slice(3) : null;
@@ -59,6 +85,7 @@ export function People({ focus }: { focus: string | null }) {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [recent, setRecent] = useState<Recent[]>(readRecent);
   const input = useRef<HTMLInputElement>(null);
 
   const search = async (q = query) => {
@@ -96,62 +123,121 @@ export function People({ focus }: { focus: string | null }) {
     <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
       <div className="col-span-12 @3xl:col-span-4">
         <form
-          className="flex gap-2"
+          className="relative"
           onSubmit={(e) => {
             e.preventDefault();
             void search();
           }}
         >
+          <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input
             ref={input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Nombre, usuario, correo o extensión"
-            className={inputClass}
+            className={`${inputClass} py-2.5 pr-24 pl-9`}
             aria-label="Buscar una persona"
           />
-          <Button onClick={() => void search()} disabled={searching || query.trim().length < 2}>
-            {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-          </Button>
+          <button
+            type="submit"
+            disabled={searching || query.trim().length < 2}
+            className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-1 rounded-md bg-neon/15 px-2.5 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/25 disabled:opacity-40"
+          >
+            {searching ? <Loader2 size={13} className="animate-spin" /> : null} Buscar
+          </button>
         </form>
         {error && <p className="mt-3 flex items-start gap-2 text-xs text-bad"><TriangleAlert size={13} className="mt-0.5 shrink-0" />{error}</p>}
         {hits && hits.length === 0 && <p className="mt-4 text-sm text-mute">Nadie en el dominio coincide con «{query}».</p>}
         {hits && hits.length > 0 && (
-          <ul className="mt-3 space-y-1">
-            {hits.map((h) => (
-              <li key={h.sam}>
-                <button
-                  onClick={() => setSelected(h.sam)}
-                  className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                    selected === h.sam ? "border-neon/50 bg-neon/10" : "border-line bg-panel hover:border-line-2"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{h.name || h.sam}</span>
-                    {h.disabled && <span className="text-[11px] text-mute">desactivada</span>}
-                    {!h.disabled && h.lockedHint && <span className="text-[11px] text-warn">bloqueo</span>}
-                  </div>
-                  <div className="truncate text-xs text-mute">
-                    {h.sam}
-                    {h.department && ` · ${h.department}`}
-                    {h.extension && ` · ext. ${h.extension}`}
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="mt-3 mb-1.5 text-[11px] text-mute">
+              {hits.length} {hits.length === 1 ? "resultado" : "resultados"}
+            </p>
+            <ul className="space-y-1">
+              {hits.map((h) => (
+                <li key={h.sam}>
+                  <button
+                    onClick={() => setSelected(h.sam)}
+                    className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
+                      selected === h.sam ? "border-neon/50 bg-neon/10" : "border-line bg-panel hover:border-line-2"
+                    }`}
+                  >
+                    <Avatar c={{ name: h.name || h.sam, favorite: false }} size={32} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-ink">{h.name || h.sam}</span>
+                      <span className="block truncate text-xs text-mute">
+                        {h.sam}
+                        {h.department && ` · ${h.department}`}
+                        {h.extension && ` · ext. ${h.extension}`}
+                      </span>
+                    </span>
+                    {h.disabled && <span className="shrink-0 rounded border border-line px-1.5 text-[10px] text-mute">desactivada</span>}
+                    {!h.disabled && h.lockedHint && <span className="shrink-0 rounded border border-warn/50 px-1.5 text-[10px] text-warn">bloqueo</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
-        {!hits && !error && (
+        {!hits && !error && recent.length > 0 && (
+          <>
+            <p className="mt-4 mb-1.5 flex items-center justify-between text-[11px] font-medium tracking-wide text-mute uppercase">
+              Recientes
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem(RECENT_KEY);
+                  } catch {
+                    /* sin almacenamiento */
+                  }
+                  setRecent([]);
+                }}
+                className="font-normal tracking-normal normal-case hover:text-ink"
+              >
+                Olvidar
+              </button>
+            </p>
+            <ul className="space-y-1">
+              {recent.map((r) => (
+                <li key={r.sam}>
+                  <button
+                    onClick={() => setSelected(r.sam)}
+                    className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${selected === r.sam ? "border-neon/50 bg-neon/10" : "border-line bg-panel hover:border-line-2"}`}
+                  >
+                    <Avatar c={{ name: r.name || r.sam, favorite: false }} size={30} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-ink">{r.name || r.sam}</span>
+                      <span className="block truncate text-xs text-mute">{r.detail || r.sam}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {!hits && !error && recent.length === 0 && (
           <p className="mt-4 text-xs text-mute">
             Busca en el dominio de la empresa con tu cuenta de Windows. Lo que puedas ver y cambiar es lo mismo que en la consola de Active Directory.
           </p>
+        )}
+        {hits && (
+          <button
+            onClick={() => {
+              setHits(null);
+              setQuery("");
+              input.current?.focus();
+            }}
+            className="mt-3 text-xs text-mute hover:text-ink"
+          >
+            Limpiar la búsqueda
+          </button>
         )}
         <ComputerSecrets initial={pc} />
       </div>
 
       <div className="col-span-12 @3xl:col-span-8">
         {selected ? (
-          <PersonCard key={selected} sam={selected} />
+          <PersonCard key={selected} sam={selected} onLoaded={(p) => setRecent(pushRecent({ sam: p.sam, name: p.name, detail: [p.department, p.extension && `ext. ${p.extension}`].filter(Boolean).join(" · ") }))} />
         ) : (
           <EmptyState icon={<UserRound size={28} />} title="Elige a una persona">
             Su cuenta del dominio, sus equipos y lo que ya se hizo con ella, con desbloquear y restablecer la contraseña a un clic.
@@ -163,13 +249,21 @@ export function People({ focus }: { focus: string | null }) {
   );
 }
 
-function PersonCard({ sam }: { sam: string }) {
+function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => void }) {
+  // La última versión del aviso al padre, sin que el efecto de carga dependa de ella.
+  const loaded = useRef(onLoaded);
+  useEffect(() => {
+    loaded.current = onLoaded;
+  }, [onLoaded]);
   const [p, setP] = useState<Person | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<Case[]>([]);
   const [busy, setBusy] = useState(false);
   const [resetting, setResetting] = useState(false);
   const toast = useToast();
+  // Foto de Microsoft 365 y presencia de Teams, por su usuario de Microsoft 365 (o el correo).
+  const who = (p?.upn || p?.mail || "").trim().toLowerCase();
+  const m365 = useTeamsPresence(useMemo(() => (who ? [who] : []), [who]));
 
   const load = () =>
     peopleApi
@@ -191,6 +285,7 @@ function PersonCard({ sam }: { sam: string }) {
         .then((d) => {
           if (!vigente()) return;
           setP(d);
+          loaded.current?.(d);
           void casesApi.forPerson(d.sam, d.name).then((h) => vigente() && setHistory(h)).catch(() => {});
         })
         .catch((e) => vigente() && setError(String(e)));
@@ -227,16 +322,41 @@ function PersonCard({ sam }: { sam: string }) {
     }
   };
 
+  const problem = p.disabled
+    ? { tone: "border-line bg-panel-2 text-dim", text: "La cuenta está desactivada: no puede iniciar sesión hasta que se vuelva a activar en el dominio.", action: null }
+    : p.locked
+      ? { tone: "border-bad/40 bg-bad/10 text-bad", text: "La cuenta está bloqueada por demasiados intentos con la contraseña equivocada.", action: "unlock" as const }
+      : p.passwordExpired
+        ? { tone: "border-bad/40 bg-bad/10 text-bad", text: "La contraseña ha caducado: no puede entrar hasta cambiarla.", action: "reset" as const }
+        : expiraEn !== null && expiraEn <= 7
+          ? { tone: "border-warn/40 bg-warn/10 text-warn", text: `La contraseña caduca en ${expiraEn} ${expiraEn === 1 ? "día" : "días"}: conviene que la cambie ya.`, action: null }
+          : null;
+
   return (
     <div className="space-y-4">
+      {problem && (
+        <div className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-sm ${problem.tone}`}>
+          <ShieldAlert size={16} className="shrink-0" />
+          <span className="min-w-0 flex-1">{problem.text}</span>
+          {problem.action === "unlock" && (
+            <Button onClick={() => void unlock()} disabled={busy}>
+              {busy ? <Loader2 size={14} className="animate-spin" /> : <LockOpen size={14} />} Desbloquear
+            </Button>
+          )}
+          {problem.action === "reset" && (
+            <Button onClick={() => setResetting(true)} disabled={busy}>
+              <KeyRound size={14} /> Dar una contraseña temporal
+            </Button>
+          )}
+        </div>
+      )}
       <Card>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-full border border-neon/50 bg-neon/10 text-sm font-semibold text-neon">
-            {(p.name || p.sam).split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
-          </span>
+          <Avatar c={{ name: p.name || p.sam, favorite: false }} size={44} photo={m365.photos[who]} presence={m365.presence[who]} />
           <div className="min-w-0 flex-1">
             <div className="text-base font-semibold text-ink">{p.name || p.sam}</div>
             <div className="truncate font-mono text-xs text-mute select-text">{p.sam}</div>
+            {presenceText(m365.presence[who]) && <div className="text-[11px] text-dim">Teams: {presenceText(m365.presence[who])}</div>}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {p.disabled && <Pill tone="mute" icon={<UserX size={11} />}>Cuenta desactivada</Pill>}

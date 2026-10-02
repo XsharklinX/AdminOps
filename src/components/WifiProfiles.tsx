@@ -1,7 +1,7 @@
 import { Copy, Eye, EyeOff, Lock, RefreshCw, Trash2, Wifi } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "./feedback";
-import { Card } from "./ui";
+import { Card, Loading } from "./ui";
 import { wifiApi, type WifiProfile } from "../lib/api";
 
 const SECURITY: Record<string, string> = {
@@ -80,7 +80,7 @@ export function WifiProfiles({ isAdmin }: { isAdmin: boolean }) {
       {error ? (
         <p className="text-sm text-mute">{error}</p>
       ) : !list ? (
-        <p className="text-sm text-mute">Leyendo redes guardadas…</p>
+        <Loading text="Leyendo redes guardadas…" />
       ) : list.length === 0 ? (
         <p className="text-sm text-mute">No hay redes Wi-Fi guardadas en este equipo.</p>
       ) : (

@@ -24,6 +24,7 @@ import { ContactDetail, type ContactActions } from "../components/contacts/Conta
 import { ContactEditor } from "../components/contacts/ContactEditor";
 import { ContactTools, type ToolTab } from "../components/contacts/ContactTools";
 import { QuickDial } from "../components/contacts/QuickDial";
+import { PresenceProvider } from "../components/contacts/Avatar";
 import { CardsView, DirectoryView, TableView, type ViewProps } from "../components/contacts/ContactViews";
 import { colorOf, TagChip, TagInput, type TagColors } from "../components/contacts/Tags";
 import { ChipRow } from "../components/ChipRow";
@@ -318,8 +319,11 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
     );
 
   const detailContact = detail ? byId.get(detail) : undefined;
+  // Presencia de Teams y fotos: de los que se ven (y los de marcación rápida).
+  const presenceEmails = useMemo(() => [...frequent, ...filtered.slice(0, 120)].map((c) => c.email).filter(Boolean), [frequent, filtered]);
 
   return (
+    <PresenceProvider emails={presenceEmails}>
     <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
       {/* De un vistazo: cuántos hay y qué falta. Cada cifra filtra. */}
       {live.length > 0 && (
@@ -694,6 +698,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
       {tools && <ContactTools tab={tools} contacts={all ?? []} colors={colors} onChanged={load} onClose={() => setTools(null)} />}
       {dialog}
     </div>
+    </PresenceProvider>
   );
 }
 

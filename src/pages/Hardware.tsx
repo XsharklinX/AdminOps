@@ -15,7 +15,7 @@ import {
   TriangleAlert,
   Zap,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
@@ -24,6 +24,7 @@ import { Card } from "../components/ui";
 import { tempColor, useSensors } from "../hooks/useSensors";
 import { hwApi, type Inventory, type MemoryTest, type SmartDisk } from "../lib/api";
 import { bytes } from "../lib/format";
+import { DataTable } from "../components/DataTable";
 
 const ageOf = (iso: string | null) => {
   if (!iso) return null;
@@ -103,7 +104,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
     }
   };
 
-  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast("ok", "Copiado al portapapeles."));
+  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast("ok", "Copiado al portapapeles."), () => toast("error", "No se pudo copiar."));
 
   if (invError) return <p className="p-8 text-bad">{invError}</p>;
   if (!inv)
@@ -334,62 +335,48 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
         ) : smart.length === 0 ? (
           <p className="text-sm text-mute">Ningún disco SATA expone SMART (los NVMe se revisan en Diagnóstico).</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] text-mute">
-                <th className="pb-2 font-medium">Disco</th>
-                <th className="pb-2 text-right font-medium">Reasignados</th>
-                <th className="pb-2 text-right font-medium">Pendientes</th>
-                <th className="pb-2 text-right font-medium">No corregibles</th>
-                <th className="pb-2 text-right font-medium">CRC</th>
-                <th className="pb-2 text-right font-medium">Horas</th>
-                <th className="pb-2 text-right font-medium">Temp.</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono text-xs tabular">
-              {smart.map((k) => {
-                const bad = (v: number | null) => (v ? "text-bad" : "text-ok");
-                const open = openSmart === k.model;
-                return (
-                  <Fragment key={k.model}>
-                    <tr onClick={() => setOpenSmart(open ? null : k.model)} className="cursor-pointer border-t border-line/60 hover:bg-panel-2">
-                      <td className="py-1.5 font-sans text-[13px] text-ink">
-                        <span className="inline-flex items-center gap-1.5">
-                          <ChevronDown size={12} className={`text-mute transition-transform ${open ? "rotate-180" : ""}`} />
-                          {k.model}
-                          {k.predictFailure && <span className="rounded bg-bad/15 px-1.5 text-[11px] text-bad">FALLO PREVISTO</span>}
-                        </span>
-                      </td>
-                      <td className={`py-1.5 text-right ${bad(k.reallocated)}`}>{k.reallocated ?? "—"}</td>
-                      <td className={`py-1.5 text-right ${bad(k.pending)}`}>{k.pending ?? "—"}</td>
-                      <td className={`py-1.5 text-right ${bad(k.uncorrectable)}`}>{k.uncorrectable ?? "—"}</td>
-                      <td className={`py-1.5 text-right ${k.crcErrors ? "text-warn" : "text-ok"}`}>{k.crcErrors ?? "—"}</td>
-                      <td className="py-1.5 text-right">{k.powerOnHours?.toLocaleString("es") ?? "—"}</td>
-                      <td className="py-1.5 text-right" style={{ color: tempColor(k.temperature) }}>
-                        {k.temperature != null ? `${k.temperature} °C` : "—"}
-                      </td>
-                    </tr>
-                    {open && (
-                      <tr>
-                        <td colSpan={7} className="bg-void/40 px-3 py-2">
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] md:grid-cols-3">
-                            {k.attributes.map((a) => (
-                              <span key={a.id} className="flex justify-between gap-2">
-                                <span className="truncate text-dim">
-                                  {a.id} · {a.name}
-                                </span>
-                                <span className="text-ink">{a.raw.toLocaleString("es")}</span>
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            mono
+            size="xs"
+            rows={smart}
+            rowKey={(k) => k.model}
+            onRowClick={(k) => setOpenSmart(openSmart === k.model ? null : k.model)}
+            expanded={(k) =>
+              openSmart === k.model ? (
+                <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] md:grid-cols-3">
+                  {k.attributes.map((a) => (
+                    <span key={a.id} className="flex justify-between gap-2">
+                      <span className="truncate text-dim">
+                        {a.id} · {a.name}
+                      </span>
+                      <span className="text-ink">{a.raw.toLocaleString("es")}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : null
+            }
+            columns={[
+              {
+                id: "disk",
+                header: "Disco",
+                sortBy: (k) => k.model,
+                className: "font-sans text-[13px] text-ink",
+                cell: (k) => (
+                  <span className="inline-flex items-center gap-1.5">
+                    <ChevronDown size={12} className={`text-mute transition-transform ${openSmart === k.model ? "rotate-180" : ""}`} />
+                    {k.model}
+                    {k.predictFailure && <span className="rounded bg-bad/15 px-1.5 text-[11px] text-bad">FALLO PREVISTO</span>}
+                  </span>
+                ),
+              },
+              { id: "reallocated", header: "Reasignados", align: "right", sortBy: (k) => k.reallocated, cell: (k) => k.reallocated ?? "—", className: (k) => (k.reallocated ? "text-bad" : "text-ok") },
+              { id: "pending", header: "Pendientes", align: "right", sortBy: (k) => k.pending, cell: (k) => k.pending ?? "—", className: (k) => (k.pending ? "text-bad" : "text-ok") },
+              { id: "uncorrectable", header: "No corregibles", align: "right", sortBy: (k) => k.uncorrectable, cell: (k) => k.uncorrectable ?? "—", className: (k) => (k.uncorrectable ? "text-bad" : "text-ok") },
+              { id: "crc", header: "CRC", align: "right", sortBy: (k) => k.crcErrors, cell: (k) => k.crcErrors ?? "—", className: (k) => (k.crcErrors ? "text-warn" : "text-ok") },
+              { id: "hours", header: "Horas", align: "right", sortBy: (k) => k.powerOnHours, cell: (k) => k.powerOnHours?.toLocaleString("es") ?? "—" },
+              { id: "temp", header: "Temp.", align: "right", sortBy: (k) => k.temperature, cell: (k) => <span style={{ color: tempColor(k.temperature) }}>{k.temperature != null ? `${k.temperature} °C` : "—"}</span> },
+            ]}
+          />
         )}
       </Card>
 

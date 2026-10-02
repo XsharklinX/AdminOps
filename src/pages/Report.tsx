@@ -47,7 +47,10 @@ export function Report() {
 
   useEffect(() => {
     void loadSnapshots();
-    void workApi.clients().then(setClients);
+    void workApi
+      .clients()
+      .then(setClients)
+      .catch(() => {});
     workApi.settings().then((s) => {
       setSettings(s);
       setTechnician((t) => t || s.technician);

@@ -1,13 +1,15 @@
-import { BellRing, ExternalLink, History, Mail, Monitor, Network, PenLine, Plus, Save, Search, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { BellRing, CalendarPlus, Copy, ExternalLink, History, Mail, Monitor, Network, PenLine, Phone, Play, Plus, Save, Search, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { inventoryLines, MachineActions, VerdictChip } from "../components/inventory";
 import { SendReportModal } from "../components/service";
-import { Button, Card, inputClass } from "../components/ui";
+import { Button, Card, inputClass, Tile } from "../components/ui";
 import { VisitChanges } from "../components/VisitChanges";
 import { MachineCompare } from "../components/MachineCompare";
 import { contactsApi, diagApi, EMPTY_CLIENT_REPORT, workApi, type Client, type ClientReport, type Contact, type SessionRecord, type VisitMetrics } from "../lib/api";
 import { bytes, money } from "../lib/format";
+import { goToPage } from "../lib/navigate";
+import { Avatar } from "../components/contacts/Avatar";
 
 const DAY = 86400;
 const date = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { dateStyle: "medium" });
@@ -39,6 +41,10 @@ export function Clients() {
   const [query, setQuery] = useState("");
   const [sending, setSending] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  /** Parte de la ficha que se ve. */
+  const [tab, setTab] = useState<"summary" | "machines" | "visits" | "data">("summary");
+  /** Solo los que tienen el mantenimiento cerca o vencido. */
+  const [onlyDue, setOnlyDue] = useState(false);
   const toast = useToast();
   useEffect(() => {
     contactsApi
@@ -61,6 +67,8 @@ export function Clients() {
   const pick = (c: Client | null) => {
     setSelected(c?.id ?? "new");
     setForm(c ?? EMPTY);
+    // Uno nuevo empieza por sus datos; uno que ya existe, por el resumen.
+    setTab(c ? "summary" : "data");
   };
 
   const save = async () => {
@@ -102,8 +110,8 @@ export function Clients() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (clients ?? []).filter((c) => !q || [c.name, c.contact, c.phone, c.email].some((x) => x.toLowerCase().includes(q)));
-  }, [clients, query]);
+    return (clients ?? []).filter((c) => (!onlyDue || dueSoon(c)) && (!q || [c.name, c.contact, c.phone, c.email].some((x) => x.toLowerCase().includes(q))));
+  }, [clients, query, onlyDue]);
 
   const due = useMemo(() => (clients ?? []).filter(dueSoon).sort((a, b) => nextOf(a)! - nextOf(b)!), [clients]);
 
@@ -117,40 +125,30 @@ export function Clients() {
   const warranties = form.sessions.flatMap((s) => s.warranties.map((w) => ({ ...w, session: s }))).filter((w) => w.until > now());
   const sendingRecord = form.sessions.find((s) => s.id === sending);
 
-  return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
-      <div className="col-span-12 space-y-4 lg:col-span-4">
-        {due.length > 0 && (
-          <Card title={`Mantenimientos próximos · ${due.length}`} icon={<BellRing size={14} />}>
-            <ul className="space-y-2">
-              {due.map((c) => {
-                const n = nextOf(c)!;
-                const l = dueLabel(n);
-                return (
-                  <li key={c.id} className="text-sm">
-                    <button onClick={() => pick(c)} className="block w-full truncate text-left text-ink hover:underline">
-                      {c.name}
-                    </button>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className={l.cls}>
-                        {date(n)} · {l.text}
-                      </span>
-                      <button onClick={() => reschedule(c, Math.max(n, now()) + 30 * DAY)} className="ml-auto text-mute hover:text-ink">
-                        +1 mes
-                      </button>
-                      <button onClick={() => reschedule(c, null)} className="text-mute hover:text-ink" title="Ya se hizo o no hace falta">
-                        Quitar
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="mt-3 text-[11px] text-mute">Llama o escribe al cliente para agendar la visita.</p>
-          </Card>
-        )}
+  const all = clients ?? [];
+  const totals = {
+    clients: all.length,
+    machines: all.reduce((n, c) => n + c.machines.length, 0),
+    due: due.length,
+    warranties: all.reduce((n, c) => n + c.sessions.flatMap((x) => x.warranties).filter((w) => w.until > now()).length, 0),
+  };
+  const copy = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast("ok", `${what} copiado.`), () => toast("error", "No se pudo copiar."));
+  const last = form.sessions[0];
+  const next = nextOf(form);
 
-        <div>
+  return (
+    <div className="mx-auto max-w-6xl space-y-4 p-6">
+      {/* De un vistazo */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Tile label="Clientes" value={totals.clients} />
+        <Tile label="Equipos a tu cargo" value={totals.machines} />
+        <Tile label="Mantenimiento cerca o vencido" value={totals.due} warn active={onlyDue} onClick={() => setOnlyDue(!onlyDue)} />
+        <Tile label="Garantías vigentes" value={totals.warranties} />
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        {/* Lista */}
+        <div className="col-span-12 lg:col-span-4">
           <div className="mb-3 flex gap-2">
             <div className="relative flex-1">
               <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
@@ -158,131 +156,229 @@ export function Clients() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar cliente…"
-                className="w-full rounded-md border border-line bg-panel py-1.5 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
+                className="w-full rounded-md border border-line bg-panel py-2 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
               />
             </div>
             <Button onClick={() => pick(null)}>
               <Plus size={13} /> Nuevo
             </Button>
           </div>
-          <div className="overflow-hidden rounded-xl border border-line bg-panel">
-            {visible.map((c, i) => (
-              <button
-                key={c.id}
-                onClick={() => pick(c)}
-                className={`flex w-full items-center gap-3 px-4 py-2.5 text-left ${i ? "border-t border-line/60" : ""} ${selected === c.id ? "bg-panel-2" : "hover:bg-panel-2/60"}`}
-              >
-                <UserRound size={15} className="shrink-0 text-mute" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-ink">{c.name}</div>
-                  <div className="truncate text-[11px] text-mute">
-                    {c.machines.length} equipo(s) · {c.sessions.length} visita(s)
-                  </div>
-                </div>
-                {dueSoon(c) && <span className="size-2 shrink-0 rounded-full bg-warn" title="Mantenimiento próximo o vencido" />}
+          {onlyDue && (
+            <p className="mb-2 flex items-center gap-2 text-xs text-dim">
+              Solo con el mantenimiento cerca o vencido
+              <button onClick={() => setOnlyDue(false)} className="text-neon hover:underline">
+                Ver todos
               </button>
-            ))}
+            </p>
+          )}
+          <div className="overflow-hidden rounded-xl border border-line bg-panel">
+            {visible.map((c, i) => {
+              const n = nextOf(c);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => pick(c)}
+                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${i ? "border-t border-line/60" : ""} ${selected === c.id ? "bg-neon/10" : "hover:bg-panel-2/60"}`}
+                >
+                  <Avatar c={{ name: c.name, favorite: false }} size={34} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm text-ink">{c.name}</div>
+                    <div className="truncate text-[11px] text-mute">
+                      {c.machines.length} {c.machines.length === 1 ? "equipo" : "equipos"} · {c.sessions.length} {c.sessions.length === 1 ? "visita" : "visitas"}
+                      {c.sessions[0] && ` · última ${date(c.sessions[0].ended)}`}
+                    </div>
+                  </div>
+                  {n !== null && dueSoon(c) && <span className={`shrink-0 text-[11px] ${dueLabel(n).cls}`}>{dueLabel(n).text}</span>}
+                </button>
+              );
+            })}
             {clients && visible.length === 0 && (
               <p className="px-4 py-6 text-center text-sm text-mute">{clients.length ? "Sin resultados." : "Aún no hay clientes. Se crean aquí o al iniciar una sesión."}</p>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="col-span-12 space-y-4 lg:col-span-8">
-        {selected === null ? (
-          <p className="rounded-xl border border-dashed border-line-2 p-10 text-center text-sm text-mute">Selecciona un cliente para ver su ficha.</p>
-        ) : (
-          <>
-            <Card title={form.id ? "Ficha del cliente" : "Nuevo cliente"} icon={<UserRound size={14} />}>
-              <div className="grid grid-cols-2 gap-3">
-                {field("name", "Nombre o empresa", true)}
-                {field("contact", "Persona de contacto")}
-                {field("phone", "Teléfono")}
-                {field("email", "Correo")}
-                {field("address", "Dirección")}
-                <label className="col-span-2 block">
-                  <span className="mb-1 block text-xs text-dim">Notas</span>
-                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className={`${inputClass} resize-y`} />
-                </label>
-              </div>
-              <ClientReportFields value={form.report ?? EMPTY_CLIENT_REPORT} onChange={(report) => setForm({ ...form, report })} />
-              <div className="mt-4 flex items-center justify-between">
-                {form.id ? (
-                  <button onClick={remove} className="flex items-center gap-1 text-xs text-mute hover:text-bad">
-                    <Trash2 size={12} /> Eliminar
-                  </button>
-                ) : (
-                  <span />
-                )}
-                <Button onClick={save}>
-                  <Save size={13} /> Guardar
-                </Button>
-              </div>
-            </Card>
-
-            {form.id && (
-              <>
-                <ClientContacts people={contacts.filter((c) => c.clientId === form.id)} />
-                {(nextOf(form) !== null || warranties.length > 0) && (
-                  <Card title="Mantenimiento y garantías" icon={<ShieldCheck size={14} />}>
-                    {nextOf(form) !== null && (
-                      <div className="mb-3 flex items-center gap-3 text-sm">
-                        <BellRing size={14} className="text-mute" />
-                        <span className="text-ink">Próximo mantenimiento: {date(nextOf(form)!)}</span>
-                        <span className={`text-xs ${dueLabel(nextOf(form)!).cls}`}>{dueLabel(nextOf(form)!).text}</span>
-                        <button onClick={() => reschedule(form, Math.max(nextOf(form)!, now()) + 30 * DAY)} className="ml-auto text-xs text-mute hover:text-ink">
-                          +1 mes
-                        </button>
-                        <button onClick={() => reschedule(form, null)} className="text-xs text-mute hover:text-ink">
-                          Quitar
-                        </button>
-                      </div>
+        {/* Ficha */}
+        <div className="col-span-12 space-y-4 lg:col-span-8">
+          {selected === null ? (
+            <div className="rounded-xl border border-dashed border-line-2 p-10 text-center">
+              <UserRound size={26} className="mx-auto text-mute" />
+              <p className="mt-2 text-sm text-ink">Elige un cliente</p>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-dim">Su resumen, sus equipos y sus visitas, con agendar y empezar la sesión a un clic.</p>
+              {due.length > 0 && (
+                <ul className="mx-auto mt-4 max-w-sm space-y-1 text-left">
+                  {due.slice(0, 5).map((c) => (
+                    <li key={c.id}>
+                      <button onClick={() => pick(c)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-panel-2">
+                        <BellRing size={13} className="shrink-0 text-warn" />
+                        <span className="min-w-0 flex-1 truncate text-ink">{c.name}</span>
+                        <span className={`text-[11px] ${dueLabel(nextOf(c)!).cls}`}>{dueLabel(nextOf(c)!).text}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <>
+              {form.id && (
+                <section className="rounded-xl border border-line bg-panel p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Avatar c={{ name: form.name, favorite: false }} size={48} />
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-base font-semibold text-ink">{form.name}</h2>
+                      <p className="truncate text-xs text-dim">{[form.contact, form.address].filter(Boolean).join(" · ") || "Sin persona de contacto"}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button onClick={() => goToPage("session", form.id)} title="Empezar la sesión de servicio con este cliente">
+                        <Play size={13} /> Empezar sesión
+                      </Button>
+                      <Button kind="ghost" onClick={() => goToPage("agenda", `client:${form.id}`)} title="Apuntar una visita en la Agenda con este cliente">
+                        <CalendarPlus size={13} /> Agendar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-dim">
+                    {form.phone && (
+                      <button onClick={() => void copy(form.phone, "Teléfono")} className="flex items-center gap-1.5 font-mono hover:text-neon" title="Copiar">
+                        <Phone size={12} className="text-mute" /> {form.phone} <Copy size={10} className="text-mute" />
+                      </button>
                     )}
-                    {warranties.length > 0 ? (
-                      <ul className="space-y-1 text-sm">
-                        {warranties.map((w, i) => (
-                          <li key={i} className="flex items-center gap-3">
-                            <span className="size-1.5 shrink-0 rounded-full bg-ok" />
-                            <span className="min-w-0 flex-1 truncate text-ink">{w.item}</span>
-                            <span className="text-xs text-mute">
-                              {w.session.number ? `Nº ${w.session.number} · ` : ""}
-                              {w.session.host}
-                            </span>
-                            <span className="w-40 text-right text-xs text-dim">hasta el {date(w.until)}</span>
+                    {form.email && (
+                      <button onClick={() => void copy(form.email, "Correo")} className="flex items-center gap-1.5 hover:text-neon" title="Copiar">
+                        <Mail size={12} className="text-mute" /> {form.email} <Copy size={10} className="text-mute" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <Kpi label="Equipos" value={String(form.machines.length)} />
+                    <Kpi label="Visitas" value={String(form.sessions.length)} />
+                    <Kpi label="Última visita" value={last ? date(last.ended) : "—"} />
+                    <Kpi label="Próximo mantenimiento" value={next !== null ? date(next) : "Sin fecha"} tone={next !== null ? dueLabel(next).cls : undefined} />
+                  </div>
+                </section>
+              )}
+
+              {form.id && (
+                <div className="flex gap-1 border-b border-line" role="tablist">
+                  {(
+                    [
+                      ["summary", "Resumen"],
+                      ["machines", `Equipos · ${form.machines.length}`],
+                      ["visits", `Visitas · ${form.sessions.length}`],
+                      ["data", "Datos y plantilla"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      role="tab"
+                      aria-selected={tab === id}
+                      onClick={() => setTab(id)}
+                      className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${tab === id ? "border-neon font-medium text-ink" : "border-transparent text-dim hover:text-ink"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {(tab === "data" || !form.id) && (
+                <Card title={form.id ? "Datos del cliente" : "Nuevo cliente"} icon={<UserRound size={14} />}>
+                  <div className="grid grid-cols-2 gap-3">
+                    {field("name", "Nombre o empresa", true)}
+                    {field("contact", "Persona de contacto")}
+                    {field("phone", "Teléfono")}
+                    {field("email", "Correo")}
+                    {field("address", "Dirección")}
+                    <label className="col-span-2 block">
+                      <span className="mb-1 block text-xs text-dim">Notas</span>
+                      <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className={`${inputClass} resize-y`} />
+                    </label>
+                  </div>
+                  <ClientReportFields value={form.report ?? EMPTY_CLIENT_REPORT} onChange={(report) => setForm({ ...form, report })} />
+                  <div className="mt-4 flex items-center justify-between">
+                    {form.id ? (
+                      <button onClick={remove} className="flex items-center gap-1 text-xs text-mute hover:text-bad">
+                        <Trash2 size={12} /> Eliminar
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                    <Button onClick={save} disabled={!form.name.trim()}>
+                      <Save size={13} /> Guardar
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              {form.id && tab === "summary" && (
+                <>
+                  {form.notes.trim() && <p className="rounded-xl border border-line bg-panel px-4 py-3 text-sm whitespace-pre-line text-dim">{form.notes}</p>}
+                  {(next !== null || warranties.length > 0) && (
+                    <Card title="Mantenimiento y garantías" icon={<ShieldCheck size={14} />}>
+                      {next !== null && (
+                        <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+                          <BellRing size={14} className="text-mute" />
+                          <span className="text-ink">Próximo mantenimiento: {date(next)}</span>
+                          <span className={`text-xs ${dueLabel(next).cls}`}>{dueLabel(next).text}</span>
+                          <button onClick={() => reschedule(form, Math.max(next, now()) + 30 * DAY)} className="ml-auto text-xs text-mute hover:text-ink">
+                            +1 mes
+                          </button>
+                          <button onClick={() => reschedule(form, null)} className="text-xs text-mute hover:text-ink" title="Ya se hizo o no hace falta">
+                            Quitar
+                          </button>
+                        </div>
+                      )}
+                      {warranties.length > 0 ? (
+                        <ul className="space-y-1 text-sm">
+                          {warranties.map((w, i) => (
+                            <li key={i} className="flex flex-wrap items-center gap-x-3">
+                              <span className="size-1.5 shrink-0 rounded-full bg-ok" />
+                              <span className="min-w-0 flex-1 truncate text-ink">{w.item}</span>
+                              <span className="text-xs text-mute">
+                                {w.session.number ? `Nº ${w.session.number} · ` : ""}
+                                {w.session.host}
+                              </span>
+                              <span className="text-right text-xs text-dim">hasta el {date(w.until)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-mute">Sin garantías vigentes.</p>
+                      )}
+                    </Card>
+                  )}
+                  <ClientContacts people={contacts.filter((c) => c.clientId === form.id)} />
+                  <Evolution sessions={form.sessions} />
+                  <VisitChanges clientId={form.id} refresh={form.sessions.length} />
+                  <MachineCompare clientId={form.id} refresh={form.sessions.length} />
+                  {form.network && form.network.devices.length > 0 && (
+                    <Card title={`Red de la oficina · ${form.network.devices.length} dispositivos`} icon={<Network size={14} />}>
+                      <p className="mb-2 text-xs text-mute">
+                        {form.network.name && `${form.network.name} · `}router {form.network.gateway} · guardado el {date(form.network.saved)}
+                      </p>
+                      <ul className="grid grid-cols-1 gap-x-6 gap-y-0.5 text-xs md:grid-cols-2">
+                        {form.network.devices.map((d) => (
+                          <li key={d.ip + d.mac} className="flex gap-2">
+                            <span className="w-24 shrink-0 font-mono text-ink">{d.ip}</span>
+                            <span className="truncate text-dim">{d.alias || d.name || d.vendor || d.mac || "—"}</span>
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <p className="text-sm text-mute">Sin garantías vigentes.</p>
-                    )}
-                  </Card>
-                )}
-
-                <Evolution sessions={form.sessions} />
-
-                {form.network && form.network.devices.length > 0 && (
-                  <Card title={`Red de la oficina · ${form.network.devices.length} dispositivos`} icon={<Network size={14} />}>
-                    <p className="mb-2 text-xs text-mute">
-                      {form.network.name && `${form.network.name} · `}router {form.network.gateway} · guardado el {date(form.network.saved)}
+                    </Card>
+                  )}
+                  {form.sessions.length === 0 && next === null && (
+                    <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mute">
+                      Aún no hay visitas con este cliente. Al terminar la primera sesión de servicio aparecerán aquí sus equipos, la evolución y las garantías.
                     </p>
-                    <ul className="grid grid-cols-1 gap-x-6 gap-y-0.5 text-xs md:grid-cols-2">
-                      {form.network.devices.map((d) => (
-                        <li key={d.ip + d.mac} className="flex gap-2">
-                          <span className="w-24 shrink-0 font-mono text-ink">{d.ip}</span>
-                          <span className="truncate text-dim">{d.alias || d.name || d.vendor || d.mac || "—"}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
-                )}
+                  )}
+                </>
+              )}
 
-                {form.id && <VisitChanges clientId={form.id} refresh={form.sessions.length} />}
-                {form.id && <MachineCompare clientId={form.id} refresh={form.sessions.length} />}
-
+              {form.id && tab === "machines" && (
                 <Card title={`Equipos · ${form.machines.length}`} icon={<Monitor size={14} />}>
                   {form.machines.length === 0 ? (
-                    <p className="text-sm text-mute">Los equipos se registran al finalizar una sesión de servicio o desde Soporte → Inventario.</p>
+                    <p className="text-sm text-mute">Los equipos se registran al finalizar una sesión de servicio o desde Puestos e inventario.</p>
                   ) : (
                     <ul className="divide-y divide-line/60 text-sm">
                       {form.machines.map((m) => (
@@ -321,8 +417,10 @@ export function Clients() {
                     </ul>
                   )}
                 </Card>
+              )}
 
-                <Card title={`Historial de visitas · ${form.sessions.length}`}>
+              {form.id && tab === "visits" && (
+                <Card title={`Historial de visitas · ${form.sessions.length}`} icon={<History size={14} />}>
                   {form.sessions.length === 0 ? (
                     <p className="text-sm text-mute">Sin visitas todavía.</p>
                   ) : (
@@ -380,13 +478,22 @@ export function Clients() {
                     </ul>
                   )}
                 </Card>
-              </>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
+        </div>
       </div>
       {sendingRecord?.report && <SendReportModal path={sendingRecord.report} client={form} onClose={() => setSending(null)} />}
       {dialog}
+    </div>
+  );
+}
+
+function Kpi({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-lg bg-panel-2 px-3 py-2">
+      <div className="text-[10px] tracking-wide text-mute uppercase">{label}</div>
+      <div className={`truncate text-sm ${tone ?? "text-ink"}`}>{value}</div>
     </div>
   );
 }

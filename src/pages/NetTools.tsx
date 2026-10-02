@@ -2,8 +2,9 @@ import { listen } from "@tauri-apps/api/event";
 import { CircleCheck, FileText, Loader2, Play, RefreshCw, Route, Save, Search, Server, Square, TriangleAlert, Undo2, Waypoints } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, inputClass } from "../components/ui";
+import { Button, Card, inputClass, Loading } from "../components/ui";
 import { netApi, type DnsAdapter, type PortEntry, type Probe } from "../lib/api";
+import { DataTable } from "../components/DataTable";
 
 type Tab = "probe" | "dns" | "ports" | "hosts";
 
@@ -158,41 +159,29 @@ function ProbePanel() {
         </div>
       )}
       <div className="max-pane-lg overflow-y-auto rounded-lg border border-line">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-panel">
-            <tr className="text-left text-[11px] text-mute">
-              <th className="px-3 py-2 font-medium">{mode === "ping" ? "#" : "Salto"}</th>
-              <th className="px-3 py-2 font-medium">Responde</th>
-              <th className="px-3 py-2 text-right font-medium">Tiempo</th>
-            </tr>
-          </thead>
-          <tbody className="font-mono text-xs">
-            {rows.map((r) => (
-              <tr key={r.seq} className="border-t border-line/60">
-                <td className="px-3 py-1.5 text-mute">{r.seq}</td>
-                <td className="px-3 py-1.5">
-                  {r.from ? (
-                    <span className={r.reached && mode === "trace" ? "text-ok" : "text-ink"}>{r.from}</span>
-                  ) : (
-                    <span className="text-mute">{r.status === "timeout" ? "sin respuesta" : r.status === "unreachable" ? "inalcanzable" : "error"}</span>
-                  )}
-                </td>
-                <td className={`px-3 py-1.5 text-right ${r.ms === null ? "text-mute" : r.ms > 150 ? "text-warn" : "text-neon"}`}>
-                  {r.ms === null ? "*" : `${r.ms} ms`}
-                </td>
-              </tr>
-            ))}
-            {!rows.length && (
-              <tr>
-                <td colSpan={3} className="px-3 py-6 text-center font-sans text-sm text-mute">
-                  {mode === "ping"
-                    ? "Envía un ping por segundo (hasta 100) para ver cortes y latencia en vivo."
-                    : "Muestra cada router por el que pasa la conexión hasta el destino (máx. 30 saltos)."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          padded
+          sticky
+          mono
+          size="xs"
+          rows={rows}
+          rowKey={(r) => r.seq}
+          empty={mode === "ping" ? "Envía un ping por segundo (hasta 100) para ver cortes y latencia en vivo." : "Muestra cada router por el que pasa la conexión hasta el destino (máx. 30 saltos)."}
+          columns={[
+            { id: "seq", header: mode === "ping" ? "#" : "Salto", sortBy: (r) => r.seq, cell: (r) => r.seq, className: "text-mute" },
+            {
+              id: "from",
+              header: "Responde",
+              cell: (r) =>
+                r.from ? (
+                  <span className={r.reached && mode === "trace" ? "text-ok" : "text-ink"}>{r.from}</span>
+                ) : (
+                  <span className="text-mute">{r.status === "timeout" ? "sin respuesta" : r.status === "unreachable" ? "inalcanzable" : "error"}</span>
+                ),
+            },
+            { id: "ms", header: "Tiempo", align: "right", sortBy: (r) => r.ms, cell: (r) => (r.ms === null ? "*" : `${r.ms} ms`), className: (r) => (r.ms === null ? "text-mute" : r.ms > 150 ? "text-warn" : "text-neon") },
+          ]}
+        />
         <div ref={bottom} />
       </div>
       {mode === "trace" && (
@@ -239,7 +228,7 @@ function DnsPanel({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  if (!adapters) return <p className="text-sm text-mute">Leyendo adaptadores…</p>;
+  if (!adapters) return <Loading text="Leyendo adaptadores…" />;
   const list = adapters.filter((a) => showVirtual || !a.virtual);
 
   return (
@@ -379,37 +368,49 @@ function PortsPanel() {
         </button>
       </div>
       {!ports ? (
-        <p className="text-sm text-mute">Leyendo conexiones…</p>
+        <Loading text="Leyendo conexiones…" />
       ) : (
         <div className="max-pane-lg overflow-y-auto rounded-lg border border-line">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-panel">
-              <tr className="text-left text-[11px] text-mute">
-                <th className="px-3 py-2 font-medium">Proto</th>
-                <th className="px-3 py-2 font-medium">Local</th>
-                <th className="px-3 py-2 font-medium">Servicio</th>
-                <th className="px-3 py-2 font-medium">{onlyListen ? "Estado" : "Remoto"}</th>
-                <th className="px-3 py-2 font-medium">Programa</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono">
-              {visible.map((p, i) => (
-                <tr key={`${p.protocol}-${p.localAddress}-${p.localPort}-${p.remoteAddress}-${p.remotePort}-${i}`} className="border-t border-line/60">
-                  <td className="px-3 py-1.5 text-mute">{p.protocol}</td>
-                  <td className="px-3 py-1.5 text-ink">
+          <DataTable
+            padded
+            sticky
+            mono
+            size="xs"
+            rows={visible}
+            rowKey={(p, i) => `${p.protocol}-${p.localAddress}-${p.localPort}-${p.remoteAddress}-${p.remotePort}-${i}`}
+            columns={[
+              { id: "proto", header: "Proto", sortBy: (p) => p.protocol, cell: (p) => p.protocol, className: "text-mute" },
+              {
+                id: "local",
+                header: "Local",
+                sortBy: (p) => p.localPort,
+                className: "text-ink",
+                cell: (p) => (
+                  <>
                     {p.localAddress}:<span className="text-neon">{p.localPort}</span>
-                  </td>
-                  <td className="px-3 py-1.5 font-sans text-dim">{WELL_KNOWN[p.localPort] ?? ""}</td>
-                  <td className="px-3 py-1.5 text-dim">
-                    {p.state === "Listen" ? <span className="font-sans text-ok">Escuchando</span> : `${p.remoteAddress}:${p.remotePort}`}
-                  </td>
-                  <td className="px-3 py-1.5">
+                  </>
+                ),
+              },
+              { id: "service", header: "Servicio", sortBy: (p) => WELL_KNOWN[p.localPort] ?? "", cell: (p) => WELL_KNOWN[p.localPort] ?? "", className: "font-sans text-dim" },
+              {
+                id: "remote",
+                header: onlyListen ? "Estado" : "Remoto",
+                sortBy: (p) => (p.state === "Listen" ? "" : `${p.remoteAddress}:${p.remotePort}`),
+                className: "text-dim",
+                cell: (p) => (p.state === "Listen" ? <span className="font-sans text-ok">Escuchando</span> : `${p.remoteAddress}:${p.remotePort}`),
+              },
+              {
+                id: "program",
+                header: "Programa",
+                sortBy: (p) => p.process ?? "",
+                cell: (p) => (
+                  <>
                     <span className="font-sans text-ink">{p.process ?? "—"}</span> <span className="text-mute">{p.pid}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </>
+                ),
+              },
+            ]}
+          />
         </div>
       )}
       <p className="mt-2 text-[11px] text-mute">Para cerrar un programa que ocupa un puerto, búscalo por su PID en Procesos.</p>

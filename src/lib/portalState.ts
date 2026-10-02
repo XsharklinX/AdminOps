@@ -26,13 +26,15 @@ export interface PortalView {
   canForward: boolean;
   /** Por qué no cargó la última página (null si cargó bien). */
   error: string | null;
+  /** Sitio que el portal quiso abrir y se mandó al navegador de fuera (null: ninguno). */
+  blocked: string | null;
   downloads: PortalDownload[];
 }
 
 /** A partir de cuánto una carga se considera lenta. */
 export const SLOW_MS = 10_000;
 
-const EMPTY: PortalView = { url: null, title: "", loading: false, slow: false, canBack: false, canForward: false, error: null, downloads: [] };
+const EMPTY: PortalView = { url: null, title: "", loading: false, slow: false, canBack: false, canForward: false, error: null, blocked: null, downloads: [] };
 const views = new Map<string, PortalView>();
 const slowTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let subs: (() => void)[] = [];
@@ -77,6 +79,7 @@ export function stowPortal(id: string) {
 /** Clave donde se recuerda el último portal usado de cada tipo (también para precargarlo). */
 export const lastPortalKey = (kind: "" | "inventory" | "mail" | "teams") => (kind ? `adminops.lastPortal.${kind}` : "adminops.lastPortal");
 export const clearPortalError = (id: string) => patch(id, { error: null });
+export const clearPortalBlocked = (id: string) => patch(id, { blocked: null });
 /** Marca un portal como fallido desde la interfaz (p. ej. la vista no llegó a crearse). */
 export const failPortal = (id: string, message: string) => patch(id, { error: message, loading: false, slow: false });
 
@@ -127,6 +130,7 @@ export function watchPortals() {
     setLoading(p.id, false);
     patch(p.id, { error: p.message || null, loading: false, slow: false });
   });
+  void listen<{ id: string; host: string }>("portal-blocked", ({ payload: p }) => patch(p.id, { blocked: p.host }));
   void listen<{ id: string } & PortalDownload>("portal-download", ({ payload: p }) =>
     patch(p.id, (v) => {
       const d = { download: p.download, name: p.name, state: p.state };

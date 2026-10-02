@@ -61,7 +61,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, Modal, inputClass } from "../components/ui";
+import { Button, Card, EmptyLine, ErrorState, Loading, Modal, inputClass } from "../components/ui";
 import { hwApi, toolboxApi, type CustomKind, type CustomTool, type Inventory, type ToolGroup, type ToolboxView } from "../lib/api";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -157,7 +157,17 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
-  const load = useCallback(() => toolboxApi.list().then(setData).catch((e) => toast("error", String(e))), [toast]);
+  const [failed, setFailed] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setFailed(null);
+    return toolboxApi
+      .list()
+      .then(setData)
+      .catch((e) => {
+        setFailed(String(e));
+        toast("error", String(e));
+      });
+  }, [toast]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -235,7 +245,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  if (!data) return <p className="p-8 font-mono text-sm text-mute">Cargando herramientas…</p>;
+  if (!data) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Cargando herramientas…" />;
 
   const favorites = data.favorites.filter((id) => tiles.has(id));
   const grid = (ids: string[]) => (
@@ -301,7 +311,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
 
       {results ? (
         <Section title={`Resultados (${results.length})`}>
-          {results.length ? grid(results) : <p className="py-3 text-sm text-mute">Nada coincide con «{query}».</p>}
+          {results.length ? grid(results) : <EmptyLine>Nada coincide con «{query}».</EmptyLine>}
         </Section>
       ) : (
         <>
@@ -557,7 +567,7 @@ function MachineCard() {
     hwApi.inventory().then(setInv).catch((e) => setError(String(e)));
   }, []);
 
-  const copy = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast("ok", `${what} copiado al portapapeles.`));
+  const copy = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast("ok", `${what} copiado al portapapeles.`), () => toast("error", "No se pudo copiar."));
 
   const sheet = inv
     ? [

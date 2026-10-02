@@ -141,6 +141,12 @@
   max-height: clamp(8rem, 26vh, 18rem);
 }
 
+/* Ajustes: el bloque al que ha llevado el buscador se marca un momento. */
+.setting-flash {
+  border-color: color-mix(in srgb, var(--color-neon) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-neon) 14%, transparent);
+}
+
 @utility pane-md {
   max-height: clamp(12rem, 44vh, 32rem);
 }

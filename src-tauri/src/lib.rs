@@ -16,7 +16,10 @@ mod followups;
 mod graph;
 mod snmp;
 mod storage;
+mod company;
+mod webview_orphans;
 mod disks;
+mod disktools;
 mod toast;
 mod evtwatch;
 mod ocr;
@@ -48,6 +51,7 @@ mod wipe;
 mod recover;
 mod family;
 mod office;
+mod shares;
 mod applock;
 mod appcare;
 mod winwatch;
@@ -99,6 +103,13 @@ pub fn run() {
     let migrated = boottime::step("Datos al pendrive", paths::migrate_to_portable_if_needed);
     if let Some(m) = &migrated {
         std::env::set_var("ADMINOPS_MIGRATED", format!("{} archivos, {} contraseñas, sesión del navegador: {}", m.files, m.secrets, if m.browser { "sí" } else { "no" }));
+    }
+    // Procesos del navegador interno que quedaron vivos de una sesión anterior:
+    // si siguen con el perfil abierto, las vistas nuevas se enganchan a ellos y
+    // no arrancan nunca (ver webview_orphans.rs).
+    let orphans = boottime::step("Navegador de sesiones anteriores", webview_orphans::kill_orphans);
+    if orphans > 0 {
+        std::env::set_var("ADMINOPS_ORPHANS", orphans.to_string());
     }
     if let Some(dir) = boottime::step("Carpeta de datos de WebView2", || paths::portable_webview_dir().or_else(paths::installed_webview_dir)) {
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", dir);
@@ -161,6 +172,9 @@ pub fn run() {
                 elevation::is_elevated(),
                 paths::is_portable()
             );
+            if let Ok(n) = std::env::var("ADMINOPS_ORPHANS") {
+                log::warn!("Cerrados {n} procesos del navegador interno que seguían vivos de una sesión anterior");
+            }
             if let Ok(m) = std::env::var("ADMINOPS_MIGRATED") {
                 log::info!("Datos de este equipo traídos al pendrive: {m}");
             }
@@ -187,6 +201,8 @@ pub fn run() {
             boottime::step("Vigilancia de la red", || officemap::start(app.handle().clone()));
             // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
             agenda::start(app.handle().clone());
+            disks::start_watch(app.handle().clone());
+            appbackup::start(app.handle().clone());
             // Nota de llamada con Ctrl+Alt+N, aunque AdminOps esté minimizado.
             quicknote::start(app.handle().clone());
             if std::env::args().any(|a| a == "--auditoria") {
@@ -283,12 +299,17 @@ pub fn run() {
             graph::graph_service_health,
             graph::graph_calendar_sync,
             graph::graph_teams_send,
+            graph::graph_calendar_pull,
+            graph::graph_calendar_view,
+            graph::graph_presence,
+            graph::graph_photos,
             portals::portal_nav,
             portals::portal_open_window,
             portals::portal_open_external,
             portals::portal_preload,
             portals::portal_close_idle,
             portals::portal_go,
+            portals::portal_allow_domain,
             portals::portal_zoom,
             portals::portal_find,
             portals::portal_login_get,
@@ -314,8 +335,20 @@ pub fn run() {
             disks::disk_surface_scan,
             disks::disk_rescue,
             disks::disk_pick_folder,
+            disks::bitlocker_local_key,
+            disktools::disk_speed_test,
+            disktools::disk_capacity_test,
+            disktools::disk_eject,
+            disktools::disk_format,
+            appbackup::autobackup_info,
+            appbackup::autobackup_set,
+            appbackup::autobackup_run_now,
             storage::storage_info,
             storage::storage_make_portable,
+            storage::storage_set_browser_on_usb,
+            company::company_export,
+            company::company_import_preview,
+            company::company_import_apply,
             hardware::sensors::read_sensors,
             hardware::sensors::install_pawnio,
             hardware::sensors::open_third_party_notices,
@@ -459,6 +492,20 @@ pub fn run() {
             office::remove_share,
             office::enable_file_sharing,
             office::ip_conflicts,
+            shares::share_grant,
+            shares::share_revoke,
+            shares::share_explain,
+            shares::network_drives,
+            shares::map_network_drive,
+            shares::unmap_network_drive,
+            shares::reconnect_network_drive,
+            shares::open_network_path,
+            shares::remote_shares,
+            shares::share_sizes,
+            shares::share_backups,
+            shares::set_share_backup,
+            shares::remove_share_backup,
+            shares::run_share_backup,
             office::export_csv,
             applock::lock_status,
             applock::lock_verify,

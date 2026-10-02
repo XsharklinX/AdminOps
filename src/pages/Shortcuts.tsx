@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { invoke } from "@tauri-apps/api/core";
 import { SHORTCUT_GROUPS, type Shortcut } from "../lib/shortcuts";
+import { EmptyLine } from "../components/ui";
 
 const FAVS = "adminops.shortcutFavorites";
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -197,7 +198,7 @@ export function Shortcuts() {
       {results ? (
         <div className="overflow-hidden rounded-xl border border-line bg-panel">
           <div className="divide-y divide-line/60">{results.map(({ s, group: g }, i) => row(s, `r${i}`, g.title))}</div>
-          {results.length === 0 && <p className="px-4 py-8 text-center text-sm text-mute">Nada coincide con «{query}».</p>}
+          {results.length === 0 && <EmptyLine>Nada coincide con «{query}».</EmptyLine>}
         </div>
       ) : (
         <>

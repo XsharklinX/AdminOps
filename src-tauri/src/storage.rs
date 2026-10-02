@@ -163,14 +163,9 @@ pub fn migrate_if_needed(root: &Path, host: &str) -> Option<Migrated> {
         }
     }
     let secrets = reseal_files(root, root);
-    // La sesión de los portales de ESTE equipo (sus cookies solo se leen aquí).
-    let mut browser = false;
-    if let Some(local) = std::env::var_os("LOCALAPPDATA").map(|l| PathBuf::from(l).join("AdminOps").join("WebView")) {
-        let dst = machine.join("webview");
-        if local.is_dir() && !dst.exists() {
-            browser = copy_tree(&local, &dst, &is_cache) > 0;
-        }
-    }
+    // La sesión de los portales se queda en el disco de este equipo (ver
+    // paths::browser_on_usb): allí sigue, sin copiarla.
+    let browser = false;
     crate::paths::clear_migration_request();
     let m = Migrated { at: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()), files, secrets, browser, from_host: host.to_string() };
     let _ = crate::paths::write_json(&root.join(MIGRATED_FILE), &m);
@@ -192,6 +187,8 @@ pub struct StorageInfo {
     can_switch: bool,
     /// Última vez que se trajeron datos de un equipo.
     migrated: Option<Migrated>,
+    /// El navegador interno (sesiones de los portales) se guarda en el pendrive.
+    browser_on_usb: bool,
 }
 
 #[tauri::command]
@@ -205,7 +202,14 @@ pub fn storage_info() -> StorageInfo {
         drive,
         can_switch: crate::paths::exe_dir_writable(),
         migrated: crate::paths::portable_data_root().map(|r| crate::paths::read_json::<Migrated>(&r.join(MIGRATED_FILE))).filter(|m| m.at > 0),
+        browser_on_usb: crate::paths::browser_on_usb(),
     }
+}
+
+/// Guardar (o no) el navegador interno en el pendrive. Surte efecto al volver a abrir AdminOps.
+#[tauri::command]
+pub fn storage_set_browser_on_usb(on: bool) -> Result<(), String> {
+    crate::paths::set_browser_on_usb(on)
 }
 
 /// Deja el archivo `AdminOps.portable` junto al programa pidiendo traer los

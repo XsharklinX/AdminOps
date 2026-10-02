@@ -29,6 +29,7 @@ import { ProfileEditor } from "../components/ProfileEditor";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, profilesApi, workApi, type ProfileDef, type ProfileResult, type ProfileView } from "../lib/api";
 import { useOnJournalChange } from "../lib/journalEvents";
+import { ErrorState, Loading } from "../components/ui";
 
 const ICONS: Record<string, LucideIcon> = {
   briefcase: Briefcase,
@@ -104,10 +105,13 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
     void load();
   };
 
+  const [failed, setFailed] = useState<string | null>(null);
   const load = useCallback(async () => {
+    setFailed(null);
     try {
       setProfiles(await profilesApi.list());
     } catch (e) {
+      setFailed(String(e));
       toast("error", String(e));
     }
   }, [toast]);
@@ -182,7 +186,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  if (!profiles) return <p className="p-8 font-mono text-sm text-mute">Detectando estado de los perfiles…</p>;
+  if (!profiles) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Detectando estado de los perfiles…" />;
 
   return (
     <div className="mx-auto max-w-6xl p-6">

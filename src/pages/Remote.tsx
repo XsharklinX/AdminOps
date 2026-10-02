@@ -1,8 +1,9 @@
-import { Copy, Download, ExternalLink, Headset, KeyRound, MonitorSmartphone, Pencil, Plug, Plus, Power, RotateCw, Stethoscope, Trash2, UserMinus, UserPlus } from "lucide-react";
+import { Copy, Download, ExternalLink, Headset, KeyRound, MonitorSmartphone, Pencil, Plug, Plus, Power, RotateCw, Search, SlidersHorizontal, Stethoscope, Trash2, UserMinus, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
+import { Button, Card, EmptyLine, EmptyState, inputClass, Modal, Loading } from "../components/ui";
+import { useLiveEffect } from "../lib/useLiveEffect";
 import { officeApi, remoteApi, usersApi, workApi, type Connection, type RdpOptions, type RdpServer, type Reach, type RemoteStatus, type RemoteTool } from "../lib/api";
 
 const KIND: Record<string, string> = { rdp: "Escritorio remoto", anydesk: "AnyDesk", rustdesk: "RustDesk", teamviewer: "TeamViewer" };
@@ -41,8 +42,18 @@ function ReachResult({ r }: { r: Reach }) {
   );
 }
 
+/** «hace 3 días», para saber de un vistazo cuáles se usan. */
+function usedAgo(ts: number): string {
+  if (!ts) return "sin usar todavía";
+  const days = Math.floor((Date.now() / 1000 - ts) / 86_400);
+  if (days <= 0) return "usada hoy";
+  if (days === 1) return "usada ayer";
+  if (days < 60) return `usada hace ${days} días`;
+  return `usada hace ${Math.floor(days / 30)} meses`;
+}
+
 export function Remote({ isAdmin }: { isAdmin: boolean }) {
-  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connections, setConnections] = useState<Connection[] | null>(null);
   const [editing, setEditing] = useState<Connection | null>(null);
   const [status, setStatus] = useState<RemoteStatus | null>(null);
   const [tools, setTools] = useState<RemoteTool[] | null>(null);
@@ -50,8 +61,12 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
   const [host, setHost] = useState("");
   const [user, setUser] = useState("");
   const [options, setOptions] = useState<RdpOptions>(DEFAULT_OPTIONS);
+  const [showOptions, setShowOptions] = useState(false);
   const [reach, setReach] = useState<Reach | null>(null);
-  const [testing, setTesting] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  /** Si contesta cada equipo guardado (solo Escritorio remoto): `null` mientras se comprueba. */
+  const [reachOf, setReachOf] = useState<Record<string, Reach | null>>({});
+  const [query, setQuery] = useState("");
   const [mac, setMac] = useState("");
   const [installing, setInstalling] = useState<string | null>(null);
   const [toolTarget, setToolTarget] = useState<Record<string, string>>({});
@@ -60,7 +75,10 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
   const { confirm, dialog } = useConfirm();
 
   const load = useCallback(() => {
-    remoteApi.list().then(setConnections).catch(() => {});
+    remoteApi
+      .list()
+      .then(setConnections)
+      .catch(() => setConnections([]));
     officeApi.remoteStatus().then(setStatus).catch((e) => toast("error", String(e)));
     remoteApi.tools().then(setTools).catch(() => setTools([]));
     remoteApi.server().then(setServer).catch(() => {});
@@ -68,19 +86,47 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(load, [load]);
 
-  const fail = (e: unknown) => toast("error", String(e));
-  const copy = (t: string, what = "Copiado") => navigator.clipboard.writeText(t).then(() => toast("ok", `${what}.`));
+  // Al abrir (y al cambiar la agenda) se mira si contesta cada equipo de
+  // Escritorio remoto, de dos en dos para no saturar la red.
+  const targets = (connections ?? [])
+    .filter((c) => c.kind === "rdp")
+    .map((c) => `${c.id}\n${c.target}`)
+    .join("\n\n");
+  const [round, setRound] = useState(0);
+  useLiveEffect(
+    (vigente) => {
+      const queue = targets ? targets.split("\n\n").map((t) => t.split("\n") as [string, string]) : [];
+      setReachOf(Object.fromEntries(queue.map(([id]) => [id, null])));
+      const worker = async () => {
+        for (let next = queue.shift(); next && vigente(); next = queue.shift()) {
+          const [id, target] = next;
+          const r = await remoteApi.test(target).catch(() => undefined);
+          if (!vigente()) return;
+          setReachOf((cur) => {
+            const copy = { ...cur };
+            if (r) copy[id] = r;
+            else delete copy[id];
+            return copy;
+          });
+        }
+      };
+      void worker();
+      void worker();
+    },
+    [targets, round],
+  );
 
-  const test = async (key: string, target: string) => {
-    setTesting(key);
+  const fail = (e: unknown) => toast("error", String(e));
+  const copy = (t: string, what = "Copiado") => navigator.clipboard.writeText(t).then(() => toast("ok", `${what}.`), () => toast("error", "No se pudo copiar."));
+
+  const test = async () => {
+    setTesting(true);
     try {
-      const r = await remoteApi.test(target);
-      if (key === "quick") setReach(r);
-      else toast(r.rdpOpen ? "ok" : "info", r.rdpOpen ? `Listo para conectar${r.pingMs !== null ? ` (${r.pingMs} ms)` : ""}.` : r.hint);
+      setReach(await remoteApi.test(host));
     } catch (e) {
       fail(e);
     } finally {
-      setTesting(null);
+      setTesting(false);
     }
   };
 
@@ -118,181 +164,277 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
     load();
   };
 
+  const newConnection = (over: Partial<Connection> = {}): Connection => ({ id: "", name: "", kind: "rdp", target: "", username: "", client: "", notes: "", options: DEFAULT_OPTIONS, savedPassword: false, lastUsed: 0, ...over });
+
+  // Las que más se usan, primero.
+  const q = query.trim().toLowerCase();
+  const shown = [...(connections ?? [])]
+    .filter((c) => !q || `${c.name} ${c.target} ${c.client} ${c.notes} ${KIND[c.kind]}`.toLowerCase().includes(q))
+    .sort((a, b) => b.lastUsed - a.lastUsed || a.name.localeCompare(b.name, "es"));
+
   const wired = status?.adapters.filter((a) => a.wired) ?? [];
   const wolReady = wired.some((a) => a.magicPacket === "Enabled") && status && !status.fastStartup;
   const btn = "rounded-md p-1.5 text-mute transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-30";
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
-      <Card title="Conexiones guardadas" icon={<Plug size={14} />} className="col-span-12">
-        <div className="mb-3 flex items-center gap-3">
-          <p className="min-w-0 flex-1 text-sm text-dim">Tu agenda de equipos: Escritorio remoto con sus opciones y contraseña (guardada en Windows), o el ID de AnyDesk, RustDesk o TeamViewer.</p>
-          <Button onClick={() => setEditing({ id: "", name: "", kind: "rdp", target: "", username: "", client: "", notes: "", options: DEFAULT_OPTIONS, savedPassword: false, lastUsed: 0 })}>
-            <Plus size={14} /> Nueva conexión
+    <div className="@container mx-auto max-w-6xl space-y-4 p-6">
+      {/* Conexión rápida: un nombre y a conectar; lo demás, a un clic. */}
+      <section className="rounded-xl border border-line bg-panel p-4">
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (host.trim()) remoteApi.connectRdp(host, user, options).catch(fail);
+          }}
+        >
+          <div className="relative min-w-56 flex-1">
+            <MonitorSmartphone size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
+            <input
+              value={host}
+              onChange={(e) => (setHost(e.target.value), setReach(null))}
+              placeholder="Conectar por Escritorio remoto a… (PC-RECEPCION, 192.168.1.20)"
+              className={`${inputClass} py-2.5 pl-9`}
+              aria-label="Equipo o IP"
+            />
+          </div>
+          <Button onClick={() => remoteApi.connectRdp(host, user, options).catch(fail)} disabled={!host.trim()}>
+            <Plug size={14} /> Conectar
           </Button>
-        </div>
-        {connections.length === 0 ? (
-          <p className="text-sm text-mute">Aún no hay conexiones guardadas.</p>
+          <Button kind="ghost" onClick={() => void test()} disabled={!host.trim() || testing}>
+            <Stethoscope size={14} /> {testing ? "Probando…" : "Probar"}
+          </Button>
+          <Button kind="ghost" onClick={() => setShowOptions(!showOptions)} title="Usuario, pantalla completa, monitores, portapapeles…">
+            <SlidersHorizontal size={14} /> Opciones
+          </Button>
+          <Button kind="ghost" onClick={() => setEditing(newConnection({ name: host.trim(), target: host.trim(), username: user.trim(), options }))} disabled={!host.trim()} title="Guardarla en la agenda de abajo">
+            <Plus size={14} /> Guardar
+          </Button>
+        </form>
+        {reach && (
+          <div className="mt-3">
+            <ReachResult r={reach} />
+          </div>
+        )}
+        {showOptions && (
+          <div className="mt-3 space-y-3 border-t border-line/60 pt-3">
+            <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Usuario (opcional, p. ej. EQUIPO\ana)" className={`${inputClass} max-w-md`} aria-label="Usuario" />
+            <Options value={options} onChange={setOptions} />
+          </div>
+        )}
+      </section>
+
+      <Card
+        title={connections?.length ? `Conexiones guardadas · ${connections.length}` : "Conexiones guardadas"}
+        icon={<Plug size={14} />}
+        right={
+          <div className="flex items-center gap-1">
+            {(connections?.length ?? 0) > 6 && (
+              <div className="relative">
+                <Search size={13} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-mute" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar"
+                  className="h-8 w-44 rounded-md border border-line bg-void/60 pr-2 pl-7 text-xs text-ink outline-none placeholder:text-mute focus:border-neon/50"
+                  aria-label="Buscar una conexión"
+                />
+              </div>
+            )}
+            <button onClick={() => setRound((n) => n + 1)} className={btn} title="Volver a comprobar si contestan">
+              <RotateCw size={14} />
+            </button>
+            <Button onClick={() => setEditing(newConnection())}>
+              <Plus size={14} /> Nueva
+            </Button>
+          </div>
+        }
+      >
+        {connections === null ? (
+          <Loading />
+        ) : connections.length === 0 ? (
+          <EmptyState icon={<Plug size={26} />} title="Aún no hay conexiones guardadas" action={<Button onClick={() => setEditing(newConnection())}>Guardar la primera</Button>}>
+            Tu agenda de equipos: Escritorio remoto con sus opciones y su contraseña (guardada en Windows), o el ID de AnyDesk, RustDesk o TeamViewer.
+          </EmptyState>
+        ) : shown.length === 0 ? (
+          <EmptyLine>Ninguna conexión coincide con «{query}».</EmptyLine>
         ) : (
-          <ul className="divide-y divide-line/60">
-            {connections.map((c) => (
-              <li key={c.id} className="group flex items-center gap-3 py-2.5">
-                <MonitorSmartphone size={16} className="shrink-0 text-mute" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-ink">{c.name}</span>
-                    <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">{KIND[c.kind]}</span>
-                    {c.savedPassword && <KeyRound size={12} className="text-mute" aria-label="Contraseña guardada" />}
+          <ul className="grid grid-cols-1 gap-2 @2xl:grid-cols-2 @5xl:grid-cols-3">
+            {shown.map((c) => {
+              const r = reachOf[c.id];
+              const checking = c.kind === "rdp" && r === null;
+              const dot = c.kind !== "rdp" || r === undefined ? "bg-line-2" : checking ? "animate-pulse bg-mute" : r?.rdpOpen ? "bg-ok" : "bg-bad";
+              const state =
+                c.kind !== "rdp"
+                  ? KIND[c.kind]
+                  : checking
+                    ? "Comprobando…"
+                    : r === undefined
+                      ? "No se pudo comprobar"
+                      : r?.rdpOpen
+                        ? `Contesta${r.pingMs !== null ? ` · ${r.pingMs} ms` : ""}`
+                        : "No contesta";
+              return (
+                <li key={c.id} className="group flex flex-col rounded-lg border border-line bg-panel-2/30 p-3 transition-colors hover:border-line-2">
+                  <div className="flex items-start gap-2">
+                    <span className={`mt-1.5 size-2 shrink-0 rounded-full ${dot}`} title={r && !r.rdpOpen ? r.hint : state} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-medium text-ink">{c.name}</span>
+                        {c.savedPassword && <KeyRound size={11} className="shrink-0 text-mute" aria-label="Contraseña guardada" />}
+                      </div>
+                      <div className="truncate font-mono text-[11px] text-dim">{c.target}</div>
+                    </div>
+                    <span className="shrink-0 rounded bg-panel-2 px-1.5 py-px text-[10px] text-dim">{KIND[c.kind]}</span>
                   </div>
-                  <div className="truncate text-xs text-mute">
-                    <span className="font-mono">{c.target}</span>
-                    {c.username && ` · ${c.username}`}
-                    {c.client && ` · ${c.client}`}
-                    {c.lastUsed > 0 && ` · usada ${new Date(c.lastUsed * 1000).toLocaleDateString("es", { dateStyle: "medium" })}`}
+                  <div className="mt-1.5 min-h-8 text-[11px] text-mute">
+                    <div className="truncate">
+                      {c.kind === "rdp" && <span className={r?.rdpOpen ? "text-ok" : r && !r.rdpOpen ? "text-bad" : ""}>{state} · </span>}
+                      {usedAgo(c.lastUsed)}
+                      {c.client && ` · ${c.client}`}
+                      {c.username && ` · ${c.username}`}
+                    </div>
+                    {r && !r.rdpOpen ? <div className="truncate text-warn" title={r.hint}>{r.hint}</div> : c.notes && <div className="truncate text-dim">{c.notes}</div>}
                   </div>
-                  {c.notes && <div className="truncate text-xs text-dim">{c.notes}</div>}
-                </div>
-                <span className="flex gap-0.5 opacity-60 group-hover:opacity-100">
-                  {c.kind === "rdp" && (
-                    <>
-                      <button onClick={() => test(c.id, c.target)} disabled={testing !== null} className={btn} title="Probar la conexión">
-                        <Stethoscope size={14} />
-                      </button>
+                  <div className="mt-2 flex items-center gap-0.5">
+                    <Button onClick={() => remoteApi.connect(c.id).then(load).catch(fail)}>Conectar</Button>
+                    <span className="flex-1" />
+                    {c.kind === "rdp" && (
                       <button onClick={() => setPwFor(c)} className={btn} title={c.savedPassword ? "Cambiar u olvidar la contraseña" : "Guardar la contraseña en Windows"}>
                         <KeyRound size={14} />
                       </button>
-                    </>
-                  )}
-                  <button onClick={() => setEditing(c)} className={btn} title="Editar">
-                    <Pencil size={14} />
-                  </button>
-                  <button onClick={() => remove(c)} className={btn} title="Borrar">
-                    <Trash2 size={14} />
-                  </button>
-                </span>
-                <Button onClick={() => remoteApi.connect(c.id).then(load).catch(fail)}>Conectar</Button>
-              </li>
-            ))}
+                    )}
+                    <button onClick={() => void copy(c.target, c.kind === "rdp" ? "Equipo copiado" : "ID copiado")} className={btn} title="Copiar">
+                      <Copy size={14} />
+                    </button>
+                    <button onClick={() => setEditing(c)} className={btn} title="Editar">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => void remove(c)} className={`${btn} hover:text-bad`} title="Borrar">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>
 
-      <Card title="Conexión rápida" icon={<MonitorSmartphone size={14} />} className="col-span-12 lg:col-span-7">
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <input value={host} onChange={(e) => (setHost(e.target.value), setReach(null))} placeholder="Equipo o IP (PC-RECEPCION, 192.168.1.20)" className={inputClass} />
-            <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Usuario (opcional, p. ej. EQUIPO\ana)" className={inputClass} />
-          </div>
-          <Options value={options} onChange={setOptions} />
-          {reach && <ReachResult r={reach} />}
-          <div className="flex flex-wrap gap-2">
-            <Button kind="ghost" onClick={() => test("quick", host)} disabled={!host.trim() || testing !== null}>
-              <Stethoscope size={14} /> {testing === "quick" ? "Probando…" : "Probar"}
-            </Button>
-            <Button onClick={() => remoteApi.connectRdp(host, user, options).catch(fail)} disabled={!host.trim()}>
-              Conectar
-            </Button>
-            <Button
-              kind="ghost"
-              onClick={() => setEditing({ id: "", name: host.trim(), kind: "rdp", target: host.trim(), username: user.trim(), client: "", notes: "", options, savedPassword: false, lastUsed: 0 })}
-              disabled={!host.trim()}
-            >
-              <Plus size={14} /> Guardar en la agenda
-            </Button>
-          </div>
-        </div>
-        <div className="mt-5 grid grid-cols-1 gap-4 border-t border-line/60 pt-4 md:grid-cols-2">
-          <div>
-            <div className="mb-1 text-xs text-dim">Asistencia remota de Windows (con una invitación)</div>
-            <Button kind="ghost" onClick={() => officeApi.remoteAssistance().catch(fail)}>
-              <Headset size={14} /> Abrir Asistencia remota
-            </Button>
-          </div>
-          <div>
-            <div className="mb-1 text-xs text-dim">Encender un equipo por la red</div>
-            <div className="flex gap-2">
-              <input value={mac} onChange={(e) => setMac(e.target.value)} placeholder="MAC (00:11:22:33:44:55)" className={`${inputClass} font-mono`} />
-              <Button
-                onClick={() =>
-                  officeApi
-                    .wake(mac)
-                    .then(() => toast("ok", "Señal de encendido enviada."))
-                    .catch(fail)
-                }
-                disabled={!mac.trim()}
+      <div className="grid grid-cols-12 gap-4">
+        <Card title="Herramientas de asistencia" icon={<Headset size={14} />} className="col-span-12 @4xl:col-span-7">
+          {tools === null ? (
+            <Loading text="Buscando…" />
+          ) : (
+            <ul className="space-y-3">
+              {tools.map((t) => (
+                <li key={t.id} className="rounded-lg border border-line px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-sm text-ink">{t.name}</span>
+                    {t.installed ? (
+                      <Button kind="ghost" onClick={() => remoteApi.openTool(t.id).catch(fail)}>
+                        <ExternalLink size={13} /> Abrir
+                      </Button>
+                    ) : (
+                      <Button kind="ghost" onClick={() => void install(t)} disabled={installing !== null || !isAdmin}>
+                        <Download size={13} /> Instalar
+                      </Button>
+                    )}
+                  </div>
+                  {t.installed && (
+                    <>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-dim">
+                        ID de este equipo:
+                        {t.thisId ? (
+                          <>
+                            <span className="font-mono text-ink select-text">{t.thisId}</span>
+                            <button onClick={() => void copy(t.thisId!, "ID copiado")} className="text-mute hover:text-ink" title="Copiar">
+                              <Copy size={12} />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-mute">ábrelo una vez para que lo genere</span>
+                        )}
+                      </div>
+                      <form
+                        className="mt-2 flex gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if ((toolTarget[t.id] ?? "").trim()) remoteApi.connectTool(t.id, toolTarget[t.id] ?? "").catch(fail);
+                        }}
+                      >
+                        <input
+                          value={toolTarget[t.id] ?? ""}
+                          onChange={(e) => setToolTarget({ ...toolTarget, [t.id]: e.target.value })}
+                          placeholder="ID del otro equipo"
+                          className="min-w-0 flex-1 rounded-md border border-line bg-void/60 px-2 py-1.5 font-mono text-xs text-ink outline-none focus:border-neon/50"
+                        />
+                        <Button onClick={() => remoteApi.connectTool(t.id, toolTarget[t.id] ?? "").catch(fail)} disabled={!(toolTarget[t.id] ?? "").trim()}>
+                          Conectar
+                        </Button>
+                      </form>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <TaskStatus task="remote-install" active={installing !== null} fallback="Instalando…" className="mt-3" />
+        </Card>
+
+        <Card title="Más maneras de llegar" icon={<Power size={14} />} className="col-span-12 @4xl:col-span-5">
+          <div className="space-y-4">
+            <div>
+              <div className="text-sm text-ink">Encender un equipo por la red</div>
+              <p className="mb-2 text-xs text-mute">Con su MAC, por cable y con «Wake on LAN» activado en su BIOS.</p>
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (mac.trim())
+                    officeApi
+                      .wake(mac)
+                      .then(() => toast("ok", "Señal de encendido enviada."))
+                      .catch(fail);
+                }}
               >
-                <Power size={14} />
+                <input value={mac} onChange={(e) => setMac(e.target.value)} placeholder="00:11:22:33:44:55" className={`${inputClass} font-mono`} aria-label="MAC del equipo" />
+                <Button
+                  onClick={() =>
+                    officeApi
+                      .wake(mac)
+                      .then(() => toast("ok", "Señal de encendido enviada."))
+                      .catch(fail)
+                  }
+                  disabled={!mac.trim()}
+                >
+                  <Power size={14} /> Encender
+                </Button>
+              </form>
+            </div>
+            <div className="border-t border-line/60 pt-4">
+              <div className="text-sm text-ink">Asistencia remota de Windows</div>
+              <p className="mb-2 text-xs text-mute">La que trae Windows: la otra persona te manda una invitación y ve lo que haces.</p>
+              <Button kind="ghost" onClick={() => officeApi.remoteAssistance().catch(fail)}>
+                <Headset size={14} /> Abrir Asistencia remota
               </Button>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
-      <Card title="Herramientas de asistencia" className="col-span-12 lg:col-span-5">
-        {tools === null ? (
-          <p className="font-mono text-xs text-mute">Buscando…</p>
-        ) : (
-          <ul className="space-y-3">
-            {tools.map((t) => (
-              <li key={t.id} className="rounded-lg border border-line px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 text-sm text-ink">{t.name}</span>
-                  {t.installed ? (
-                    <Button kind="ghost" onClick={() => remoteApi.openTool(t.id).catch(fail)}>
-                      <ExternalLink size={13} /> Abrir
-                    </Button>
-                  ) : (
-                    <Button kind="ghost" onClick={() => install(t)} disabled={installing !== null || !isAdmin}>
-                      <Download size={13} /> Instalar
-                    </Button>
-                  )}
-                </div>
-                {t.installed && (
-                  <>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-dim">
-                      ID de este equipo:
-                      {t.thisId ? (
-                        <>
-                          <span className="font-mono text-ink select-text">{t.thisId}</span>
-                          <button onClick={() => copy(t.thisId!, "ID copiado")} className="text-mute hover:text-ink" title="Copiar">
-                            <Copy size={12} />
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-mute">ábrelo una vez para que lo genere</span>
-                      )}
-                    </div>
-                    <form
-                      className="mt-2 flex gap-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        remoteApi.connectTool(t.id, toolTarget[t.id] ?? "").catch(fail);
-                      }}
-                    >
-                      <input
-                        value={toolTarget[t.id] ?? ""}
-                        onChange={(e) => setToolTarget({ ...toolTarget, [t.id]: e.target.value })}
-                        placeholder="ID del otro equipo"
-                        className="min-w-0 flex-1 rounded-md border border-line bg-void/60 px-2 py-1.5 font-mono text-xs text-ink outline-none focus:border-neon/50"
-                      />
-                      <Button onClick={() => remoteApi.connectTool(t.id, toolTarget[t.id] ?? "").catch(fail)} disabled={!(toolTarget[t.id] ?? "").trim()}>
-                        Conectar
-                      </Button>
-                    </form>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        <TaskStatus task="remote-install" active={installing !== null} fallback="Instalando…" className="mt-3" />
-      </Card>
-
-      <Card title="Este equipo" className="col-span-12">
+      <Card
+        title="Este equipo"
+        icon={<MonitorSmartphone size={14} />}
+        right={
+          <button onClick={load} className={btn} title="Volver a comprobar">
+            <RotateCw size={14} />
+          </button>
+        }
+      >
         {!status ? (
           <Loading />
         ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 @3xl:grid-cols-3">
             <div className="space-y-1 text-sm">
               {[
                 ["Nombre", status.host],
@@ -303,7 +445,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
                   <span className="w-16 text-dim">{k}</span>
                   <span className="font-mono text-ink">{v || "—"}</span>
                   {v && (
-                    <button onClick={() => copy(v)} className="text-mute hover:text-ink" title="Copiar">
+                    <button onClick={() => void copy(v)} className="text-mute hover:text-ink" title="Copiar">
                       <Copy size={12} />
                     </button>
                   )}
@@ -323,7 +465,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
                   </div>
                 </div>
                 {status.rdpSupported && (
-                  <Button kind={status.rdpEnabled ? "ghost" : "primary"} onClick={toggleRdp} disabled={!isAdmin}>
+                  <Button kind={status.rdpEnabled ? "ghost" : "primary"} onClick={() => void toggleRdp()} disabled={!isAdmin}>
                     {status.rdpEnabled ? "Desactivar" : "Activar"}
                   </Button>
                 )}
@@ -351,11 +493,6 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
             </div>
           </div>
         )}
-        <div className="mt-3 flex justify-end">
-          <Button kind="ghost" onClick={load}>
-            <RotateCw size={14} /> Volver a comprobar
-          </Button>
-        </div>
       </Card>
 
       {editing && (

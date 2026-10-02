@@ -8,6 +8,7 @@ import { WifiProfiles } from "../components/WifiProfiles";
 import { Card } from "../components/ui";
 import { toolsApi, type NetworkReport, type SpeedResult } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { DataTable } from "../components/DataTable";
 
 const when = (ts: number) => new Date(ts * 1000).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
 
@@ -50,26 +51,18 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
         {history.length === 0 ? (
           <p className="text-sm text-mute">Aún no hay tests en este equipo.</p>
         ) : (
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-[11px] text-mute">
-                <th className="pb-2 font-medium">Fecha</th>
-                <th className="pb-2 text-right font-medium">Bajada</th>
-                <th className="pb-2 text-right font-medium">Subida</th>
-                <th className="pb-2 text-right font-medium">Ping</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono tabular">
-              {history.slice(0, 12).map((h) => (
-                <tr key={h.timestamp} className="border-t border-line/60">
-                  <td className="py-1.5 font-sans text-dim">{when(h.timestamp)}</td>
-                  <td className="py-1.5 text-right text-neon">{h.downloadMbps.toFixed(1)}</td>
-                  <td className="py-1.5 text-right text-neon-2">{h.uploadMbps.toFixed(1)}</td>
-                  <td className="py-1.5 text-right">{h.latencyMs.toFixed(0)} ms</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            size="xs"
+            mono
+            rows={history.slice(0, 12)}
+            rowKey={(h) => h.timestamp}
+            columns={[
+              { id: "date", header: "Fecha", sortBy: (h) => h.timestamp, cell: (h) => when(h.timestamp), className: "font-sans text-dim" },
+              { id: "down", header: "Bajada", align: "right", sortBy: (h) => h.downloadMbps, cell: (h) => h.downloadMbps.toFixed(1), className: "text-neon" },
+              { id: "up", header: "Subida", align: "right", sortBy: (h) => h.uploadMbps, cell: (h) => h.uploadMbps.toFixed(1), className: "text-neon-2" },
+              { id: "ping", header: "Ping", align: "right", sortBy: (h) => h.latencyMs, cell: (h) => `${h.latencyMs.toFixed(0)} ms` },
+            ]}
+          />
         )}
       </Card>
 
@@ -123,45 +116,50 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
               ))}
             </div>
             <div className="col-span-12 lg:col-span-7">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-[11px] text-mute">
-                    <th className="pb-2 font-medium">Destino</th>
-                    <th className="pb-2 text-right font-medium">Respuestas</th>
-                    <th className="pb-2 text-right font-medium">Media</th>
-                    <th className="pb-2 text-right font-medium">Mín / Máx</th>
-                  </tr>
-                </thead>
-                <tbody className="font-mono tabular">
-                  {report.pings.map((p) => {
+              <DataTable
+                size="xs"
+                mono
+                rows={[
+                  ...report.pings.map((p) => {
                     const lost = p.sent - p.received;
-                    return (
-                      <tr key={p.target} className="border-t border-line/60">
-                        <td className="py-1.5 font-sans">
-                          <div className="text-ink">{p.label}</div>
-                          <div className="font-mono text-[11px] text-mute">{p.target}</div>
-                        </td>
-                        <td className={`py-1.5 text-right ${lost === 0 ? "text-ok" : lost === p.sent ? "text-bad" : "text-warn"}`}>
-                          {p.received}/{p.sent}
-                        </td>
-                        <td className="py-1.5 text-right">{p.avgMs !== null ? `${p.avgMs.toFixed(0)} ms` : "—"}</td>
-                        <td className="py-1.5 text-right text-dim">{p.minMs !== null ? `${p.minMs} / ${p.maxMs} ms` : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                  {report.dns.map((d) => (
-                    <tr key={d.host} className="border-t border-line/60">
-                      <td className="py-1.5 font-sans">
-                        <div className="text-ink">DNS · {d.host}</div>
-                        <div className="truncate font-mono text-[11px] text-mute">{d.addresses.slice(0, 2).join(", ")}</div>
-                      </td>
-                      <td className={`py-1.5 text-right ${d.ok ? "text-ok" : "text-bad"}`}>{d.ok ? "Resuelve" : "Falla"}</td>
-                      <td className="py-1.5 text-right">{d.ms.toFixed(0)} ms</td>
-                      <td />
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    return {
+                      key: p.target,
+                      label: p.label,
+                      sub: p.target,
+                      answer: `${p.received}/${p.sent}`,
+                      tone: lost === 0 ? "text-ok" : lost === p.sent ? "text-bad" : "text-warn",
+                      avg: p.avgMs,
+                      range: p.minMs !== null ? `${p.minMs} / ${p.maxMs} ms` : "—",
+                    };
+                  }),
+                  ...report.dns.map((d) => ({
+                    key: `dns-${d.host}`,
+                    label: `DNS · ${d.host}`,
+                    sub: d.addresses.slice(0, 2).join(", "),
+                    answer: d.ok ? "Resuelve" : "Falla",
+                    tone: d.ok ? "text-ok" : "text-bad",
+                    avg: d.ms as number | null,
+                    range: "",
+                  })),
+                ]}
+                rowKey={(r) => r.key}
+                columns={[
+                  {
+                    id: "target",
+                    header: "Destino",
+                    className: "font-sans",
+                    cell: (r) => (
+                      <>
+                        <div className="text-ink">{r.label}</div>
+                        <div className="truncate font-mono text-[11px] text-mute">{r.sub}</div>
+                      </>
+                    ),
+                  },
+                  { id: "answers", header: "Respuestas", align: "right", cell: (r) => r.answer, className: (r) => r.tone },
+                  { id: "avg", header: "Media", align: "right", sortBy: (r) => r.avg, cell: (r) => (r.avg !== null ? `${r.avg.toFixed(0)} ms` : "—") },
+                  { id: "range", header: "Mín / Máx", align: "right", cell: (r) => r.range, className: "text-dim" },
+                ]}
+              />
               <p className="mt-2 text-[11px] text-mute">
                 Router lento o con pérdidas → problema de la red local o del Wi-Fi. Router bien pero Internet mal → problema del proveedor.
               </p>

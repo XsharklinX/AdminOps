@@ -3,7 +3,7 @@ import { bytes } from "../lib/format";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Modal, inputClass } from "../components/ui";
+import { Button, ErrorState, Loading, Modal, inputClass } from "../components/ui";
 import { appsApi, type AppCatalog, type CatalogApp, type InstallResult } from "../lib/api";
 
 const CATEGORY: Record<string, string> = {
@@ -40,7 +40,14 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
-  const loadCatalog = useCallback(() => appsApi.catalog().then(setCatalog).catch((e) => toast("error", String(e))), [toast]);
+  const [failed, setFailed] = useState<string | null>(null);
+  const loadCatalog = useCallback(() => {
+    setFailed(null);
+    return appsApi
+      .catalog()
+      .then(setCatalog)
+      .catch((e) => setFailed(String(e)));
+  }, []);
   const loadInstalled = useCallback(() => {
     setInstalled(null);
     setInstalledError(null);
@@ -133,7 +140,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
     void loadCatalog();
   };
 
-  if (!catalog) return <p className="p-8 font-mono text-sm text-mute">Cargando catálogo…</p>;
+  if (!catalog) return failed ? <ErrorState page message={failed} onRetry={() => void loadCatalog()} /> : <Loading page text="Cargando catálogo…" />;
 
   const q = norm(query.trim());
   const filtered = catalog.apps.filter((a) => !q || norm(a.name).includes(q) || norm(a.id).includes(q));

@@ -7,14 +7,16 @@ import {
   Play,
   Plus,
   ScrollText,
+  Search,
   Undo2,
   Wrench,
   XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Card, Loading } from "../components/ui";
+import { Card, EmptyLine, ErrorState, Loading } from "../components/ui";
+import { groupByDay, JOURNAL_FILTERS, matchesJournal, type JournalFilter } from "../lib/journalDays";
 import { appApi, tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
 import { RestoreStorageCard } from "../components/Maintenance";
 import { Timeline } from "../components/Timeline";
@@ -28,18 +30,37 @@ const OP = {
   restorePoint: { label: "Punto de restauración", icon: LifeBuoy },
 };
 
-const when = (secs: number) =>
-  new Date(secs * 1000).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" });
+const time = (secs: number) => new Date(secs * 1000).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+/** Cuántos cambios se pintan de una vez (el diario de un equipo muy trabajado es largo). */
+const PAGE = 150;
 
 export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?: (p: PageId) => void }) {
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [entries, setEntries] = useState<JournalEntry[] | null>(null);
+  const [journalError, setJournalError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<JournalFilter>("all");
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(PAGE);
   const [points, setPoints] = useState<RestorePoint[] | null>(null);
   const [pointsError, setPointsError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [reverting, setReverting] = useState<number | null>(null);
   const toast = useToast();
 
-  const loadJournal = useCallback(() => tweaksApi.journal().then(setEntries), []);
+  const loadJournal = useCallback(
+    () =>
+      tweaksApi
+        .journal()
+        .then((j) => {
+          setEntries(j);
+          setJournalError(null);
+        })
+        .catch((e) => setJournalError(String(e))),
+    [],
+  );
+
+  const shown = useMemo(() => (entries ?? []).filter((e) => matchesJournal(e, filter, query)), [entries, filter, query]);
+  const days = useMemo(() => groupByDay(shown.slice(0, limit)), [shown, limit]);
+  const undoable = useMemo(() => (entries ?? []).filter((e) => matchesJournal(e, "undoable", "")).length, [entries]);
   const loadPoints = useCallback(async () => {
     if (!isAdmin) return;
     try {
@@ -120,7 +141,7 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
         ) : points === null ? (
           <Loading />
         ) : points.length === 0 ? (
-          <p className="text-xs text-mute">No hay puntos de restauración en este equipo.</p>
+          <EmptyLine>No hay puntos de restauración en este equipo.</EmptyLine>
         ) : (
           <ul className="pane-md space-y-1.5 overflow-y-auto">
             {points.map((p) => (
@@ -135,49 +156,102 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
         )}
       </Card>
 
-      <Card title="Diario de cambios" icon={<HistoryIcon size={14} />} className="col-span-12 lg:col-span-7">
-        {entries.length === 0 ? (
-          <p className="py-6 text-center text-sm text-mute">Todavía no se ha hecho ningún cambio.</p>
+      <Card
+        title={entries?.length ? `Diario de cambios · ${entries.length}` : "Diario de cambios"}
+        icon={<HistoryIcon size={14} />}
+        className="col-span-12 lg:col-span-7"
+        right={undoable > 0 ? <span className="text-[11px] text-mute">{undoable === 1 ? "1 cambio se puede deshacer" : `${undoable} cambios se pueden deshacer`}</span> : undefined}
+      >
+        {journalError ? (
+          <ErrorState message={journalError} onRetry={() => void loadJournal()} />
+        ) : entries === null ? (
+          <Loading />
+        ) : entries.length === 0 ? (
+          <EmptyLine>Todavía no se ha hecho ningún cambio. Todo lo que AdminOps cambie en el equipo quedará aquí, con su «Deshacer».</EmptyLine>
         ) : (
-          <ol className="space-y-1">
-            {entries.map((e) => {
-              const op = OP[e.op];
-              const canUndo = e.undoable && !e.reverted;
-              return (
-                <li key={e.id} className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-panel-2">
-                  <op.icon size={15} className={`mt-0.5 shrink-0 ${e.ok ? "text-neon" : "text-bad"}`} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-ink">{e.title}</span>
-                      <span className="text-[11px] text-mute">{op.label}</span>
-                      {e.ok ? (
-                        <CheckCircle2 size={12} className="text-ok" />
-                      ) : (
-                        <XCircle size={12} className="text-bad" />
-                      )}
-                      {e.reverted && (
-                        <span className="rounded border border-line-2 px-1.5 text-[11px] text-dim">Deshecho</span>
-                      )}
-                    </div>
-                    {e.message && (
-                      <p className={`text-xs break-words select-text ${e.ok ? "text-dim" : "text-bad"}`}>{e.message}</p>
-                    )}
-                    <p className="font-mono text-[11px] text-mute">{when(e.timestamp)}</p>
-                  </div>
-                  {canUndo && (
-                    <button
-                      onClick={() => revert(e)}
-                      disabled={reverting !== null}
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-line-2 px-2.5 py-1 text-xs text-dim transition-colors hover:border-neon/40 hover:text-neon disabled:opacity-40"
-                    >
-                      {reverting === e.id ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
-                      Deshacer
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <div className="relative min-w-40 flex-1">
+                <Search size={13} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-mute" />
+                <input
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setLimit(PAGE);
+                  }}
+                  placeholder="Buscar en el diario"
+                  className="h-8 w-full rounded-md border border-line bg-void/60 pr-2 pl-7 text-xs text-ink outline-none placeholder:text-mute focus:border-neon/50"
+                  aria-label="Buscar en el diario"
+                />
+              </div>
+              {JOURNAL_FILTERS.map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setFilter(id);
+                    setLimit(PAGE);
+                  }}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filter === id ? "border-neon/60 bg-neon/10 text-ink" : "border-line text-mute hover:text-ink"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {shown.length === 0 ? (
+              <EmptyLine>Nada en el diario con ese filtro.</EmptyLine>
+            ) : (
+              <div className="space-y-4">
+                {days.map((d) => (
+                  <section key={d.day}>
+                    <h3 className="mb-1 flex items-baseline gap-2 text-xs font-medium text-dim">
+                      {d.label}
+                      <span className="font-normal text-mute">
+                        {d.entries.length} {d.entries.length === 1 ? "cambio" : "cambios"}
+                      </span>
+                    </h3>
+                    {/* La línea vertical une los cambios del día, como una línea de tiempo. */}
+                    <ol className="relative ml-[7px] space-y-0.5 border-l border-line pl-4">
+                      {d.entries.map((e) => {
+                        const op = OP[e.op];
+                        const canUndo = e.undoable && !e.reverted;
+                        return (
+                          <li key={e.id} className="relative flex items-start gap-3 rounded-lg px-2 py-1.5 hover:bg-panel-2">
+                            <span className={`absolute top-3 -left-[21px] size-2 rounded-full ring-2 ring-panel ${e.ok ? (e.reverted ? "bg-mute" : "bg-neon") : "bg-bad"}`} />
+                            <span className="w-10 shrink-0 pt-0.5 font-mono text-[11px] text-mute">{time(e.timestamp)}</span>
+                            <op.icon size={14} className={`mt-0.5 shrink-0 ${e.ok ? "text-dim" : "text-bad"}`} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`text-sm ${e.reverted ? "text-dim line-through" : "text-ink"}`}>{e.title}</span>
+                                <span className="text-[11px] text-mute">{op.label}</span>
+                                {e.ok ? <CheckCircle2 size={12} className="text-ok" /> : <XCircle size={12} className="text-bad" />}
+                                {e.reverted && <span className="rounded border border-line-2 px-1.5 text-[11px] text-dim">Deshecho</span>}
+                              </div>
+                              {e.message && <p className={`text-xs break-words select-text ${e.ok ? "text-dim" : "text-bad"}`}>{e.message}</p>}
+                            </div>
+                            {canUndo && (
+                              <button
+                                onClick={() => void revert(e)}
+                                disabled={reverting !== null}
+                                className="flex shrink-0 items-center gap-1 rounded-md border border-line-2 px-2.5 py-1 text-xs text-dim transition-colors hover:border-neon/40 hover:text-neon disabled:opacity-40"
+                              >
+                                {reverting === e.id ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                                Deshacer
+                              </button>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </section>
+                ))}
+                {shown.length > limit && (
+                  <button onClick={() => setLimit(limit + PAGE)} className="text-xs text-neon hover:underline">
+                    Ver más antiguos ({shown.length - limit})
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </Card>
 

@@ -162,7 +162,8 @@ export function M365Settings() {
             <span className="font-mono">AuditLog.Read.All</span>, <span className="font-mono">Directory.Read.All</span>,{" "}
             <span className="font-mono">UserAuthenticationMethod.ReadWrite.All</span>, <span className="font-mono">User.RevokeSessions.All</span>,{" "}
             <span className="font-mono">ServiceHealth.Read.All</span>, <span className="font-mono">Calendars.ReadWrite</span>,{" "}
-            <span className="font-mono">Chat.Create</span> y <span className="font-mono">ChatMessage.Send</span>. Los que no se den, esa función avisa y el resto funciona.
+            <span className="font-mono">Chat.Create</span>, <span className="font-mono">ChatMessage.Send</span>,{" "}
+            <span className="font-mono">Presence.Read.All</span> (presencia de Teams) y <span className="font-mono">User.ReadBasic.All</span> (fotos). Los que no se den, esa función avisa y el resto funciona.
           </li>
           <li>
             Además, tu cuenta necesita el rol que corresponde: leer inicios de sesión (Lector de informes o Lector global, y Entra ID P1), tocar el MFA de otros

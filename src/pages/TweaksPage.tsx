@@ -5,6 +5,7 @@ import { TweakCard } from "../components/TweakCard";
 import { RP_FAILED, tweaksApi, type OpResult, type TweakView } from "../lib/api";
 import { ScheduleCard } from "../components/Maintenance";
 import { useOnJournalChange } from "../lib/journalEvents";
+import { ErrorState, Loading, EmptyLine } from "../components/ui";
 
 const CANCELLED = "Cancelado por el usuario.";
 
@@ -66,12 +67,15 @@ export function TweaksPage({
   }, [focus, loaded]);
 
   const catKey = Array.isArray(category) ? category.join(",") : category;
+  const [failed, setFailed] = useState<string | null>(null);
   const load = useCallback(async () => {
+    setFailed(null);
     setLoading(true);
     try {
       const cats = catKey.split(",");
       setTweaks(cats.length > 1 ? (await tweaksApi.list()).filter((t) => cats.includes(t.category)) : await tweaksApi.list(catKey));
     } catch (e) {
+      setFailed(String(e));
       toast("error", String(e));
     } finally {
       setLoading(false);
@@ -179,7 +183,7 @@ export function TweaksPage({
     }
   };
 
-  if (!tweaks) return <p className="p-8 font-mono text-sm text-mute">Detectando estado actual…</p>;
+  if (!tweaks) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Detectando estado actual…" />;
 
   const shown = query.trim() ? tweaks.filter((t) => matchesTweak(t, query)) : tweaks;
   const toggles = shown.filter((t) => t.kind === "toggle");
@@ -227,7 +231,7 @@ export function TweaksPage({
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Volver a detectar
         </button>
       </div>
-      {shown.length === 0 && <p className="py-10 text-center text-sm text-mute">Ningún ajuste coincide con «{query}».</p>}
+      {shown.length === 0 && <EmptyLine>Ningún ajuste coincide con «{query}».</EmptyLine>}
       {groups.map((g) => (
         <section key={g.c} className="mb-6">
           {grouped && <h3 className="mb-2 text-xs font-medium tracking-wide text-mute uppercase">{TWEAK_CATEGORY_LABEL[g.c] ?? g.c}</h3>}

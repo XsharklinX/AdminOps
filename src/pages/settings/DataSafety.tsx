@@ -120,6 +120,11 @@ export function DataSafety() {
                   <KeyRound size={10} /> Clave de contraseñas {h.keyPresent ? "presente" : "aún no creada"}
                 </p>
               )}
+              {h.keyPresent && h.keyProtected !== null && (
+                <p className={`text-[11px] ${h.keyProtected ? "text-ok" : "text-warn"}`}>
+                  {h.keyProtected ? "Protegida con tu PIN" : "Sin PIN: activa el bloqueo en Seguridad para protegerla"}
+                </p>
+              )}
             </div>
             <div>
               <p className="text-[11px] text-mute">Copias</p>

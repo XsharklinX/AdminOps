@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useToast } from "../components/feedback";
-import { Button, Card, inputClass, Modal } from "../components/ui";
+import { Button, Card, inputClass, Loading, Modal } from "../components/ui";
 import { lanApi, portalsApi, type LanInfo, type PublicIp, type RouterCheck, type RouterProfile } from "../lib/api";
 import { windowRect } from "../lib/prefs";
 import { stowPortal } from "../lib/portalState";
@@ -184,14 +184,14 @@ export function Router({ covered = false }: { covered?: boolean }) {
     }
   };
 
-  const copy = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast("ok", `${what} copiado.`));
+  const copy = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast("ok", `${what} copiado.`), () => toast("error", "No se pudo copiar."));
   const set = (patch: Partial<RouterProfile>) => {
     if (!profile) return;
     setProfile({ ...profile, ...patch });
     setDirty(true);
   };
 
-  if (info === undefined) return <p className="p-8 font-mono text-sm text-mute">Leyendo la red…</p>;
+  if (info === undefined) return <Loading page text="Leyendo la red…" />;
   if (info === null)
     return (
       <div className="mx-auto max-w-3xl p-6">

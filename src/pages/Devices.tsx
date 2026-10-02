@@ -34,6 +34,7 @@ import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Modal } from "../components/ui";
 import { lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
 import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
+import { DataTable } from "../components/DataTable";
 
 const ipNum = (ip: string) => ip.split(".").reduce((a, o) => a * 256 + Number(o), 0);
 
@@ -360,87 +361,113 @@ export function Devices() {
               ))}
             </div>
           )}
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-xs text-mute">
-                <th className="w-8 pb-2" />
-                <th className="pb-2 font-medium">Dispositivo</th>
-                <th className="pb-2 font-medium">IP</th>
-                <th className="pb-2 font-medium">MAC</th>
-                <th className="pb-2 font-medium">Fabricante</th>
-                <th className="pb-2 text-right font-medium">Ping</th>
-                <th className="w-24 pb-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {devices.map((d) => {
-                const key = kindKey(d);
-                const Icon = KINDS[key].icon;
-                const sub = [d.manufacturer && d.manufacturer !== d.vendor ? d.manufacturer : "", d.model, key === "unknown" ? "" : KINDS[key].label.split(" (")[0], d.os].filter(Boolean).join(" · ");
-                return (
-                  <tr key={d.ip} className="group cursor-pointer border-t border-line/60 hover:bg-panel-2/40" onClick={() => editing !== d.ip && setDetail(d)}>
-                    <td className="py-2 text-mute" title={KINDS[key].label}>
+          <DataTable
+            rows={devices}
+            rowKey={(d) => d.ip}
+            onRowClick={(d) => editing !== d.ip && setDetail(d)}
+            rowClass={() => "group"}
+            columns={[
+              {
+                id: "kind",
+                header: "",
+                headClass: "w-8",
+                className: "text-mute",
+                cell: (d) => {
+                  const Icon = KINDS[kindKey(d)].icon;
+                  return (
+                    <span title={KINDS[kindKey(d)].label}>
                       <Icon size={15} />
-                    </td>
-                    <td className="py-2 pr-3" onClick={(e) => editing === d.ip && e.stopPropagation()}>
-                      {editing === d.ip ? (
-                        <form
-                          className="flex gap-1"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            void saveAlias(d);
-                          }}
-                        >
-                          <input autoFocus value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Nombre para reconocerlo" className="w-44 rounded border border-line bg-void px-2 py-0.5 text-[13px] text-ink outline-none focus:border-neon/50" />
-                          <button type="submit" className="text-ok" title="Guardar">
-                            <Check size={14} />
+                    </span>
+                  );
+                },
+              },
+              {
+                id: "device",
+                header: "Dispositivo",
+                sortBy: (d) => title(d),
+                cell: (d) => {
+                  const key = kindKey(d);
+                  const sub = [d.manufacturer && d.manufacturer !== d.vendor ? d.manufacturer : "", d.model, key === "unknown" ? "" : KINDS[key].label.split(" (")[0], d.os].filter(Boolean).join(" · ");
+                  return editing === d.ip ? (
+                    <form
+                      className="flex gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void saveAlias(d);
+                      }}
+                    >
+                      <input autoFocus value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Nombre para reconocerlo" className="w-44 rounded border border-line bg-void px-2 py-0.5 text-[13px] text-ink outline-none focus:border-neon/50" />
+                      <button type="submit" className="text-ok" title="Guardar">
+                        <Check size={14} />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="text-ink">{title(d)}</span>
+                        {d.gateway && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">router</span>}
+                        {d.thisPc && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">este equipo</span>}
+                        {d.new && <span className="rounded bg-warn/15 px-1.5 text-[11px] text-warn">nuevo</span>}
+                        {office.meta[macKey(d.mac)]?.watch && (
+                          <span title="Vigilado">
+                            <Eye size={11} className="text-neon" />
+                          </span>
+                        )}
+                        {!d.thisPc && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditing(d.ip);
+                              setAlias(d.alias);
+                            }}
+                            className="text-mute opacity-0 group-hover:opacity-100 hover:text-ink"
+                            title="Ponerle un nombre"
+                          >
+                            <Pencil size={12} />
                           </button>
-                        </form>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <span className="text-ink">{title(d)}</span>
-                            {d.gateway && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">router</span>}
-                            {d.thisPc && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">este equipo</span>}
-                            {d.new && <span className="rounded bg-warn/15 px-1.5 text-[11px] text-warn">nuevo</span>}
-                            {office.meta[macKey(d.mac)]?.watch && (
-                              <span title="Vigilado">
-                                <Eye size={11} className="text-neon" />
-                              </span>
-                            )}
-                            {!d.thisPc && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditing(d.ip);
-                                  setAlias(d.alias);
-                                }}
-                                className="text-mute opacity-0 group-hover:opacity-100 hover:text-ink"
-                                title="Ponerle un nombre"
-                              >
-                                <Pencil size={12} />
-                              </button>
-                            )}
-                          </div>
-                          {office.meta[macKey(d.mac)]?.role && <div className="truncate text-[11px] text-neon">{office.meta[macKey(d.mac)].role}</div>}
-                          {sub && <div className="truncate text-[11px] text-mute">{sub}</div>}
-                        </>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3 font-mono text-xs text-ink">{d.ip}</td>
-                    <td className="py-2 pr-3 font-mono text-[11px] text-dim">{d.mac || "—"}</td>
-                    <td className="py-2 pr-3 text-xs text-dim">
-                      {d.privateMac ? <span className="text-mute" title="Los móviles modernos usan una MAC aleatoria por red">MAC privada (móvil)</span> : d.vendor || d.manufacturer || "—"}
-                    </td>
-                    <td className="py-2 text-right font-mono text-xs text-dim">{d.ms === null ? <span className="text-mute" title="No responde al ping, pero está en la red">—</span> : `${d.ms} ms`}</td>
-                    <td className="py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                      {actions(d)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        )}
+                      </div>
+                      {office.meta[macKey(d.mac)]?.role && <div className="truncate text-[11px] text-neon">{office.meta[macKey(d.mac)].role}</div>}
+                      {sub && <div className="truncate text-[11px] text-mute">{sub}</div>}
+                    </>
+                  );
+                },
+              },
+              { id: "ip", header: "IP", sortBy: (d) => d.ip, cell: (d) => d.ip, className: "font-mono text-xs text-ink" },
+              { id: "mac", header: "MAC", sortBy: (d) => d.mac, cell: (d) => d.mac || "—", className: "font-mono text-[11px] text-dim" },
+              {
+                id: "vendor",
+                header: "Fabricante",
+                sortBy: (d) => (d.privateMac ? "" : d.vendor || d.manufacturer),
+                className: "text-xs text-dim",
+                cell: (d) =>
+                  d.privateMac ? (
+                    <span className="text-mute" title="Los móviles modernos usan una MAC aleatoria por red">
+                      MAC privada (móvil)
+                    </span>
+                  ) : (
+                    d.vendor || d.manufacturer || "—"
+                  ),
+              },
+              {
+                id: "ping",
+                header: "Ping",
+                align: "right",
+                sortBy: (d) => d.ms,
+                className: "font-mono text-xs text-dim",
+                cell: (d) =>
+                  d.ms === null ? (
+                    <span className="text-mute" title="No responde al ping, pero está en la red">
+                      —
+                    </span>
+                  ) : (
+                    `${d.ms} ms`
+                  ),
+              },
+              { id: "actions", header: "", align: "right", headClass: "w-24", stopClick: true, cell: (d) => actions(d) },
+            ]}
+          />
           <p className="mt-3 text-[11px] text-mute">
             Haz clic en un dispositivo para ver todo lo que se sabe de él. Los móviles y algunos equipos no responden al ping pero aparecen igualmente. Ponle
             nombre a los tuyos para reconocer rápido uno desconocido.

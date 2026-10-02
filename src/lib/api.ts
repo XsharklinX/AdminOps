@@ -737,6 +737,8 @@ export interface Visit {
   place: string;
   /** Id del evento de Outlook, si se puso en el calendario ("" si no). */
   outlookEvent?: string;
+  /** Cuándo se marcó como hecha (segundos); 0 o ausente si no se sabe. */
+  doneAt?: number;
 }
 
 /** Cada cuánto se repite una visita, para el desplegable. */
@@ -1279,6 +1281,20 @@ export interface DiskVolume {
   /** Windows lo marcó como dañado («Reparar disco»). null: no se pudo mirar (sin administrador). */
   dirty: boolean | null;
   system: boolean;
+  /** "" sin cifrar o no se sabe · on · suspended · encrypting · decrypting */
+  bitlocker: string;
+  bitlockerPercent: number;
+}
+
+/** Foto diaria de las cifras de desgaste de un disco. */
+export interface DiskPoint {
+  day: number;
+  reallocated: number | null;
+  pending: number | null;
+  uncorrectable: number | null;
+  crc: number | null;
+  readErrors: number;
+  wear: number;
 }
 
 export interface DiskVerdict {
@@ -1311,6 +1327,28 @@ export interface DiskReport {
   uncorrectable: number | null;
   crcErrors: number | null;
   verdict: DiskVerdict;
+  /** Últimos 90 días (una foto por día). */
+  trend: DiskPoint[];
+  /** Lo que ha subido en el último mes. */
+  rising: string[];
+}
+
+export interface DiskSpeed {
+  writeMbps: number;
+  readMbps: number;
+  randomIops: number;
+  level: "ok" | "warn" | "bad";
+  text: string;
+}
+
+export interface DiskCapacity {
+  tested: number;
+  good: number;
+  firstError: number | null;
+  writeMbps: number;
+  readMbps: number;
+  fake: boolean;
+  text: string;
 }
 
 export interface DiskCheck {
@@ -1337,6 +1375,14 @@ export const disksApi = {
   /** Copia lo legible: tarea «disk-rescue». */
   rescue: (source: string, dest: string) => invoke<RescueResult>("disk_rescue", { source, dest }),
   pickFolder: () => invoke<string | null>("disk_pick_folder"),
+  /** Claves de recuperación de BitLocker de un volumen de este equipo (queda en el diario). */
+  bitlockerKey: (letter: string) => invoke<{ id: string; password: string }[]>("bitlocker_local_key", { letter }),
+  /** Tarea «disk-speed:LETRA». */
+  speed: (letter: string, media: string, bus: string) => invoke<DiskSpeed>("disk_speed_test", { letter, media, bus }),
+  /** Tarea «disk-capacity:LETRA». Llena el espacio libre y lo comprueba. */
+  capacity: (letter: string) => invoke<DiskCapacity>("disk_capacity_test", { letter }),
+  eject: (letter: string) => invoke<void>("disk_eject", { letter }),
+  format: (letter: string, fs: string, label: string) => invoke<void>("disk_format", { letter, fs, label }),
 };
 
 /** Dónde guarda AdminOps sus datos (Ajustes → Datos). */
@@ -1349,12 +1395,16 @@ export interface StorageInfo {
   drive: string;
   canSwitch: boolean;
   migrated: { at: number; files: number; secrets: number; browser: boolean; fromHost: string } | null;
+  /** El navegador interno (sesiones de Correo, Teams…) se guarda en el pendrive. */
+  browserOnUsb: boolean;
 }
 
 export const storageApi = {
   info: () => invoke<StorageInfo>("storage_info"),
   /** Guarda todo en la carpeta del programa al volver a abrir AdminOps. */
   makePortable: () => invoke<void>("storage_make_portable"),
+  /** Surte efecto al volver a abrir AdminOps. */
+  setBrowserOnUsb: (on: boolean) => invoke<void>("storage_set_browser_on_usb", { on }),
 };
 
 export interface MigrateEstimate {
@@ -1559,6 +1609,49 @@ export const graphApi = {
   /** Devuelve el id del evento de Outlook. */
   calendarSync: (visitId: string) => invoke<string>("graph_calendar_sync", { visitId }),
   teamsSend: (upn: string, text: string) => invoke<void>("graph_teams_send", { upn, text }),
+  /** Trae a la Agenda lo que se movió o borró en Outlook. */
+  calendarPull: () => invoke<{ updated: string[]; unlinked: string[] }>("graph_calendar_pull"),
+  /** Eventos de Outlook entre dos fechas (segundos), sin los que ya son visitas. */
+  calendarView: (from: number, to: number) => invoke<OutlookEvent[]>("graph_calendar_view", { from, to }),
+  /** Presencia de Teams por correo (en minúsculas). */
+  presence: (emails: string[]) => invoke<Record<string, TeamsPresence>>("graph_presence", { emails }),
+  /** Fotos de Microsoft 365 (data URL) por correo; las que no hay, no vienen. */
+  photos: (emails: string[]) => invoke<Record<string, string>>("graph_photos", { emails }),
+};
+
+export interface OutlookEvent {
+  id: string;
+  subject: string;
+  start: number;
+  end: number;
+  location: string;
+  allDay: boolean;
+}
+
+export interface TeamsPresence {
+  /** Available · Busy · DoNotDisturb · Away · BeRightBack · Offline · PresenceUnknown */
+  availability: string;
+  activity: string;
+}
+
+// ---------- Configuración de empresa ----------
+
+export interface CompanyPreview {
+  path: string;
+  company: string;
+  domain: string;
+  portalsNew: string[];
+  portalsExisting: number;
+  graph: boolean;
+  visitTypes: number;
+  catalog: number;
+}
+
+export const companyApi = {
+  /** Nombre del archivo guardado, o null si se canceló. */
+  export: () => invoke<string | null>("company_export"),
+  preview: () => invoke<CompanyPreview | null>("company_import_preview"),
+  apply: (path: string, settings: boolean, portals: boolean, graph: boolean) => invoke<string>("company_import_apply", { path, settings, portals, graph }),
 };
 
 // ---------- Seguimientos y nota de llamada ----------
@@ -1665,6 +1758,8 @@ export const portalsApi = {
   nav: (id: string, action: PortalAction) => invoke<void>("portal_nav", { id, action }),
   /** `false`: la dirección está fuera del portal y se abrió en el navegador. */
   go: (id: string, url: string) => invoke<boolean>("portal_go", { id, url }),
+  /** Permitir que el portal navegue por un sitio que se abrió fuera (queda guardado). */
+  allowDomain: (id: string, host: string) => invoke<void>("portal_allow_domain", { id, host }),
   zoom: (id: string, zoom: number) => invoke<number>("portal_zoom", { id, zoom }),
   find: (id: string, text: string, backwards: boolean) => invoke<void>("portal_find", { id, text, backwards }),
   login: (id: string) => invoke<{ user: string; hasPassword: boolean } | null>("portal_login_get", { id }),
@@ -2070,12 +2165,76 @@ export interface Share {
   name: string;
   path: string;
   description: string;
-  access: { account: string; right: string; allow: boolean }[];
+  access: ShareAccess[];
   openFiles: number;
   /** La carpeta compartida ya no existe en el disco. */
   missingPath: boolean;
   /** Se comparte con «Todos» pero los permisos del disco no dejan entrar. */
   ntfsBlocks: boolean;
+  /** Lo que conviene revisar. */
+  risks: ShareRisk[];
+}
+
+export interface ShareAccess {
+  account: string;
+  /** Full | Change | Read */
+  right: string;
+  allow: boolean;
+  sid: string;
+}
+
+/** «Todos» con control total, un disco entero, carpetas personales o de Windows. */
+export type ShareRisk = "everyone-full" | "whole-disk" | "profile" | "personal" | "system";
+export type ShareRight = "Read" | "Change" | "Full";
+
+/** Qué puede hacer de verdad una cuenta en una carpeta compartida, y qué se lo impide. */
+export interface ShareExplain {
+  verdict: "none" | "read" | "write";
+  headline: string;
+  shareRight: "none" | "read" | "change" | "full";
+  diskRight: "none" | "read" | "write" | "unknown";
+  findings: { level: "bad" | "warn" | "ok"; text: string; fix: "" | "sharing" | "permissions" }[];
+}
+
+export interface NetDrive {
+  letter: string;
+  path: string;
+  host: string;
+  /** El equipo que la sirve contesta ahora mismo. */
+  reachable: boolean;
+}
+
+export interface NetDrives {
+  drives: NetDrive[];
+  /** Letras libres para conectar una unidad nueva. */
+  free: string[];
+}
+
+export interface RemoteShare {
+  name: string;
+  kind: "folder" | "printer";
+  remark: string;
+}
+
+export interface ShareSize {
+  name: string;
+  bytes: number;
+  files: number;
+  diskFree: number;
+  diskTotal: number;
+}
+
+/** Copia diaria de una carpeta compartida a otra carpeta. */
+export interface ShareBackup {
+  share: string;
+  dest: string;
+  time: string;
+  lastRun: string | null;
+  lastResult: number | null;
+  nextRun: string | null;
+  running: boolean;
+  /** La última copia terminó bien (null: aún no se ha hecho ninguna). */
+  ok: boolean | null;
 }
 
 /** Archivo que alguien tiene abierto ahora mismo desde otro equipo. */
@@ -2092,6 +2251,8 @@ export interface SharingStatus {
   discovery: boolean;
   sessions: string[];
   open: OpenFile[];
+  /** Nombre de este equipo en la red. */
+  host: string;
 }
 
 export interface IpConflict {
@@ -2112,6 +2273,22 @@ export const officeApi = {
   createShare: (path: string, name: string, who: string, write: boolean) => invoke<void>("create_share", { path, name, who, write }),
   removeShare: (name: string) => invoke<void>("remove_share", { name }),
   enableSharing: () => invoke<void>("enable_file_sharing"),
+  /** Da o cambia el acceso de una cuenta ("everyone", un usuario local o la cuenta completa). */
+  shareGrant: (name: string, account: string, right: ShareRight) => invoke<void>("share_grant", { name, account, right }),
+  shareRevoke: (name: string, account: string, deny: boolean) => invoke<void>("share_revoke", { name, account, deny }),
+  shareExplain: (name: string, user: string) => invoke<ShareExplain>("share_explain", { name, user }),
+  shareSizes: () => invoke<ShareSize[]>("share_sizes"),
+  drives: () => invoke<NetDrives>("network_drives"),
+  mapDrive: (letter: string, path: string) => invoke<void>("map_network_drive", { letter, path }),
+  unmapDrive: (letter: string) => invoke<void>("unmap_network_drive", { letter }),
+  reconnectDrive: (letter: string) => invoke<string>("reconnect_network_drive", { letter }),
+  /** Abre una unidad o una ruta de red en el Explorador (Windows pide ahí las credenciales). */
+  openNetworkPath: (path: string) => invoke<void>("open_network_path", { path }),
+  remoteShares: (host: string) => invoke<RemoteShare[]>("remote_shares", { host }),
+  shareBackups: () => invoke<ShareBackup[]>("share_backups"),
+  setShareBackup: (name: string, dest: string, time: string) => invoke<void>("set_share_backup", { name, dest, time }),
+  removeShareBackup: (name: string) => invoke<void>("remove_share_backup", { name }),
+  runShareBackup: (name: string) => invoke<void>("run_share_backup", { name }),
   conflicts: () => invoke<IpConflict[]>("ip_conflicts"),
   exportCsv: (name: string, content: string) => invoke<string | null>("export_csv", { name, content }),
 };
@@ -2564,6 +2741,8 @@ export interface StorageHealth {
   free: number;
   dataBytes: number;
   keyPresent: boolean | null;
+  /** La clave del pendrive va protegida con el PIN del bloqueo. */
+  keyProtected: boolean | null;
   lastBackup: number | null;
   lastContactsBackup: number | null;
   warnings: string[];
@@ -2574,6 +2753,27 @@ export const appBackupApi = {
     invoke<{ path: string; files: number; bytes: number } | null>("backup_app_data", { password, prefs, machines, reports }),
   restore: (password: string) => invoke<{ files: number; created: number; prefs: unknown } | null>("restore_app_data", { password }),
   health: () => invoke<StorageHealth>("storage_health"),
+};
+
+export interface AutoBackupInfo {
+  enabled: boolean;
+  folder: string;
+  everyDays: number;
+  keep: number;
+  /** Se configuró en este equipo: solo aquí se hace sola. */
+  here: boolean;
+  configuredOn: string;
+  lastBackup: number | null;
+  nextDue: number | null;
+  lastError: string;
+  onedrive: string | null;
+}
+
+export const autoBackupApi = {
+  info: () => invoke<AutoBackupInfo>("autobackup_info"),
+  /** Carpeta vacía: desactiva. Contraseña vacía: mantiene la que había. */
+  set: (folder: string, password: string, everyDays: number, keep: number) => invoke<void>("autobackup_set", { folder, password, everyDays, keep }),
+  runNow: () => invoke<{ path: string; files: number; bytes: number }>("autobackup_run_now"),
 };
 
 export const auditApi = {

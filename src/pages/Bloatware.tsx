@@ -4,6 +4,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, systemApi, type Advice, type AppView } from "../lib/api";
 import { useOnJournalChange } from "../lib/journalEvents";
+import { ErrorState, Loading } from "../components/ui";
 
 const ADVICE: Record<Advice, { title: string; hint: string; cls: string }> = {
   remove: { title: "Recomendado quitar", hint: "Promocionales o retiradas por Microsoft.", cls: "text-ok" },
@@ -21,11 +22,14 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
+  const [failed, setFailed] = useState<string | null>(null);
   const load = useCallback(async () => {
+    setFailed(null);
     setLoading(true);
     try {
       setApps(await systemApi.listApps());
     } catch (e) {
+      setFailed(String(e));
       toast("error", String(e));
     } finally {
       setLoading(false);
@@ -137,7 +141,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  if (!apps) return <p className="p-8 font-mono text-sm text-mute">Leyendo apps instaladas…</p>;
+  if (!apps) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Leyendo apps instaladas…" />;
 
   const row = (a: AppView) => (
     <label

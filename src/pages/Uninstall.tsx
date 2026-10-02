@@ -20,7 +20,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Modal } from "../components/ui";
+import { Button, Modal, ErrorState, Loading, EmptyLine } from "../components/ui";
 import { bytes, friendlyPath } from "../lib/format";
 import { programKey as key, norm } from "../lib/programs";
 import { officeApi, programsApi, toolsApi, type InstalledProgram, type Leftover, type SoftwareUpdate } from "../lib/api";
@@ -61,11 +61,14 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
+  const [failed, setFailed] = useState<string | null>(null);
   const load = useCallback(async () => {
+    setFailed(null);
     setLoading(true);
     try {
       setList(await programsApi.list());
     } catch (e) {
+      setFailed(String(e));
       toast("error", String(e));
     } finally {
       setLoading(false);
@@ -210,7 +213,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
     officeApi.exportCsv("Programas instalados", csv).catch((e) => toast("error", String(e)));
   };
 
-  if (!list) return <p className="p-8 font-mono text-sm text-mute">Leyendo programas instalados…</p>;
+  if (!list) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Leyendo programas instalados…" />;
 
   const orphans = list.filter((p) => p.orphan).length;
   const busy = running !== null || batch !== null;
@@ -357,7 +360,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
             </div>
           );
         })}
-        {visible.length === 0 && <p className="px-4 py-8 text-center text-sm text-mute">Sin resultados.</p>}
+        {visible.length === 0 && <EmptyLine>Ningún programa con esa búsqueda y ese filtro.</EmptyLine>}
       </div>
       <p className="mt-3 text-xs text-mute">
         Las apps de Microsoft Store se quitan desde <span className="text-ink">Bloatware</span>. Tras desinstalar, AdminOps busca carpetas, accesos directos y claves del registro

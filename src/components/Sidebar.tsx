@@ -156,9 +156,7 @@ export const NAV: NavItem[] = [
     help: "Plantillas: todo lo que hay que hacer en un equipo nuevo (quitar bloatware, instalar programas, aplicar ajustes, crear el usuario, unir al dominio…), de una vez y siempre igual. Perfiles de ajustes: grupos de ajustes que se aplican juntos y se pueden deshacer.",
   },
   // Red
-  { id: "router", label: "Mi red", tab: "Mi red", help: "La red en la que está el equipo: router y su acceso, Wi-Fi y contraseña, y todos los dispositivos conectados." },
-  { id: "network", label: "Velocidad y diagnóstico de red", tab: "Velocidad y diagnóstico", help: "Test de velocidad, estado de la conexión, reparar la red y controlar la Wi-Fi." },
-  { id: "nettools", label: "Herramientas de red", tab: "Herramientas", help: "Ping, traceroute, puertos abiertos, DNS y archivo hosts." },
+  { id: "router", label: "Red", tab: "Red", help: "Todo lo de la red en un sitio: el router y la Wi-Fi, los dispositivos conectados, el test de velocidad con reparar la red, y las herramientas (ping, traceroute, puertos, DNS, hosts)." },
   // Administración
   {
     id: "stations",
@@ -190,9 +188,9 @@ export const NAV: NavItem[] = [
   { id: "tickets", label: "Tickets", tab: "Tickets", help: "Tu sistema de tickets dentro de AdminOps, sin salir de la app." },
   {
     id: "people",
-    label: "Personas",
-    tab: "Personas",
-    help: "La ficha de alguien del dominio: si su cuenta está bloqueada o caducada, desbloquearla, darle una contraseña temporal, en qué equipo está, y las contraseñas LAPS y de BitLocker de un equipo. Con tus propios permisos del dominio.",
+    label: "Personas y clientes",
+    tab: "Personas y clientes",
+    help: "A quién atiendes. Personas: la ficha de alguien del dominio (cuenta bloqueada o caducada, desbloquear, contraseña temporal, su equipo y sus claves), con tus propios permisos. Clientes: sus fichas con equipos, visitas, garantías y mantenimientos.",
   },
   {
     id: "agenda",
@@ -212,7 +210,6 @@ export const NAV: NavItem[] = [
     tab: "Teams",
     help: "Tu Teams (del trabajo o personal) dentro de AdminOps: chats, equipos y reuniones sin instalarlo en el equipo del cliente. La cuenta se guarda cifrada y, en sesión privada, no queda nada en el equipo al salir.",
   },
-  { id: "clients", label: "Clientes", tab: "Clientes", help: "Fichas de clientes con sus equipos, visitas, garantías, mantenimientos y contactos." },
   { id: "contacts", label: "Contactos", tab: "Contactos", help: "A quién llamar y para qué: extensiones, correos, Teams. Viaja contigo en todos los equipos." },
   {
     id: "knowledge",
@@ -242,6 +239,8 @@ export const NAV: NavItem[] = [
 export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   repair: ["troubleshoot", "repairs"],
   devices: ["router", "devices"],
+  network: ["router", "speed"],
+  nettools: ["router", "tools"],
   inventory: ["stations", "inventory"],
   // Ajustes de Windows
   cleanup: ["tweaks", "cleanup"],
@@ -263,6 +262,8 @@ export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   hardware: ["machine", "hardware"],
   security: ["machine", "security"],
   history: ["machine", "history"],
+  // Personas y clientes
+  clients: ["people", "clients"],
   // Administración
   domain: ["accounts", "domain"],
   shares: ["printers", "shares"],
@@ -336,8 +337,8 @@ const DEFAULT_AREAS: Omit<Area, "icon">[] = [
   // Los id se conservan: las navegaciones personalizadas siguen funcionando.
   { id: "panel", label: "Inicio", iconName: "Home", pages: ["dashboard", "troubleshoot", "session"] },
   { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["machine", "tweaks", "processes", "space"] },
-  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "people", "mail", "teams", "agenda", "clients", "contacts", "knowledge"] },
-  { id: "red", label: "Red", iconName: "Network", pages: ["router", "network", "nettools"] },
+  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "people", "mail", "teams", "agenda", "contacts", "knowledge"] },
+  { id: "red", label: "Red", iconName: "Network", pages: ["router"] },
   { id: "programas", label: "Aplicaciones", iconName: "Package", pages: ["apps", "recipes"] },
   { id: "admin", label: "Administración", iconName: "Building2", pages: ["stations", "users", "accounts", "printers", "remote", "tools"] },
   { id: "datos", label: "Datos", iconName: "Lock", pages: ["data"] },

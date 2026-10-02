@@ -36,6 +36,7 @@ import {
 } from "../lib/api";
 import { bytes } from "../lib/format";
 import { DriverRestoreButton } from "../components/Maintenance";
+import { DataTable } from "../components/DataTable";
 
 /** Mientras se analiza, cada sección se pinta en cuanto el backend la termina. */
 const EMPTY_SECTION = { data: null, error: null } as unknown as Section<never>;
@@ -588,44 +589,28 @@ export function Diagnostics({
         >
           <Unavailable section={shown.disks}>
             {(disks) => (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] text-mute">
-                    <th className="pb-2 font-medium">Disco</th>
-                    <th className="pb-2 font-medium">Estado</th>
-                    <th className="pb-2 text-right font-medium">Temp.</th>
-                    <th className="pb-2 text-right font-medium">Desgaste</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {disks.map((k) => (
-                    <tr
-                      key={k.name + k.size}
-                      className="border-t border-line/70"
-                    >
-                      <td className="py-1.5 pr-3">
+              <DataTable
+                rows={disks}
+                rowKey={(k) => k.name + k.size}
+                columns={[
+                  {
+                    id: "disk",
+                    header: "Disco",
+                    sortBy: (k) => k.name,
+                    cell: (k) => (
+                      <>
                         <div className="text-ink">{k.name}</div>
                         <div className="font-mono text-[11px] text-mute">
                           {k.mediaType} · {k.busType} · {bytes(k.size)}
                         </div>
-                      </td>
-                      <td
-                        className={
-                          k.health === "Healthy" ? "text-ok" : "text-bad"
-                        }
-                      >
-                        {k.health === "Healthy" ? "Saludable" : k.health}
-                      </td>
-                      <td className="text-right font-mono text-xs">
-                        {k.temperature ? `${k.temperature} °C` : "—"}
-                      </td>
-                      <td className="text-right font-mono text-xs">
-                        {k.wear !== null ? `${k.wear}%` : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </>
+                    ),
+                  },
+                  { id: "health", header: "Estado", sortBy: (k) => k.health, cell: (k) => (k.health === "Healthy" ? "Saludable" : k.health), className: (k) => (k.health === "Healthy" ? "text-ok" : "text-bad") },
+                  { id: "temp", header: "Temp.", align: "right", sortBy: (k) => k.temperature, cell: (k) => (k.temperature ? `${k.temperature} °C` : "—"), className: "font-mono text-xs" },
+                  { id: "wear", header: "Desgaste", align: "right", sortBy: (k) => k.wear, cell: (k) => (k.wear !== null ? `${k.wear}%` : "—"), className: "font-mono text-xs" },
+                ]}
+              />
             )}
           </Unavailable>
           {!shown.admin && (

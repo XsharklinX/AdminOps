@@ -3,8 +3,9 @@
 //!
 //! Seguridad: son páginas remotas, así que no tienen acceso a los comandos de
 //! AdminOps (Tauri solo permite el IPC a la interfaz local, ver
-//! capabilities/default.json). Además solo navegan dentro de los dominios del
-//! portal: cualquier otro enlace se abre en el navegador del usuario.
+//! capabilities/default.json). Los enlaces a otros sitios se abren en el
+//! navegador del usuario; lo que es parte de entrar al portal (redirecciones,
+//! envío del formulario de inicio de sesión) sigue dentro: ver `guard_navigation`.
 //!
 //! Rapidez: la vista de cada portal se crea una vez y se mantiene viva (oculta
 //! cuando no se ve); la del último portal usado se puede precargar al abrir
@@ -12,7 +13,7 @@
 //! pulsa el botón de Outlook en la propia página en vez de recargarla entera.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
@@ -94,6 +95,68 @@ fn host_matches(host: &str, domain: &str) -> bool {
     h == d || h.ends_with(&format!(".{d}"))
 }
 
+/// Terminaciones que no son de nadie («com.do», «gob.do», «co.uk»): bajo ellas
+/// hay empresas distintas, así que no sirven para decir «es de la misma casa».
+fn public_suffix_like(labels: &[&str]) -> bool {
+    labels.len() < 2
+        || (labels.len() == 2 && labels[1].len() == 2 && ["com", "co", "org", "net", "gob", "gov", "edu", "ac", "mil", "nom", "web", "sld", "art", "gouv", "or", "ne", "go"].contains(&labels[0]))
+}
+
+/// ¿Es `host` de la misma casa que el portal (`own`)? El inicio de sesión de una
+/// intranet casi nunca está en el mismo nombre que la web: va en un hermano
+/// (`intranet.empresa.com` → `sso.empresa.com`), o la web se abre por su nombre
+/// corto y contesta con el largo o con su IP.
+fn same_org(host: &str, own: &str) -> bool {
+    let (h, o) = (host.to_ascii_lowercase(), own.to_ascii_lowercase());
+    if o.is_empty() {
+        return false;
+    }
+    let internal = |x: &str| !x.contains('.') || crate::network::lan::is_private_host(x);
+    if internal(&o) {
+        // Portal de la red interna: el resto de la red interna, y su nombre largo.
+        return internal(&h) || h.starts_with(&format!("{o}."));
+    }
+    if o.parse::<std::net::IpAddr>().is_ok() {
+        return false;
+    }
+    let labels: Vec<&str> = o.split('.').collect();
+    // El nombre corto del mismo servidor (intranet.empresa.local → intranet).
+    if h == labels[0] {
+        return true;
+    }
+    labels.len() >= 3 && !public_suffix_like(&labels[1..]) && host_matches(&h, &labels[1..].join("."))
+}
+
+/// Sitios a los que cada portal ha ido como parte de entrar (ver
+/// `guard_navigation`) o que el técnico ha permitido: valen mientras AdminOps
+/// esté abierta, sin tener que recrear la vista.
+static LEARNED: LazyLock<Mutex<HashMap<String, HashSet<String>>>> = LazyLock::new(Default::default);
+
+fn learn(id: &str, host: &str) {
+    LEARNED.lock().unwrap_or_else(|e| e.into_inner()).entry(id.to_string()).or_default().insert(host.to_ascii_lowercase());
+}
+
+fn learned(id: &str, host: &str) -> bool {
+    LEARNED.lock().unwrap_or_else(|e| e.into_inner()).get(id).is_some_and(|set| set.iter().any(|d| host_matches(host, d)))
+}
+
+/// Páginas de inicio de sesión que usan media internet: «Entrar con Microsoft»,
+/// «Entrar con Google», Okta, Auth0… El botón que lleva a ellas es un enlace
+/// normal que pulsa el usuario, así que no se distingue de un enlace a otro
+/// sitio: se admiten de fábrica en todos los portales.
+const IDENTITY_PROVIDERS: &[&str] = &[
+    "login.microsoftonline.com",
+    "login.microsoft.com",
+    "login.live.com",
+    "login.windows.net",
+    "b2clogin.com",
+    "accounts.google.com",
+    "okta.com",
+    "auth0.com",
+    "onelogin.com",
+    "duosecurity.com",
+];
+
 /// ¿Puede el portal navegar a `url` sin salir de la app?
 pub fn allowed(p: &Portal, url: &Url) -> bool {
     match url.scheme() {
@@ -101,9 +164,105 @@ pub fn allowed(p: &Portal, url: &Url) -> bool {
         "http" | "https" => {
             let Some(host) = url.host_str() else { return false };
             let own = Url::parse(&p.url).ok().and_then(|u| u.host_str().map(String::from)).unwrap_or_default();
-            host_matches(host, &own) || p.extra_domains.iter().any(|d| host_matches(host, d))
+            host_matches(host, &own)
+                || p.extra_domains.iter().any(|d| host_matches(host, d))
+                || same_org(host, &own)
+                || (url.scheme() == "https" && IDENTITY_PROVIDERS.iter().any(|d| host_matches(host, d)))
+                || learned(&p.id, host)
         }
         _ => false,
+    }
+}
+
+/// Qué hacer con una navegación que sale de los sitios del portal. `Some(motivo)`:
+/// es parte de usar la web y se deja pasar; `None`: es un enlace a otro sitio, y
+/// va al navegador del usuario.
+///
+/// Un inicio de sesión sale del dominio de tres maneras, y ninguna es «pulsar un
+/// enlace»: el servidor redirige (302 al proveedor de identidad), la página
+/// navega sola por script, o se envía un formulario (la petición lleva
+/// `Content-Type`). Cortar cualquiera de las tres rompe la entrada: la página de
+/// destino se abría en el navegador de fuera, sin la sesión ni los datos del
+/// formulario, y solo enseñaba un error.
+fn off_site(redirected: bool, user_initiated: bool, form: bool) -> Option<&'static str> {
+    if redirected {
+        Some("redirección del servidor")
+    } else if form {
+        Some("envío de un formulario")
+    } else if !user_initiated {
+        Some("navegación de la propia página")
+    } else {
+        None
+    }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct BlockedEvent {
+    id: String,
+    /// Sitio que se abrió fuera (solo el nombre: la dirección puede llevar datos).
+    host: String,
+}
+
+/// Avisa a la interfaz de que algo se abrió en el navegador de fuera, para que
+/// el técnico pueda permitir ese sitio en el portal con un clic.
+fn report_blocked(app: &tauri::AppHandle, p: &Portal, url: &Url) {
+    let host = url.host_str().unwrap_or_default().to_string();
+    if host.is_empty() {
+        return;
+    }
+    log::info!("Portal «{}»: «{host}» no es del portal y se abrió en el navegador del usuario", p.name);
+    let _ = app.emit("portal-blocked", BlockedEvent { id: p.id.clone(), host });
+}
+
+/// Decide cada navegación de la página con lo que WebView2 sabe de ella (si es
+/// una redirección, si la inició el usuario, si envía un formulario). Lo que es
+/// de los sitios del portal pasa; lo que es parte de entrar pasa y ese sitio
+/// queda admitido; un enlace a otro sitio se cancela y se abre fuera.
+fn guard_navigation<R: tauri::Runtime>(webview: &tauri::Webview<R>, app: &tauri::AppHandle, p: &Portal) {
+    #[cfg(windows)]
+    {
+        let (app, p) = (app.clone(), p.clone());
+        let _ = webview.with_webview(move |pw| unsafe {
+            use webview2_com::NavigationStartingEventHandler;
+            let Ok(core) = pw.controller().CoreWebView2() else { return };
+            let handler = NavigationStartingEventHandler::create(Box::new(move |_, args| {
+                let Some(args) = args else { return Ok(()) };
+                let mut uri = windows_core::PWSTR::null();
+                if args.Uri(&mut uri).is_err() {
+                    return Ok(());
+                }
+                let Ok(url) = Url::parse(&webview2_com::take_pwstr(uri)) else { return Ok(()) };
+                if !matches!(url.scheme(), "http" | "https") || allowed(&p, &url) {
+                    return Ok(());
+                }
+                let (mut redirected, mut user, mut form) = (windows_core::BOOL(0), windows_core::BOOL(0), windows_core::BOOL(0));
+                let _ = args.IsRedirected(&mut redirected);
+                let _ = args.IsUserInitiated(&mut user);
+                if let Ok(headers) = args.RequestHeaders() {
+                    let _ = headers.Contains(windows_core::w!("Content-Type"), &mut form);
+                }
+                match off_site(redirected.as_bool(), user.as_bool(), form.as_bool()) {
+                    Some(why) => {
+                        let host = url.host_str().unwrap_or_default();
+                        learn(&p.id, host);
+                        log::info!("Portal «{}»: se sigue a «{host}» ({why})", p.name);
+                    }
+                    None => {
+                        let _ = args.SetCancel(true);
+                        open_external(url.as_str());
+                        report_blocked(&app, &p, &url);
+                    }
+                }
+                Ok(())
+            }));
+            let mut token = 0i64;
+            let _ = core.add_NavigationStarting(&handler, &mut token);
+        });
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (webview, app, p);
     }
 }
 
@@ -702,12 +861,18 @@ macro_rules! configure {
     ($builder:expr, $app:expr, $portal:expr, $label:expr, $get:ident) => {{
         let (p_nav, p_new, p_load, app_new, app_load, app_title, app_dl, label_new) =
             ($portal.clone(), $portal.clone(), $portal.clone(), $app.clone(), $app.clone(), $app.clone(), $app.clone(), $label.clone());
+        let app_blocked = $app.clone();
         let (id, id_title, id_dl) = ($portal.id.clone(), $portal.id.clone(), $portal.id.clone());
         let popups_in_window = $portal.popups == "window";
         let mut b = $builder
             .incognito($portal.private)
             .zoom_hotkeys_enabled(true)
             .on_navigation(move |url| {
+                // Las páginas web las decide `guard_navigation`, que sabe si es una
+                // redirección o un formulario; aquí solo se sabe la dirección.
+                if matches!(url.scheme(), "http" | "https") {
+                    return true;
+                }
                 let ok = allowed(&p_nav, url);
                 if !ok {
                     open_external(url.as_str());
@@ -717,6 +882,7 @@ macro_rules! configure {
             .on_new_window(move |url, _| {
                 if !allowed(&p_new, &url) {
                     open_external(url.as_str());
+                    report_blocked(&app_blocked, &p_new, &url);
                     return NewWindowResponse::Deny;
                 }
                 // Webs como Outlook abren mensajes y adjuntos en su propia ventana.
@@ -816,6 +982,7 @@ fn create_embedded(app: &tauri::AppHandle, p: &Portal, pos: LogicalPosition<f64>
     if !visible {
         let _ = v.hide();
     }
+    guard_navigation(&v, app, p);
     enable_autofill(&v);
     accept_router_certificates(&v, p);
     watch_navigation(&v, app, &p.id);
@@ -898,7 +1065,9 @@ pub fn save_portal(app: tauri::AppHandle, portal: Portal) -> Result<Portal, Stri
             }
             *x = p.clone();
             // La vista abierta sigue con las reglas viejas: se recrea al volver a mostrarla.
+            // Y los sitios aprendidos se olvidan: mandan los dominios que se acaban de guardar.
             close_views(&app, &p.id);
+            LEARNED.lock().unwrap_or_else(|e| e.into_inner()).remove(&p.id);
         }
         None => {
             let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
@@ -910,9 +1079,31 @@ pub fn save_portal(app: tauri::AppHandle, portal: Portal) -> Result<Portal, Stri
     Ok(p)
 }
 
+/// Permite que el portal navegue por un sitio que se abrió fuera. Vale al
+/// momento (sin recargar la vista) y queda guardado en el portal.
+#[tauri::command(async)]
+pub fn portal_allow_domain(app: tauri::AppHandle, id: String, host: String) -> Result<(), String> {
+    let host = host.trim().trim_start_matches("*.").to_ascii_lowercase();
+    if host.is_empty() || host.len() > 253 || !host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
+        return Err("Ese sitio no es válido.".into());
+    }
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut list = load(&app);
+    let p = list.iter_mut().find(|p| p.id == id).ok_or("Ese portal ya no existe.")?;
+    if !p.extra_domains.contains(&host) {
+        p.extra_domains.push(host.clone());
+    }
+    let name = p.name.clone();
+    crate::paths::write_json(&path(&app), &list)?;
+    learn(&id, &host);
+    log::info!("Portal «{name}»: «{host}» permitido por el técnico");
+    Ok(())
+}
+
 #[tauri::command(async)]
 pub fn delete_portal(app: tauri::AppHandle, id: String) -> Result<(), String> {
     close_views(&app, &id);
+    LEARNED.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
     let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut list = load(&app);
     list.retain(|p| p.id != id);
@@ -1334,6 +1525,7 @@ pub fn portal_open_window(app: tauri::AppHandle, id: String) -> Result<(), Strin
         .min_inner_size(600.0, 400.0)
         .theme(Some(tauri::Theme::Dark));
     let w = builder.build().map_err(|e| format!("No se pudo abrir la ventana: {e}"))?;
+    guard_navigation(w.as_ref(), &app, &p);
     enable_autofill(w.as_ref());
     accept_router_certificates(w.as_ref(), &p);
     if p.zoom_factor() != 1.0 {
@@ -1476,11 +1668,67 @@ mod tests {
         assert!(ok("https://archivos.intranet.pgr.gob.do/x.pdf"));
         assert!(ok("https://login.microsoftonline.com/oauth"));
         assert!(ok("about:blank"));
-        assert!(!ok("https://pgr.gob.do/"));
+        // El resto de la casa: el inicio de sesión suele estar en un hermano.
+        assert!(ok("https://sso.pgr.gob.do/login"));
+        assert!(ok("https://pgr.gob.do/"));
+        assert!(!ok("https://otra.gob.do/"));
         assert!(!ok("https://intranet.pgr.gob.do.evil.com/"));
-        assert!(!ok("https://evilintranet.pgr.gob.do/"));
+        assert!(!ok("https://google.com/"));
         assert!(!ok("file:///C:/Windows/win.ini"));
         assert!(!ok("javascript:alert(1)"));
+    }
+
+    /// «Entrar con Microsoft / Google» funciona sin configurar nada, y solo por https.
+    #[test]
+    fn sign_in_buttons_work_out_of_the_box() {
+        let p = Portal { id: "sso".into(), name: "Tickets".into(), url: "https://tickets.empresa.com".into(), ..Default::default() };
+        let ok = |u: &str| allowed(&p, &u.parse().unwrap());
+        assert!(ok("https://login.microsoftonline.com/common/oauth2/v2.0/authorize"));
+        assert!(ok("https://accounts.google.com/o/oauth2/auth"));
+        assert!(ok("https://empresa.okta.com/login"));
+        assert!(!ok("http://login.microsoftonline.com/"));
+        assert!(!ok("https://www.google.com/search?q=x"));
+        assert!(!ok("https://login.microsoftonline.com.evil.net/"));
+    }
+
+    #[test]
+    fn same_house_without_opening_the_door_to_everyone() {
+        // Hermanos bajo el dominio de la empresa.
+        assert!(same_org("sso.empresa.com", "intranet.empresa.com"));
+        assert!(same_org("empresa.com", "www.empresa.com"));
+        assert!(!same_org("empresa.com.evil.net", "intranet.empresa.com"));
+        // «com.do» o «co.uk» no son de nadie: no valen como casa común.
+        assert!(!same_org("otra.com.do", "empresa.com.do"));
+        assert!(!same_org("otra.co.uk", "empresa.co.uk"));
+        assert!(!same_org("google.com", "empresa.com"));
+        // Intranet por nombre corto o IP: su nombre largo y el resto de la red interna.
+        assert!(same_org("intranet.empresa.local", "intranet"));
+        assert!(same_org("192.168.1.20", "intranet"));
+        assert!(same_org("sso", "10.0.0.5"));
+        assert!(same_org("intranet", "intranet.empresa.local"));
+        assert!(!same_org("google.com", "intranet"));
+        assert!(!same_org("8.8.8.8", "10.0.0.5"));
+        assert!(!same_org("9.9.9.9", "8.8.8.8"));
+    }
+
+    #[test]
+    fn signing_in_is_not_a_link_to_another_site() {
+        // Redirección del servidor, formulario enviado o navegación por script: pasan.
+        assert!(off_site(true, false, false).is_some());
+        assert!(off_site(true, true, false).is_some());
+        assert!(off_site(false, true, true).is_some());
+        assert!(off_site(false, false, false).is_some());
+        // Un enlace que pulsa el usuario hacia otro sitio: al navegador de fuera.
+        assert!(off_site(false, true, false).is_none());
+
+        // Un sitio al que se llegó entrando queda admitido para ese portal, y solo para él.
+        let p = Portal { id: "aprende".into(), name: "X".into(), url: "https://tickets.empresa.com".into(), ..Default::default() };
+        let idp: Url = "https://idp.proveedor.net/sso".parse().unwrap();
+        assert!(!allowed(&p, &idp));
+        learn(&p.id, "idp.proveedor.net");
+        assert!(allowed(&p, &idp));
+        assert!(!allowed(&Portal { id: "otro".into(), ..p.clone() }, &idp));
+        LEARNED.lock().unwrap().remove("aprende");
     }
 
     #[test]

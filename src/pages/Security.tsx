@@ -17,7 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Modal } from "../components/ui";
+import { Button, Card, Modal, Loading } from "../components/ui";
 import { TweaksPage } from "./TweaksPage";
 import { securityApi, toolboxApi, toolsApi, type BitlockerVolume, type SecurityAudit, type SecurityCheck, type SuspiciousItem } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -199,7 +199,7 @@ function BitlockerCard({ isAdmin }: { isAdmin: boolean }) {
       ) : error ? (
         <p className="text-sm text-mute">{error}</p>
       ) : !vols ? (
-        <p className="text-sm text-mute">Leyendo unidades…</p>
+        <Loading text="Leyendo unidades…" />
       ) : vols.length === 0 ? (
         <p className="text-sm text-mute">Esta edición de Windows no ofrece BitLocker ni cifrado de dispositivo.</p>
       ) : (
@@ -327,7 +327,7 @@ function SuspiciousCard({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
       {items && items.some((i) => i.kind !== "task") && (
-        <p className="mt-2 text-[11px] text-mute">Servicios e inicio se gestionan en sus páginas; el archivo hosts, en Herramientas de red.</p>
+        <p className="mt-2 text-[11px] text-mute">Servicios e inicio se gestionan en sus páginas; el archivo hosts, en Red → Herramientas.</p>
       )}
     </Card>
   );

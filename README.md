@@ -93,7 +93,7 @@ o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer 
 | Sección | Qué hace |
 | --- | --- |
 | **Tickets** | Abre la web de tickets de tu empresa (intranet, GLPI, osTicket…) dentro de AdminOps, con la sesión recordada. |
-| **Mi red y router** | La red actual (IP, router, DNS, IP pública), el panel del router dentro de AdminOps con su acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT y QR para conectar un móvil. |
+| **Red** (router, dispositivos, velocidad y herramientas) | La red actual (IP, router, DNS, IP pública), el panel del router dentro de AdminOps con su acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT y QR para conectar un móvil. |
 | **Dispositivos en la red** | Todo lo conectado a la red local con IP, MAC, fabricante y nombre; ponles nombre y detecta los nuevos. |
 | **Acceso remoto** | Agenda de conexiones, Escritorio remoto con opciones y contraseña guardada en Windows, prueba de conexión, AnyDesk/RustDesk/TeamViewer con el ID de este equipo, Asistencia remota de Windows y encendido por red. |
 | **Avisos de errores de Windows** | Mientras está abierta, detecta pantallazos azules, discos que fallan, programas que se cierran, falta de memoria o espacio, amenazas… y explica qué son y qué hacer. |

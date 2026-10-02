@@ -92,7 +92,37 @@ pub fn is_portable() -> bool {
 /// USB viene protegido contra escritura (o el antivirus del cliente bloquea la
 /// primera creación), WebView2 no arrancaría y la ventana se quedaría en negro.
 /// En ese caso no se devuelve nada y se usa la carpeta del equipo.
+/// Dónde va el perfil del navegador interno en portable: «pendrive» o «equipo».
+const BROWSER_PLACE: &str = "navegador.txt";
+
+/// ¿El navegador interno (sesiones de Correo, Teams, Tickets) se guarda en el
+/// pendrive? Por defecto:
+/// - AdminOps **instalado en el pendrive**: no, en el disco de cada equipo.
+///   Teams y Outlook escriben miles de archivos pequeños y en un pendrive van
+///   lentísimos (páginas en blanco, arranque de 40 s); y sus sesiones solo
+///   valen en el equipo donde se iniciaron, así que en el pendrive no viajaban.
+/// - **El portable** (el .zip, pensado para equipos de clientes): sí, para no
+///   dejar rastro.
+///
+/// Se cambia en Ajustes → Datos.
+pub fn browser_on_usb() -> bool {
+    let Some(root) = portable_root() else { return false };
+    match std::fs::read_to_string(root.join(BROWSER_PLACE)).map(|s| s.trim().to_lowercase()) {
+        Ok(v) if v == "pendrive" => true,
+        Ok(v) if v == "equipo" => false,
+        _ => portable_reason() == "marker",
+    }
+}
+
+pub fn set_browser_on_usb(on: bool) -> Result<(), String> {
+    let root = portable_root().ok_or("Solo cuando AdminOps guarda los datos junto al programa.")?;
+    std::fs::write(root.join(BROWSER_PLACE), if on { "pendrive" } else { "equipo" }).map_err(|e| e.to_string())
+}
+
 pub fn portable_webview_dir() -> Option<PathBuf> {
+    if !browser_on_usb() {
+        return None;
+    }
     let root = portable_root()?;
     // Una por equipo: las sesiones de los portales van cifradas por Windows para
     // cada equipo, y una sola carpeta compartida obligaba a volver a entrar en
@@ -139,7 +169,7 @@ pub fn installed_webview_dir() -> Option<PathBuf> {
     is_writable(&fallback).then_some(fallback)
 }
 
-fn host() -> String {
+pub fn host() -> String {
     sysinfo::System::host_name()
         .unwrap_or_else(|| "equipo".into())
         .chars()

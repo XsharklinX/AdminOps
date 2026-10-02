@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActionPlan } from "../components/ActionPlan";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
-import { Bar, Sparkline } from "../components/ui";
+import { Bar, Sparkline, Loading } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
 import { api, diagApi, toolboxApi, tweaksApi, type JournalEntry, type SystemInfo } from "../lib/api";
 import { getPrefs } from "../lib/prefs";
 import { bytes, duration, loadColor, rate } from "../lib/format";
+import { FirstSteps } from "../components/FirstSteps";
 import { TodayCard } from "../components/TodayCard";
 
 type Latest = Awaited<ReturnType<typeof diagApi.latest>>;
@@ -111,12 +112,15 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   useEffect(() => {
     api.systemInfo().then(setInfo).catch(() => {});
     void loadLatest();
-    void tweaksApi.journal().then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)));
+    void tweaksApi
+        .journal()
+        .then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)))
+        .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir el Panel; después se recarga desde los botones
   }, []);
 
   if (error && !m) return <p className="p-8 text-bad">Error leyendo métricas: {error}</p>;
-  if (!m) return <p className="p-8 text-sm text-mute">Leyendo el equipo…</p>;
+  if (!m) return <Loading page text="Leyendo el equipo…" />;
 
 
   const quick = async (key: string, label: string, run: () => Promise<string | void>) => {
@@ -124,7 +128,10 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     try {
       const msg = await run();
       toast("ok", msg ? `${label}: ${msg}` : `${label}: hecho.`);
-      void tweaksApi.journal().then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)));
+      void tweaksApi
+        .journal()
+        .then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)))
+        .catch(() => {});
     } catch (e) {
       toast("error", `${label}: ${e}`);
     } finally {
@@ -165,6 +172,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-7 px-8 py-6">
       {/* Lo pendiente del técnico: casos, seguimientos, visitas y avisos (no en modo usuario). */}
+      <FirstSteps />
       <TodayCard />
       {/* Lo que se apuntó de este equipo o de esta red la última vez */}
       <PlaceNotes compact />

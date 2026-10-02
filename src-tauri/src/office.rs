@@ -166,7 +166,7 @@ pub fn set_remote_desktop(tweaks: State<'_, TweakState>, enabled: bool) -> Resul
     r
 }
 
-fn valid_host(h: &str) -> bool {
+pub(crate) fn valid_host(h: &str) -> bool {
     !h.is_empty() && h.len() <= 253 && h.chars().all(|c| c.is_ascii_alphanumeric() || ".-_:".contains(c))
 }
 
@@ -202,6 +202,9 @@ pub struct ShareAccess {
     /// Full | Change | Read
     right: String,
     allow: bool,
+    /// SID de la cuenta: «Todos» se llama distinto en cada idioma de Windows.
+    #[serde(default)]
+    sid: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -221,6 +224,34 @@ pub struct Share {
     /// gente recibe «acceso denegado» sin que nadie entienda por qué, porque el
     /// acceso real es la intersección de los dos permisos.
     ntfs_blocks: bool,
+    /// Lo que conviene revisar (ver `share_risks`).
+    #[serde(default)]
+    risks: Vec<String>,
+}
+
+/// Compartidos que suelen ser un descuido: «Todos» con control total, un disco
+/// entero, la carpeta personal de alguien o carpetas de Windows.
+fn share_risks(path: &str, access: &[ShareAccess]) -> Vec<String> {
+    let mut out = Vec::new();
+    if access.iter().any(|a| a.allow && a.sid == "S-1-1-0" && a.right == "Full") {
+        out.push("everyone-full".to_string());
+    }
+    let p = path.trim_end_matches('\\').to_lowercase();
+    let parts: Vec<&str> = p.split('\\').skip(1).collect();
+    let windows = std::env::var("SystemRoot").unwrap_or_default().trim_end_matches('\\').to_lowercase();
+    if p.len() <= 2 {
+        out.push("whole-disk".into());
+    } else if (!windows.is_empty() && p.starts_with(&windows)) || parts.first().is_some_and(|d| d.starts_with("program files") || *d == "programdata") {
+        out.push("system".into());
+    } else if parts.first().is_some_and(|d| *d == "users" || *d == "usuarios") {
+        match parts.len() {
+            // C:\Users o C:\Users\ana: todas las carpetas personales.
+            1 | 2 => out.push("profile".into()),
+            3 if ["desktop", "escritorio", "documents", "documentos", "downloads", "descargas"].contains(&parts[2]) => out.push("personal".into()),
+            _ => {}
+        }
+    }
+    out
 }
 
 /// Un archivo que alguien tiene abierto ahora mismo desde otro equipo.
@@ -247,13 +278,16 @@ pub struct SharingStatus {
     sessions: Vec<String>,
     /// Qué archivos están abiertos ahora mismo, y por quién.
     open: Vec<OpenFile>,
+    /// Nombre de este equipo en la red: la ruta es `\\EQUIPO\Carpeta`.
+    host: String,
 }
 
 const SHARES_SCRIPT: &str = r#"
+$sidOf = { param($n) try { ([Security.Principal.NTAccount]"$n").Translate([Security.Principal.SecurityIdentifier]).Value } catch { '' } }
 $open = @(Get-SmbOpenFile -ErrorAction SilentlyContinue)
 $shares = @(Get-SmbShare -ErrorAction SilentlyContinue | Where-Object { -not $_.Special -and $_.Name -notmatch '\$$' -and $_.ShareType -eq 'FileSystemDirectory' } | ForEach-Object {
   $s = $_
-  $acc = @(Get-SmbShareAccess -Name $s.Name -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ account = "$($_.AccountName)"; right = "$($_.AccessRight)"; allow = "$($_.AccessControlType)" -eq 'Allow' } })
+  $acc = @(Get-SmbShareAccess -Name $s.Name -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ account = "$($_.AccountName)"; right = "$($_.AccessRight)"; allow = "$($_.AccessControlType)" -eq 'Allow'; sid = (& $sidOf $_.AccountName) } })
   $existe = Test-Path -LiteralPath "$($s.Path)"
   # ¿Se comparte con Todos pero el disco no deja entrar a Todos?
   $paraTodos = @($acc | Where-Object { $_.allow -and "$($_.account)" -match 'Everyone|Todos' }).Count -gt 0
@@ -284,15 +318,19 @@ $profile = Get-NetConnectionProfile -ErrorAction SilentlyContinue | Select-Objec
 $fs = @(Get-NetFirewallRule -Group '@FirewallAPI.dll,-28502' -Direction Inbound -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -eq 'True' }).Count -gt 0
 $nd = @(Get-NetFirewallRule -Group '@FirewallAPI.dll,-32752' -Direction Inbound -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -eq 'True' }).Count -gt 0
 $sessions = @(Get-SmbSession -ErrorAction SilentlyContinue | ForEach-Object { "$($_.ClientUserName) desde $($_.ClientComputerName)" } | Sort-Object -Unique)
-[pscustomobject]@{ shares = $shares; category = if ($profile) { "$($profile.NetworkCategory)" } else { '' }; fileSharing = $fs; discovery = $nd; sessions = $sessions; open = $abiertos } | ConvertTo-Json -Depth 4 -Compress
+[pscustomobject]@{ shares = $shares; category = if ($profile) { "$($profile.NetworkCategory)" } else { '' }; fileSharing = $fs; discovery = $nd; sessions = $sessions; open = $abiertos; host = "$env:COMPUTERNAME" } | ConvertTo-Json -Depth 4 -Compress
 "#;
 #[tauri::command(async)]
 pub fn list_shares() -> Result<SharingStatus, String> {
     let out = crate::pspool::query(SHARES_SCRIPT, Some(Duration::from_secs(40)), "Carpetas compartidas")?;
-    serde_json::from_str(out.trim()).map_err(|e| format!("Respuesta inesperada: {e}"))
+    let mut status: SharingStatus = serde_json::from_str(out.trim()).map_err(|e| format!("Respuesta inesperada: {e}"))?;
+    for s in &mut status.shares {
+        s.risks = share_risks(&s.path, &s.access);
+    }
+    Ok(status)
 }
 
-fn valid_share_name(n: &str) -> bool {
+pub(crate) fn valid_share_name(n: &str) -> bool {
     !n.is_empty() && n.chars().count() <= 80 && !n.ends_with('$') && !n.chars().any(|c| "\\/[]:|<>+=;,?*\"".contains(c) || c.is_control())
 }
 
@@ -321,11 +359,15 @@ pub fn create_share(tweaks: State<'_, TweakState>, path: String, name: String, w
     let script = format!(
         "$ErrorActionPreference = 'Stop'\n{}{}{account}\
          New-SmbShare -Name $name -Path $path {share_right} $acct -FolderEnumerationMode AccessBased | Out-Null\n\
-         & icacls.exe $path /grant \"$($acct):(OI)(CI){ntfs}\" /T /C /Q | Out-Null\n'ok'",
+         & icacls.exe $path /grant \"$($acct):(OI)(CI){ntfs}\" /C /Q | Out-Null\n'ok'",
         text_var("path", &dir.display().to_string()),
         text_var("name", name)
     );
-    let r = crate::ps::powershell(&script).map(|_| ());
+    // Un solo permiso heredable en la carpeta: Windows lo lleva a lo que hay
+    // dentro. (Con /T quedaba uno suelto en cada archivo, lento de poner y que
+    // luego no se quitaba al quitar a la persona de la carpeta.) En una carpeta
+    // con muchos archivos puede tardar: se le da tiempo.
+    let r = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(900)), task: None }).map(|_| ());
     tweaks.record(Op::Run, &format!("Carpeta compartida «{name}» ({})", if write { "lectura y escritura" } else { "solo lectura" }), &r);
     r
 }
@@ -418,6 +460,19 @@ mod tests {
         assert!(!valid_share_name("Oculta$"));
         assert!(!valid_share_name("a/b"));
         assert!(valid_host("192.168.1.20") && valid_host("PC-RECEPCION") && !valid_host("a b") && !valid_host("x;calc"));
+    }
+
+    #[test]
+    fn risky_shares_are_flagged() {
+        let everyone = |right: &str| vec![ShareAccess { account: "Todos".into(), right: right.into(), allow: true, sid: "S-1-1-0".into() }];
+        assert_eq!(share_risks(r"D:\Datos\Facturas", &everyone("Change")), Vec::<String>::new());
+        assert_eq!(share_risks(r"D:\Datos\Facturas", &everyone("Full")), ["everyone-full"]);
+        assert_eq!(share_risks(r"D:\", &[]), ["whole-disk"]);
+        assert_eq!(share_risks(r"C:\Users\ana", &[]), ["profile"]);
+        assert_eq!(share_risks(r"C:\Users", &[]), ["profile"]);
+        assert_eq!(share_risks(r"C:\Users\ana\Desktop", &[]), ["personal"]);
+        assert_eq!(share_risks(r"C:\Users\ana\Documents\Clientes", &[]), Vec::<String>::new());
+        assert_eq!(share_risks(r"C:\Program Files\Algo", &[]), ["system"]);
     }
 
     /// Equipo real: `cargo test office_real -- --ignored --nocapture`

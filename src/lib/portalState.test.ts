@@ -10,7 +10,7 @@ describe("portales", () => {
   });
 
   it("al volver la conexión recarga solo las vistas que fallaron", () => {
-    const base = { url: null, title: "", loading: false, slow: false, canBack: false, canForward: false, downloads: [] };
+    const base = { url: null, title: "", loading: false, slow: false, canBack: false, canForward: false, blocked: null, downloads: [] };
     const list: [string, typeof base & { error: string | null }][] = [
       ["correo", { ...base, error: "Este equipo no tiene conexión a Internet ni a la red." }],
       ["tickets", { ...base, error: null }],

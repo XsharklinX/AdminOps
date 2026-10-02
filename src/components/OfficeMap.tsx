@@ -103,7 +103,7 @@ export function OfficeMapCard({
                     onClick={(e) => {
                       e.stopPropagation();
                       const v = contact.extension || contact.phone || contact.mobile || contact.email;
-                      if (v) void navigator.clipboard.writeText(v).then(() => toast("ok", `${contact.name}: copiado.`));
+                      if (v) void navigator.clipboard.writeText(v).then(() => toast("ok", `${contact.name}: copiado.`), () => toast("error", "No se pudo copiar."));
                     }}
                     className="mt-0.5 flex items-center gap-1 text-[11px] text-neon hover:underline"
                     title="Copiar su extensión o teléfono"

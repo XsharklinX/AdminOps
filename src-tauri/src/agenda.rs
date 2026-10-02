@@ -46,6 +46,8 @@ pub struct Visit {
     pub place: String,
     /// Id del evento en el calendario de Outlook, si se puso ahí (graph.rs).
     pub outlook_event: String,
+    /// Cuándo se marcó como hecha (para el historial). 0: no se sabe o no está hecha.
+    pub done_at: u64,
 }
 
 /// Cliente con el mantenimiento vencido o cerca, sin visita planificada.
@@ -306,6 +308,7 @@ pub fn set_visit_status(app: tauri::AppHandle, id: String, status: String) -> Re
     let mut list = load(&app);
     let v = list.iter_mut().find(|v| v.id == id).ok_or("Esa visita ya no existe.")?;
     v.status = status.clone();
+    v.done_at = if status == "done" { now() } else { 0 };
     let mut creada = None;
     if status == "done" {
         if let Some(mut siguiente) = next_in_series(v) {
@@ -365,7 +368,39 @@ pub fn next_in_series(done: &Visit) -> Option<Visit> {
     siguiente.start = done.start + paso;
     siguiente.status = "planned".into();
     siguiente.reminded = false;
+    siguiente.done_at = 0;
+    // La siguiente de la serie es otra cita: en Outlook tendrá su propio evento.
+    siguiente.outlook_event = String::new();
     Some(siguiente)
+}
+
+/// Visitas planificadas que están en Outlook (para traer lo que cambió allí).
+pub fn linked_visits(app: &tauri::AppHandle) -> Vec<Visit> {
+    load(app).into_iter().filter(|v| !v.outlook_event.is_empty() && v.status == "planned").collect()
+}
+
+/// Aplica a una visita lo que se cambió en Outlook. `unlink`: el evento ya no
+/// existe allí; la visita se queda, sin enlace.
+pub fn apply_outlook(app: &tauri::AppHandle, id: &str, start: Option<u64>, minutes: Option<u32>, place: Option<String>, unlink: bool) -> Result<(), String> {
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut list = load(app);
+    let v = list.iter_mut().find(|v| v.id == id).ok_or("Esa visita ya no existe.")?;
+    if unlink {
+        v.outlook_event.clear();
+    }
+    if let Some(s) = start {
+        if s != v.start {
+            v.start = s;
+            v.reminded = false;
+        }
+    }
+    if let Some(m) = minutes {
+        v.minutes = m;
+    }
+    if let Some(p) = place {
+        v.place = p.chars().take(120).collect();
+    }
+    save(app, &list)
 }
 
 /// Una visita por su id (para ponerla en Outlook).
@@ -385,8 +420,8 @@ pub fn set_outlook_event(app: &tauri::AppHandle, id: &str, event: &str) -> Resul
 /// Aplaza una visita el número de días indicado.
 #[tauri::command]
 pub fn postpone_visit(app: tauri::AppHandle, id: String, days: i64) -> Result<(), String> {
-    if !(-30..=365).contains(&days) || days == 0 {
-        return Err("Solo se puede aplazar entre 1 y 365 días (o adelantar hasta 30).".into());
+    if !(-365..=365).contains(&days) || days == 0 {
+        return Err("Solo se puede mover hasta un año antes o después.".into());
     }
     let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut list = load(&app);

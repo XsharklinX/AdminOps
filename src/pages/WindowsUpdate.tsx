@@ -2,7 +2,7 @@ import { CircleCheck, CircleX, Eye, EyeOff, Loader2, Pause, Play, RefreshCw, Sea
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card } from "../components/ui";
+import { Button, Card, Loading } from "../components/ui";
 import { bytes } from "../lib/format";
 import { toolboxApi, tweaksApi, updateApi, type PendingUpdate, type UpdateHistoryEntry } from "../lib/api";
 
@@ -188,7 +188,7 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
         {historyError ? (
           <p className="text-sm text-bad">{historyError}</p>
         ) : !history ? (
-          <p className="text-sm text-mute">Leyendo historial…</p>
+          <Loading text="Leyendo historial…" />
         ) : shown.length === 0 ? (
           <p className="text-sm text-mute">{onlyFailed ? "Ninguna actualización ha fallado recientemente." : "Sin historial."}</p>
         ) : (

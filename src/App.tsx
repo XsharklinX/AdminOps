@@ -48,11 +48,8 @@ const CommandPalette = lazyPage("CommandPalette", () => import("./components/Com
 const Onboarding = lazyPage("Onboarding", () => import("./components/Onboarding"));
 const TweaksPage = lazyPage("TweaksPage", () => import("./pages/TweaksPage"));
 const Processes = lazyPage("Processes", () => import("./pages/Processes"));
-const Network = lazyPage("Network", () => import("./pages/Network"));
 const DiskTools = lazyPage("DiskTools", () => import("./pages/Merged"));
-const Clients = lazyPage("Clients", () => import("./pages/Clients"));
 const Users = lazyPage("Users", () => import("./pages/Users"));
-const NetTools = lazyPage("NetTools", () => import("./pages/NetTools"));
 const Tickets = lazyPage("Tickets", () => import("./pages/Tickets"));
 const Remote = lazyPage("Remote", () => import("./pages/Remote"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
@@ -69,7 +66,7 @@ const PrintersAndShares = lazyPage("PrintersAndShares", () => import("./pages/Me
 const MyNetwork = lazyPage("MyNetwork", () => import("./pages/Merged"));
 const Workstations = lazyPage("Workstations", () => import("./pages/Merged"));
 const Agenda = lazyPage("Agenda", () => import("./pages/Agenda"));
-const People = lazyPage("People", () => import("./pages/People"));
+const PeopleAndClients = lazyPage("PeopleAndClients", () => import("./pages/Merged"));
 const WindowsTweaks = lazyPage("WindowsTweaks", () => import("./pages/Merged"));
 const RecipesAndProfiles = lazyPage("RecipesAndProfiles", () => import("./pages/Merged"));
 
@@ -436,7 +433,7 @@ export default function App() {
       { id: "go:webinventory", title: "Inventario web de la empresa", subtitle: "Puestos e inventario → Inventario web", keywords: "inventario web intranet portal pgr", run: () => navigate("stations", "webinventory") },
       { id: "go:localaccount", title: "Pasar el equipo a una cuenta local", subtitle: "Cuentas → salir de Entra ID o de la cuenta de Microsoft", keywords: "cuenta profesional azure entra desconectar local microsoft", run: () => navigate("accounts") },
       { id: "go:winupdate", title: "Windows Update", subtitle: "Actualizaciones → Windows Update", keywords: "parches actualizaciones windows", run: () => navigate("winupdate") },
-      { id: "go:devices", title: "Dispositivos en la red", subtitle: "Mi red → Dispositivos", keywords: "escanear red ip mac intrusos", run: () => navigate("devices") },
+      { id: "go:devices", title: "Dispositivos en la red", subtitle: "Red → Dispositivos", keywords: "escanear red ip mac intrusos", run: () => navigate("devices") },
       { id: "go:inventory", title: "Inventario de equipos", subtitle: "Puestos e inventario → Inventario", keywords: "equipos clientes renovar", run: () => navigate("inventory") },
       { id: "go:repair", title: "Reparaciones de Windows", subtitle: "Solucionar problemas → Reparaciones", keywords: "sfc dism reparar winsock", run: () => navigate("repair") },
       { id: "sheet", title: "Ficha del equipo", subtitle: "Modelo, serie, licencia, red… para el inventario", keywords: "inventario serie numero modelo garantia licencia", run: () => navigate("hardware", "sheet") },
@@ -476,7 +473,6 @@ export default function App() {
     const category = TWEAK_PAGES[p];
     if (p === "dashboard") return <Dashboard onNavigate={navigate} />;
     if (p === "processes") return <Processes isAdmin={!!isAdmin} />;
-    if (p === "network") return <Network isAdmin={!!isAdmin} />;
     if (p === "troubleshoot") return <Troubleshoot isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
     if (p === "tweaks") return <WindowsTweaks isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "machine") return <MachineState isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
@@ -485,23 +481,21 @@ export default function App() {
     if (p === "data") return <DataTools focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
     if (p === "space") return <DiskTools isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "session") return <ServiceSession onSessionChange={setSessionActive} focus={p === page ? focus : null} />;
-    if (p === "agenda") return <Agenda onNavigate={navigate} />;
-    if (p === "people") return <People focus={p === page ? focus : null} />;
-    if (p === "clients") return <Clients />;
+    if (p === "agenda") return <Agenda onNavigate={navigate} focus={p === page ? focus : null} />;
+    if (p === "people") return <PeopleAndClients focus={p === page ? focus : null} />;
     if (p === "contacts") return <Contacts focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "recipes") return <RecipesAndProfiles isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "stations") return <Workstations covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "users") return <Users isAdmin={!!isAdmin} />;
     if (p === "accounts") return <AccountsAndDomain isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "nettools") return <NetTools isAdmin={!!isAdmin} />;
     if (p === "printers") return <PrintersAndShares isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "tickets") return <Tickets split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
     if (p === "mail") return <Tickets kind="mail" split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
     if (p === "teams") return <Tickets kind="teams" split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
-    if (p === "router") return <MyNetwork covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "router") return <MyNetwork isAdmin={!!isAdmin} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "remote") return <Remote isAdmin={!!isAdmin} />;
-    if (p === "settings") return <SettingsPage appInfo={appInfo} onNavigate={(x: PageId) => navigate(x)} />;
+    if (p === "settings") return <SettingsPage appInfo={appInfo} onNavigate={(x: PageId) => navigate(x)} focus={p === page ? focus : null} />;
     if (category) return <TweaksPage category={category} isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     return null;
   };

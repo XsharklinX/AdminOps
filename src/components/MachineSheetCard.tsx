@@ -61,13 +61,13 @@ export function MachineSheetCard({ autoLoad = false }: { autoLoad?: boolean }) {
 
   const copyText = () => {
     if (!sheet) return;
-    void navigator.clipboard.writeText(rows(sheet).map(([k, v]) => `${k}: ${v}`).join("\n")).then(() => toast("ok", "Ficha copiada."));
+    void navigator.clipboard.writeText(rows(sheet).map(([k, v]) => `${k}: ${v}`).join("\n")).then(() => toast("ok", "Ficha copiada."), () => toast("error", "No se pudo copiar."));
   };
   // Tabulado: se pega en Excel como una fila con su cabecera.
   const copyExcel = () => {
     if (!sheet) return;
     const r = rows(sheet);
-    void navigator.clipboard.writeText(`${r.map(([k]) => k).join("\t")}\n${r.map(([, v]) => v.replace(/\t|\n/g, " ")).join("\t")}`).then(() => toast("ok", "Copiada para pegar en Excel."));
+    void navigator.clipboard.writeText(`${r.map(([k]) => k).join("\t")}\n${r.map(([, v]) => v.replace(/\t|\n/g, " ")).join("\t")}`).then(() => toast("ok", "Copiada para pegar en Excel."), () => toast("error", "No se pudo copiar."));
   };
   const exportCsv = () => {
     if (!sheet) return;

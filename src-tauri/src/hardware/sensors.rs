@@ -62,12 +62,34 @@ fn plain(p: PathBuf) -> PathBuf {
 }
 
 fn lhm_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
+    static LOCAL: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     let exe_dir = std::env::current_exe().ok().and_then(|e| e.parent().map(PathBuf::from));
-    [app.path().resource_dir().ok().map(|r| r.join("lhm")), exe_dir.clone().map(|d| d.join("lhm")), exe_dir.map(|d| d.join("resources").join("lhm"))]
+    let found = [app.path().resource_dir().ok().map(|r| r.join("lhm")), exe_dir.clone().map(|d| d.join("lhm")), exe_dir.map(|d| d.join("resources").join("lhm"))]
         .into_iter()
         .flatten()
         .map(plain)
-        .find(|d| d.join("LibreHardwareMonitorLib.dll").is_file())
+        .find(|d| d.join("LibreHardwareMonitorLib.dll").is_file())?;
+    if !crate::paths::is_portable() {
+        return Some(found);
+    }
+    // Desde un pendrive, cargar las DLL tarda mucho (17 s la primera lectura):
+    // se copian una vez al disco del equipo y se cargan de ahí.
+    LOCAL.get_or_init(|| local_copy(&found)).clone().or(Some(found))
+}
+
+/// Copia de las DLL de sensores en el disco del equipo, por versión de AdminOps.
+fn local_copy(from: &std::path::Path) -> Option<PathBuf> {
+    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from)?;
+    let dst = base.join("AdminOps").join(format!("lhm-{}", env!("CARGO_PKG_VERSION")));
+    if !dst.join("LibreHardwareMonitorLib.dll").is_file() {
+        std::fs::create_dir_all(&dst).ok()?;
+        for e in std::fs::read_dir(from).ok()?.flatten() {
+            if e.file_type().is_ok_and(|t| t.is_file()) {
+                std::fs::copy(e.path(), dst.join(e.file_name())).ok()?;
+            }
+        }
+    }
+    Some(dst)
 }
 
 pub fn pawnio_installed() -> bool {
@@ -122,7 +144,9 @@ fn raw(app: &tauri::AppHandle) -> Result<Vec<Sensor>, String> {
             return Err(err.clone());
         }
     }
-    unblock(&dir);
+    // Quitar la marca de Internet una vez por sesión (cada lectura recorría la carpeta).
+    static UNBLOCKED: std::sync::Once = std::sync::Once::new();
+    UNBLOCKED.call_once(|| unblock(&dir));
     let r = raw_from_dir(&dir).map_err(|e| {
         log::warn!("Sensores: {e}");
         explain(&e)

@@ -148,6 +148,8 @@ información a ninguna parte. Las únicas conexiones salientes son, todas visibl
 | `ipinfo.io` | Solo si el técnico pulsa «IP pública» | Nada; es una consulta GET |
 | `speed.cloudflare.com` | Solo si el técnico ejecuta el test de velocidad | Tráfico de prueba |
 | Microsoft (Outlook/Teams) | Solo si el técnico los configura | Su propia sesión, como en cualquier navegador |
+| `login.microsoftonline.com`, `graph.microsoft.com` | Solo si el técnico conecta Microsoft 365 | Sus consultas, con su cuenta y los permisos que IT dio |
+| Red local: SNMP, mDNS, WS-Discovery | Solo al revisar o buscar impresoras | Consultas de solo lectura, sin salir de la red |
 
 ### 4.7 Datos personales en pantalla
 

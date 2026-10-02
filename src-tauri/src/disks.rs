@@ -35,6 +35,10 @@ pub struct Volume {
     pub dirty: Option<bool>,
     /// Es el volumen de Windows.
     pub system: bool,
+    /// BitLocker: "" sin cifrar o no se sabe · on · suspended · encrypting · decrypting.
+    pub bitlocker: String,
+    /// Porcentaje cifrado (mientras cifra o descifra).
+    pub bitlocker_percent: i64,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
@@ -66,6 +70,110 @@ pub struct Disk {
     pub crc_errors: Option<u64>,
     #[serde(skip_deserializing)]
     pub verdict: Verdict,
+    /// Cifras de los últimos días (una por día) para ver si va a peor.
+    #[serde(skip_deserializing)]
+    pub trend: Vec<Point>,
+    /// Lo que ha subido en el último mes («Sectores apartados: 8 → 40 en 7 días»).
+    #[serde(skip_deserializing)]
+    pub rising: Vec<String>,
+}
+
+/// Una foto diaria de las cifras que indican desgaste.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Point {
+    /// Días desde 1970.
+    pub day: u32,
+    pub reallocated: Option<u64>,
+    pub pending: Option<u64>,
+    pub uncorrectable: Option<u64>,
+    pub crc: Option<u64>,
+    pub read_errors: i64,
+    pub wear: i64,
+}
+
+type History = std::collections::BTreeMap<String, Vec<Point>>;
+/// Por disco (modelo), lo que ha subido.
+type News = Vec<(String, Vec<String>)>;
+
+fn today() -> u32 {
+    (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()) / 86_400) as u32
+}
+
+fn history_key(d: &Disk) -> String {
+    format!("{}|{}", d.model.trim(), d.size)
+}
+
+fn point(d: &Disk, day: u32) -> Point {
+    Point { day, reallocated: d.reallocated, pending: d.pending, uncorrectable: d.uncorrectable, crc: d.crc_errors, read_errors: d.read_errors, wear: d.wear }
+}
+
+/// Qué ha subido entre dos fotos, en palabras.
+pub fn rising(from: &Point, to: &Point) -> Vec<String> {
+    let days = to.day.saturating_sub(from.day);
+    let when = match days {
+        0 => "hoy".to_string(),
+        1 => "en 1 día".to_string(),
+        n => format!("en {n} días"),
+    };
+    let mut out = Vec::new();
+    let mut up = |name: &str, a: Option<u64>, b: Option<u64>| {
+        if let (Some(a), Some(b)) = (a, b) {
+            if b > a {
+                out.push(format!("{name}: {a} → {b} {when}"));
+            }
+        }
+    };
+    up("Sectores apartados", from.reallocated, to.reallocated);
+    up("Sectores pendientes", from.pending, to.pending);
+    up("Errores no corregibles", from.uncorrectable, to.uncorrectable);
+    up("Errores de conexión", from.crc, to.crc);
+    let known = |x: i64| (x >= 0).then_some(x as u64);
+    up("Errores de lectura", known(from.read_errors), known(to.read_errors));
+    out
+}
+
+/// Apunta la foto de hoy de cada disco y devuelve, por disco, lo que ha subido
+/// en el último mes (para la tarjeta) y desde la foto anterior (para avisar).
+fn record(history: &mut History, disks: &mut [Disk], day: u32) -> News {
+    let mut news = Vec::new();
+    for d in disks.iter_mut() {
+        let list = history.entry(history_key(d)).or_default();
+        let now = point(d, day);
+        if let Some(prev) = list.iter().rev().find(|p| p.day < day) {
+            let fresh = rising(prev, &now);
+            if !fresh.is_empty() {
+                news.push((d.model.clone(), fresh));
+            }
+        }
+        list.retain(|p| p.day != day);
+        list.push(now.clone());
+        list.sort_by_key(|p| p.day);
+        let keep = list.len().saturating_sub(365);
+        list.drain(..keep);
+        if let Some(oldest) = list.iter().find(|p| p.day + 30 >= day && p.day < day) {
+            d.rising = rising(oldest, &now);
+        }
+        d.trend = list.iter().filter(|p| p.day + 90 >= day).cloned().collect();
+    }
+    news
+}
+
+/// Un disco que va a peor no está «sano», aunque hoy sus cifras aún sean bajas.
+fn apply_trend(d: &mut Disk) {
+    if d.rising.is_empty() || d.verdict.level == "bad" {
+        return;
+    }
+    d.verdict = v(
+        "warn",
+        "Va a peor",
+        format!("{}. Es la señal de un disco que empieza a fallar.", d.rising.join(" · ")),
+        &["Ten una copia al día de lo importante (Rescatar archivos o la copia de seguridad).", "Si sigue subiendo en los próximos días, cámbialo."],
+    );
+}
+
+fn history_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::machine_data_dir(app).join("discos-historial.json")
 }
 
 #[derive(Serialize, Clone, Debug, Default, PartialEq)]
@@ -162,6 +270,9 @@ pub fn verdict(d: &Disk) -> Verdict {
 
 const STATUS_SCRIPT: &str = r#"
 $sys = "$env:SystemDrive".TrimEnd(':')
+# BitLocker (solo con administrador y en ediciones que lo tienen).
+$bl = @{}
+try { Get-BitLockerVolume -ErrorAction Stop | ForEach-Object { $bl["$($_.MountPoint)".TrimEnd(':', '\')] = $_ } } catch {}
 $r = @(Get-PhysicalDisk -ErrorAction Stop | ForEach-Object {
   $pd = $_
   $rel = $null
@@ -171,7 +282,10 @@ $r = @(Get-PhysicalDisk -ErrorAction Stop | ForEach-Object {
   if ($disk) {
     $vols = @(Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | ForEach-Object {
       $vo = $_ | Get-Volume -ErrorAction SilentlyContinue
-      if ($vo) { [pscustomobject]@{ letter = "$($_.DriveLetter)"; label = "$($vo.FileSystemLabel)"; fs = "$($vo.FileSystem)"; size = [uint64]$vo.Size; free = [uint64]$vo.SizeRemaining; health = "$($vo.HealthStatus)"; system = ("$($_.DriveLetter)" -eq $sys) } }
+      $l = "$($_.DriveLetter)"
+      $b = $bl[$l]
+      if ($vo) { [pscustomobject]@{ letter = $l; label = "$($vo.FileSystemLabel)"; fs = "$($vo.FileSystem)"; size = [uint64]$vo.Size; free = [uint64]$vo.SizeRemaining; health = "$($vo.HealthStatus)"; system = ($l -eq $sys)
+        bitlocker = if ($b) { "$($b.ProtectionStatus)|$($b.VolumeStatus)" } else { '' }; bitlockerPercent = if ($b) { [int64]$b.EncryptionPercentage } else { -1 } } }
     })
   }
   $n = { param($x) if ($null -eq $x) { -1 } else { [int64]$x } }
@@ -188,7 +302,7 @@ ConvertTo-Json -InputObject $r -Depth 4 -Compress
 
 /// ¿Windows marcó el volumen como dañado? (FSCTL_IS_VOLUME_DIRTY, necesita administrador.)
 #[cfg(windows)]
-fn is_dirty(letter: &str) -> Option<bool> {
+pub fn is_dirty(letter: &str) -> Option<bool> {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::Storage::FileSystem::{CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING};
     use windows_sys::Win32::System::IO::DeviceIoControl;
@@ -211,19 +325,83 @@ fn is_dirty(letter: &str) -> Option<bool> {
 }
 
 #[cfg(not(windows))]
-fn is_dirty(_: &str) -> Option<bool> {
+pub fn is_dirty(_: &str) -> Option<bool> {
     None
 }
 
-fn same_model(a: &str, b: &str) -> bool {
+/// «On|FullyEncrypted» → on; lo que no es cifrado → "".
+pub fn bitlocker_state(raw: &str) -> String {
+    let (protection, status) = raw.split_once('|').unwrap_or(("", raw));
+    match status {
+        "FullyEncrypted" if protection.eq_ignore_ascii_case("On") => "on",
+        "FullyEncrypted" => "suspended",
+        "EncryptionInProgress" | "EncryptionPaused" => "encrypting",
+        "DecryptionInProgress" | "DecryptionPaused" => "decrypting",
+        _ => "",
+    }
+    .to_string()
+}
+
+pub fn same_model(a: &str, b: &str) -> bool {
     let n = |s: &str| s.to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
     let (a, b) = (n(a), n(b));
     !a.is_empty() && !b.is_empty() && (a.contains(&b) || b.contains(&a))
 }
 
-/// Todos los discos con sus volúmenes y su veredicto.
+/// Todos los discos con sus volúmenes, su veredicto y su tendencia.
 #[tauri::command(async)]
-pub fn disks_status() -> Result<Vec<Disk>, String> {
+pub fn disks_status(app: tauri::AppHandle) -> Result<Vec<Disk>, String> {
+    status_and_record(&app).map(|(d, _)| d)
+}
+
+/// Lee los discos y apunta la foto de hoy. Devuelve también lo que subió desde la anterior.
+fn status_and_record(app: &tauri::AppHandle) -> Result<(Vec<Disk>, News), String> {
+    let mut disks = read_status()?;
+    let path = history_path(app);
+    let mut history: History = crate::paths::read_json(&path);
+    let news = record(&mut history, &mut disks, today());
+    let _ = crate::paths::write_json(&path, &history);
+    for d in &mut disks {
+        apply_trend(d);
+    }
+    Ok((disks, news))
+}
+
+/// Una vez al día, con AdminOps abierto: si un disco va a peor, avisa.
+pub fn start_watch(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(10 * 60));
+        let mut last = 0u32;
+        loop {
+            if today() != last {
+                last = today();
+                if let Ok((_, news)) = status_and_record(&app) {
+                    let alerts = news
+                        .into_iter()
+                        .map(|(model, changes)| crate::winwatch::Alert {
+                            key: format!("disk-trend:{model}:{}", changes.join(",")),
+                            level: "warn".into(),
+                            title: format!("El disco {model} va a peor"),
+                            detail: changes.join(" · "),
+                            explanation: "Las cifras de desgaste del disco han subido desde ayer. Es la señal típica de un disco que empieza a fallar.".into(),
+                            advice: "Haz una copia de lo importante y míralo en Discos → Salud y reparación.".into(),
+                            page: Some("space".into()),
+                            count: 1,
+                            time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()),
+                            ..Default::default()
+                        })
+                        .collect::<Vec<_>>();
+                    if !alerts.is_empty() {
+                        crate::winwatch::push_alerts(&app, alerts);
+                    }
+                }
+            }
+            std::thread::sleep(Duration::from_secs(3600));
+        }
+    });
+}
+
+fn read_status() -> Result<Vec<Disk>, String> {
     let out = crate::ps::powershell_opts(STATUS_SCRIPT, crate::ps::Opts { timeout: Some(Duration::from_secs(90)), task: None })?;
     let mut disks: Vec<Disk> = serde_json::from_str(out.trim()).map_err(|e| format!("Respuesta inesperada: {e}"))?;
     // SMART (solo con administrador): se cruza por modelo.
@@ -244,11 +422,43 @@ pub fn disks_status() -> Result<Vec<Disk>, String> {
         }
         for vol in &mut d.volumes {
             vol.dirty = is_dirty(&vol.letter);
+            vol.bitlocker = bitlocker_state(&vol.bitlocker);
         }
         d.verdict = verdict(d);
     }
     disks.sort_by_key(|d| (!d.system, d.number));
     Ok(disks)
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryKey {
+    pub id: String,
+    pub password: String,
+}
+
+/// Las claves de recuperación de BitLocker de un volumen de ESTE equipo
+/// (necesita administrador). Queda en el diario que se consultaron.
+#[tauri::command(async)]
+pub fn bitlocker_local_key(letter: String, tweaks: State<'_, TweakState>) -> Result<Vec<RecoveryKey>, String> {
+    let l = letter_ok(&letter)?;
+    need_admin()?;
+    let script = format!(
+        "@((Get-BitLockerVolume -MountPoint '{l}:' -ErrorAction Stop).KeyProtector | Where-Object {{ \"$($_.KeyProtectorType)\" -eq 'RecoveryPassword' }} | ForEach-Object {{ \"$($_.KeyProtectorId)|$($_.RecoveryPassword)\" }}) -join \"`n\""
+    );
+    let result = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: None }).map(|out| {
+        out.lines()
+            .filter_map(|x| x.trim().split_once('|'))
+            .map(|(id, pw)| RecoveryKey { id: id.trim_matches(['{', '}']).to_string(), password: pw.to_string() })
+            .collect::<Vec<_>>()
+    });
+    let journal = result.as_ref().map(|_| ()).map_err(Clone::clone);
+    tweaks.record(Op::Run, &format!("Consultada la clave de recuperación de BitLocker de {l}:"), &journal);
+    let keys = result?;
+    if keys.is_empty() {
+        return Err(format!("{l}: no tiene clave de recuperación (o no está cifrado con BitLocker)."));
+    }
+    Ok(keys)
 }
 
 // ---------- Acciones ----------
@@ -586,6 +796,38 @@ mod tests {
         assert!(verdict(&tired).title.contains("8 apartados"));
         assert_eq!(verdict(&Disk { media: "SSD".into(), wear: 95, ..disk() }).level, "warn");
         assert_eq!(verdict(&Disk { health: "Unhealthy".into(), ..disk() }).level, "bad");
+    }
+
+    /// La foto de cada día se apunta una vez; lo que sube se dice con cifras y
+    /// hace que un disco «sano» pase a «va a peor».
+    #[test]
+    fn trend_catches_a_disk_getting_worse() {
+        let mut h = History::new();
+        let mut d = vec![Disk { reallocated: Some(8), pending: Some(0), ..disk() }];
+        assert!(record(&mut h, &mut d, 100).is_empty(), "la primera foto no compara con nada");
+        d[0].reallocated = Some(40);
+        d[0].pending = Some(3);
+        let news = record(&mut h, &mut d, 107);
+        assert_eq!(news[0].1, ["Sectores apartados: 8 → 40 en 7 días", "Sectores pendientes: 0 → 3 en 7 días"]);
+        assert_eq!(d[0].rising.len(), 2);
+        // El mismo día otra vez: no se duplica la foto.
+        record(&mut h, &mut d, 107);
+        assert_eq!(h.values().next().unwrap().len(), 2);
+        d[0].verdict = verdict(&Disk { pending: None, ..d[0].clone() });
+        apply_trend(&mut d[0]);
+        assert_eq!(d[0].verdict.title, "Va a peor");
+        // Sin cambios: nada que decir.
+        let quieto = Point { day: 1, reallocated: Some(5), ..Default::default() };
+        assert!(rising(&quieto, &Point { day: 9, ..quieto.clone() }).is_empty());
+    }
+
+    #[test]
+    fn bitlocker_states() {
+        assert_eq!(bitlocker_state("On|FullyEncrypted"), "on");
+        assert_eq!(bitlocker_state("Off|FullyEncrypted"), "suspended");
+        assert_eq!(bitlocker_state("Off|EncryptionInProgress"), "encrypting");
+        assert_eq!(bitlocker_state("Off|FullyDecrypted"), "");
+        assert_eq!(bitlocker_state(""), "");
     }
 
     #[test]

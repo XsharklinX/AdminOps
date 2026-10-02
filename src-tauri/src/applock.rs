@@ -123,7 +123,17 @@ pub fn lock_status(app: tauri::AppHandle) -> LockStatus {
 #[tauri::command(async)]
 pub fn lock_verify(app: tauri::AppHandle, secret: String) -> Result<bool, String> {
     let Some(s) = load(&app) else { return Ok(true) };
-    attempt(|| matches(&s, &secret))
+    let ok = attempt(|| matches(&s, &secret))?;
+    // En el pendrive, el PIN también abre la clave de las contraseñas guardadas
+    // (y la protege la primera vez). Ver secrets.rs.
+    if ok {
+        if let Some(root) = crate::paths::portable_data_root() {
+            if !crate::secrets::key_unlock(root, &secret) {
+                log::warn!("La clave del pendrive no se pudo abrir con el PIN");
+            }
+        }
+    }
+    Ok(ok)
 }
 
 /// Pone o cambia el bloqueo. Si ya había uno, pide el PIN o la contraseña actual.
@@ -135,6 +145,13 @@ pub fn lock_set(app: tauri::AppHandle, kind: String, secret: String, idle_minute
         }
     }
     validate(&kind, &secret)?;
+    // En el pendrive, la clave de las contraseñas pasa a ir cifrada con el PIN nuevo.
+    if let Some(root) = crate::paths::portable_data_root() {
+        if !current.is_empty() {
+            crate::secrets::key_unlock(root, &current);
+        }
+        crate::secrets::key_protect(root, &secret).map_err(|e| format!("No se pudo proteger la clave del pendrive: {e}"))?;
+    }
     let salt = random(16);
     let stored = Stored {
         hash: b64().encode(derive(&secret, &salt, ITERATIONS)),
@@ -164,6 +181,11 @@ pub fn lock_disable(app: tauri::AppHandle, current: String) -> Result<(), String
     let Some(s) = load(&app) else { return Ok(()) };
     if !attempt(|| matches(&s, &current))? {
         return Err("El PIN o la contraseña no es correcto.".into());
+    }
+    if let Some(root) = crate::paths::portable_data_root() {
+        if crate::secrets::key_unlock(root, &current) {
+            crate::secrets::key_unprotect(root)?;
+        }
     }
     std::fs::remove_file(path(&app)).map_err(|e| e.to_string())?;
     log::info!("Bloqueo de la app quitado");

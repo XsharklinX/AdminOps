@@ -85,7 +85,7 @@ fn qty(q: f64) -> String {
 const CSS: &str = r#"
 *{box-sizing:border-box}
 html{background:#e8ecf1}
-body{margin:0;color:#1b2330;font:12.5px/1.5 "IBM Plex Sans","Segoe UI",system-ui,sans-serif;counter-reset:sec}
+body{margin:0;color:#1b2330;font:12.5px/1.5 "Plex","IBM Plex Sans","Segoe UI",system-ui,sans-serif;counter-reset:sec;font-feature-settings:"tnum" 0}
 main{max-width:840px;margin:24px auto;background:#fff;padding:44px 48px 36px;box-shadow:0 1px 4px rgba(20,30,50,.12)}
 .top{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}
 .brand{display:flex;gap:14px;align-items:center;min-width:0}
@@ -140,6 +140,16 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 .sign .who{text-align:center;margin-top:5px;font-size:11.5px}.sign .who span{display:block;color:#5b6778;font-size:10.5px}
 .conditions{font-size:10px;color:#5b6778;white-space:pre-wrap;border-top:1px solid #e3e8ef;margin-top:26px;padding-top:8px}
 footer{margin-top:22px;color:#8a95a5;font-size:10px;text-align:center}
+.areas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.area{border:1px solid #e3e8ef;border-left:4px solid var(--c);border-radius:8px;padding:8px 11px;break-inside:avoid;min-width:0}
+.area .n{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;font-weight:600;color:#5b6778;text-transform:uppercase;letter-spacing:.06em}
+.area .s{color:var(--c);text-transform:none;letter-spacing:0}
+.area p{margin:3px 0 0;font-size:11.5px;color:#2b3544}
+.a-ok{--c:#12784a}.a-warn{--c:#b06f00}.a-bad{--c:#c0223f}.a-na{--c:#aab3c0}
+.prio{display:inline-block;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;padding:1px 6px;margin-right:6px;vertical-align:1px}
+.prio.bad{background:#fbe6ea;color:#c0223f}.prio.warn{background:#fdf1dc;color:#935d00}
+.ring{display:flex;flex-direction:column;align-items:center;min-width:74px}.ring svg{width:52px;height:52px}.ring span{font-size:10.5px;color:#5b6778}
+.about{font-size:10px;color:#5b6778;border-top:1px solid #e3e8ef;margin-top:22px;padding-top:8px}
 @media print{
 *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 html{background:#fff}main{margin:0;padding:0;max-width:none;box-shadow:none}
@@ -148,6 +158,23 @@ tr,.f,.box,.kpi{break-inside:avoid}footer{display:none}
 "#;
 
 const LOGO: &str = include_str!("../../../src/assets/logo.svg");
+
+/// IBM Plex Sans dentro del propio informe: se ve igual en cualquier equipo,
+/// tenga o no la fuente instalada (Edge caía a Segoe UI). Licencia OFL, en
+/// assets/fonts.
+const FONTS: [(u16, &[u8]); 4] = [
+    (400, include_bytes!("../../assets/fonts/ibm-plex-sans-latin-400-normal.woff2")),
+    (500, include_bytes!("../../assets/fonts/ibm-plex-sans-latin-500-normal.woff2")),
+    (600, include_bytes!("../../assets/fonts/ibm-plex-sans-latin-600-normal.woff2")),
+    (700, include_bytes!("../../assets/fonts/ibm-plex-sans-latin-700-normal.woff2")),
+];
+
+fn font_faces() -> String {
+    FONTS
+        .iter()
+        .map(|(w, bytes)| format!("@font-face{{font-family:\"Plex\";src:url(data:font/woff2;base64,{})format(\"woff2\");font-weight:{w};font-style:normal}}", b64(bytes)))
+        .collect()
+}
 
 /// Datos del informe además del diagnóstico.
 pub struct ReportInput {
@@ -438,12 +465,187 @@ fn summary(h: &mut String, c: &Ctx, work: usize) {
     }
     let _ = write!(h, "<div class=\"verdict {cls}\"><div class=state><div class=t>{title}</div><p>{}</p></div><div class=kpis>", esc(&text.join(" ")));
     if let Some(a) = &d.security.data {
-        let _ = write!(h, "<div class=kpi><b>{}</b><span>Seguridad /100</span></div>", a.score);
+        h.push_str(&ring(a.score));
     }
     if let Some(s) = solved {
         let _ = write!(h, "<div class=kpi><b>{s}</b><span>Resueltos</span></div>");
     }
     let _ = write!(h, "<div class=kpi><b>{}</b><span>Pendientes</span></div><div class=kpi><b>{work}</b><span>Acciones</span></div></div></div>", bad + warn);
+}
+
+/// Nota de seguridad en un anillo (verde, ámbar o rojo según la nota).
+fn ring(score: u32) -> String {
+    let s = score.min(100) as f64;
+    let color = if s >= 80.0 { "#12784a" } else if s >= 60.0 { "#b06f00" } else { "#c0223f" };
+    let len = 2.0 * std::f64::consts::PI * 22.0;
+    format!(
+        "<div class=ring><svg viewBox=\"0 0 52 52\"><circle cx=26 cy=26 r=22 fill=none stroke=\"#e8ecf1\" stroke-width=5 /><circle cx=26 cy=26 r=22 fill=none stroke=\"{color}\" stroke-width=5 stroke-linecap=round stroke-dasharray=\"{:.1} {len:.1}\" transform=\"rotate(-90 26 26)\" /><text x=26 y=30.5 text-anchor=middle font-size=13 font-weight=600 fill=\"#1b2330\">{score}</text></svg><span>Seguridad /100</span></div>",
+        len * s / 100.0
+    )
+}
+
+/// Estado de una parte del equipo para el cuadro «Estado por áreas».
+#[derive(Debug, Clone, PartialEq)]
+pub struct AreaState {
+    pub name: &'static str,
+    /// ok | warn | bad | na
+    pub level: &'static str,
+    pub text: String,
+}
+
+/// El disco del informe en el formato de la página Discos, para dar el mismo veredicto.
+fn as_disk(k: &super::collect::PhysicalDisk, smart: Option<&crate::hardware::smart::SmartDisk>) -> crate::disks::Disk {
+    crate::disks::Disk {
+        model: k.name.clone(),
+        bus: k.bus_type.clone(),
+        media: k.media_type.clone(),
+        size: k.size,
+        health: k.health.clone(),
+        temperature: k.temperature.map_or(-1, i64::from),
+        hours: k.power_on_hours.map_or(-1, |h| h as i64),
+        read_errors: k.read_errors.map_or(-1, |e| e as i64),
+        write_errors: k.write_errors.map_or(-1, |e| e as i64),
+        wear: k.wear.map_or(-1, i64::from),
+        predict_failure: smart.is_some_and(|s| s.predict_failure),
+        reallocated: smart.and_then(|s| s.reallocated),
+        pending: smart.and_then(|s| s.pending),
+        uncorrectable: smart.and_then(|s| s.uncorrectable),
+        crc_errors: smart.and_then(|s| s.crc_errors),
+        ..Default::default()
+    }
+}
+
+fn disk_verdicts(d: &Diagnostics) -> Vec<(String, crate::disks::Verdict)> {
+    d.disks
+        .data
+        .iter()
+        .flatten()
+        .map(|k| {
+            let smart = d.smart.data.iter().flatten().find(|s| crate::disks::same_model(&s.model, &k.name));
+            (k.name.clone(), crate::disks::verdict(&as_disk(k, smart)))
+        })
+        .collect()
+}
+
+/// Cómo está cada parte del equipo, en una línea. Lo que no se pudo medir sale como «—».
+pub fn areas(d: &Diagnostics) -> Vec<AreaState> {
+    let mut out = Vec::new();
+    let a = |name, level, text: String| AreaState { name, level, text };
+
+    // Discos: el peor veredicto de todos.
+    let verdicts = disk_verdicts(d);
+    out.push(match verdicts.iter().max_by_key(|(_, v)| match v.level.as_str() { "bad" => 2, "warn" => 1, _ => 0 }) {
+        None => a("Discos", "na", "No se pudo leer".into()),
+        Some((_, v)) if v.level == "ok" => a("Discos", "ok", if verdicts.len() == 1 { "Sano".into() } else { format!("Los {} sanos", verdicts.len()) }),
+        Some((name, v)) => a("Discos", if v.level == "bad" { "bad" } else { "warn" }, format!("{}: {}", name.trim(), v.title.to_lowercase())),
+    });
+
+    // Espacio del disco del sistema.
+    let sys = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into()).to_uppercase();
+    out.push(match d.volumes.iter().find(|v| v.mount.to_uppercase().starts_with(&sys)).filter(|v| v.total > 0) {
+        None => a("Espacio", "na", "—".into()),
+        Some(v) => {
+            let pct = v.free as f64 * 100.0 / v.total as f64;
+            let level = if pct < 10.0 { "bad" } else if pct < 20.0 { "warn" } else { "ok" };
+            a("Espacio", level, format!("{} libres ({pct:.0} %)", gb(v.free)))
+        }
+    });
+
+    // Seguridad.
+    out.push(match &d.security.data {
+        None => a("Seguridad", "na", "—".into()),
+        Some(s) => a("Seguridad", if s.score >= 80 { "ok" } else if s.score >= 60 { "warn" } else { "bad" }, format!("{}/100 · {}", s.score, if s.score >= 80 { "bien protegido" } else if s.score >= 60 { "mejorable" } else { "en riesgo" })),
+    });
+
+    // Actualizaciones de programas y de Windows.
+    let pending_programs = d.software_updates.data.as_ref().map(Vec::len);
+    let reboot = d.system.data.as_ref().is_some_and(|s| s.pending_reboot);
+    out.push(match (pending_programs, reboot) {
+        (None, false) => a("Actualizaciones", "na", "—".into()),
+        (n, reboot) => {
+            let n = n.unwrap_or(0);
+            let mut t = if n == 0 { "Programas al día".to_string() } else { format!("{n} {} por actualizar", if n == 1 { "programa" } else { "programas" }) };
+            if reboot {
+                t.push_str(" · reinicio pendiente");
+            }
+            a("Actualizaciones", if n > 0 || reboot { "warn" } else { "ok" }, t)
+        }
+    });
+
+    // Estabilidad: pantallazos azules y apagados inesperados.
+    out.push(match &d.stability.data {
+        None => a("Estabilidad", "na", "—".into()),
+        Some(s) => {
+            let n = s.bugchecks.len() + s.unexpected_shutdowns.len();
+            let level = match n {
+                0 => "ok",
+                1 | 2 => "warn",
+                _ => "bad",
+            };
+            a("Estabilidad", level, if n == 0 { format!("Sin cuelgues en {} días", s.days) } else { format!("{n} cuelgues o apagados en {} días", s.days) })
+        }
+    });
+
+    // Dispositivos.
+    out.push(match &d.drivers.data {
+        None => a("Dispositivos", "na", "—".into()),
+        Some(v) if v.is_empty() => a("Dispositivos", "ok", "Todos funcionan".into()),
+        Some(v) => a("Dispositivos", "warn", format!("{} con problemas", v.len())),
+    });
+
+    // Memoria: prueba y cantidad.
+    let ram_gb = d.ram_total as f64 / 1024f64.powi(3);
+    out.push(match &d.memory_test.data {
+        Some(Some(m)) if !m.passed => a("Memoria", "bad", "La prueba de memoria dio errores".into()),
+        _ if d.ram_total > 0 && ram_gb < 7.5 => a("Memoria", "warn", format!("{ram_gb:.0} GB: justa para Windows 11")),
+        _ if d.ram_total > 0 => a("Memoria", "ok", format!("{ram_gb:.0} GB")),
+        _ => a("Memoria", "na", "—".into()),
+    });
+
+    // Temperatura del procesador.
+    out.push(match d.temperatures.data.as_ref().and_then(|t| t.cpu) {
+        None => a("Temperatura", "na", "—".into()),
+        Some(c) => a("Temperatura", if c >= 90.0 { "bad" } else if c >= 80.0 { "warn" } else { "ok" }, format!("Procesador a {c:.0} °C")),
+    });
+
+    // Batería (solo portátiles).
+    if let Some(Some(b)) = &d.battery.data {
+        let h = b.health();
+        out.push(a("Batería", if h < 60.0 { "bad" } else if h < 80.0 { "warn" } else { "ok" }, format!("{h:.0} % de su capacidad original")));
+    }
+    out
+}
+
+fn areas_section(h: &mut String, d: &Diagnostics) {
+    let list = areas(d);
+    if list.iter().all(|x| x.level == "na") {
+        return;
+    }
+    h.push_str("<h2>Estado por áreas</h2><div class=areas>");
+    for x in &list {
+        let label = match x.level {
+            "ok" => "Bien",
+            "warn" => "Mejorable",
+            "bad" => "Atención",
+            _ => "Sin datos",
+        };
+        let _ = write!(h, "<div class=\"area a-{}\"><div class=n>{}<span class=s>{label}</span></div><p>{}</p></div>", x.level, x.name, esc(&x.text));
+    }
+    h.push_str("</div>");
+}
+
+/// Un pendiente con su prioridad: lo urgente y lo recomendable se distinguen de un vistazo.
+fn pending_row(h: &mut String, f: &Finding, detail: bool) {
+    let tag = match f.severity {
+        Severity::Bad => "<span class=\"prio bad\">Urgente</span>",
+        Severity::Warn => "<span class=\"prio warn\">Recomendado</span>",
+        Severity::Info => "",
+    };
+    let small = match (&f.detail, detail) {
+        (Some(x), true) => format!("<small>{} · {}</small>", esc(&f.area), esc(x)),
+        _ => format!("<small>{}</small>", esc(&f.area)),
+    };
+    let _ = write!(h, "<div class=f><div class=\"dot {}\"></div><div>{tag}<b>{}</b>{small}</div></div>", sev_class(f.severity), esc(&f.title));
 }
 
 fn finding_row(h: &mut String, f: &Finding, detail: bool, dot: &str) {
@@ -699,18 +901,23 @@ fn technical_sections(h: &mut String, d: &Diagnostics) {
     }
     h.push_str("</table>");
     if let Some(disks) = &d.disks.data {
-        h.push_str("<h3>Salud de los discos</h3><table><thead><tr><th>Disco</th><th>Tipo</th><th>Estado</th><th class=num>Temp.</th><th class=num>Desgaste</th><th class=num>Horas</th></tr></thead>");
+        h.push_str("<h3>Salud de los discos</h3><table><thead><tr><th>Disco</th><th>Tipo</th><th>Veredicto</th><th class=num>Temp.</th><th class=num>Desgaste</th><th class=num>Horas</th></tr></thead>");
+        let verdicts = disk_verdicts(d);
         for k in disks {
-            let health = if k.health.eq_ignore_ascii_case("Healthy") { "<span class=better>Saludable</span>".to_string() } else { format!("<span class=worse>{}</span>", esc(&k.health)) };
+            let health = match verdicts.iter().find(|(n, _)| *n == k.name).map(|(_, v)| v) {
+                Some(v) if v.level == "ok" => "<span class=better>Sano</span>".to_string(),
+                Some(v) => format!("<span class={}>{}</span>", if v.level == "bad" { "worse" } else { "warn" }, esc(&v.title)),
+                None => esc(&k.health),
+            };
             let _ = write!(
                 h,
-                "<tr><td>{}<div class=muted>{}</div></td><td>{} · {}</td><td>{health}</td><td class=num>{}</td><td class=num>{}</td><td class=num>{}</td></tr>",
+                "<tr><td>{}<div class=muted>{}</div></td><td>{}</td><td>{health}</td><td class=num>{}</td><td class=num>{}</td><td class=num>{}</td></tr>",
                 esc(&k.name),
                 gb(k.size),
-                esc(&k.media_type),
-                esc(&k.bus_type),
-                k.temperature.map(|t| format!("{t} °C")).unwrap_or("—".into()),
-                k.wear.map(|w| format!("{w}%")).unwrap_or("—".into()),
+                // «Unspecified» no le dice nada a nadie; el desgaste solo tiene sentido en un SSD.
+                esc(&[k.media_type.as_str(), k.bus_type.as_str()].into_iter().filter(|x| !x.is_empty() && !x.eq_ignore_ascii_case("Unspecified")).collect::<Vec<_>>().join(" · ")),
+                k.temperature.filter(|t| *t > 0).map(|t| format!("{t} °C")).unwrap_or("—".into()),
+                k.wear.filter(|_| k.media_type.eq_ignore_ascii_case("SSD")).map(|w| format!("{w}%")).unwrap_or("—".into()),
                 k.power_on_hours.map(|p| p.to_string()).unwrap_or("—".into())
             );
         }
@@ -835,12 +1042,16 @@ fn build(c: &Ctx) -> String {
         h,
         "<!doctype html><html lang=es><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\"><title>Informe {} — {}</title><style>{CSS}\
          @page{{size:A4;margin:14mm 13mm 16mm;\
-         @bottom-left{{content:\"{} · Informe Nº {}\";font:8.5px \"Segoe UI\",sans-serif;color:#8a95a5}}\
-         @bottom-right{{content:\"Página \" counter(page) \" de \" counter(pages);font:8.5px \"Segoe UI\",sans-serif;color:#8a95a5}}}}</style></head><body><main>",
+         @bottom-left{{content:\"{} · Informe Nº {}\";font:8.5px \"Plex\",\"Segoe UI\",sans-serif;color:#8a95a5}}\
+         @bottom-right{{content:\"Página \" counter(page) \" de \" counter(pages);font:8.5px \"Plex\",\"Segoe UI\",sans-serif;color:#8a95a5}}\
+         @top-right{{content:\"{}\";font:8.5px \"Plex\",\"Segoe UI\",sans-serif;color:#8a95a5}}}}\
+         @page:first{{@top-right{{content:none}}}}{}</style></head><body><main>",
         esc(&d.host),
         esc(c.number),
         css_str(&who),
-        css_str(c.number)
+        css_str(c.number),
+        css_str(&format!("{} · {}", d.host, fmt_day(d.timestamp))),
+        font_faces()
     );
     header(&mut h, c);
 
@@ -863,6 +1074,7 @@ fn build(c: &Ctx) -> String {
 
     let work: Vec<&Entry> = c.journal.iter().filter(|e| e.ok && e.op != Op::Revert).collect();
     summary(&mut h, c, work.len());
+    areas_section(&mut h, d);
 
     if !c.input.problem.trim().is_empty() {
         let _ = write!(h, "<h2>Motivo de la visita</h2><div class=text>{}</div>", esc(c.input.problem.trim()));
@@ -919,7 +1131,12 @@ fn build(c: &Ctx) -> String {
 
     // Problemas resueltos y pendientes
     let solved = c.base.map(|b| resolved(d, b)).unwrap_or_default();
-    let pending: Vec<&Finding> = d.findings.iter().filter(|f| c.technical() || important(f)).collect();
+    let mut pending: Vec<&Finding> = d.findings.iter().filter(|f| c.technical() || important(f)).collect();
+    pending.sort_by_key(|f| match f.severity {
+        Severity::Bad => 0,
+        Severity::Warn => 1,
+        Severity::Info => 2,
+    });
     if !solved.is_empty() || !pending.is_empty() {
         h.push_str("<h2>Problemas detectados</h2>");
         let both = !solved.is_empty() && !pending.is_empty() && !c.technical();
@@ -939,7 +1156,7 @@ fn build(c: &Ctx) -> String {
             h.push_str(if c.base.is_some() { "<h3>Pendientes</h3>" } else { "<h3>Estado actual</h3>" });
             h.push_str(if both { "<div>" } else { "<div class=fgrid>" });
             for f in &pending {
-                finding_row(&mut h, f, c.technical(), sev_class(f.severity));
+                pending_row(&mut h, f, c.technical());
             }
             h.push_str("</div>");
         }
@@ -991,6 +1208,13 @@ fn build(c: &Ctx) -> String {
     if !st.conditions.trim().is_empty() {
         let _ = write!(h, "<div class=conditions>{}</div>", esc(st.conditions.trim()));
     }
+    let _ = write!(
+        h,
+        "<p class=about>Los datos de este informe se obtuvieron del propio equipo el {} con AdminOps {}. Las temperaturas, el espacio y el estado de los discos son los del momento del análisis. Informe Nº {}.</p>",
+        fmt_ts(d.timestamp),
+        env!("CARGO_PKG_VERSION"),
+        esc(c.number)
+    );
     let _ = write!(h, "<footer>Generado el {} con AdminOps</footer></main></body></html>", Local::now().format("%d/%m/%Y %H:%M"));
     h
 }
@@ -1298,6 +1522,24 @@ mod tests {
         assert!(check_mail_fields("no-es-correo", "x").is_err());
         assert!(check_mail_fields("", "x").is_ok());
         assert_eq!(url_encode("a b&c"), "a%20b%26c");
+    }
+
+    /// El cuadro por áreas: lo que falta sale como «sin datos», no como «bien».
+    #[test]
+    fn areas_tell_the_truth() {
+        let mut d = Diagnostics { ram_total: 4 * 1024u64.pow(3), ..Default::default() };
+        d.volumes = vec![super::super::Volume { mount: std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into()) + "\\", total: 100 * 1024u64.pow(3), free: 5 * 1024u64.pow(3) }];
+        d.drivers = super::super::Section { data: Some(vec![]), error: None };
+        let a = areas(&d);
+        let get = |n: &str| a.iter().find(|x| x.name == n).unwrap().clone();
+        assert_eq!(get("Espacio").level, "bad", "5 % libre");
+        assert_eq!(get("Memoria").level, "warn", "4 GB");
+        assert_eq!(get("Dispositivos").level, "ok");
+        assert_eq!(get("Discos").level, "na", "sin datos no es «sano»");
+        assert_eq!(get("Seguridad").level, "na");
+        assert!(a.iter().all(|x| x.name != "Batería"), "sin batería no se enseña");
+        let r = ring(85);
+        assert!(r.contains("#12784a") && r.contains(">85<"));
     }
 
     /// Informes de muestra con análisis reales para revisar el diseño:

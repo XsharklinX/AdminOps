@@ -173,6 +173,200 @@ pub fn restore_app_data(app: tauri::AppHandle, password: String) -> Result<Optio
     Ok(Some(r))
 }
 
+// ---------- Copia automática ----------
+
+const AUTO: &str = "copia-automatica.json";
+
+/// Copia automática: a una carpeta (OneDrive, otro disco) cada N días, en el
+/// equipo donde se configuró (en un pendrive, en otro PC esa carpeta sería la
+/// de otra persona). La contraseña del .zip se guarda cifrada como las demás.
+#[derive(Serialize, serde::Deserialize, Default, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+struct AutoStored {
+    folder: String,
+    password: String,
+    every_days: u32,
+    keep: u32,
+    host: String,
+    last_error: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoBackupInfo {
+    enabled: bool,
+    folder: String,
+    every_days: u32,
+    keep: u32,
+    /// Se configuró en este equipo (solo aquí se hace sola).
+    here: bool,
+    configured_on: String,
+    last_backup: Option<u64>,
+    next_due: Option<u64>,
+    last_error: String,
+    /// Carpeta de OneDrive de este usuario, si la hay (para proponerla).
+    onedrive: Option<String>,
+}
+
+fn auto_load(root: &Path) -> AutoStored {
+    crate::paths::read_json(&root.join(AUTO))
+}
+
+fn last_backup(root: &Path) -> Option<u64> {
+    std::fs::read_to_string(root.join(LAST)).ok().and_then(|s| s.trim().parse().ok())
+}
+
+/// ¿Toca copia? (Nunca hecha, o hace `every` días o más.)
+pub fn backup_due(last: Option<u64>, every_days: u32, at: u64) -> bool {
+    every_days > 0 && last.is_none_or(|l| at.saturating_sub(l) >= u64::from(every_days) * 86_400)
+}
+
+/// Deja solo las `keep` copias automáticas más recientes de la carpeta.
+fn prune(folder: &Path, keep: u32) {
+    let mut copies: Vec<PathBuf> = std::fs::read_dir(folder)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("AdminOps-copia-") && n.ends_with(".zip")))
+        .collect();
+    copies.sort();
+    let extra = copies.len().saturating_sub(keep.max(1) as usize);
+    for p in copies.into_iter().take(extra) {
+        let _ = std::fs::remove_file(p);
+    }
+}
+
+fn run_auto(app: &tauri::AppHandle) -> Result<BackupDone, String> {
+    let root = crate::paths::shared_data_dir(app);
+    let cfg = auto_load(&root);
+    if cfg.folder.is_empty() {
+        return Err("La copia automática no está configurada.".into());
+    }
+    let folder = PathBuf::from(&cfg.folder);
+    if !folder.is_dir() {
+        return Err("La carpeta de la copia no está disponible (¿OneDrive o el disco, desconectados?).".into());
+    }
+    let password = crate::secrets::open(&cfg.password)?;
+    let out = folder.join(format!("AdminOps-copia-{}.zip", chrono::Local::now().format("%Y-%m-%d")));
+    let (files, bytes) = write_zip(&root, &out, &password, &serde_json::json!({}), false, false)?;
+    let _ = std::fs::write(root.join(LAST), now().to_string());
+    prune(&folder, if cfg.keep == 0 { 5 } else { cfg.keep });
+    log::info!("Copia automática de AdminOps: {files} archivos");
+    Ok(BackupDone { path: out.display().to_string(), files, bytes })
+}
+
+#[tauri::command]
+pub fn autobackup_info(app: tauri::AppHandle) -> AutoBackupInfo {
+    let root = crate::paths::shared_data_dir(&app);
+    let cfg = auto_load(&root);
+    let last = last_backup(&root);
+    let every = if cfg.every_days == 0 { 7 } else { cfg.every_days };
+    AutoBackupInfo {
+        enabled: !cfg.folder.is_empty(),
+        here: cfg.host.is_empty() || cfg.host == crate::paths::host(),
+        configured_on: cfg.host.clone(),
+        next_due: (!cfg.folder.is_empty()).then(|| last.map_or(now(), |l| l + u64::from(every) * 86_400)),
+        folder: cfg.folder,
+        every_days: every,
+        keep: if cfg.keep == 0 { 5 } else { cfg.keep },
+        last_backup: last,
+        last_error: cfg.last_error,
+        onedrive: std::env::var("OneDrive").ok().filter(|p| Path::new(p).is_dir()).map(|p| Path::new(&p).join("AdminOps copias").display().to_string()),
+    }
+}
+
+/// Configura la copia automática (carpeta vacía: la desactiva).
+#[tauri::command]
+pub fn autobackup_set(app: tauri::AppHandle, folder: String, password: String, every_days: u32, keep: u32) -> Result<(), String> {
+    let root = crate::paths::shared_data_dir(&app);
+    let path = root.join(AUTO);
+    if folder.trim().is_empty() {
+        let _ = std::fs::remove_file(&path);
+        return Ok(());
+    }
+    let dir = PathBuf::from(folder.trim());
+    if dir.starts_with(&root) {
+        return Err("Elige una carpeta fuera de los datos de AdminOps (OneDrive, otro disco…).".into());
+    }
+    let old = auto_load(&root);
+    // Sin contraseña nueva, se mantiene la que había.
+    let sealed = if password.is_empty() {
+        if old.password.is_empty() {
+            return Err("Pon una contraseña para cifrar la copia (al menos 8 caracteres).".into());
+        }
+        old.password
+    } else {
+        if password.chars().count() < 8 {
+            return Err("La contraseña debe tener al menos 8 caracteres.".into());
+        }
+        crate::secrets::seal(&password)?
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+    let cfg = AutoStored { folder: dir.display().to_string(), password: sealed, every_days: every_days.clamp(1, 60), keep: keep.clamp(1, 30), host: crate::paths::host(), last_error: String::new() };
+    crate::paths::write_json(&path, &cfg)
+}
+
+#[tauri::command(async)]
+pub fn autobackup_run_now(app: tauri::AppHandle) -> Result<BackupDone, String> {
+    let r = run_auto(&app);
+    let root = crate::paths::shared_data_dir(&app);
+    let mut cfg = auto_load(&root);
+    if !cfg.folder.is_empty() {
+        cfg.last_error = r.as_ref().err().cloned().unwrap_or_default();
+        let _ = crate::paths::write_json(&root.join(AUTO), &cfg);
+    }
+    r
+}
+
+/// Cada hora: la copia automática si toca; una vez al día, la salud de la
+/// unidad de datos (el pendrive) con aviso si algo va mal.
+pub fn start(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(3 * 60));
+        let mut checked_day = 0u64;
+        loop {
+            let root = crate::paths::shared_data_dir(&app);
+            let cfg = auto_load(&root);
+            let every = if cfg.every_days == 0 { 7 } else { cfg.every_days };
+            if !cfg.folder.is_empty() && cfg.host == crate::paths::host() && backup_due(last_backup(&root), every, now()) {
+                let r = run_auto(&app);
+                let mut cfg = cfg.clone();
+                cfg.last_error = r.as_ref().err().cloned().unwrap_or_default();
+                let _ = crate::paths::write_json(&root.join(AUTO), &cfg);
+                if let Err(e) = r {
+                    log::warn!("Copia automática: {e}");
+                }
+            }
+            let day = now() / 86_400;
+            if crate::paths::is_portable() && day != checked_day {
+                checked_day = day;
+                let h = storage_health(app.clone());
+                let alerts: Vec<crate::winwatch::Alert> = h
+                    .warnings
+                    .iter()
+                    .map(|w| crate::winwatch::Alert {
+                        key: format!("usb:{}", w.chars().take(40).collect::<String>()),
+                        level: if w.contains("dañado") || w.contains("problema") { "bad".into() } else { "warn".into() },
+                        title: "Los datos de AdminOps en el pendrive".into(),
+                        detail: w.clone(),
+                        explanation: "El pendrive donde va AdminOps es lo más frágil de todo: si se estropea o se pierde, se van tus clientes, contactos y agenda.".into(),
+                        advice: "Ajustes → Datos: copia automática a OneDrive u otro disco. Y en Discos, su salud.".into(),
+                        page: Some("settings".into()),
+                        count: 1,
+                        time: now(),
+                        ..Default::default()
+                    })
+                    .collect();
+                if !alerts.is_empty() {
+                    crate::winwatch::push_alerts(&app, alerts);
+                }
+            }
+            std::thread::sleep(Duration::from_secs(3600));
+        }
+    });
+}
+
 // ---------- Salud del almacenamiento ----------
 
 #[derive(Serialize, Default)]
@@ -190,6 +384,8 @@ pub struct StorageHealth {
     pub data_bytes: u64,
     /// Portable: la clave de las contraseñas está en el USB.
     pub key_present: Option<bool>,
+    /// Portable: esa clave va protegida con el PIN del bloqueo.
+    pub key_protected: Option<bool>,
     pub last_backup: Option<u64>,
     pub last_contacts_backup: Option<u64>,
     pub warnings: Vec<String>,
@@ -201,6 +397,9 @@ fn dir_bytes(root: &Path) -> u64 {
     while let Some(d) = stack.pop() {
         for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
             match e.file_type() {
+                // El navegador interno son miles de archivos: recorrerlo en un
+                // pendrive tarda segundos, y no son «tus datos».
+                Ok(t) if t.is_dir() && SKIP_DIRS.iter().any(|s| e.file_name().to_string_lossy().eq_ignore_ascii_case(s)) => {}
                 Ok(t) if t.is_dir() => stack.push(e.path()),
                 Ok(t) if t.is_file() => total += e.metadata().map(|m| m.len()).unwrap_or(0),
                 _ => {}
@@ -233,6 +432,7 @@ pub fn storage_health(app: tauri::AppHandle) -> StorageHealth {
     h.data_bytes = dir_bytes(&root);
     if h.portable {
         h.key_present = Some(root.join(".clave").is_file());
+        h.key_protected = Some(crate::secrets::key_is_protected(&root));
     }
     h.last_backup = std::fs::read_to_string(root.join(LAST)).ok().and_then(|s| s.trim().parse().ok());
     h.last_contacts_backup = std::fs::read_dir(root.join("contacts-copias"))
@@ -252,10 +452,15 @@ pub fn storage_health(app: tauri::AppHandle) -> StorageHealth {
     if h.total > 0 && h.free < 500 * 1024 * 1024 {
         h.warnings.push("Queda muy poco espacio en la unidad.".into());
     }
+    // En un pendrive, perderlo es perderlo todo: la copia se pide antes.
+    let limit = if h.portable { 15 } else { 30 };
     match days(h.last_backup) {
         None => h.warnings.push("Nunca se ha hecho una copia de seguridad cifrada de estos datos.".into()),
-        Some(d) if d > 30 => h.warnings.push(format!("La última copia de seguridad es de hace {d} días.")),
+        Some(d) if d > limit => h.warnings.push(format!("La última copia de seguridad es de hace {d} días.")),
         _ => {}
+    }
+    if h.portable && drive.chars().next().is_some_and(|c| crate::disks::is_dirty(&c.to_string()) == Some(true)) {
+        h.warnings.push("Windows marcó el sistema de archivos de esta unidad como dañado: repáralo en Discos → Salud y reparación y haz una copia cuanto antes.".into());
     }
     if h.key_present == Some(false) && std::fs::read_to_string(root.join("routers.json")).is_ok_and(|s| s.contains("p1:")) {
         h.warnings.push("Falta la clave del USB: las contraseñas de routers guardadas no se pueden leer.".into());
@@ -266,6 +471,30 @@ pub fn storage_health(app: tauri::AppHandle) -> StorageHealth {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn when_a_backup_is_due() {
+        let day = 86_400;
+        assert!(backup_due(None, 7, 100 * day), "nunca hecha");
+        assert!(!backup_due(Some(95 * day), 7, 100 * day));
+        assert!(backup_due(Some(93 * day), 7, 100 * day));
+        assert!(!backup_due(None, 0, 100 * day), "desactivada");
+    }
+
+    #[test]
+    fn keeps_only_the_newest_copies() {
+        let dir = std::env::temp_dir().join(format!("adminops-prune-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for d in ["2026-09-01", "2026-09-08", "2026-09-15", "2026-09-22"] {
+            std::fs::write(dir.join(format!("AdminOps-copia-{d}.zip")), b"x").unwrap();
+        }
+        std::fs::write(dir.join("otra-cosa.zip"), b"x").unwrap();
+        prune(&dir, 2);
+        let mut left: Vec<String> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        left.sort();
+        assert_eq!(left, ["AdminOps-copia-2026-09-15.zip", "AdminOps-copia-2026-09-22.zip", "otra-cosa.zip"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn backup_and_restore_roundtrip() {

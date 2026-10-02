@@ -29,7 +29,7 @@ import logo from "../assets/logo.svg";
 import { useToast } from "../components/feedback";
 import { SignaturePad } from "../components/service";
 import { NAV } from "../components/Sidebar";
-import { Button, Card, inputClass, Loading, Modal } from "../components/ui";
+import { Button, Card, ErrorState, inputClass, Loading, Modal } from "../components/ui";
 import { PerfPanel } from "../components/PerfPanel";
 import { openOnboarding } from "../lib/navigate";
 import {
@@ -59,6 +59,9 @@ import {
 } from "../lib/prefs";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { DataSafety } from "./settings/DataSafety";
+import { AutoBackup } from "./settings/AutoBackup";
+import { CompanyConfig } from "../components/CompanyConfig";
+import { showFirstStepsAgain } from "../components/FirstSteps";
 import { Search } from "lucide-react";
 import { PortalSettings } from "./settings/Portals";
 import {
@@ -87,9 +90,12 @@ function readTab(): Tab {
 export function SettingsPage({
   appInfo,
   onNavigate,
+  focus,
 }: {
   appInfo: AppInfo | null;
   onNavigate: (p: PageId) => void;
+  /** Sección a la que llevar (Primeros pasos, enlaces): portals, security, general… */
+  focus?: string | null;
 }) {
   const [s, setS] = useState<Settings | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -101,21 +107,42 @@ export function SettingsPage({
   // Lleva la vista a la fila buscada en cuanto la sección la pinta.
   useEffect(() => {
     if (!highlight) return;
+    let flashed: Element | null = null;
     const t = window.setTimeout(() => {
-      document
-        .querySelector(`[data-setting="${CSS.escape(highlight)}"]`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Una fila lleva el título exacto; una tarjeta puede llevar algo detrás («Portales configurados · 3»).
+      const name = CSS.escape(highlight);
+      const el = document.querySelector(`[data-setting="${name}"]`) ?? document.querySelector(`[data-setting^="${name}"]`);
+      if (!el) return;
+      const block = el.tagName === "SECTION";
+      el.scrollIntoView({ behavior: "smooth", block: block ? "start" : "center" });
+      // Las filas se resaltan solas (HighlightCtx); a las tarjetas se les marca el borde.
+      if (block) {
+        el.classList.add("setting-flash");
+        flashed = el;
+      }
     }, 60);
     const clear = window.setTimeout(() => setHighlight(null), 3000);
     return () => {
       window.clearTimeout(t);
       window.clearTimeout(clear);
+      flashed?.classList.remove("setting-flash");
     };
   }, [highlight, tab]);
 
-  useEffect(() => {
-    void workApi.settings().then(setS);
+  const [failed, setFailed] = useState<string | null>(null);
+  const loadSettings = useCallback(() => {
+    setFailed(null);
+    workApi
+      .settings()
+      .then(setS)
+      .catch((e) => setFailed(String(e)));
   }, []);
+  useEffect(loadSettings, [loadSettings]);
+
+  // Desde Primeros pasos o un enlace: abrir esa sección.
+  useEffect(() => {
+    if (focus && SECTIONS.some((x) => x.id === focus)) setTab(focus as Tab);
+  }, [focus]);
 
   const pickTab = (t: Tab) => {
     setTab(t);
@@ -126,7 +153,7 @@ export function SettingsPage({
     }
   };
 
-  if (!s) return <Loading page />;
+  if (!s) return failed ? <ErrorState page message={failed} onRetry={loadSettings} /> : <Loading page />;
 
   const set = (patch: Partial<Settings>) => {
     setS({ ...s, ...patch });
@@ -250,7 +277,7 @@ export function SettingsPage({
                 s={s}
                 set={set}
                 portable={!!appInfo?.portable}
-                onImported={() => workApi.settings().then(setS)}
+                onImported={loadSettings}
               />
             )}
             {tab === "appearance" && <Appearance />}
@@ -387,6 +414,15 @@ function General({
           <Button kind="ghost" onClick={openOnboarding}>
             <Sparkles size={14} /> Ver la bienvenida
           </Button>
+          <Button
+            kind="ghost"
+            onClick={() => {
+              showFirstStepsAgain();
+              toast("ok", "Primeros pasos vuelve a salir en el Panel.");
+            }}
+          >
+            Ver «Primeros pasos»
+          </Button>
         </Row>
         <Row
           title="Actualización del Panel"
@@ -474,6 +510,10 @@ function General({
 
       <DataSafety />
 
+      <AutoBackup />
+
+      <CompanyConfig />
+
       <DataCare s={s} set={set} />
 
       <Card title="Red y dominio">
@@ -514,6 +554,7 @@ function General({
 function WhereStored({ portable }: { portable: boolean }) {
   const [info, setInfo] = useState<StorageInfo | null>(null);
   const [asked, setAsked] = useState(false);
+  const [browserOnUsb, setBrowserOnUsb] = useState<boolean | null>(null);
   const toast = useToast();
   useEffect(() => {
     storageApi.info().then(setInfo).catch(() => {});
@@ -529,7 +570,7 @@ function WhereStored({ portable }: { portable: boolean }) {
     "Informes PDF (todos juntos)",
   ];
   const perPc = [
-    "La sesión iniciada en los portales (Correo, Teams…): Windows la cifra para cada equipo. Se entra una vez en cada PC y luego se mantiene",
+    "La sesión iniciada en los portales (Correo, Teams…): Windows la cifra para cada equipo. Se entra una vez en cada PC y luego se mantiene (en el disco de ese PC, salvo que elijas el pendrive aquí abajo)",
     "Diario de cambios y «Deshacer» (solo sirven en ese equipo)",
     "Diagnósticos y su comparación",
     "Avisos de Windows y línea de tiempo",
@@ -562,6 +603,34 @@ function WhereStored({ portable }: { portable: boolean }) {
           Para actualizar, vuelve a pasar el instalador sobre la misma carpeta: los datos no se tocan (el instalador solo cambia los archivos del programa). Lo tuyo
           se configura una vez y te acompaña; lo de cada equipo se separa por su nombre.
         </p>
+      )}
+      {portable && info && (
+        <div className="mb-3 rounded-lg border border-line bg-panel-2 p-3">
+          <label className="flex items-start gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={browserOnUsb ?? info.browserOnUsb}
+              onChange={(e) => {
+                const on = e.target.checked;
+                storageApi
+                  .setBrowserOnUsb(on)
+                  .then(() => {
+                    setBrowserOnUsb(on);
+                    toast("ok", "Se aplicará al volver a abrir AdminOps.");
+                  })
+                  .catch((err) => toast("error", String(err)));
+              }}
+              className="mt-1 accent-[var(--color-neon)]"
+            />
+            <span>
+              Guardar también el navegador interno en el pendrive
+              <span className="block text-xs text-dim">
+                No deja nada de Correo, Teams ni Tickets en el disco del equipo (para equipos de clientes), pero en un pendrive van mucho más lentos: páginas en
+                blanco y un arranque de varios segundos más. Desactivado, cada equipo guarda su sesión en su propio disco, que es donde de todas formas vale.
+              </span>
+            </span>
+          </label>
+        </div>
       )}
       {info?.migrated && (
         <p className="mb-3 flex items-start gap-1.5 text-xs text-ok">

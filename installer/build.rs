@@ -13,6 +13,15 @@ fn main() {
     let payload = root.join(format!("src-tauri/target/release/bundle/nsis/AdminOps_{version}_x64-setup.exe"));
     println!("cargo:rerun-if-changed={}", payload.display());
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("payload.exe");
+    // Huella del adminops.exe que lleva dentro: al terminar se comprueba que el
+    // instalado es este (la versión no basta: dos builds pueden tener la misma).
+    let exe = root.join("src-tauri/target/release/adminops.exe");
+    println!("cargo:rerun-if-changed={}", exe.display());
+    let hash = std::fs::read(&exe).map(|b| {
+        use sha2::Digest;
+        sha2::Sha256::digest(&b).iter().map(|x| format!("{x:02x}")).collect::<String>()
+    });
+    println!("cargo:rustc-env=APP_EXE_SHA256={}", hash.unwrap_or_default());
     if payload.exists() {
         std::fs::copy(&payload, &out).unwrap();
     } else if std::env::var("PROFILE").as_deref() == Ok("release") {

@@ -7,6 +7,7 @@ import { openCase } from "../lib/currentCase";
 import { recognize, type Recognized } from "../lib/recognize";
 import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { EmptyLine } from "./ui";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -87,7 +88,7 @@ function smartEntries(r: Recognized, go: (page: PageId, focus?: string | null) =
     case "ip":
       return [
         e("ip-web", `Abrir la página de ${v}`, "Router, impresora o lo que sea que responda ahí", () => lanApi.openDevice(v)),
-        e("ip-tools", "Herramientas de red", "Ping, traceroute y puertos", () => go("nettools")),
+        e("ip-tools", "Herramientas de red", "Red → Herramientas: ping, traceroute y puertos", () => go("nettools")),
       ];
     case "printer":
       return [e("printer", "Revisar las impresoras", "Por qué no imprime y qué hacer", () => go("printers"))];
@@ -274,7 +275,7 @@ export function CommandPalette({
               <span className="shrink-0 text-[11px] tracking-wide text-mute">{KIND_LABEL[e.kind]}</span>
             </button>
           ))}
-          {results.length === 0 && <p className="px-4 py-6 text-center text-sm text-mute">Nada coincide con «{query}».</p>}
+          {results.length === 0 && <EmptyLine>Nada coincide con «{query}».</EmptyLine>}
         </div>
         <div className="flex gap-4 border-t border-line px-4 py-2 text-[11px] text-mute">
           <span>↑↓ moverse</span>

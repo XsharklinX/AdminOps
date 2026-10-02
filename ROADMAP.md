@@ -107,6 +107,211 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
+### v1.1.9 — Lavado de cara y repaso de fallos
+
+Nueve pantallas repasadas, por lotes, y una revisión de lo que fallaba en silencio. Incluye lo de
+abajo que estaba «sin build» (Tickets, Carpetas compartidas, Agenda, Personas y clientes).
+
+**Pantallas**
+
+- **Usuarios locales**, como Clientes: cifras arriba (usuarios, administradores activos,
+  desactivadas, con algo que revisar; las tres últimas filtran), buscador, lista con avatar y
+  última entrada, y una ficha por cuenta con sus datos y sus acciones con nombre. **Lo que conviene
+  revisar** de cada cuenta sale arriba de la ficha con el botón que lo arregla: contraseña caducada
+  o a punto, administrador sin contraseña, «Administrador» o invitado integrados activos, y cuentas
+  que nadie usa desde hace seis meses (`lib/userIssues.ts`, con sus pruebas).
+- **Procesos**: agrupados por programa (un navegador cuenta como uno, con la suma de todos; se
+  despliega para ver cada proceso), barras de CPU y memoria, «lo que más pesa ahora» arriba,
+  filtros «de quien usa el equipo / de Windows» y **finalizar el programa entero**. Un fallo al
+  releer ya no saca un aviso cada dos segundos.
+- **Acceso remoto**: barra de conexión rápida (un nombre y Conectar; usuario y opciones a un
+  clic), conexiones guardadas como fichas ordenadas por uso, con buscador y un punto que dice si
+  el equipo **contesta** (se comprueba al abrir, de dos en dos), y por qué no cuando no.
+- **Sesión de servicio por pasos**: Motivo → Trabajo → Informe → Cobro → Firma y cierre, con lo que
+  lleva cada paso a la vista y pudiendo saltar a cualquiera. El cierre ya no es una ventana
+  aparte: avisa de lo que falta (motivo, checklist, observaciones) antes de generar el informe.
+- **Red, una sola página** con cuatro pestañas: Red y router · Dispositivos · Velocidad y
+  diagnóstico · Herramientas. Los enlaces antiguos llevan a su pestaña.
+- **Diario de cambios** como línea de tiempo: por días (Hoy, Ayer, fecha), con buscador, filtros
+  (ajustes, acciones, deshechos, con error, se pueden deshacer) y cuántos cambios quedan por poder
+  deshacer.
+- **Tabla común** (`components/DataTable.tsx`): misma cabecera y densidad, y **ordenar por
+  columna**, en Dispositivos, Estaciones, Herramientas de red (ping/traceroute y puertos),
+  Velocidad (historial y diagnóstico), SMART de Hardware y discos del Diagnóstico. Las IP se
+  ordenan como números y lo vacío va siempre al final.
+- **Cargas, vacíos y errores iguales en toda la app**: `Loading`, `EmptyLine`/`EmptyState` y
+  `ErrorState` (con «Reintentar»).
+- **Ajustes**: ya tenía buscador y secciones, así que lo que se hizo fue arreglar el buscador:
+  8 ajustes que no se encontraban, 4 entradas que apuntaban a nombres que ya no existen, y ahora
+  lleva y marca también los bloques enteros, no solo las filas. Una prueba compara el índice con la
+  pantalla para que no se vuelva a desfasar.
+
+**Fallos corregidos**
+
+- **Páginas que se quedaban en «Leyendo…» para siempre** si la primera lectura fallaba: Usuarios,
+  Procesos, Impresoras, Perfiles, Inicio de Windows, Ajustes de Windows, Desinstalar, Bloatware,
+  Instalar, Herramientas, Carpetas compartidas, Sesión de servicio, Ajustes y la lista de copias
+  de drivers. Ahora dicen qué pasó y dejan reintentar.
+- **Carpetas compartidas**: los permisos del disco se ponían archivo por archivo (`icacls /T`):
+  lento en carpetas grandes (podía agotar el tiempo y dejarlo a medias) y, al quitar a la persona
+  después, los permisos sueltos de cada archivo se quedaban. Ahora es un solo permiso heredable en
+  la carpeta. Al compartir o cambiar permisos se da más tiempo.
+- **Tickets**: los botones «Entrar con Microsoft / Google / Okta…» se admiten de fábrica (son un
+  enlace que pulsa el usuario y no se distinguían de un enlace a otro sitio); al guardar un portal
+  se olvidan los sitios aprendidos en la sesión.
+- **Copiar al portapapeles** sin avisar si fallaba, en 8 sitios.
+- Diario, Informe, Panel y editor de perfiles: lecturas sin gestionar el error.
+
+### Tickets: el inicio de sesión ya no se corta al salir del dominio (hecho, sin build)
+
+Un portal solo navegaba por su propio nombre y sus subdominios; cualquier otra dirección se
+cancelaba y se abría en el navegador de fuera. Eso rompía el inicio de sesión de las intranets que
+lo tienen en otro sitio (`intranet.empresa.com` → `sso.empresa.com`, nombre corto → nombre largo o
+IP, un proveedor de identidad externo): al enviar las credenciales, la página de destino se abría
+fuera, sin la sesión ni los datos del formulario, y solo enseñaba un error. Además no quedaba
+rastro en el registro.
+
+- **Misma casa**: valen también los hermanos del dominio (`*.empresa.com`, sin abrir terminaciones
+  que no son de nadie como `com.do` o `gob.do`), y para una intranet por nombre corto o IP privada,
+  su nombre largo y el resto de la red interna.
+- **Lo que es parte de entrar pasa siempre** (`guard_navigation`, con lo que WebView2 sabe de cada
+  navegación): redirecciones del servidor, envío de formularios y navegación de la propia página.
+  El sitio al que se llega así queda admitido para ese portal mientras AdminOps esté abierta.
+  Solo un enlace que pulsa el usuario hacia otro sitio se abre fuera.
+- **Aviso con arreglo**: cuando algo se abre fuera, una barra lo dice con el nombre del sitio y
+  «Permitir en este portal» (queda guardado en sus dominios, sin recargar la vista).
+- Todo se anota en el registro técnico (solo el nombre del sitio, nunca la dirección entera).
+
+### Carpetas compartidas a fondo (hecho, sin build)
+
+Módulo nuevo `shares.rs` y la pestaña «Carpetas compartidas» rehecha. Todo con los mecanismos de
+Windows y el usuario de quien usa el equipo: AdminOps no guarda contraseñas ni toca otros equipos.
+
+- **Quién puede entrar, sin volver a compartir**: por carpeta, cambiar el permiso de cada cuenta
+  (leer / leer y modificar / control total), quitarla o añadir otra. Al dar acceso se ajustan
+  también los permisos del disco (nunca en un disco entero ni en carpetas de Windows).
+- **«¿Por qué no puede entrar?»**: carpeta + persona → lo que deja la compartición, lo que deja el
+  disco y lo que puede de verdad (la intersección), con cada causa en claro: red pública, firewall,
+  carpeta que ya no existe, cuenta que no existe, desactivada o sin contraseña, cuenta de
+  Microsoft, un «Denegar», no estar en la lista. Con el botón que lo arregla al lado.
+- **Unidades de red de este equipo**: las que Windows recuerda, con si el equipo que las sirve
+  contesta; reconectar, abrir, quitar y conectar una nueva. Elevado, se le pide al escritorio de
+  Windows que ejecute `net use`, porque las unidades son de la sesión del usuario.
+- **Qué comparte otro equipo**: nombre o IP → sus carpetas e impresoras (lo mismo que enseña el
+  Explorador en `\\EQUIPO`), conectar como unidad, copiar la ruta o abrir.
+- **Copiar la ruta y las instrucciones**: `\\EQUIPO\Carpeta` y un texto listo para mandar.
+- **Revisión de riesgos**: «Todos: control total» (con «Bajarlo a leer y modificar»), disco
+  entero, carpetas personales (perfil, Escritorio, Documentos, Descargas) y carpetas de Windows.
+- **Tamaño y espacio**: cuánto ocupa cada carpeta y aviso si al disco le queda menos del 10 % o
+  de 10 GB.
+- **Copia diaria a otro disco**: tarea programada de Windows con robocopy (`/E`: lo nuevo y lo
+  cambiado, nunca borra en la copia), con hora, última copia, si falló y «Copiar ahora».
+
+### Historial de la Agenda, y Personas y Clientes juntos y rediseñados (hecho, sin build)
+
+- **Agenda → Historial** (tercera vista, junto a Lista y Mes): todo lo hecho, lo cancelado y lo que
+  pasó sin marcarse, con los seguimientos hechos. Buscar, filtrar por estado y por tipo, y por cada
+  mes cuántas se hicieron y cuánto tiempo. Arriba: hechas este mes, tiempo este mes, hechas este
+  año y sin marcar. Cada cosa se puede volver a dejar pendiente, marcar como hecha, **repetir**
+  (abre el editor con una copia) o borrar. Se guarda cuándo se marcó como hecha.
+- **«Atrasado»** arriba de la lista: lo que se quedó sin marcar (su día pasó y no está ni hecho ni
+  cancelado) ya no se esconde en «lo pasado»: sale primero, con su fecha, para marcarlo, pasarlo a
+  hoy o cancelarlo.
+- **Personas y Clientes, una sola página** con dos pestañas (lo que abría «Clientes» lleva a su
+  pestaña). **Clientes**: cuatro cifras arriba (clientes, equipos, mantenimiento cerca o vencido
+  —filtra al pulsarla— y garantías vigentes), lista con avatar y última visita, y la ficha con
+  cabecera (Empezar sesión, Agendar —abre la Agenda con ese cliente—, teléfono y correo para
+  copiar, y cuatro datos clave) y pestañas **Resumen · Equipos · Visitas · Datos y plantilla**, en
+  vez de todo apilado con el formulario delante. **Personas**: buscador con el botón dentro,
+  **recientes** (las últimas 8 personas abiertas, a un clic), resultados con avatar y estado, y un
+  **aviso arriba de la ficha** cuando la cuenta tiene un problema (bloqueada, contraseña caducada,
+  desactivada, caduca pronto) con el botón que lo arregla ahí mismo.
+
+### Listo para el equipo, Agenda de mes con Outlook y presencia de Teams (hecho, sin build)
+
+- **Fase 34, cerrada en lo que depende del código**:
+  - **Primeros pasos** en el Panel (modo técnico): tus datos y los de la empresa, portales,
+    Microsoft 365, bloqueo con PIN y copia automática, cada uno con su botón y su casilla que se
+    marca sola. Se oculta al completarlo; vuelve desde Ajustes → General.
+  - **Configuración de empresa exportable** (Ajustes → General, y en Primeros pasos): datos de la
+    empresa (logo, condiciones, precios, impuestos, tipos de visita, checklist), portales, dominio y
+    la aplicación de Microsoft 365, en un .json. Al importar se elige qué aplicar; los portales que
+    ya existen no se duplican. **Nunca** lleva contraseñas, sesiones, el nombre ni la firma del técnico.
+  - **Paquete de soporte** con `resumen.txt`: versión, modo (pendrive/instalado), dónde va el
+    navegador, Microsoft 365, los últimos arranques con sus tiempos y los últimos avisos y errores.
+  - **Manual del técnico** (`docs/MANUAL.md`), **guía de instalación para IT**
+    (`docs/INSTALACION-IT.md`: requisitos, permisos, conexiones, Microsoft 365, antivirus) y **lista
+    de componentes de terceros** (`docs/TERCEROS.md`, generada con `scripts/terceros.py`: 535 de
+    Rust y 7 de la interfaz, ninguno GPL). La CI ejecuta `cargo audit` y `npm audit`.
+  - Falta lo que no es código: las capturas del manual y que otro técnico lo use una semana.
+- **Agenda: vista de mes** (seis semanas, lunes a domingo) con **arrastrar para cambiar de día**,
+  doble clic para apuntar, «y N más» que abre ese día en la lista. **Outlook en los dos sentidos**:
+  al abrir la Agenda se trae lo que se movió en Outlook (hora, duración, sitio) de lo que salió de
+  aquí, y si se borró allí la visita se queda sin enlace y se dice; lo que se mueve o edita aquí se
+  actualiza solo en Outlook; y lo demás de tu calendario de Outlook se ve en gris, en la lista y en
+  el mes, para tener un solo calendario. Se puede mover hasta un año antes o después.
+- **Presencia de Teams y fotos de Microsoft 365** en Contactos (tarjetas, tabla, directorio,
+  marcación rápida y ficha) y en Personas: punto de color (disponible, ocupado, ausente, no
+  molestar…) y «Teams: Ocupado · en una reunión». La presencia se refresca cada 2 minutos con la
+  página a la vista, en lotes de 20 ($batch); las fotos se guardan una semana (y quien no tiene,
+  también, para no volver a pedirla). Permisos nuevos: `Presence.Read.All`, `User.ReadBasic.All`.
+
+### v1.1.8 — Discos y pendrive a fondo, e informe profesional (hecho)
+
+- **Correo y Teams «no llegó a abrirse» sesión tras sesión: la causa de verdad.** Al cerrarse
+  AdminOps de golpe (el instalador lo cierra para actualizar, un cuelgue), sus procesos de WebView2
+  seguían vivos con el perfil abierto; el AdminOps siguiente se enganchaba a ellos y las vistas no
+  arrancaban nunca. Ahora, al abrir, antes de crear ninguna vista, se cierran los procesos de
+  WebView2 con perfil de AdminOps si no hay otro AdminOps abierto (y se anota en el registro); el
+  instalador también los cierra. Además, la vista que tarda en arrancar ya no se destruye a los
+  25 s (en un equipo cargado se destruía justo antes de llegar y así nunca llegaba): se espera un
+  minuto.
+- **El instalador comprueba que de verdad actualizó.** Si NSIS no podía sobrescribir
+  `adminops.exe` (algo lo tenía abierto), terminaba sin error; y como las dos builds tenían la misma
+  versión, se daba por actualizado y se seguía usando el programa anterior (pasó con la corrección
+  del navegador). Ahora compara la huella SHA-256 del `adminops.exe` instalado con la del que lleva
+  dentro; si no coincide, cierra todo, reintenta y, si sigue igual, lo dice.
+- **Corrección tras probar la build en el pendrive**: Correo y Teams se quedaban en blanco y
+  AdminOps tardaba 38 s en abrir. El perfil del navegador interno estaba en el pendrive, y Teams y
+  Outlook escriben miles de archivos pequeños: en un pendrive se arrastran. Ahora, con AdminOps
+  instalado en el pendrive, el navegador va al disco de cada equipo (donde sus sesiones valen de
+  todas formas: Windows las cifra por equipo). Los datos siguen en el pendrive. El portable (.zip,
+  para equipos de clientes) sigue guardándolo en el pendrive para no dejar rastro; se cambia en
+  Ajustes → Datos. Las DLL de temperaturas se copian una vez al disco del equipo (la primera lectura
+  tardaba 17 s desde el pendrive) y el tamaño de los datos ya no recorre el perfil del navegador.
+
+- **La clave del pendrive, con tu PIN.** Con el bloqueo de AdminOps activado, la clave que cifra
+  las contraseñas guardadas (portales, routers, Microsoft 365) se guarda a su vez cifrada con el
+  PIN (PBKDF2 de 210 000 vueltas + AES-256-GCM). Al desbloquear se descifra y queda solo en
+  memoria; quien se lleve el pendrive no puede leerlas. Las claves que ya existían se protegen la
+  primera vez que se desbloquea con el PIN. Si se olvida el PIN, esas contraseñas no se recuperan
+  (se dice en Ajustes → Seguridad).
+- **Tendencia de cada disco**: una foto diaria de sus cifras de desgaste (sectores apartados,
+  pendientes, no corregibles, errores de conexión y de lectura, desgaste). La tarjeta enseña su
+  evolución; si algo sube, el veredicto pasa a «Va a peor» aunque las cifras sean bajas, y con
+  AdminOps abierto se revisa una vez al día y avisa.
+- **Medir velocidad** de cada disco: 256 MB escritos y leídos sin caché de Windows y 3 s de
+  lecturas aleatorias, con lo que es normal para su tipo (USB 2.0, disco mecánico → «cámbialo por
+  un SSD», NVMe lento…).
+- **¿Capacidad real?** (pendrives falsos, como H2testw): llena el espacio libre con datos que
+  dependen de su posición y los vuelve a leer sin caché. Dice si la capacidad es real o desde qué GB
+  se pierde lo escrito. No toca lo que había y borra la prueba al acabar; cancelable.
+- **Expulsar** (dice qué programa lo tiene abierto si no se puede) y **formatear** (exFAT
+  recomendado, FAT32 solo hasta 32 GB, NTFS; hay que escribir la letra para confirmar) unidades
+  extraíbles y discos USB; nunca la de Windows ni aquella desde la que corre AdminOps.
+- **BitLocker en cada volumen** (activo, en pausa, cifrando…) y su **clave de recuperación**, con
+  constancia en el diario de que se consultó.
+- **Copia automática** de los datos a OneDrive u otro disco cada N días (cifrada, con las últimas N
+  copias), solo en el equipo donde se configuró. **Salud del pendrive** una vez al día: sistema de
+  archivos dañado, FAT32, poco espacio o más de 15 días sin copia → aviso.
+- **Informe profesional**: la tipografía va dentro del PDF (se ve igual en cualquier equipo),
+  **estado por áreas** (discos, espacio, seguridad, actualizaciones, estabilidad, dispositivos,
+  memoria, temperatura, batería) con semáforo, la nota de seguridad en un anillo, los pendientes con
+  su prioridad (Urgente / Recomendado) y los urgentes primero, el veredicto de cada disco con las
+  mismas palabras que Discos, cabecera (equipo y fecha) y pie en todas las páginas desde la segunda,
+  y una nota final con de dónde salen los datos. Lo que no se pudo medir sale «Sin datos», nunca
+  «Bien».
+
 ### v1.1.7 — AdminOps en el pendrive y Discos (hecho, sin probar en otro equipo)
 
 - **Instalado en el pendrive, los datos viajan con él.** Si el programa está en una unidad

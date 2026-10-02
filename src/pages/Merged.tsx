@@ -11,6 +11,7 @@ import {
   Gauge,
   Globe,
   Activity,
+  Building2,
   Cpu,
   FolderKey,
   HardDrive,
@@ -60,6 +61,8 @@ import { Recipes } from "./Recipes";
 import { Recover } from "./Recover";
 import { Report } from "./Report";
 import { Session } from "./Session";
+import { People } from "./People";
+import { Clients } from "./Clients";
 import { Disks } from "./Disks";
 import { Space } from "./Space";
 import { Shortcuts } from "./Shortcuts";
@@ -69,6 +72,8 @@ import { Uninstall } from "./Uninstall";
 import { Vault } from "./Vault";
 import { Wipe } from "./Wipe";
 import { Router } from "./Router";
+import { Network } from "./Network";
+import { NetTools } from "./NetTools";
 import { Software } from "./Software";
 import { Stations } from "./Stations";
 import { Tickets } from "./Tickets";
@@ -181,7 +186,7 @@ export function Apps({
   );
 }
 
-type NetTab = "router" | "devices";
+type NetTab = "router" | "devices" | "speed" | "tools";
 const NET: PageTab<NetTab>[] = [
   {
     id: "router",
@@ -195,23 +200,39 @@ const NET: PageTab<NetTab>[] = [
     icon: <Radar size={14} />,
     help: "Todo lo que está conectado a la red, con su función y su responsable; puedes vigilar los que importan.",
   },
+  {
+    id: "speed",
+    label: "Velocidad y diagnóstico",
+    icon: <Gauge size={14} />,
+    help: "Test de velocidad, estado de la conexión, reparar la red y controlar la Wi-Fi.",
+  },
+  {
+    id: "tools",
+    label: "Herramientas",
+    icon: <Wrench size={14} />,
+    help: "Ping, traceroute, puertos abiertos, DNS y archivo hosts.",
+  },
 ];
 
-/** La red en la que está el equipo: router, Wi-Fi y lo que hay conectado. */
+/** Todo lo de la red: router y Wi-Fi, lo que hay conectado, velocidad y herramientas. */
 export function MyNetwork({
   covered,
+  isAdmin,
   focus,
 }: {
   covered: boolean;
+  isAdmin: boolean;
   focus?: string | null;
 }) {
+  // Enlaces antiguos a una parte de Herramientas («dns») llevan a su pestaña.
+  const tab = focus === "dns" ? "tools" : focus;
   // El portal del router es una ventana nativa: se oculta si su pestaña no está a la vista.
   return (
     <Tabbed
       tabs={NET}
-      focus={focus}
+      focus={tab}
       render={(t, visible) =>
-        t === "router" ? <Router covered={covered || !visible} /> : <Devices />
+        t === "router" ? <Router covered={covered || !visible} /> : t === "devices" ? <Devices /> : t === "speed" ? <Network isAdmin={isAdmin} /> : <NetTools isAdmin={isAdmin} />
       }
     />
   );
@@ -623,6 +644,29 @@ export function DiskTools({
   return <Tabbed tabs={DISK_TABS} focus={focus} render={(t) => (t === "space" ? <Space onNavigate={onNavigate} /> : <Disks isAdmin={isAdmin} />)} />;
 }
 
+type WhoTab = "people" | "clients";
+const WHO: PageTab<WhoTab>[] = [
+  {
+    id: "people",
+    label: "Personas",
+    icon: <UserRound size={14} />,
+    help: "La gente del dominio de la empresa: su cuenta, sus equipos, desbloquear, contraseña temporal y las claves de su equipo.",
+  },
+  {
+    id: "clients",
+    label: "Clientes",
+    icon: <Building2 size={14} />,
+    help: "Fichas de clientes con sus equipos, visitas, garantías, mantenimientos y contactos.",
+  },
+];
+
+/** A quién se atiende: la gente del dominio y los clientes. */
+export function PeopleAndClients({ focus }: { focus?: string | null }) {
+  // El foco puede ser la pestaña («clients») o lo que buscar en Personas («ana», «pc:EQUIPO»).
+  const isTab = focus === "clients" || focus === "people";
+  return <Tabbed tabs={WHO} focus={isTab ? focus : focus ? "people" : null} render={(t, visible) => (t === "people" ? <People focus={!isTab && visible ? (focus ?? null) : null} /> : <Clients />)} />;
+}
+
 type SharedTab = "printers" | "shares";
 const SHARED: PageTab<SharedTab>[] = [
   {
@@ -635,7 +679,7 @@ const SHARED: PageTab<SharedTab>[] = [
     id: "shares",
     label: "Carpetas compartidas",
     icon: <FolderKey size={14} />,
-    help: "Carpetas compartidas en la red de la oficina y quién tiene acceso a cada una.",
+    help: "Las carpetas que este equipo comparte: quién entra y con qué permiso, por qué alguien no puede entrar, cuánto ocupan y su copia diaria. Y el otro lado: las unidades de red de este equipo y lo que comparten otros.",
   },
 ];
 

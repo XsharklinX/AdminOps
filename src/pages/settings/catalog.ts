@@ -11,7 +11,7 @@ export const SECTIONS = [
   { id: "appearance", label: "Apariencia", icon: Palette, hint: "Tema, color, tamaño de la interfaz y animaciones." },
   { id: "navigation", label: "Navegación", icon: SlidersHorizontal, hint: "La barra lateral, las secciones y tus atajos de teclado." },
   { id: "portals", label: "Portales y correo", icon: Ticket, hint: "Tickets, inventario web, el Correo y Teams: cómo se cargan y se cierran." },
-  { id: "security", label: "Seguridad", icon: Lock, hint: "Bloqueo con PIN o contraseña y modo solo mirar." },
+  { id: "security", label: "Seguridad", icon: Lock, hint: "Bloqueo de AdminOps con PIN o contraseña, y cuándo se bloquea solo." },
   { id: "reports", label: "Informes y cobros", icon: Building2, hint: "Tu marca, firma, checklist, garantías e impuestos." },
   { id: "performance", label: "Rendimiento", icon: Gauge, hint: "Cuánto tarda AdminOps en abrirse y cada página en cargar." },
   { id: "about", label: "Acerca de", icon: Info, hint: "Versión, licencias y datos de la aplicación." },
@@ -29,6 +29,7 @@ export interface SettingEntry {
 
 export const SETTINGS_INDEX: SettingEntry[] = [
   // General
+  { section: "general", title: "Para quién es AdminOps en este equipo", keywords: "modo tecnico usuario sencillo cliente interfaz simple" },
   { section: "general", title: "Página al abrir AdminOps", keywords: "inicio arranque primera pagina" },
   { section: "general", title: "Volver a ver la bienvenida", keywords: "asistente inicio primera vez tutorial modo bienvenida" },
   { section: "general", title: "Actualización del Panel", keywords: "refresco segundos cpu memoria" },
@@ -42,30 +43,38 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { section: "general", title: "Limpieza automática al abrir", keywords: "datos antiguos historial informes" },
   { section: "general", title: "Copia de la configuración", keywords: "exportar importar respaldo ajustes" },
   { section: "general", title: "Datos de AdminOps", keywords: "carpeta espacio historial diagnosticos borrar" },
+  { section: "general", title: "Actualizaciones", keywords: "version nueva adminops buscar actualizar" },
   { section: "general", title: "Seguridad de tus datos", keywords: "copia cifrada respaldo restaurar usb" },
+  { section: "general", title: "Configuración de empresa", keywords: "exportar importar empresa otro tecnico equipo portales dominio" },
+  { section: "general", title: "Copia automática", keywords: "onedrive respaldo copia seguridad pendrive usb automatica" },
+  { section: "general", title: "Dónde se guardan tus datos", keywords: "pendrive usb portable carpeta programa datos viajan" },
+  { section: "general", title: "Tus datos viajan con AdminOps", keywords: "pendrive usb portable carpeta programa navegador" },
   // Apariencia
   { section: "appearance", title: "Tema", keywords: "oscuro claro automatico" },
   { section: "appearance", title: "Color de acento", keywords: "azul verde violeta naranja" },
   { section: "appearance", title: "Tamaño de la interfaz", keywords: "zoom letra grande pequeño" },
   { section: "appearance", title: "Reducir animaciones", keywords: "movimiento accesibilidad" },
   // Navegación
-  { section: "navigation", title: "Atajos propios", keywords: "teclado combinacion ctrl" },
+  { section: "navigation", title: "Atajos para abrir páginas", keywords: "teclado combinacion ctrl propios" },
+  { section: "navigation", title: "Estructura", keywords: "secciones paginas ocultar ordenar areas renombrar icono" },
   { section: "navigation", title: "Barra lateral", keywords: "ancho posicion iconos densidad acoplar" },
-  { section: "navigation", title: "Secciones y páginas", keywords: "ocultar ordenar areas favoritos" },
+  { section: "navigation", title: "Comportamiento", keywords: "secciones desplegadas pestañas bajo el titulo al pulsar" },
+  { section: "navigation", title: "Accesos rápidos en la barra", keywords: "favoritos recientes" },
   // Portales
+  { section: "portals", title: "Cómo se abren los portales", keywords: "precargar cerrar zoom tickets correo teams" },
   { section: "portals", title: "Precargar el último portal", keywords: "rapido tickets correo teams inventario" },
-  { section: "portals", title: "Cerrar las sesiones privadas al salir", keywords: "correo outlook privacidad cliente" },
   { section: "portals", title: "Zoom de los portales", keywords: "tamaño letra web" },
   { section: "portals", title: "Dominio de la empresa", keywords: "intranet cuenta windows autenticacion integrada" },
-  { section: "portals", title: "Portales configurados", keywords: "tickets inventario correo teams web" },
+  { section: "portals", title: "Portales configurados", keywords: "tickets inventario correo teams web sesion privada privacidad rellenar inicio de sesion cuenta guardada" },
   { section: "portals", title: "Microsoft 365", keywords: "graph entra azure mfa inicio sesion outlook calendario teams estado servicio inquilino" },
   // Seguridad
-  { section: "security", title: "Bloqueo de AdminOps", keywords: "pin contraseña bloquear inactividad" },
-  { section: "security", title: "Modo solo mirar", keywords: "auditoria sin cambios" },
+  { section: "security", title: "Bloqueo de AdminOps", keywords: "pin contraseña bloquear" },
+  { section: "security", title: "Bloquear por inactividad", keywords: "minutos tiempo automatico bloqueo" },
   // Informes
   { section: "reports", title: "Tu marca en los informes", keywords: "empresa telefono correo web logotipo" },
   { section: "reports", title: "Logo", keywords: "imagen marca" },
   { section: "reports", title: "Checklist de servicio", keywords: "visita pasos" },
+  { section: "reports", title: "Tipos de visita", keywords: "checklist propia mantenimiento instalacion sesion" },
   { section: "reports", title: "Tu firma", keywords: "firmar informe" },
   { section: "reports", title: "Presupuestos, recibos y garantías", keywords: "impuesto itbis iva numeracion mantenimiento" },
   // Rendimiento

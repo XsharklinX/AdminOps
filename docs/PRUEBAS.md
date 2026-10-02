@@ -146,6 +146,76 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Buscar en la red: las impresoras salen con nombre y modelo; una que este equipo no había visto nunca también aparece.
 - [ ] En una red sin impresoras: «No se ha visto ninguna», sin colgarse.
 
+## Lavado de cara (1.1.9)
+- [ ] Usuarios locales: las cuatro cifras cuadran; pulsar «Con algo que revisar» filtra. Una cuenta sin contraseña sale con el punto de color y, en la ficha, el aviso con «Cambiar contraseña». Buscar por nombre. Los botones apagados dicen por qué al pasar el ratón (único administrador, sesión iniciada…). Al borrar a alguien, la ficha pasa a otra cuenta.
+- [ ] Procesos: agrupado, Chrome/Edge salen una vez con «× N»; la flecha enseña sus procesos. «Finalizar el programa» los cierra todos. Los dos avisos de arriba (CPU y memoria) seleccionan el programa. Quitar «Agrupar por programa» vuelve a la lista de siempre y se recuerda. Ordenar por cada columna.
+- [ ] Acceso remoto: escribir un equipo y Enter conecta. Las fichas guardadas enseñan «Contesta · N ms» o «No contesta» con el motivo; el botón de recargar vuelve a comprobar. Con más de 6, aparece el buscador.
+- [ ] Sesión de servicio: empieza en «Motivo»; con el motivo escrito, al volver abre en «Trabajo». Cada paso enseña lo que lleva (3/8, «Apuntado», «Sin cobro»…). «Firma y cierre» avisa de lo que falta y genera el informe. Descartar sigue pidiendo confirmación.
+- [ ] Red: una sola entrada en la barra lateral con cuatro pestañas. Ctrl+K «Herramientas de red» y «Reparar la red» llevan a su pestaña. El panel del router se oculta al cambiar de pestaña.
+- [ ] Historial: el diario sale por días con la línea a la izquierda; los filtros y el buscador funcionan; «Deshacer» sigue funcionando y la entrada queda tachada.
+- [ ] Tablas: en Dispositivos, ordenar por IP (192.168.1.3 antes que 192.168.1.20) y por Ping (los que no responden, al final). En Estaciones, por «Sin actualizar». En Puertos, por programa.
+- [ ] Ajustes: buscar «inactividad», «tipos de visita», «modo», «favoritos» encuentra y lleva; un bloque entero queda con el borde marcado unos segundos.
+- [ ] Con el modo auditoría o sin red, las páginas que no pueden leer enseñan el recuadro rojo con «Reintentar», no un «Leyendo…» eterno.
+- [ ] Compartir una carpeta con muchos archivos: no tarda minutos, y en un archivo de dentro el permiso sale como heredado (Propiedades → Seguridad → Opciones avanzadas).
+
+## Tickets: inicio de sesión fuera del dominio
+- [ ] Intranet cuyo inicio de sesión está en otro sitio (otro subdominio, IP o proveedor externo): poner usuario y contraseña entra, sin que se abra el navegador de fuera.
+- [ ] Un enlace dentro de un ticket a una web ajena: se abre en el navegador de fuera y aparece la barra «…se abrió en tu navegador». «Permitir en este portal» la quita; al pulsar otra vez el enlace, abre dentro. El sitio queda en «Editar portal» → dominios.
+- [ ] Correo y Teams siguen entrando igual que antes.
+- [ ] En el registro técnico aparecen «se sigue a «sitio» (redirección del servidor…)» y «no es del portal y se abrió en el navegador».
+
+## Carpetas compartidas a fondo
+- [ ] Cada carpeta enseña su ruta `\\EQUIPO\Nombre`, su tamaño (primero «calculando tamaño…») y sus permisos. Copiar la ruta y copiar las instrucciones dejan el texto en el portapapeles.
+- [ ] «Quién puede entrar»: cambiar a alguien de «Solo leer» a «Leer y modificar» se ve en la lista al momento y en Propiedades → Compartir de Windows. Añadir un usuario y quitarlo. Sin administrador, todo desactivado con su explicación.
+- [ ] «¿Por qué no puede entrar?»: un usuario que no está en la lista → «no puede entrar» con «Darle acceso», que abre «Quién puede entrar» con él propuesto. Tras dárselo, sale que puede. Con una cuenta inventada: dice que no existe. Con la red en pública: lo dice y ofrece «Activar».
+- [ ] Una carpeta compartida con «Todos: control total» sale marcada, con «Bajarlo a leer y modificar». Un disco entero o el Escritorio de alguien salen marcados. Arriba se cuenta cuántas cosas hay que revisar.
+- [ ] Disco con menos del 10 % libre: aviso en la carpeta.
+- [ ] Unidades de red: salen las que tiene el usuario (también con AdminOps elevado). Con el servidor apagado: «no contesta», y «Reconectar» lo explica. Conectar `\\EQUIPO\Carpeta` en una letra libre: aparece en «Este equipo» del Explorador. Quitarla: desaparece. Una ruta mal escrita o un equipo que no existe: mensaje claro.
+- [ ] Un equipo que pide usuario y contraseña: el mensaje lo dice y «Abrir» lleva al Explorador, que es quien los pide.
+- [ ] «Qué comparte otro equipo»: con el nombre de otro PC salen sus carpetas e impresoras; «Conectar como unidad» usa la primera letra libre y la unidad aparece arriba. Recuerda el último equipo escrito.
+- [ ] Copia diaria: elegir un destino en otro disco y una hora; «Copiar ahora» crea `<destino>\<nombre>` con los archivos y un `.log` al lado. La carpeta enseña «Copia diaria a las HH:MM · última: …». Destino en el mismo disco: aviso. Con el disco de destino desconectado: «La última copia falló». «Quitar la copia» la quita del Programador de tareas (`\AdminOps\Copias`) y deja lo copiado.
+- [ ] Modo auditoría: cambiar permisos, conectar o quitar unidades y programar copias se bloquean; ver, explicar y mirar otro equipo siguen funcionando.
+
+## Historial de la Agenda, Personas y Clientes
+- [ ] Agenda → Historial: salen lo hecho, lo cancelado y lo sin marcar, agrupado por mes con su total. Buscar y los filtros funcionan. «Volver a pendiente» la devuelve a la lista; «Repetir» abre el editor con una copia para mañana; borrar pide confirmación.
+- [ ] Una visita de ayer sin marcar: sale arriba de la lista en «Atrasado» con su fecha; el botón del amanecer la pasa a hoy.
+- [ ] Al cerrar y abrir AdminOps estando en Historial, la Agenda abre en Lista (o Mes, lo último usado).
+- [ ] Soporte → «Personas y clientes»: dos pestañas. Ctrl+K «Clientes» abre la pestaña Clientes; Ctrl+K con un nombre abre Personas buscándolo.
+- [ ] Clientes: la cifra «Mantenimiento cerca o vencido» filtra la lista. La ficha abre en Resumen; Equipos, Visitas y Datos enseñan lo suyo; «Nuevo» abre directamente en Datos. «Agendar» abre la Agenda con el editor y ese cliente puesto.
+- [ ] Personas: tras abrir a alguien, aparece en «Recientes» al volver; «Olvidar» los quita. Una cuenta bloqueada enseña el aviso rojo con «Desbloquear»; una con la contraseña caducada, «Dar una contraseña temporal».
+- [ ] Tickets con «Al lado: Personas» (pantalla dividida): se ve bien en media pantalla.
+
+## Listo para el equipo, Agenda de mes y presencia
+- [ ] Panel con datos vacíos: sale «Primeros pasos» con 5 pasos; cada botón lleva a su sitio; al hacerlo, la casilla se marca al volver a la ventana. La X lo oculta; Ajustes → General «Ver Primeros pasos» lo devuelve. En modo usuario no sale.
+- [ ] Ajustes → Configuración de empresa → Exportar: el .json no contiene contraseñas, ni el nombre ni la firma del técnico. En otro equipo (o tras borrar un portal), Importar enseña qué trae, deja elegir y no duplica portales.
+- [ ] Paquete de soporte: el .zip trae `resumen.txt` con los arranques y los últimos errores legibles.
+- [ ] Agenda → Mes: arrastrar una visita a otro día la mueve (y el aviso lo dice); doble clic en un día abre «Apuntar» con esa fecha; «y N más» abre ese día en la lista.
+- [ ] Con Microsoft 365: lo de Outlook sale en gris en la lista y en el mes. Mover en Outlook una visita que se creó desde AdminOps y abrir la Agenda: se actualiza y lo dice. Borrarla en Outlook: aquí sigue, sin enlace. Moverla aquí (arrastrando): en Outlook cambia sola.
+- [ ] Contactos con Microsoft 365 y permisos: fotos y punto de presencia; la ficha dice «Teams: …». Sin el permiso, todo funciona igual sin puntos.
+- [ ] Personas: la ficha enseña la foto y la presencia de esa persona.
+
+## Pendrive seguro, discos a fondo e informe (1.1.8)
+- [ ] Con AdminOps abierto (y Correo cargado), pasar el Setup encima: al terminar, AdminOps es el nuevo (Ajustes → Acerca de, o el registro dice «navegador» en el disco del equipo). Si algo lo impide, el instalador lo dice en vez de «listo».
+- [ ] Cerrar AdminOps desde el Administrador de tareas con Correo abierto y volver a abrirlo: Correo y Teams cargan; el registro dice «Cerrados N procesos del navegador interno…».
+- [ ] AdminOps instalado en el pendrive: arranca en pocos segundos; Correo y Teams cargan como en el disco (tras entrar una vez en este PC).
+- [ ] El Panel enseña las temperaturas en unos segundos (no 17 s).
+- [ ] Ajustes → Datos → «Guardar también el navegador interno en el pendrive»: al volver a abrir, pide entrar de nuevo en Correo (perfil en el pendrive); desmarcarlo vuelve al del disco.
+- [ ] En el pendrive con bloqueo por PIN: al abrir, desbloquear con el PIN → los portales con «Entrar solo» y los routers siguen funcionando. Ajustes → Datos dice «Protegida con tu PIN».
+- [ ] Abrir con la contraseña de Windows (PIN «olvidado»): AdminOps abre, pero una contraseña guardada dice que está protegida con el PIN.
+- [ ] Cambiar el PIN y reiniciar: el PIN nuevo abre las contraseñas. Quitar el bloqueo: siguen funcionando sin PIN.
+- [ ] Discos: la tarjeta dice «Desde hoy se apunta una foto al día…». Al día siguiente sale la evolución.
+- [ ] «Medir velocidad» en un SSD, un disco mecánico y un pendrive: cifras razonables y el texto adecuado (USB 2.0, «cámbialo por un SSD»…). No queda el archivo de prueba.
+- [ ] «¿Capacidad real?» en un pendrive pequeño: escribe, comprueba, dice «capacidad real» y la carpeta de prueba desaparece. Cancelar a mitad también la borra.
+- [ ] «Expulsar» un pendrive con una ventana del Explorador abierta en él: lo expulsa o dice qué lo tiene abierto.
+- [ ] «Formatear»: sin escribir la letra no deja; FAT32 desactivado en uno de más de 32 GB; formatea como exFAT con el nombre puesto.
+- [ ] En el disco de Windows no salen expulsar ni formatear, ni en el pendrive desde el que corre AdminOps.
+- [ ] Un volumen con BitLocker: chip «BitLocker activo» y «clave» enseña la clave de recuperación; el diario lo anota.
+- [ ] Ajustes → Copia automática: «Usar OneDrive», contraseña, Activar, «Hacer una ahora» → aparece el .zip en OneDrive\AdminOps copias; con 6 copias y «las 5 últimas», queda en 5.
+- [ ] En otro PC, la copia automática dice dónde se configuró y no se hace sola allí.
+- [ ] Pendrive sin copia desde hace más de 15 días: aviso en la campana.
+- [ ] Informe al cliente: la letra es la misma en otro equipo sin IBM Plex instalada; «Estado por áreas» con colores; los pendientes urgentes primero; en la página 2 arriba a la derecha salen el equipo y la fecha.
+- [ ] Informe técnico: la tabla de discos dice «Sano» o el veredicto, sin «Unspecified» ni desgaste en discos mecánicos.
+
 ## AdminOps en el pendrive (1.1.7)
 - [ ] En el PC donde ya estaba instalado: instalar la 1.1.7 en el pendrive. Al abrirla, Ajustes → Datos dice «está en un pendrive (E:)» y «Datos traídos del equipo …»: clientes, contactos, agenda y portales están.
 - [ ] Un router o portal con contraseña guardada: funciona desde el pendrive en OTRO equipo (se cifró de nuevo con la clave del pendrive).

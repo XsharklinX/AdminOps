@@ -1,11 +1,13 @@
-import { Eye, EyeOff, KeyRound, Loader2, Pencil, RefreshCw, ShieldCheck, ShieldOff, Trash2, TriangleAlert, UserCheck, UserPlus, UserRound, UserX } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, Pencil, RefreshCw, Search, ShieldAlert, ShieldCheck, ShieldOff, Trash2, TriangleAlert, UserCheck, UserPlus, UserRound, UserX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Avatar } from "../components/contacts/Avatar";
 import { useToast } from "../components/feedback";
-import { Button, Modal, inputClass } from "../components/ui";
+import { Button, EmptyLine, EmptyState, ErrorState, Loading, Modal, Tile, inputClass } from "../components/ui";
 import { bytes } from "../lib/format";
 import { usersApi, type LocalUser, type NewUser } from "../lib/api";
 import { WindowsTools } from "../components/WindowsTools";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { userIssues, worstIssue, type UserIssue } from "../lib/userIssues";
 
 type Action = "delete" | "disable" | "enable" | "demote" | "promote" | "password" | "rename";
 
@@ -43,10 +45,27 @@ function nameError(name: string): string | null {
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" }) : null;
 
+/** «hace 3 días», para la lista: la fecha exacta está en la ficha. */
+function ago(iso: string | null): string | null {
+  if (!iso) return null;
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "hoy";
+  if (days === 1) return "ayer";
+  if (days < 60) return `hace ${days} días`;
+  if (days < 730) return `hace ${Math.floor(days / 30)} meses`;
+  return `hace ${Math.floor(days / 365)} años`;
+}
+
+type Filter = "all" | "admins" | "disabled" | "review";
+
 export function Users({ isAdmin }: { isAdmin: boolean }) {
   const [users, setUsers] = useState<LocalUser[] | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [password, setPassword] = useState<LocalUser | null>(null);
@@ -58,21 +77,36 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
     setLoading(true);
     try {
       setUsers(await usersApi.list());
+      setFailed(null);
     } catch (e) {
-      toast("error", String(e));
+      setFailed(String(e));
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const visible = useMemo(
-    () => (users ?? []).filter((u) => showSystem || !u.builtin || u.enabled),
-    [users, showSystem],
-  );
+  /** Lo que conviene revisar de cada cuenta, por SID. */
+  const issues = useMemo(() => new Map((users ?? []).map((u) => [u.sid, userIssues(u)])), [users]);
+
+  // Las cuentas internas de Windows no se enseñan salvo que se pidan… o que
+  // estén activas, que es justo cuando importa verlas.
+  const base = useMemo(() => (users ?? []).filter((u) => showSystem || !u.builtin || u.enabled), [users, showSystem]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return base.filter(
+      (u) =>
+        (filter === "all" || (filter === "admins" && u.admin && u.enabled) || (filter === "disabled" && !u.enabled) || (filter === "review" && (issues.get(u.sid)?.length ?? 0) > 0)) &&
+        (!q || `${u.name} ${u.fullName} ${u.description}`.toLowerCase().includes(q)),
+    );
+  }, [base, query, filter, issues]);
+
+  // Siempre hay alguien abierto: quien usa el equipo, o el primero de la lista.
+  const current = visible.find((u) => u.sid === selected) ?? visible.find((u) => u.isTarget) ?? visible[0] ?? null;
 
   const run = async (u: LocalUser, label: string, op: () => Promise<void>) => {
     setBusy(u.sid);
@@ -87,120 +121,117 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  if (!users) return <p className="p-8 font-mono text-sm text-mute">Leyendo usuarios del equipo…</p>;
+  if (!users) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Leyendo usuarios del equipo…" />;
 
-  const hidden = users.length - visible.length;
+  const hidden = users.length - base.length;
   const people = users.filter((u) => !u.builtin);
+  const toReview = base.filter((u) => (issues.get(u.sid)?.length ?? 0) > 0).length;
+  const toggle = (f: Filter) => setFilter((cur) => (cur === f ? "all" : f));
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-4 flex items-center gap-3">
-        <p className="text-sm text-dim">
-          <span className="font-mono text-neon">{people.length}</span> {people.length === 1 ? "usuario" : "usuarios"} ·{" "}
-          <span className="font-mono text-neon">{people.filter((u) => u.admin).length}</span> administradores
-        </p>
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-dim">
-          <input type="checkbox" checked={showSystem} onChange={(e) => setShowSystem(e.target.checked)} className="accent-[var(--color-neon)]" />
-          Mostrar cuentas del sistema{hidden > 0 && !showSystem ? ` (${hidden})` : ""}
-        </label>
-        <button onClick={load} disabled={loading} className="rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink" title="Volver a leer">
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-        </button>
-        <Button onClick={() => setCreating(true)} disabled={!isAdmin} title={isAdmin ? undefined : "Requiere ejecutar AdminOps como administrador"}>
-          <UserPlus size={14} /> Nuevo usuario
-        </Button>
+    <div className="@container mx-auto max-w-6xl space-y-4 p-6">
+      <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-4">
+        <Tile label={people.length === 1 ? "Usuario" : "Usuarios"} value={people.length} />
+        <Tile label="Administradores activos" value={users.filter((u) => u.admin && u.enabled).length} active={filter === "admins"} onClick={() => toggle("admins")} />
+        <Tile label="Desactivadas" value={base.filter((u) => !u.enabled).length} active={filter === "disabled"} onClick={() => toggle("disabled")} />
+        <Tile label="Con algo que revisar" value={toReview} warn active={filter === "review"} onClick={() => toggle("review")} />
       </div>
 
+      {failed && <ErrorState message={failed} onRetry={() => void load()} />}
+
       {!isAdmin && (
-        <p className="mb-4 flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
-          <TriangleAlert size={13} /> Sin administrador solo puedes ver los usuarios. Para crearlos o modificarlos, reinicia AdminOps como administrador.
+        <p className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
+          <TriangleAlert size={13} className="shrink-0" /> Sin administrador solo puedes ver los usuarios. Para crearlos o modificarlos, reinicia AdminOps como administrador.
         </p>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-line bg-panel">
-        {visible.map((u, i) => {
-          const reason = (a: Action) => (!isAdmin ? "Requiere administrador." : blockReason(users, u, a));
-          const working = busy === u.sid;
-          return (
-            <div key={u.sid} className={`flex items-center gap-4 px-4 py-3 ${i > 0 ? "border-t border-line/70" : ""} ${u.enabled ? "" : "opacity-60"}`}>
-              <span
-                className={`grid size-9 shrink-0 place-items-center rounded-full border text-sm font-semibold ${
-                  u.admin ? "border-neon/50 bg-neon/10 text-neon" : "border-line bg-void/60 text-dim"
-                }`}
-              >
-                {u.builtin ? <UserRound size={15} /> : u.name.slice(0, 1).toUpperCase()}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-sm font-medium text-ink">{u.name}</span>
-                  {u.fullName && u.fullName !== u.name && <span className="text-xs text-mute">{u.fullName}</span>}
-                  <Badge tone={u.admin ? "neon" : "mute"}>{u.admin ? "Administrador" : "Estándar"}</Badge>
-                  {u.microsoft && <Badge tone="mute">Cuenta Microsoft</Badge>}
-                  {u.builtin && <Badge tone="mute">{BUILTIN_LABEL[u.builtin]}</Badge>}
-                  {!u.enabled && <Badge tone="warn">Desactivada</Badge>}
-                  {u.signedIn && <Badge tone="ok">Sesión iniciada</Badge>}
-                  {u.isSelf && <Badge tone="neon">Ejecuta AdminOps</Badge>}
-                </div>
-                <div className="mt-0.5 text-[11px] text-mute">
-                  {when(u.lastLogon)
-                    ? `Último inicio: ${when(u.lastLogon)}`
-                    : u.signedIn || u.hasProfile
-                      ? "Último inicio: sin registrar"
-                      : "Nunca ha iniciado sesión"}
-                  {u.passwordLastSet && ` · Contraseña cambiada: ${when(u.passwordLastSet)}`}
-                  {u.passwordExpires && ` · Caduca: ${when(u.passwordExpires)}`}
-                </div>
-              </div>
-              {working ? (
-                <Loader2 size={16} className="animate-spin text-neon" />
-              ) : (
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <IconAction icon={Pencil} label="Renombrar o editar sus datos" reason={reason("rename")} onClick={() => setRenaming(u)} />
-                  <IconAction icon={KeyRound} label="Cambiar contraseña" reason={reason("password")} onClick={() => setPassword(u)} />
-                  {u.admin ? (
-                    <IconAction
-                      icon={ShieldOff}
-                      label="Convertir en usuario estándar"
-                      reason={reason("demote")}
-                      onClick={() => run(u, `${u.name} ahora es usuario estándar.`, () => usersApi.setAdmin(u.sid, false))}
-                    />
-                  ) : (
-                    <IconAction
-                      icon={ShieldCheck}
-                      label="Hacer administrador"
-                      reason={reason("promote")}
-                      onClick={() => run(u, `${u.name} ahora es administrador.`, () => usersApi.setAdmin(u.sid, true))}
-                    />
-                  )}
-                  {u.enabled ? (
-                    <IconAction
-                      icon={UserX}
-                      label="Desactivar cuenta"
-                      reason={reason("disable")}
-                      onClick={() => run(u, `Cuenta ${u.name} desactivada.`, () => usersApi.setEnabled(u.sid, false))}
-                    />
-                  ) : (
-                    <IconAction
-                      icon={UserCheck}
-                      label="Activar cuenta"
-                      reason={reason("enable")}
-                      onClick={() => run(u, `Cuenta ${u.name} activada.`, () => usersApi.setEnabled(u.sid, true))}
-                    />
-                  )}
-                  <IconAction icon={Trash2} label="Eliminar usuario" danger reason={reason("delete")} onClick={() => setDeleting(u)} />
-                </div>
-              )}
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12 @3xl:col-span-5">
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar un usuario" className={`${inputClass} pl-8`} aria-label="Buscar un usuario" />
             </div>
-          );
-        })}
+            <button onClick={() => void load()} disabled={loading} className="rounded-md p-2 text-dim transition-colors hover:bg-panel-2 hover:text-ink" title="Volver a leer">
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            </button>
+            <Button onClick={() => setCreating(true)} disabled={!isAdmin} title={isAdmin ? undefined : "Requiere ejecutar AdminOps como administrador"}>
+              <UserPlus size={14} /> Nuevo
+            </Button>
+          </div>
+
+          <div className="mt-3 overflow-hidden rounded-xl border border-line bg-panel">
+            {visible.length === 0 ? (
+              <EmptyLine>{query ? `Nadie coincide con «${query}».` : "Ninguna cuenta con ese filtro."}</EmptyLine>
+            ) : (
+              <ul className="divide-y divide-line/60">
+                {visible.map((u) => {
+                  const worst = worstIssue(issues.get(u.sid) ?? []);
+                  return (
+                    <li key={u.sid}>
+                      <button
+                        onClick={() => setSelected(u.sid)}
+                        className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${current?.sid === u.sid ? "bg-neon/10" : "hover:bg-panel-2"} ${u.enabled ? "" : "opacity-60"}`}
+                      >
+                        {u.builtin ? (
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-void/60 text-dim">
+                            <UserRound size={15} />
+                          </span>
+                        ) : (
+                          <Avatar c={{ name: u.fullName || u.name, favorite: false }} size={36} />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate text-sm text-ink">{u.name}</span>
+                            {u.admin && <ShieldCheck size={12} className="shrink-0 text-neon" aria-label="Administrador" />}
+                          </span>
+                          <span className="block truncate text-[11px] text-mute">
+                            {!u.enabled ? "Desactivada" : u.signedIn ? "Sesión iniciada" : ago(u.lastLogon) ? `Entró ${ago(u.lastLogon)}` : u.hasProfile ? "Sin fecha de último inicio" : "Nunca ha entrado"}
+                          </span>
+                        </span>
+                        {worst && <span className={`size-2 shrink-0 rounded-full ${worst === "bad" ? "bg-bad" : "bg-warn"}`} title="Tiene algo que revisar" />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <label className="mt-2 flex items-center gap-1.5 text-xs text-dim">
+            <input type="checkbox" checked={showSystem} onChange={(e) => setShowSystem(e.target.checked)} className="accent-[var(--color-neon)]" />
+            Mostrar cuentas del sistema{hidden > 0 && !showSystem ? ` (${hidden})` : ""}
+          </label>
+        </div>
+
+        <div className="col-span-12 @3xl:col-span-7">
+          {current ? (
+            <UserCard
+              key={current.sid}
+              u={current}
+              issues={issues.get(current.sid) ?? []}
+              working={busy === current.sid}
+              reason={(a) => (!isAdmin ? "Requiere administrador." : blockReason(users, current, a))}
+              onRename={() => setRenaming(current)}
+              onPassword={() => setPassword(current)}
+              onDelete={() => setDeleting(current)}
+              onAdmin={(admin) => void run(current, admin ? `${current.name} ahora es administrador.` : `${current.name} ahora es usuario estándar.`, () => usersApi.setAdmin(current.sid, admin))}
+              onEnabled={(enabled) => void run(current, enabled ? `Cuenta ${current.name} activada.` : `Cuenta ${current.name} desactivada.`, () => usersApi.setEnabled(current.sid, enabled))}
+            />
+          ) : (
+            <EmptyState icon={<UserRound size={28} />} title="Elige una cuenta">
+              Su estado, lo que conviene revisar y lo que se puede hacer con ella.
+            </EmptyState>
+          )}
+        </div>
       </div>
-      <p className="mt-3 text-xs text-mute">
-        AdminOps nunca deja el equipo sin un administrador activo ni permite borrar la cuenta con la sesión abierta. Las contraseñas no
-        se guardan en el historial ni en el registro de actividad.
+
+      <p className="text-xs text-mute">
+        AdminOps nunca deja el equipo sin un administrador activo ni permite borrar la cuenta con la sesión abierta. Las contraseñas no se guardan en el historial ni en el registro de
+        actividad.
       </p>
 
       <WindowsTools
-        className="mt-4"
         links={[
           { id: "lusrmgr", what: "Opciones de contraseña, grupos y desbloquear una cuenta (renombrar y editar sus datos ya se hace aquí)." },
           { id: "netplwiz", what: "Inicio de sesión automático y grupo de cada cuenta." },
@@ -250,10 +281,124 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
           onDeleted={() => {
             toast("ok", `Usuario ${deleting.name} eliminado.`);
             setDeleting(null);
+            setSelected(null);
             void load();
           }}
         />
       )}
+    </div>
+  );
+}
+
+/** La ficha de una cuenta: qué pasa con ella arriba, sus datos y lo que se puede hacer. */
+function UserCard({
+  u,
+  issues,
+  working,
+  reason,
+  onRename,
+  onPassword,
+  onDelete,
+  onAdmin,
+  onEnabled,
+}: {
+  u: LocalUser;
+  issues: UserIssue[];
+  working: boolean;
+  /** Por qué no se puede hacer algo (null: se puede). */
+  reason: (a: Action) => string | null;
+  onRename: () => void;
+  onPassword: () => void;
+  onDelete: () => void;
+  onAdmin: (admin: boolean) => void;
+  onEnabled: (enabled: boolean) => void;
+}) {
+  const fix = (i: UserIssue) => {
+    if (i.fix === "password" && !reason("password"))
+      return (
+        <Button onClick={onPassword} disabled={working}>
+          <KeyRound size={14} /> Cambiar contraseña
+        </Button>
+      );
+    if (i.fix === "disable" && !reason("disable"))
+      return (
+        <Button onClick={() => onEnabled(false)} disabled={working}>
+          <UserX size={14} /> Desactivar
+        </Button>
+      );
+    return null;
+  };
+
+  return (
+    <div className="space-y-3">
+      {issues.map((i) => (
+        <div key={i.text} className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-sm ${i.level === "bad" ? "border-bad/40 bg-bad/10 text-bad" : "border-warn/40 bg-warn/10 text-warn"}`}>
+          <ShieldAlert size={16} className="shrink-0" />
+          <span className="min-w-0 flex-1">{i.text}</span>
+          {fix(i)}
+        </div>
+      ))}
+
+      <section className="rounded-xl border border-line bg-panel p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {u.builtin ? (
+            <span className="grid size-12 shrink-0 place-items-center rounded-full border border-line bg-void/60 text-dim">
+              <UserRound size={20} />
+            </span>
+          ) : (
+            <Avatar c={{ name: u.fullName || u.name, favorite: false }} size={48} />
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <h2 className="text-base font-semibold text-ink">{u.name}</h2>
+              {u.fullName && u.fullName !== u.name && <span className="text-sm text-dim">{u.fullName}</span>}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              <Badge tone={u.admin ? "neon" : "mute"}>{u.admin ? "Administrador" : "Estándar"}</Badge>
+              {u.microsoft && <Badge tone="mute">Cuenta Microsoft</Badge>}
+              {u.builtin && <Badge tone="mute">{BUILTIN_LABEL[u.builtin]}</Badge>}
+              {!u.enabled && <Badge tone="warn">Desactivada</Badge>}
+              {u.signedIn && <Badge tone="ok">Sesión iniciada</Badge>}
+              {u.isSelf && <Badge tone="neon">Ejecuta AdminOps</Badge>}
+            </div>
+          </div>
+          {working && <Loader2 size={18} className="animate-spin text-neon" />}
+        </div>
+
+        {u.description && <p className="mt-3 text-sm text-dim">{u.description}</p>}
+
+        <dl className="mt-4 grid grid-cols-2 gap-2 @2xl:grid-cols-4">
+          <Fact label="Último inicio">{when(u.lastLogon) ?? (u.signedIn || u.hasProfile ? "Sin registrar" : "Nunca")}</Fact>
+          <Fact label="Contraseña cambiada">{u.microsoft ? "La gestiona Microsoft" : (when(u.passwordLastSet) ?? "Nunca")}</Fact>
+          <Fact label="Caduca">{when(u.passwordExpires) ?? "No caduca"}</Fact>
+          <Fact label="Carpeta personal">{u.hasProfile ? "Sí, en este equipo" : "Aún no (no ha entrado)"}</Fact>
+        </dl>
+
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-line/60 pt-4">
+          <CardAction icon={KeyRound} label="Cambiar contraseña" reason={reason("password")} disabled={working} onClick={onPassword} />
+          <CardAction icon={Pencil} label="Editar sus datos" reason={reason("rename")} disabled={working} onClick={onRename} />
+          {u.admin ? (
+            <CardAction icon={ShieldOff} label="Pasar a estándar" reason={reason("demote")} disabled={working} onClick={() => onAdmin(false)} />
+          ) : (
+            <CardAction icon={ShieldCheck} label="Hacer administrador" reason={reason("promote")} disabled={working} onClick={() => onAdmin(true)} />
+          )}
+          {u.enabled ? (
+            <CardAction icon={UserX} label="Desactivar" reason={reason("disable")} disabled={working} onClick={() => onEnabled(false)} />
+          ) : (
+            <CardAction icon={UserCheck} label="Activar" reason={reason("enable")} disabled={working} onClick={() => onEnabled(true)} />
+          )}
+          <CardAction icon={Trash2} label="Eliminar" danger reason={reason("delete")} disabled={working} onClick={onDelete} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-panel-2/50 px-3 py-2">
+      <dt className="text-[10px] tracking-wide text-mute uppercase">{label}</dt>
+      <dd className="mt-0.5 truncate text-xs text-ink">{children}</dd>
     </div>
   );
 }
@@ -263,27 +408,32 @@ function Badge({ tone, children }: { tone: "neon" | "mute" | "warn" | "ok"; chil
   return <span className={`rounded border px-1.5 py-px text-[11px] ${c}`}>{children}</span>;
 }
 
-function IconAction({
+/** Botón de la ficha. Si no se puede, queda apagado y dice por qué al pasar el ratón. */
+function CardAction({
   icon: Icon,
   label,
   reason,
   danger,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ size?: number }>;
   label: string;
   reason: string | null;
   danger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={!!reason}
-      title={reason ? `${label}: ${reason}` : label}
-      className={`rounded-md p-2 text-dim transition-colors disabled:opacity-25 ${danger ? "hover:bg-bad/10 hover:text-bad" : "hover:bg-panel-2 hover:text-neon"}`}
+      disabled={!!reason || disabled}
+      title={reason ?? undefined}
+      className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
+        danger ? "border-bad/40 text-bad hover:bg-bad/10" : "border-line-2 text-dim hover:bg-panel-2 hover:text-ink"
+      }`}
     >
-      <Icon size={15} />
+      <Icon size={14} /> {label}
     </button>
   );
 }

@@ -59,6 +59,19 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib
 
+      # Vulnerabilidades conocidas en las dependencias (RustSec y npm). IT lo
+      # pregunta antes de aprobar un programa; aquí falla la CI si aparece una.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: Auditoria de dependencias de Rust
+        working-directory: src-tauri
+        run: cargo audit
+
+      - name: Auditoria de dependencias de la interfaz
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Instalador y portable
         run: npm run build:release
 

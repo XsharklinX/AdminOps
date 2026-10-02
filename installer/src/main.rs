@@ -16,6 +16,20 @@ use tauri::Emitter;
 const PAYLOAD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/payload.exe"));
 const VERSION: &str = env!("APP_VERSION");
 const UNINSTALL_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\AdminOps";
+/// Huella del adminops.exe de este instalador ("" en desarrollo).
+const EXE_SHA256: &str = env!("APP_EXE_SHA256");
+
+/// ¿El adminops.exe de esa carpeta es exactamente el que trae este instalador?
+/// NSIS en silencio puede no poder sobrescribirlo (algo lo tenía abierto) y
+/// terminar sin error; como las dos builds tienen la misma versión, eso pasaba
+/// por «actualizado» y se seguía usando la anterior.
+fn exe_is_current(dir: &Path) -> bool {
+    use sha2::Digest;
+    if EXE_SHA256.is_empty() {
+        return true;
+    }
+    std::fs::read(dir.join("adminops.exe")).is_ok_and(|b| sha2::Sha256::digest(&b).iter().map(|x| format!("{x:02x}")).collect::<String>() == EXE_SHA256)
+}
 
 fn parse_version(v: &str) -> Vec<u32> {
     v.split(['.', '-']).map(|p| p.parse().unwrap_or(0)).collect()
@@ -131,8 +145,11 @@ fn stop_app(dir: &Path) {
     const NO_WINDOW: u32 = 0x0800_0000;
     let _ = std::process::Command::new("taskkill.exe").args(["/F", "/T", "/IM", "adminops.exe"]).creation_flags(NO_WINDOW).status();
     let d = dir.display().to_string().replace('\'', "''");
+    // También el navegador interno de AdminOps (msedgewebview2 con su perfil):
+    // si queda vivo, el AdminOps nuevo se engancha a él y Correo y Teams no cargan.
     let script = format!(
-        r"Get-Process powershell, pwsh -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne $PID -and ($_.Modules.FileName -like '{d}\*') }} | Stop-Process -Force -ErrorAction SilentlyContinue"
+        r#"Get-Process powershell, pwsh -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne $PID -and ($_.Modules.FileName -like '{d}\*') }} | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction SilentlyContinue | Where-Object {{ $_.CommandLine -like '*\AdminOps\WebView*' -or $_.CommandLine -like '*\AdminOps-data\*' }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"#
     );
     let _ = std::process::Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
@@ -182,11 +199,18 @@ fn install(app: tauri::AppHandle, dir: String, desktop: bool, close_app: bool) -
     let tmp = std::env::temp_dir().join(format!("adminops-setup-{}.exe", std::process::id()));
     std::fs::write(&tmp, PAYLOAD).map_err(|e| format!("No se pudo preparar la instalación: {e}"))?;
     let mut code = run_payload(&tmp, &dir, &emit);
+    if code == 0 && !exe_is_current(&dir) {
+        // Terminó «bien» pero el programa sigue siendo el anterior: algo lo tenía abierto.
+        code = 2;
+    }
     if code != 0 && code != -2 {
         // Archivos aún bloqueados (un proceso que tardó en cerrarse): cerrar de nuevo y reintentar.
         emit(8, "Reintentando…");
         stop_app(&dir);
         code = run_payload(&tmp, &dir, &emit);
+        if code == 0 && !exe_is_current(&dir) {
+            code = 2;
+        }
     }
     let _ = std::fs::remove_file(&tmp);
     if code != 0 {

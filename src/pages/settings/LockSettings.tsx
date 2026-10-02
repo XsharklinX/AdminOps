@@ -2,7 +2,7 @@ import { KeyRound, Lock, LockOpen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
 import { Button, Card, inputClass, Loading } from "../../components/ui";
-import { lockApi, type LockStatus } from "../../lib/api";
+import { appApi, lockApi, type LockStatus } from "../../lib/api";
 
 const IDLE = [
   [0, "Solo al abrir AdminOps"],
@@ -18,6 +18,13 @@ const notify = () => window.dispatchEvent(new Event("adminops-lock"));
 
 /** Poner, cambiar o quitar el PIN / contraseña de AdminOps. */
 export function LockSettings() {
+  const [portable, setPortable] = useState(false);
+  useEffect(() => {
+    appApi
+      .info()
+      .then((i) => setPortable(i.portable))
+      .catch(() => {});
+  }, []);
   const [status, setStatus] = useState<LockStatus | null>(null);
   const [kind, setKind] = useState<"pin" | "password">("pin");
   const [secret, setSecret] = useState("");
@@ -144,6 +151,13 @@ export function LockSettings() {
           casa de un cliente. Bloquea la aplicación, no cifra los datos (para eso está la Caja fuerte). Si lo olvidas, se desbloquea con la contraseña de
           Windows de esta cuenta.
         </p>
+        {portable && (
+          <p className="mb-4 rounded-lg border border-neon/30 bg-neon/5 px-3 py-2 text-xs text-dim">
+            <b className="text-ink">En el pendrive, el PIN también protege tus contraseñas guardadas</b> (portales, routers, Microsoft 365): si pierdes el pendrive,
+            nadie puede leerlas sin él. Por eso, si olvidas el PIN, esas contraseñas no se pueden recuperar (con la contraseña de Windows se abre AdminOps, pero no
+            ellas): tendrías que volver a guardarlas.
+          </p>
+        )}
 
         {status.enabled ? (
           <div className="space-y-4">

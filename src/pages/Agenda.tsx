@@ -23,16 +23,18 @@ import {
   Plus,
   Repeat,
   Sunrise,
-  Trash2,
+  History as HistoryIcon,
   Users,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { OutlookButton } from "../components/M365";
+import { AgendaHistory } from "../components/AgendaHistory";
+import { MonthView, daysBetween, monthGrid } from "../components/AgendaMonth";
+import { OutlookButton, useGraph } from "../components/M365";
 import type { PageId } from "../components/Sidebar";
 import { Button, Card, inputClass, Loading, Modal } from "../components/ui";
-import { agendaApi, followupsApi, portalsApi, REPEATS, workApi, type AgendaKind, type Client, type DueClient, type Followup, type Settings, type Visit } from "../lib/api";
+import { agendaApi, followupsApi, graphApi, portalsApi, REPEATS, workApi, type AgendaKind, type Client, type DueClient, type Followup, type OutlookEvent, type Settings, type Visit } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 const DAY_MS = 86_400_000;
@@ -110,17 +112,40 @@ function emptyEntry(start: number, patch: Partial<Visit> = {}): Visit {
 }
 
 /** Agenda: visitas, tareas, llamadas y reuniones, con o sin cliente. */
-export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: string | null) => void }) {
+export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus?: string | null) => void; focus?: string | null }) {
   const [data, setData] = useState<{ visits: Visit[]; due: DueClient[] } | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [followups, setFollowups] = useState<Followup[]>([]);
+  /** Todos, también los hechos: para el historial. */
+  const [allFollowups, setAllFollowups] = useState<Followup[]>([]);
   const [editing, setEditing] = useState<Visit | null>(null);
-  const [showPast, setShowPast] = useState(false);
   /** Día elegido en la tira de la semana (null: todos). */
   const [dayFilter, setDayFilter] = useState<number | null>(null);
   const quickRef = useRef<QuickAddHandle | null>(null);
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
+  /** Lista o mes (se recuerda). */
+  const [mode, setModeState] = useState<"list" | "month" | "history">(() => {
+    try {
+      return localStorage.getItem("adminops.agenda.mode") === "month" ? "month" : "list";
+    } catch {
+      return "list";
+    }
+  });
+  const setMode = (m: "list" | "month" | "history") => {
+    setModeState(m);
+    try {
+      // El historial se consulta de vez en cuando: al volver se abre la lista o el mes.
+      if (m !== "history") localStorage.setItem("adminops.agenda.mode", m);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
+  const [month, setMonth] = useState(() => new Date());
+  // Outlook: lo que hay en tu calendario (en gris) y lo que cambió allí.
+  const graph = useGraph();
+  const [outlook, setOutlook] = useState<OutlookEvent[]>([]);
+  const pulled = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -128,6 +153,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
       setData(a);
       setClients(c);
       setFollowups(f.filter((x) => !x.done));
+      setAllFollowups(f);
     } catch (e) {
       toast("error", String(e));
     }
@@ -136,24 +162,78 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
     void load();
   }, [load]);
 
+  // Al abrir la Agenda con Microsoft 365 conectado: primero lo que se movió o
+  // borró en Outlook de lo que salió de aquí, luego se recarga.
+  useEffect(() => {
+    if (!graph?.connected || pulled.current) return;
+    pulled.current = true;
+    graphApi
+      .calendarPull()
+      .then((r) => {
+        if (r.updated.length || r.unlinked.length) {
+          const parts = [r.updated.length && `${r.updated.length} ${r.updated.length === 1 ? "cambió" : "cambiaron"} en Outlook y se actualizaron aquí`, r.unlinked.length && `${r.unlinked.length} se borraron en Outlook (aquí siguen)`].filter(Boolean);
+          toast("info", `Agenda y Outlook: ${parts.join("; ")}.`);
+          void load();
+        }
+      })
+      .catch(() => {});
+  }, [graph, load, toast]);
+
+  // Los eventos de Outlook del rango que se ve (lista: 30 días; mes: su cuadrícula).
+  const range = useMemo(() => {
+    if (mode === "month") {
+      const g = monthGrid(month);
+      return [g[0] / 1000, g[41] / 1000 + 86_400];
+    }
+    const t = todayKey() / 1000;
+    return [t, t + 31 * 86_400];
+  }, [mode, month]);
+  useLiveEffect(
+    (vigente) => {
+      if (!graph?.connected) return;
+      graphApi
+        .calendarView(range[0], range[1])
+        .then((e) => vigente() && setOutlook(e))
+        .catch(() => vigente() && setOutlook([]));
+    },
+    [graph, range, data],
+  );
+
+  /** Si la visita está en Outlook, que allí también cambie (los dos calendarios, iguales). */
+  const pushOutlook = (id: string, linked: boolean) => {
+    if (linked && graph?.connected) void graphApi.calendarSync(id).catch(() => toast("info", "Guardado aquí; Outlook no se pudo actualizar ahora."));
+  };
+
   const byId = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
+
+  // Desde la ficha de un cliente: «Agendar» abre ya el editor con ese cliente.
+  const handled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focus?.startsWith("client:") || handled.current === focus || clients.length === 0) return;
+    handled.current = focus;
+    const c = byId.get(focus.slice(7));
+    if (c) setEditing(emptyEntry(proposedStart(todayKey() + DAY_MS), { kind: "visit", clientId: c.id, machines: c.machines.length }));
+  }, [focus, clients, byId]);
 
   const groups = useMemo(() => {
     const today = todayKey();
     const visits = (data?.visits ?? []).filter((v) => v.status !== "cancelled");
     const upcoming = visits.filter((v) => dayKey(v.start) >= today && v.status === "planned");
     const past = visits.filter((v) => dayKey(v.start) < today || v.status === "done").sort((a, b) => b.start - a.start);
-    const days = new Map<number, { visits: Visit[]; followups: Followup[] }>();
+    // Lo que se quedó sin marcar: ni hecho ni cancelado, y su día ya pasó.
+    const overdue = visits.filter((v) => v.status === "planned" && dayKey(v.start) < today).sort((a, b) => a.start - b.start);
+    const days = new Map<number, { visits: Visit[]; followups: Followup[]; outlook: OutlookEvent[] }>();
     const slot = (k: number) => {
       let d = days.get(k);
-      if (!d) days.set(k, (d = { visits: [], followups: [] }));
+      if (!d) days.set(k, (d = { visits: [], followups: [], outlook: [] }));
       return d;
     };
     for (const v of upcoming) slot(dayKey(v.start)).visits.push(v);
     // Los seguimientos atrasados cuentan como de hoy: siguen pendientes.
     for (const f of followups) slot(Math.max(dayKey(f.due), today)).followups.push(f);
-    return { days: [...days.entries()].sort((a, b) => a[0] - b[0]), past };
-  }, [data, followups]);
+    for (const o of outlook) if (dayKey(o.start) >= today) slot(dayKey(o.start)).outlook.push(o);
+    return { days: [...days.entries()].sort((a, b) => a[0] - b[0]), past, overdue };
+  }, [data, followups, outlook]);
 
   const setStatus = async (v: Visit, status: Visit["status"]) => {
     try {
@@ -180,7 +260,8 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
   const postpone = async (v: Visit, days: number) => {
     try {
       await agendaApi.postpone(v.id, days);
-      toast("ok", days > 0 ? `Aplazada ${days === 1 ? "a mañana" : `${days} días`}.` : "Adelantada un día.");
+      toast("ok", days > 0 ? `Aplazada ${days === 1 ? "a mañana" : `${days} días`}.` : days === -1 ? "Adelantada un día." : `Adelantada ${-days} días.`);
+      pushOutlook(v.id, !!v.outlookEvent);
       void load();
     } catch (e) {
       toast("error", String(e));
@@ -223,7 +304,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
 
   const today = todayKey();
   const tomorrow = today + DAY_MS;
-  const dayData = (k: number) => groups.days.find(([d]) => d === k)?.[1] ?? { visits: [], followups: [] };
+  const dayData = (k: number) => groups.days.find(([d]) => d === k)?.[1] ?? { visits: [], followups: [], outlook: [] };
   const weekCount = groups.days.filter(([k]) => k < today + 7 * DAY_MS).reduce((n, [, d]) => n + d.visits.length + d.followups.length, 0);
   const shown = dayFilter === null ? groups.days : groups.days.filter(([k]) => k === dayFilter);
 
@@ -245,18 +326,59 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
         <Stat label="Hoy" n={dayData(today).visits.length + dayData(today).followups.length} active />
         <Stat label="Mañana" n={dayData(tomorrow).visits.length + dayData(tomorrow).followups.length} />
         <Stat label="Próximos 7 días" n={weekCount} />
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <span className="flex overflow-hidden rounded-md border border-line text-xs" role="tablist" aria-label="Vista">
+            {(["list", "month", "history"] as const).map((m) => (
+              <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`px-3 py-1.5 ${mode === m ? "bg-neon/15 text-neon" : "text-mute hover:text-ink"}`}>
+                {m === "list" ? "Lista" : m === "month" ? "Mes" : "Historial"}
+              </button>
+            ))}
+          </span>
           <Button onClick={() => setEditing(emptyEntry(proposedStart(dayFilter ?? today)))}>
             <CalendarPlus size={14} /> Nueva
           </Button>
         </div>
       </div>
 
-      <QuickAdd ref={quickRef} onAdded={() => void load()} />
+      {mode === "month" && (
+        <MonthView
+          month={month}
+          onMonth={setMonth}
+          visits={(data.visits ?? []).filter((v) => v.status !== "cancelled")}
+          followups={followups}
+          outlook={outlook}
+          onMove={(v, k) => void postpone(v, daysBetween(dayKey(v.start), k))}
+          onOpenDay={(k) => {
+            setMode("list");
+            setDayFilter(k);
+          }}
+          onAdd={(k) => setEditing(emptyEntry(proposedStart(k)))}
+          onEdit={(v) => setEditing(v)}
+        />
+      )}
 
-      <WeekStrip days={groups.days} selected={dayFilter} onSelect={setDayFilter} />
+      {mode === "history" && (
+        <AgendaHistory
+          visits={data.visits}
+          followups={allFollowups}
+          onReopen={(v) => void setStatus(v, "planned")}
+          onDone={(v) => void setStatus(v, "done")}
+          onRepeat={(v) => setEditing({ ...v, id: "", status: "planned", reminded: false, outlookEvent: "", doneAt: 0, start: proposedStart(todayKey() + DAY_MS) })}
+          onRemove={(v) => void remove(v)}
+          onReopenFollowup={(f) =>
+            void followupsApi
+              .setDone(f.id, false)
+              .then(() => load())
+              .catch((e) => toast("error", String(e)))
+          }
+        />
+      )}
 
-      <div className="grid grid-cols-12 gap-4">
+      {mode !== "history" && <QuickAdd ref={quickRef} onAdded={() => void load()} />}
+
+      {mode === "list" && <WeekStrip days={groups.days} selected={dayFilter} onSelect={setDayFilter} />}
+
+      <div className={`grid grid-cols-12 gap-4 ${mode !== "list" ? "hidden" : ""}`}>
         <div className="col-span-12 space-y-4 lg:col-span-4">
           <NextUp visits={dayData(today).visits} />
 
@@ -323,6 +445,22 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
             </div>
           )}
 
+          {groups.overdue.length > 0 && dayFilter === null && (
+            <section>
+              <h3 className="mb-2 flex items-baseline gap-2 text-xs font-medium text-warn">
+                Atrasado
+                <span className="font-normal text-mute">
+                  {groups.overdue.length} sin marcar: ¿se {groups.overdue.length === 1 ? "hizo" : "hicieron"}? Márcalo como hecho, pásalo a otro día o cancélalo.
+                </span>
+              </h3>
+              <ul className="space-y-2">
+                {groups.overdue.map((v) => (
+                  <EntryRow key={v.id} {...rowProps(v)} overdue />
+                ))}
+              </ul>
+            </section>
+          )}
+
           {shown.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line px-6 py-10 text-center">
               <CalendarDays size={22} className="text-mute" />
@@ -348,6 +486,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
                   {dayLabel(key)}
                   <span className="font-normal text-mute">
                     {d.visits.length > 0 && `${d.visits.length} en la agenda`}
+                    {d.outlook.length > 0 && `${d.visits.length > 0 ? " · " : ""}${d.outlook.length} en Outlook`}
                     {d.visits.length > 0 && d.followups.length > 0 && " · "}
                     {d.followups.length > 0 && `${d.followups.length} ${d.followups.length === 1 ? "seguimiento" : "seguimientos"}`}
                   </span>
@@ -362,40 +501,18 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
                   {d.followups.map((f) => (
                     <FollowupRow key={f.id} f={f} onDone={() => void followup(f, "done")} onSnooze={() => void followup(f, "snooze")} />
                   ))}
+                  {d.outlook.map((o) => (
+                    <OutlookRow key={o.id} o={o} />
+                  ))}
                 </ul>
               </section>
             ))
           )}
 
           {groups.past.length > 0 && dayFilter === null && (
-            <section>
-              <button onClick={() => setShowPast(!showPast)} className="text-xs text-mute hover:text-ink">
-                {showPast ? "Ocultar" : "Ver"} lo pasado ({groups.past.length})
-              </button>
-              {showPast && (
-                <ul className="mt-2 divide-y divide-line/60 rounded-xl border border-line bg-panel">
-                  {groups.past.slice(0, 50).map((v) => {
-                    const k = KINDS[kindOf(v)];
-                    return (
-                      <li key={v.id} className="flex items-center gap-3 px-4 py-2 text-sm">
-                        <span className="w-20 shrink-0 text-xs text-mute">{shortDate(v.start)}</span>
-                        <k.Icon size={13} className={`shrink-0 ${k.text}`} />
-                        <span className="min-w-0 flex-1 truncate text-dim">{labelOf(v)}</span>
-                        <span className={`text-xs ${v.status === "done" ? "text-ok" : "text-warn"}`}>{v.status === "done" ? "Hecha" : "Sin marcar"}</span>
-                        {v.status !== "done" && (
-                          <button onClick={() => void setStatus(v, "done")} className="text-xs text-neon hover:underline">
-                            Marcar hecha
-                          </button>
-                        )}
-                        <button onClick={() => void remove(v)} className="text-mute hover:text-bad" title="Borrar">
-                          <Trash2 size={13} />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
+            <button onClick={() => setMode("history")} className="flex items-center gap-1.5 text-xs text-mute hover:text-ink">
+              <HistoryIcon size={12} /> Ver el historial ({groups.past.length})
+            </button>
           )}
         </div>
       </div>
@@ -414,6 +531,7 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
               : undefined
           }
           onSaved={(conflict: string) => {
+            if (editing.id) pushOutlook(editing.id, !!editing.outlookEvent);
             setEditing(null);
             // Se guarda igual (a veces se solapan a propósito), pero hay que saberlo.
             toast(conflict ? "info" : "ok", conflict ? `Guardado, pero se pisa con «${conflict}».` : "Guardado en la agenda.");
@@ -423,6 +541,19 @@ export function Agenda({ onNavigate }: { onNavigate: (page: PageId, focus?: stri
       )}
       {dialog}
     </div>
+  );
+}
+
+/** Algo de tu Outlook (solo se ve: se cambia en Outlook). */
+function OutlookRow({ o }: { o: OutlookEvent }) {
+  return (
+    <li className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-panel/40 py-2 pr-3 pl-4 text-sm">
+      <div className="w-14 shrink-0 text-center font-mono text-xs text-mute">{o.allDay ? "Todo el día" : time(o.start)}</div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-dim">{o.subject}</div>
+        <div className="truncate text-[11px] text-mute">Outlook{o.location ? ` · ${o.location}` : ""}</div>
+      </div>
+    </li>
   );
 }
 
@@ -649,6 +780,7 @@ function EntryRow({
   onRemind,
   onPostpone,
   onChanged,
+  overdue = false,
 }: {
   v: Visit;
   client?: Client;
@@ -659,6 +791,8 @@ function EntryRow({
   onRemind: () => void;
   onPostpone: (days: number) => void;
   onChanged: () => void;
+  /** Su día ya pasó: se enseña la fecha y «a hoy» en vez de «a mañana». */
+  overdue?: boolean;
 }) {
   const btn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink";
   const k = KINDS[kindOf(v)];
@@ -668,7 +802,7 @@ function EntryRow({
       <span className={`absolute inset-y-0 left-0 w-1 ${k.bar}`} />
       <div className="w-14 shrink-0 text-center">
         <div className="font-mono text-base text-ink">{time(v.start)}</div>
-        <div className="text-[10px] text-mute">{v.minutes >= 60 ? `${Math.round((v.minutes / 60) * 10) / 10} h` : `${v.minutes} min`}</div>
+        <div className={`text-[10px] ${overdue ? "text-warn" : "text-mute"}`}>{overdue ? shortDate(v.start) : v.minutes >= 60 ? `${Math.round((v.minutes / 60) * 10) / 10} h` : `${v.minutes} min`}</div>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
@@ -716,7 +850,11 @@ function EntryRow({
         <button onClick={onDone} className={`${btn} hover:text-ok`} title="Hecho">
           <Check size={14} />
         </button>
-        <button onClick={() => onPostpone(1)} className={btn} title="Pasarlo a mañana (sin abrir el editor)">
+        <button
+          onClick={() => onPostpone(overdue ? Math.max(1, daysBetween(dayKey(v.start), todayKey())) : 1)}
+          className={btn}
+          title={overdue ? "Pasarlo a hoy" : "Pasarlo a mañana (sin abrir el editor)"}
+        >
           <Sunrise size={14} />
         </button>
         <OutlookButton visitId={v.id} inOutlook={!!v.outlookEvent} onDone={onChanged} className={btn} />

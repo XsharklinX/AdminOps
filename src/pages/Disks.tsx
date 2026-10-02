@@ -7,6 +7,7 @@
 import { Activity, CheckCircle2, CircleAlert, FolderInput, FolderOutput, HardDrive, Loader2, RefreshCw, ScanSearch, ShieldAlert, Usb, Wrench, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
+import { BitLockerChip, DiskTrend, RemovableActions, SpeedTest } from "../components/DiskExtras";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Loading } from "../components/ui";
 import { disksApi, type DiskCheck, type DiskReport, type DiskVolume, type RescueResult } from "../lib/api";
@@ -144,11 +145,13 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
       )}
       {d.verdict.level === "ok" && <p className="-mt-1 px-4 pb-2 text-xs text-dim">{d.verdict.text}</p>}
       {facts.length > 0 && <p className="px-4 pb-3 text-[11px] text-mute">{facts.join(" · ")}</p>}
+      <DiskTrend d={d} />
+      <SpeedTest d={d} />
 
       {d.volumes.length > 0 && (
         <ul className="divide-y divide-line/60 border-t border-line/60">
           {d.volumes.map((v) => (
-            <VolumeRow key={v.letter} v={v} failing={d.verdict.level === "bad"} isAdmin={isAdmin} onChanged={onChanged} />
+            <VolumeRow key={v.letter} v={v} failing={d.verdict.level === "bad"} removable={external || d.bus.toUpperCase() === "SD"} diskSize={d.size} isAdmin={isAdmin} onChanged={onChanged} />
           ))}
         </ul>
       )}
@@ -156,7 +159,21 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
   );
 }
 
-function VolumeRow({ v, failing, isAdmin, onChanged }: { v: DiskVolume; failing: boolean; isAdmin: boolean; onChanged: () => void }) {
+function VolumeRow({
+  v,
+  failing,
+  removable,
+  diskSize,
+  isAdmin,
+  onChanged,
+}: {
+  v: DiskVolume;
+  failing: boolean;
+  removable: boolean;
+  diskSize: number;
+  isAdmin: boolean;
+  onChanged: () => void;
+}) {
   const [busy, setBusy] = useState<"check" | "repair" | "surface" | null>(null);
   const [result, setResult] = useState<DiskCheck | null>(null);
   const toast = useToast();
@@ -209,6 +226,7 @@ function VolumeRow({ v, failing, isAdmin, onChanged }: { v: DiskVolume; failing:
             <span className="truncate text-dim">{v.label || "Sin nombre"}</span>
             <span className="text-mute">{v.fs}</span>
             {v.dirty === true && <span className="rounded border border-warn/50 px-1 text-[10px] text-warn">marcado como dañado</span>}
+            <BitLockerChip v={v} isAdmin={isAdmin} />
           </div>
           <div className="mt-1 flex items-center gap-2">
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
@@ -234,6 +252,7 @@ function VolumeRow({ v, failing, isAdmin, onChanged }: { v: DiskVolume; failing:
         </div>
       </div>
       {busy === "surface" && <TaskStatus task={`disk-surface:${v.letter}`} active className="mt-2" fallback="Revisando la superficie…" />}
+      {removable && !v.system && <RemovableActions v={v} size={Math.min(v.size || diskSize, diskSize || v.size)} onChanged={onChanged} />}
       {busy === "check" && <p className="mt-2 text-xs text-mute">Comprobando sin cambiar nada… (en discos grandes, unos minutos)</p>}
       {result && t && (
         <p className={`mt-2 flex items-start gap-1.5 text-xs ${t.text}`}>
