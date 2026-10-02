@@ -123,21 +123,6 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Hoy: con un caso abierto, un seguimiento vencido, una visita de hoy y un aviso de Windows, salen los cuatro, el vencido primero. «Hecho» y «Mañana» funcionan.
 - [ ] Modo usuario: el Panel no enseña «Hoy».
 
-## Microsoft 365 (Graph)
-- [ ] Ajustes → Portales y correo → Microsoft 365: inquilino e id de aplicación mal escritos → mensaje claro, no se guarda.
-- [ ] «Conectar»: se abre microsoft.com/devicelogin en el navegador y el código ya está copiado. Tras iniciar sesión (con MFA), AdminOps dice «Conectado como …» solo, sin pulsar nada.
-- [ ] Cancelar a mitad y volver a conectar: funciona. Dejar caducar el código: lo dice.
-- [ ] Cerrar AdminOps y abrirlo: sigue conectado (no vuelve a pedir el código).
-- [ ] Personas → alguien que falló el MFA hoy: «Inicios de sesión» muestra el fallo con el motivo en español, la app, el sitio y el detalle del MFA.
-- [ ] «MFA»: lista sus métodos; la contraseña no tiene «Quitar». Quitar el del móvil viejo pide confirmación y queda en el diario.
-- [ ] «Cerrar sus sesiones»: confirmación; en unos minutos Outlook web le pide entrar de nuevo.
-- [ ] Modo auditoría: quitar MFA y cerrar sesiones se bloquean; ver inicios de sesión sigue funcionando.
-- [ ] Sin un permiso (por ejemplo sin AuditLog.Read.All): esa función lo dice y las demás van.
-- [ ] Hoy: con una incidencia abierta en Microsoft 365, aparece arriba en rojo.
-- [ ] Agenda → icono de Outlook: la visita aparece en el calendario a su hora; cambiar la hora y volver a pulsar la actualiza (no duplica).
-- [ ] Cerrar un caso con persona del dominio → «Avisar por Teams»: le llega el mensaje en un chat uno a uno.
-- [ ] Desconectar: se borra la sesión; Personas dice cómo conectarlo.
-
 ## Impresoras de red (SNMP, mDNS, WS-Discovery)
 - [ ] Revisar una impresora de red con SNMP: salen los niveles de tóner con barras y el contador de páginas.
 - [ ] Con el tóner por debajo del 10 %: el título dice «Tóner … al N %» en ámbar.
@@ -145,6 +130,19 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Una impresora sin SNMP: Revisar funciona igual que antes, sin niveles (tarda unos segundos más como mucho).
 - [ ] Buscar en la red: las impresoras salen con nombre y modelo; una que este equipo no había visto nunca también aparece.
 - [ ] En una red sin impresoras: «No se ha visto ninguna», sin colgarse.
+
+## Guía, novedades, términos y reportar fallos (1.1.10)
+- [ ] Acerca de (pulsando el logo): cuatro botones. «Guía» abre la ayuda con los capítulos a la izquierda; «Abrir esta pantalla» cierra la ayuda y lleva a esa pantalla y pestaña.
+- [ ] Buscar «deshacer», «pendrive», «pin»: salen apartados de la guía, preguntas y glosario. Sin tildes también encuentra.
+- [ ] Con Tickets o el Correo abiertos, la ayuda se ve entera: el portal no la tapa. Esc la cierra.
+- [ ] Novedades: la primera es la versión instalada, marcada «la que tienes»; baja hasta la 0.1 y no hay ninguna fecha.
+- [ ] Términos de uso: se leen completos y son los mismos del instalador.
+- [ ] Reportar un problema: con menos de 10 letras el botón está apagado. «Preparar el correo» abre el programa de correo con el destinatario, el asunto, el texto y el .zip adjunto; sin enviar, no sale nada. «Sin adjunto» abre el correo con el texto y la carpeta del .zip. El .zip trae `descripcion.txt`.
+- [ ] En un equipo sin programa de correo: el aviso verde dice qué hacer.
+- [ ] Instalador: «Instalar» está apagado hasta marcar «He leído y acepto»; «términos de uso» los abre dentro del instalador, y «Acepto» marca la casilla. El instalador clásico enseña la página de la licencia; con `/S` instala sin preguntar.
+- [ ] Ya no hay nada de Microsoft 365: ni en Ajustes → Portales y correo, ni en Personas, ni el icono de Outlook en la Agenda, ni puntos de presencia en Contactos, ni «Avisar por Teams» al cerrar un caso. El Correo y Teams siguen abriendo.
+- [ ] Una agenda guardada con visitas que estaban en Outlook sigue abriendo y editándose con normalidad.
+- [ ] Importar un archivo de empresa antiguo (con Microsoft 365 dentro): importa lo demás sin error.
 
 ## Lavado de cara (1.1.9)
 - [ ] Usuarios locales: las cuatro cifras cuadran; pulsar «Con algo que revisar» filtra. Una cuenta sin contraseña sale con el punto de color y, en la ficha, el aviso con «Cambiar contraseña». Buscar por nombre. Los botones apagados dicen por qué al pasar el ratón (único administrador, sesión iniciada…). Al borrar a alguien, la ficha pasa a otra cuenta.
@@ -185,14 +183,11 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Personas: tras abrir a alguien, aparece en «Recientes» al volver; «Olvidar» los quita. Una cuenta bloqueada enseña el aviso rojo con «Desbloquear»; una con la contraseña caducada, «Dar una contraseña temporal».
 - [ ] Tickets con «Al lado: Personas» (pantalla dividida): se ve bien en media pantalla.
 
-## Listo para el equipo, Agenda de mes y presencia
+## Listo para el equipo y Agenda de mes
 - [ ] Panel con datos vacíos: sale «Primeros pasos» con 5 pasos; cada botón lleva a su sitio; al hacerlo, la casilla se marca al volver a la ventana. La X lo oculta; Ajustes → General «Ver Primeros pasos» lo devuelve. En modo usuario no sale.
 - [ ] Ajustes → Configuración de empresa → Exportar: el .json no contiene contraseñas, ni el nombre ni la firma del técnico. En otro equipo (o tras borrar un portal), Importar enseña qué trae, deja elegir y no duplica portales.
 - [ ] Paquete de soporte: el .zip trae `resumen.txt` con los arranques y los últimos errores legibles.
 - [ ] Agenda → Mes: arrastrar una visita a otro día la mueve (y el aviso lo dice); doble clic en un día abre «Apuntar» con esa fecha; «y N más» abre ese día en la lista.
-- [ ] Con Microsoft 365: lo de Outlook sale en gris en la lista y en el mes. Mover en Outlook una visita que se creó desde AdminOps y abrir la Agenda: se actualiza y lo dice. Borrarla en Outlook: aquí sigue, sin enlace. Moverla aquí (arrastrando): en Outlook cambia sola.
-- [ ] Contactos con Microsoft 365 y permisos: fotos y punto de presencia; la ficha dice «Teams: …». Sin el permiso, todo funciona igual sin puntos.
-- [ ] Personas: la ficha enseña la foto y la presencia de esa persona.
 
 ## Pendrive seguro, discos a fondo e informe (1.1.8)
 - [ ] Con AdminOps abierto (y Correo cargado), pasar el Setup encima: al terminar, AdminOps es el nuevo (Ajustes → Acerca de, o el registro dice «navegador» en el disco del equipo). Si algo lo impide, el instalador lo dice en vez de «listo».
@@ -247,7 +242,6 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Un seguimiento de la nota de llamada para mañana sale en «Mañana» y en su día, con «Hecho» y «Mañana».
 - [ ] «Hoy» dice «En N min» con lo próximo y tacha lo que ya pasó.
 - [ ] Aviso 30 minutos antes: «Llamada en menos de 30 minutos» con el título.
-- [ ] Outlook: el evento de una tarea sin cliente se llama «Tarea · título».
 - [ ] Contactos: las seis cifras filtran al pulsarlas (y «Contactos» quita los filtros). «Sin completar» en ámbar si hay alguno.
 - [ ] Marcación rápida: favoritos primero; al pasar el ratón, llamar, Teams, correo y copiar funcionan.
 - [ ] Las tarjetas, la tabla, el directorio y la ficha muestran el avatar del mismo color para la misma persona, en claro y en oscuro.

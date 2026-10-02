@@ -25,13 +25,12 @@ import {
   UserRound,
   UserX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "../components/feedback";
 import { Button, Card, EmptyState, inputClass, Modal } from "../components/ui";
 import { casesApi, contactsApi, officeApi, peopleApi, portalsApi, type Case, type LapsPassword, type Person, type PersonHit, type RecoveryKey } from "../lib/api";
 import { openCase } from "../lib/currentCase";
-import { M365Person } from "../components/M365";
-import { Avatar, presenceText, useTeamsPresence } from "../components/contacts/Avatar";
+import { Avatar } from "../components/contacts/Avatar";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 const DAY = 86_400;
@@ -261,9 +260,6 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
   const [busy, setBusy] = useState(false);
   const [resetting, setResetting] = useState(false);
   const toast = useToast();
-  // Foto de Microsoft 365 y presencia de Teams, por su usuario de Microsoft 365 (o el correo).
-  const who = (p?.upn || p?.mail || "").trim().toLowerCase();
-  const m365 = useTeamsPresence(useMemo(() => (who ? [who] : []), [who]));
 
   const load = () =>
     peopleApi
@@ -352,11 +348,10 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
       )}
       <Card>
         <div className="flex flex-wrap items-center gap-3">
-          <Avatar c={{ name: p.name || p.sam, favorite: false }} size={44} photo={m365.photos[who]} presence={m365.presence[who]} />
+          <Avatar c={{ name: p.name || p.sam, favorite: false }} size={44} />
           <div className="min-w-0 flex-1">
             <div className="text-base font-semibold text-ink">{p.name || p.sam}</div>
             <div className="truncate font-mono text-xs text-mute select-text">{p.sam}</div>
-            {presenceText(m365.presence[who]) && <div className="text-[11px] text-dim">Teams: {presenceText(m365.presence[who])}</div>}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {p.disabled && <Pill tone="mute" icon={<UserX size={11} />}>Cuenta desactivada</Pill>}
@@ -457,7 +452,6 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
         </Card>
       </div>
 
-      <M365Person upn={p.upn} name={p.name || p.sam} />
 
       {resetting && (
         <ResetDialog

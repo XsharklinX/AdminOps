@@ -1,0 +1,53 @@
+TÉRMINOS DE USO DE ADMINOPS
+
+Al instalar o usar AdminOps aceptas estos términos. Si no estás de acuerdo, no lo instales ni lo uses.
+
+1. Qué es AdminOps
+
+AdminOps es una herramienta de diagnóstico, mantenimiento y soporte técnico para equipos con Windows 10 y Windows 11. Está pensada para personas con conocimientos técnicos. Su autor y titular de todos los derechos es David Bonilla.
+
+2. Licencia
+
+Se te concede permiso para instalar y usar AdminOps en los equipos que administres o en los que tengas autorización para trabajar, tanto para uso propio como profesional. No se te cede la propiedad del programa. No está permitido modificarlo, descompilarlo, venderlo, alquilarlo ni distribuir copias modificadas, ni presentarlo como obra propia.
+
+3. Autorización sobre los equipos
+
+Solo puedes usar AdminOps en equipos que sean tuyos o sobre los que tengas permiso expreso de su dueño o de la organización responsable. Eres tú quien responde de tener esa autorización. Usarlo para acceder a equipos, cuentas, redes o datos ajenos sin permiso está prohibido y puede ser un delito.
+
+4. Cambios en el equipo
+
+AdminOps puede cambiar la configuración de Windows, borrar archivos, desinstalar programas, modificar cuentas de usuario, permisos, servicios y ajustes de red. La mayoría de esos cambios se anotan en el diario de AdminOps y se pueden deshacer desde él, pero no todos. No se pueden deshacer, entre otros: el borrado seguro de archivos y del espacio libre, el formateo de unidades, la eliminación de un usuario junto con su carpeta personal, la desinstalación de programas y la limpieza de archivos temporales. El programa lo advierte antes de hacerlos.
+
+Antes de aplicar cambios importantes debes tener una copia de seguridad de los datos que no se puedan perder. Decidir qué cambio aplicar, en qué equipo y en qué momento es responsabilidad tuya.
+
+5. Sin garantía
+
+AdminOps se entrega «tal cual», sin garantía de ningún tipo, ni expresa ni implícita. No se garantiza que funcione sin errores, que sea adecuado para un fin concreto, ni que sus diagnósticos sean completos o exactos. Un diagnóstico es una ayuda para el técnico, no un dictamen.
+
+6. Limitación de responsabilidad
+
+Hasta donde la ley lo permita, el autor no responde de daños directos ni indirectos derivados del uso o de la imposibilidad de usar AdminOps: pérdida de datos, interrupción del trabajo, daños en el equipo o en el sistema, pérdida de ingresos o reclamaciones de terceros. Si prestas servicios a clientes con AdminOps, la relación con ellos y la responsabilidad por el trabajo realizado son tuyas.
+
+7. Tus datos
+
+AdminOps no tiene cuentas, no envía telemetría y no tiene servidor propio. Todo lo que guardas (clientes, contactos, agenda, diagnósticos, informes, ajustes) se queda en el equipo o en el pendrive desde el que lo usas. Las contraseñas que decides guardar se cifran.
+
+El programa solo se conecta a Internet cuando usas una función que lo necesita: comprobar si hay una versión nueva, la prueba de velocidad y la consulta de la IP pública, instalar o actualizar programas con las herramientas de Windows, y las páginas web que tú abras dentro de él. «Reportar un problema» prepara un correo con la descripción y un archivo de diagnóstico; ese correo solo sale si tú lo envías, y puedes revisar antes lo que contiene.
+
+Si guardas datos de terceros (clientes, empleados, contactos), tú eres el responsable de tratarlos conforme a la ley que te aplique.
+
+8. Programas de terceros
+
+AdminOps incluye o utiliza componentes de terceros con sus propias licencias, que se detallan en la documentación (TERCEROS). También abre páginas y servicios ajenos, como el correo o los portales de tu empresa, que se rigen por sus propias condiciones.
+
+9. Avisos de seguridad de Windows
+
+AdminOps no está firmado digitalmente. Es normal que Windows muestre un aviso al instalarlo, y es posible que algún antivirus pida confirmación por tratarse de una herramienta que modifica el sistema. Descárgalo siempre de su origen oficial.
+
+10. Cambios en estos términos
+
+Estos términos pueden cambiar con las versiones nuevas. La versión vigente es la que acompaña a la versión del programa que estés usando.
+
+11. Contacto
+
+Para dudas sobre estos términos o para informar de un fallo: Contactoyerlindavid@gmail.com

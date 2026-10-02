@@ -33,10 +33,9 @@ fn summary(app: &tauri::AppHandle) -> String {
         _ => "instalado (datos en este equipo)",
     };
     format!(
-        "{}Modo: {reason}\nNavegador interno: {}\nMicrosoft 365: {}\nModo auditoría: {}\n\n{}",
+        "{}Modo: {reason}\nNavegador interno: {}\nModo auditoría: {}\n\n{}",
         info_text(app),
         if crate::paths::browser_on_usb() { "en el pendrive" } else { "en el disco de este equipo" },
-        serde_json::to_value(crate::graph::graph_status(app.clone())).ok().map_or("—".into(), |v| if v["connected"] == true { "conectado" } else if v["configured"] == true { "configurado, sin conectar" } else { "no configurado" }.to_string()),
         if crate::audit::active() { "activo" } else { "no" },
         digest(&log, 5, 40)
     )
@@ -56,15 +55,22 @@ fn info_text(app: &tauri::AppHandle) -> String {
     )
 }
 
-/// Crea el .zip junto a los informes y lo muestra en el Explorador. Devuelve su ruta.
-#[tauri::command(async)]
-pub fn support_package(app: tauri::AppHandle) -> Result<String, String> {
+/// A dónde van los avisos de fallos: el correo del autor.
+pub const SUPPORT_EMAIL: &str = "Contactoyerlindavid@gmail.com";
+
+/// Crea el .zip junto a los informes. Con `description`, lleva dentro lo que
+/// contó el técnico (`descripcion.txt`).
+fn build_package(app: &tauri::AppHandle, description: Option<&str>) -> Result<PathBuf, String> {
+    let app = app.clone();
     let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
     let staging = std::env::temp_dir().join(format!("adminops-soporte-{stamp}"));
     let result = (|| -> Result<PathBuf, String> {
         std::fs::create_dir_all(staging.join("registro")).map_err(|e| e.to_string())?;
         std::fs::write(staging.join("info.txt"), info_text(&app)).map_err(|e| e.to_string())?;
         std::fs::write(staging.join("resumen.txt"), summary(&app)).map_err(|e| e.to_string())?;
+        if let Some(text) = description {
+            std::fs::write(staging.join("descripcion.txt"), text).map_err(|e| e.to_string())?;
+        }
         for entry in std::fs::read_dir(crate::paths::logs_dir(&app)).into_iter().flatten().flatten() {
             let _ = std::fs::copy(entry.path(), staging.join("registro").join(entry.file_name()));
         }
@@ -91,10 +97,78 @@ pub fn support_package(app: tauri::AppHandle) -> Result<String, String> {
         Ok(zip)
     })();
     let _ = std::fs::remove_dir_all(&staging);
-    let zip = result?;
+    result
+}
+
+/// Crea el paquete de soporte y lo muestra en el Explorador. Devuelve su ruta.
+#[tauri::command(async)]
+pub fn support_package(app: tauri::AppHandle) -> Result<String, String> {
+    let zip = build_package(&app, None)?;
     let _ = std::process::Command::new("explorer.exe").arg(format!("/select,{}", zip.display())).spawn();
     log::info!("Paquete de soporte creado");
     Ok(zip.display().to_string())
+}
+
+/// El texto del aviso: lo que pasó, cómo repetirlo y a quién contestar.
+fn problem_text(what: &str, steps: &str, contact: &str) -> String {
+    let clip = |s: &str, n: usize| s.trim().chars().take(n).collect::<String>();
+    let mut out = format!("QUÉ PASÓ\n{}\n", clip(what, 4000));
+    let steps = clip(steps, 4000);
+    if !steps.is_empty() {
+        out.push_str(&format!("\nQUÉ ESTABA HACIENDO / CÓMO SE REPITE\n{steps}\n"));
+    }
+    let contact = clip(contact, 200);
+    if !contact.is_empty() {
+        out.push_str(&format!("\nPARA CONTESTAR\n{contact}\n"));
+    }
+    out
+}
+
+/// Asunto del correo: la versión y el principio de lo que pasó.
+fn problem_subject(version: &str, what: &str) -> String {
+    let first: String = what.trim().lines().next().unwrap_or("").chars().take(70).collect();
+    format!("AdminOps {version}: {first}")
+}
+
+/// Reportar un problema: prepara un correo para el autor con la descripción y
+/// el paquete de soporte. `manual`: sin adjunto (correo web); se abre el correo
+/// con el texto y la carpeta del archivo para arrastrarlo. AdminOps no envía
+/// nada: el correo sale cuando el técnico lo envía.
+#[tauri::command(async)]
+pub fn report_problem(app: tauri::AppHandle, what: String, steps: String, contact: String, manual: bool) -> Result<(), String> {
+    use crate::diagnostics::report::{build_eml, shell_open, url_encode};
+    if what.trim().chars().count() < 10 {
+        return Err("Cuenta qué pasó con un poco más de detalle.".into());
+    }
+    let text = problem_text(&what, &steps, &contact);
+    let zip = build_package(&app, Some(&text))?;
+    let subject = problem_subject(&app.package_info().version.to_string(), &what);
+    let body = format!("{text}\n---\n{}", info_text(&app));
+    if manual {
+        let short: String = body.chars().take(1500).collect();
+        let url = format!("mailto:{SUPPORT_EMAIL}?subject={}&body={}", url_encode(&subject), url_encode(&short.replace('\n', "\r\n")));
+        shell_open(&[std::ffi::OsStr::new(&url)])?;
+        let arg = format!("/select,{}", zip.display());
+        shell_open(&[std::ffi::OsStr::new(&arg)])?;
+    } else {
+        let data = std::fs::read(&zip).map_err(|e| format!("No se pudo leer el archivo de diagnóstico: {e}"))?;
+        if data.len() > 20 * 1024 * 1024 {
+            return Err("El archivo de diagnóstico es demasiado grande para adjuntarlo. Usa «Sin adjunto» y arrástralo al correo.".into());
+        }
+        let name = zip.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "AdminOps-soporte.zip".into());
+        let eml = build_eml(SUPPORT_EMAIL, &subject, &body, &name, &data);
+        let out = zip.with_extension("eml");
+        std::fs::write(&out, eml).map_err(|e| format!("No se pudo preparar el correo: {e}"))?;
+        shell_open(&[out.as_os_str()])?;
+    }
+    log::info!("Aviso de un problema preparado para enviar ({})", if manual { "sin adjunto" } else { "con adjunto" });
+    Ok(())
+}
+
+/// Los términos de uso, tal como van en el instalador.
+#[tauri::command]
+pub fn terms_of_use() -> &'static str {
+    include_str!("../terminos.txt")
 }
 
 #[cfg(test)]
@@ -113,5 +187,17 @@ mod tests {
         assert!(d.contains("no llegó a arrancar") && d.contains("[ERROR]"));
         assert!(!d.contains("PowerShell ok"), "lo normal no hace ruido");
         assert!(super::digest("", 5, 5).contains("(ninguno)"));
+    }
+
+    #[test]
+    fn problem_reports_are_readable() {
+        let t = super::problem_text("  Tickets no carga\nSale en blanco ", "Abrí Tickets", " ana@example.com ");
+        assert!(t.starts_with("QUÉ PASÓ\nTickets no carga\nSale en blanco\n"));
+        assert!(t.contains("CÓMO SE REPITE\nAbrí Tickets") && t.contains("PARA CONTESTAR\nana@example.com"));
+        // Sin pasos ni contacto, no salen sus títulos.
+        let solo = super::problem_text("Algo falla al abrir", "", "  ");
+        assert!(!solo.contains("REPITE") && !solo.contains("CONTESTAR"));
+        assert_eq!(super::problem_subject("1.2.3", "Tickets no carga\nmás detalle"), "AdminOps 1.2.3: Tickets no carga");
+        assert!(super::terms_of_use().contains("Sin garantía") && super::terms_of_use().contains(super::SUPPORT_EMAIL));
     }
 }

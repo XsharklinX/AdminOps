@@ -1237,7 +1237,7 @@ impl Ctx<'_> {
 
 /// Abre un archivo con la app predeterminada. Se lanza a través de explorer.exe
 /// para que el navegador NO herede los privilegios de administrador de AdminOps.
-fn shell_open(args: &[&std::ffi::OsStr]) -> Result<(), String> {
+pub(crate) fn shell_open(args: &[&std::ffi::OsStr]) -> Result<(), String> {
     std::process::Command::new("explorer.exe").args(args).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
@@ -1421,10 +1421,17 @@ fn check_mail_fields(to: &str, subject: &str) -> Result<(), String> {
 }
 
 /// Correo en formato .eml, marcado como borrador para que el programa de correo lo abra listo para enviar.
-fn build_eml(to: &str, subject: &str, body: &str, file_name: &str, attachment: &[u8]) -> String {
+pub(crate) fn build_eml(to: &str, subject: &str, body: &str, file_name: &str, attachment: &[u8]) -> String {
     let boundary = format!("adminops-{:x}", attachment.len() ^ 0x5eed);
     let body = body.replace("\r\n", "\n").replace('\n', "\r\n");
-    let mime = if file_name.to_lowercase().ends_with(".pdf") { "application/pdf" } else { "text/html" };
+    let lower = file_name.to_lowercase();
+    let mime = if lower.ends_with(".pdf") {
+        "application/pdf"
+    } else if lower.ends_with(".zip") {
+        "application/zip"
+    } else {
+        "text/html"
+    };
     format!(
         "X-Unsent: 1\r\nTo: {to}\r\nSubject: {}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"{boundary}\"\r\n\r\n\
          --{boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{}\r\n\
@@ -1454,7 +1461,7 @@ pub fn email_report(app: tauri::AppHandle, path: String, to: String, subject: St
     shell_open(&[out.as_os_str()])
 }
 
-fn url_encode(s: &str) -> String {
+pub(crate) fn url_encode(s: &str) -> String {
     let mut out = String::new();
     for b in s.bytes() {
         if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {

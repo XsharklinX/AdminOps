@@ -5,7 +5,7 @@
 import { Check, ChevronRight, Rocket, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useCompanyImport } from "./CompanyConfig";
-import { autoBackupApi, graphApi, lockApi, portalsApi, workApi } from "../lib/api";
+import { autoBackupApi, lockApi, portalsApi, workApi } from "../lib/api";
 import { goToPage } from "../lib/navigate";
 import { usePrefs } from "../lib/prefs";
 
@@ -31,17 +31,15 @@ export function FirstSteps() {
   });
 
   const load = useCallback(async () => {
-    const [s, portals, graph, lock, backup] = await Promise.all([
+    const [s, portals, lock, backup] = await Promise.all([
       workApi.settings().catch(() => null),
       portalsApi.list().catch(() => []),
-      graphApi.status().catch(() => null),
       lockApi.status().catch(() => null),
       autoBackupApi.info().catch(() => null),
     ]);
     setSteps([
       { id: "company", title: "Tus datos y los de la empresa", why: "Salen en los informes y presupuestos.", done: !!s?.company.trim() && !!s?.technician.trim(), go: () => goToPage("settings", "general") },
       { id: "portals", title: "Tickets, Correo y Teams", why: "Los portales de la empresa dentro de AdminOps.", done: portals.length > 0, go: () => goToPage("settings", "portals") },
-      { id: "m365", title: "Conectar Microsoft 365", why: "Inicios de sesión, MFA, presencia de Teams y el calendario.", done: !!graph?.connected, go: () => goToPage("settings", "portals") },
       { id: "lock", title: "Bloqueo con PIN", why: "Protege la app y, en el pendrive, tus contraseñas guardadas.", done: !!lock?.enabled, go: () => goToPage("settings", "security") },
       { id: "backup", title: "Copia automática", why: "Si pierdes el pendrive o el equipo, no pierdes nada.", done: !!backup?.enabled, go: () => goToPage("settings", "general") },
     ]);

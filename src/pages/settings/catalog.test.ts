@@ -22,13 +22,13 @@ describe("buscador de ajustes", () => {
   // Si a un ajuste se le cambia el nombre y el índice se queda con el viejo, el
   // buscador lleva a la sección pero no encuentra a dónde ir.
   it("cada ajuste del índice existe con ese título en la pantalla", () => {
-    const files = import.meta.glob<string>(["../SettingsPage.tsx", "./*.tsx", "../../components/CompanyConfig.tsx", "../../components/M365.tsx", "../../components/PerfPanel.tsx"], {
+    const files = import.meta.glob<string>(["../SettingsPage.tsx", "./*.tsx", "../../components/CompanyConfig.tsx", "../../components/PerfPanel.tsx"], {
       query: "?raw",
       import: "default",
       eager: true,
     });
     const source = Object.values(files).join("\n");
-    expect(Object.keys(files).length).toBeGreaterThan(8);
+    expect(Object.keys(files).length).toBeGreaterThan(7);
     // title="…", title={`…`} y los títulos que se eligen entre dos («a» : «b»).
     const missing = SETTINGS_INDEX.filter((e) => !source.includes(`"${e.title}"`) && !source.includes(`\`${e.title}`)).map((e) => e.title);
     expect(missing).toEqual([]);

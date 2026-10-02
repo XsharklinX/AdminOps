@@ -65,8 +65,6 @@ const BLOCKED: &[&str] = &[
     "rename_user",
     "unlock_account",
     "reset_domain_password",
-    "graph_mfa_remove",
-    "graph_revoke_sessions",
     "set_dns_filter",
     "set_blocked_sites",
     "set_logon_hours",
@@ -204,9 +202,6 @@ const SAFE: &[&str] = &[
     // followups y nota de llamada (datos y ventanas del propio técnico)
     "list_followups", "add_followup", "set_followup_done", "snooze_followup", "delete_followup",
     "open_quick_note", "close_quick_note", "open_screen_clip", "redact_clipboard_image",
-    // graph (consultas, conexión del propio técnico, su calendario y sus mensajes)
-    "graph_status", "graph_configure", "graph_login_start", "graph_login_poll", "graph_logout", "graph_open_devicelogin",
-    "graph_signins", "graph_mfa_methods", "graph_service_health", "graph_calendar_sync", "graph_teams_send", "graph_calendar_pull", "graph_calendar_view", "graph_presence", "graph_photos",
     // cases
     "case_current", "case_open", "case_update", "case_actions", "case_draft", "case_close", "case_discard", "cases_for_person",
     // people
@@ -240,6 +235,9 @@ const SAFE: &[&str] = &[
     "check_stations",
     // support
     "support_package",
+    // Prepara un correo (lo envía el técnico) y enseña los términos: no cambian el equipo.
+    "report_problem",
+    "terms_of_use",
     // target_user
     "get_target_user",
     // task

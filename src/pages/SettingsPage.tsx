@@ -62,7 +62,8 @@ import { DataSafety } from "./settings/DataSafety";
 import { AutoBackup } from "./settings/AutoBackup";
 import { CompanyConfig } from "../components/CompanyConfig";
 import { showFirstStepsAgain } from "../components/FirstSteps";
-import { Search } from "lucide-react";
+import { BookOpen, Bug, Scale, Search } from "lucide-react";
+import { openHelp } from "../lib/help";
 import { PortalSettings } from "./settings/Portals";
 import {
   findSettings,
@@ -564,7 +565,6 @@ function WhereStored({ portable }: { portable: boolean }) {
     "Tus ajustes, marca, precios, checklist y firma",
     "Clientes, contactos, agenda, seguimientos y casos",
     "Portales (Tickets, Correo, Teams…) y sus cuentas guardadas para «Entrar solo», cifradas",
-    "La conexión con Microsoft 365",
     "Accesos a routers y conexiones de acceso remoto (contraseñas cifradas)",
     "Apariencia, navegación, atajos y favoritos",
     "Informes PDF (todos juntos)",
@@ -1390,6 +1390,24 @@ function About({ appInfo }: { appInfo: AppInfo | null }) {
           </button>
         ))}
       </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line/60 pt-4 lg:grid-cols-4">
+        {(
+          [
+            ["guide", "Guía y glosario", BookOpen],
+            ["news", "Novedades", Sparkles],
+            ["terms", "Términos de uso", Scale],
+            ["report", "Reportar un problema", Bug],
+          ] as const
+        ).map(([tab, label, Icon]) => (
+          <button
+            key={tab}
+            onClick={() => openHelp(tab)}
+            className="flex items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-left text-[13px] text-dim transition-colors hover:border-neon/40 hover:text-ink"
+          >
+            <Icon size={15} strokeWidth={1.7} className="shrink-0 text-neon" /> {label}
+          </button>
+        ))}
+      </div>
       <div className="mt-4 border-t border-line/60 pt-3">
         <Button
           kind="ghost"
@@ -1406,8 +1424,9 @@ function About({ appInfo }: { appInfo: AppInfo | null }) {
         </Button>
         <p className="mt-1.5 text-[11px] text-mute">
           Un .zip con el registro de actividad, el último diagnóstico y la
-          versión, para enviarlo si algo falla. Puede contener el nombre del
-          equipo y del usuario: revísalo antes de compartirlo.
+          versión. «Reportar un problema» lo prepara y lo adjunta al correo
+          por ti. Puede contener el nombre del equipo y del usuario: revísalo
+          antes de compartirlo.
         </p>
       </div>
       <div className="mt-4 border-t border-line/60 pt-3 text-xs text-dim">

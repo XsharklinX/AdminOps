@@ -13,7 +13,6 @@ mod migrate;
 mod network;
 mod cases;
 mod followups;
-mod graph;
 mod snmp;
 mod storage;
 mod company;
@@ -286,23 +285,6 @@ pub fn run() {
             quicknote::close_quick_note,
             quicknote::open_screen_clip,
             quicknote::redact_clipboard_image,
-            graph::graph_status,
-            graph::graph_configure,
-            graph::graph_login_start,
-            graph::graph_login_poll,
-            graph::graph_logout,
-            graph::graph_open_devicelogin,
-            graph::graph_signins,
-            graph::graph_mfa_methods,
-            graph::graph_mfa_remove,
-            graph::graph_revoke_sessions,
-            graph::graph_service_health,
-            graph::graph_calendar_sync,
-            graph::graph_teams_send,
-            graph::graph_calendar_pull,
-            graph::graph_calendar_view,
-            graph::graph_presence,
-            graph::graph_photos,
             portals::portal_nav,
             portals::portal_open_window,
             portals::portal_open_external,
@@ -321,6 +303,8 @@ pub fn run() {
             portals::portal_download_reveal,
             paths::read_log,
             support::support_package,
+            support::report_problem,
+            support::terms_of_use,
             paths::log_frontend_error,
             paths::open_logs_folder,
             paths::open_app_folder,

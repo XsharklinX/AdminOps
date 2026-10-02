@@ -11,9 +11,9 @@ aprende usándolo (cada página tiene un «?» junto al título que dice para qu
    sobre la misma carpeta: los datos no se tocan.
 2. **Si te pasaron el archivo de la empresa** (`AdminOps-empresa-….json`): Panel → *Primeros
    pasos* → «Importar la configuración de la empresa». Trae el nombre y logo de la empresa, las
-   condiciones, los precios, los tipos de visita, los portales (Tickets, Correo, Teams), el dominio
-   y la aplicación de Microsoft 365. No trae contraseñas ni sesiones: cada uno entra con su cuenta.
-3. Sigue **Primeros pasos** en el Panel: tus datos, los portales, conectar Microsoft 365, el
+   condiciones, los precios, los tipos de visita, los portales (Tickets, Correo, Teams) y el
+   dominio. No trae contraseñas ni sesiones: cada uno entra con su cuenta.
+3. Sigue **Primeros pasos** en el Panel: tus datos, los portales, el
    bloqueo con PIN y la copia automática. Cada paso se marca solo al hacerlo.
 
 ## 2. Dos modos
@@ -34,8 +34,8 @@ las reparaciones de Windows (SFC, DISM, red, Windows Update).
 **Una persona llama.** Ctrl+Alt+N abre la **nota de llamada** aunque AdminOps esté minimizado:
 quién, qué equipo, qué pasa. Desde ahí, «Abrir caso» o «Para mañana». Con un **caso abierto**, todo
 lo que hagas en AdminOps queda apuntado y al cerrarlo se redacta la resolución para el ticket
-(«Pegar en Tickets»). En *Personas* (dominio): desbloquear la cuenta, contraseña temporal, la clave
-de BitLocker o LAPS de su equipo, y con Microsoft 365, por qué falla su inicio de sesión o su MFA.
+(«Pegar en Tickets»). En *Personas* (dominio): desbloquear la cuenta, contraseña temporal, y la clave
+de BitLocker o LAPS de su equipo.
 
 **Un equipo va mal.** Equipo → *Estado del equipo*: diagnóstico con lo que hay que arreglar,
 piezas y temperaturas, seguridad e historial. Equipo → *Discos*: el espacio y la **salud** de cada
@@ -46,9 +46,8 @@ trabajo, diagnóstico al irse, presupuesto o recibo y firma. Al final, el **info
 antes y después, el estado por áreas y lo pendiente por prioridad.
 
 **Organizar el día.** Soporte → *Agenda*: tareas, llamadas, reuniones y visitas, con o sin cliente;
-vista de lista o de **mes** (arrastra para cambiar de día). Con Microsoft 365, lo de tu Outlook
-aparece también, y lo que cambias en un lado se refleja en el otro. *Hoy*, en el Panel, junta lo
-urgente: caso abierto, seguimientos, visitas, avisos de Windows e incidencias de Microsoft 365.
+vista de lista o de **mes** (arrastra para cambiar de día) e **historial**. *Hoy*, en el Panel, junta lo
+urgente: caso abierto, seguimientos, visitas y avisos de Windows.
 
 ## 4. Atajos
 
@@ -63,8 +62,8 @@ urgente: caso abierto, seguimientos, visitas, avisos de Windows e incidencias de
 
 - **Todo cambio es reversible**: cada ajuste queda en el *historial* con «Deshacer», y antes de lo
   arriesgado se crea un punto de restauración.
-- **Nada sale del equipo** salvo lo que pidas: comprobar versiones nuevas, el test de velocidad, y
-  Microsoft 365 si lo conectas.
+- **Nada sale del equipo** salvo lo que pidas: comprobar versiones nuevas, el test de velocidad,
+  instalar programas y las webs que abras dentro.
 - **Datos personales**: AdminOps nunca enseña rutas con el nombre de usuario; los recortes de
   pantalla tapan solos rutas, usuario y equipo antes de pegarlos en un ticket.
 - **Si algo falla**: Ajustes → *Datos de AdminOps* → «Paquete de soporte». Es un .zip con un

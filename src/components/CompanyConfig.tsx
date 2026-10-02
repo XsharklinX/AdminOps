@@ -1,5 +1,5 @@
 // Configuración de empresa: exportarla para dársela a otro técnico, o
-// importarla para empezar con todo listo (portales, dominio, Microsoft 365,
+// importarla para empezar con todo listo (portales, dominio,
 // datos de la empresa). Nunca lleva contraseñas ni sesiones.
 import { Building2, Download, Loader2, Upload } from "lucide-react";
 import { useState } from "react";
@@ -36,14 +36,13 @@ export function useCompanyImport(onDone?: () => void) {
 function ImportDialog({ p, onClose, onDone }: { p: CompanyPreview; onClose: () => void; onDone: (msg: string) => void }) {
   const [settings, setSettings] = useState(true);
   const [portals, setPortals] = useState(p.portalsNew.length > 0);
-  const [graph, setGraph] = useState(p.graph);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
 
   const apply = async () => {
     setBusy(true);
     try {
-      onDone(await companyApi.apply(p.path, settings, portals, graph));
+      onDone(await companyApi.apply(p.path, settings, portals));
     } catch (e) {
       toast("error", String(e));
       setBusy(false);
@@ -70,7 +69,7 @@ function ImportDialog({ p, onClose, onDone }: { p: CompanyPreview; onClose: () =
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={() => void apply()} disabled={busy || (!settings && !portals && !graph)}>
+          <Button onClick={() => void apply()} disabled={busy || (!settings && !portals)}>
             {busy && <Loader2 size={14} className="animate-spin" />} Importar
           </Button>
         </>
@@ -90,7 +89,6 @@ function ImportDialog({ p, onClose, onDone }: { p: CompanyPreview; onClose: () =
           p.portalsNew.length ? `${p.portalsExisting ? `${p.portalsExisting} ya los tenías; ` : ""}tendrás que entrar con tu cuenta en cada uno.` : "Ya tienes todos los del archivo.",
           p.portalsNew.length === 0,
         )}
-        {row(graph, setGraph, "Microsoft 365", p.graph ? "La aplicación de la empresa. Después conecta tu cuenta en Ajustes → Portales y correo." : "El archivo no la trae.", !p.graph)}
       </div>
       <p className="mt-3 text-[11px] text-mute">No trae contraseñas, sesiones, tu nombre ni tu firma: eso lo pone cada técnico.</p>
     </Modal>
@@ -118,8 +116,8 @@ export function CompanyConfig() {
   return (
     <Card title="Configuración de empresa" icon={<Building2 size={14} />}>
       <p className="text-xs text-dim">
-        Para que otro técnico empiece con todo listo: los datos de la empresa (logo, condiciones, precios, tipos de visita), los portales, el dominio y la
-        aplicación de Microsoft 365, en un archivo. No lleva contraseñas ni sesiones: cada técnico entra con su cuenta.
+        Para que otro técnico empiece con todo listo: los datos de la empresa (logo, condiciones, precios, tipos de visita), los portales y el dominio, en un
+        archivo. No lleva contraseñas ni sesiones: cada técnico entra con su cuenta.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button kind="ghost" onClick={() => void exp()} disabled={busy}>

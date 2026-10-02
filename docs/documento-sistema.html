@@ -62,7 +62,7 @@
     <p class="lema">Qué hace, cómo funciona, cómo está construido, qué prioriza y dónde están sus puntos fuertes y débiles.</p>
   </div>
   <div class="datos">
-    Versión descrita: 1.1.9<br>
+    Versión descrita: 1.1.10<br>
     Fecha: octubre de 2026<br>
     Autor del sistema: David Bonilla
   </div>
@@ -119,7 +119,7 @@
 <figure>
   <div class="capas">
     <div class="capa"><b>Interfaz</b>Lo que se ve. Páginas, botones, tablas. No puede tocar el sistema por sí misma: solo puede pedir.</div>
-    <div class="flecha">▼ pide por nombre una de las 406 operaciones permitidas ▲ recibe datos o un error explicado</div>
+    <div class="flecha">▼ pide por nombre una de las 391 operaciones permitidas ▲ recibe datos o un error explicado</div>
     <div class="capa gris"><b>Punto de control</b>Comprueba que la operación existe, que el modo auditoría no la bloquea y si hace falta ser administrador.</div>
     <div class="flecha">▼</div>
     <div class="capa"><b>Motor</b>Hace el trabajo: lee sensores, consulta a Windows, cambia un ajuste, lanza una reparación. Guarda el valor anterior antes de cambiar nada.</div>
@@ -148,12 +148,12 @@
   <tr><td>Calidad</td><td>Pruebas automáticas en Rust y en la interfaz, dos analizadores de código y una integración continua en GitHub que además revisa vulnerabilidades conocidas en las dependencias.</td></tr>
 </table>
 <div class="cifras">
-  <div><b>≈ 38.000</b>líneas de Rust en 97 archivos</div>
-  <div><b>≈ 42.000</b>líneas de interfaz en 157 archivos</div>
-  <div><b>406</b>operaciones que la interfaz puede pedir</div>
-  <div><b>343</b>pruebas automáticas (279 + 64)</div>
+  <div><b>≈ 37.000</b>líneas de Rust en 96 archivos</div>
+  <div><b>≈ 43.000</b>líneas de interfaz en 161 archivos</div>
+  <div><b>391</b>operaciones que la interfaz puede pedir</div>
+  <div><b>341</b>pruebas automáticas (270 + 71)</div>
 </div>
-<p class="nota">Cifras de la versión 1.1.9. Otras 41 pruebas existen pero solo se ejecutan a mano, porque necesitan un equipo real o permisos de administrador.</p>
+<p class="nota">Cifras de la versión 1.1.10. Otras 41 pruebas existen pero solo se ejecutan a mano, porque necesitan un equipo real o permisos de administrador.</p>
 
 <h2>6. Qué prioriza</h2>
 <p>Cuando dos cosas chocan, estas son las que ganan. Están en orden.</p>
@@ -174,8 +174,8 @@
   <tr><td>Diseño</td><td>La arquitectura de dos mitades se fijó al principio y se ha mantenido. El diseño de cada pantalla, en cambio, se ha hecho sobre la marcha, y por eso ha habido que rehacer varias (la versión 0.18 y la 1.1.9 son rediseños).</td></tr>
   <tr><td>Construcción</td><td>Por fases cortas. Cada fase es una versión con un objetivo y un criterio de «terminado cuando…». Van 34 fases.</td></tr>
   <tr><td>Pruebas</td><td>Automáticas para las piezas, y una lista de comprobación manual (<code>docs/PRUEBAS.md</code>) para lo que hay que ver funcionando. Es la etapa más floja: se explica en la sección 9.</td></tr>
-  <tr><td>Despliegue</td><td>Un solo comando genera el instalador, el instalador clásico y el portable. No hay actualización automática ni firma digital.</td></tr>
-  <tr><td>Mantenimiento</td><td>Es donde está hoy el proyecto. Las últimas versiones corrigen fallos encontrados al usarlo y repasan pantallas, más que añadir funciones.</td></tr>
+  <tr><td>Despliegue</td><td>Un solo comando genera el instalador, el instalador clásico y el portable. El instalador pide aceptar los términos de uso. No hay actualización automática ni firma digital.</td></tr>
+  <tr><td>Mantenimiento</td><td>Es donde está hoy el proyecto. Las últimas versiones corrigen fallos encontrados al usarlo y repasan pantallas, más que añadir funciones. Cada versión deja escrito lo que cambió («Novedades») y el programa trae un canal para reportar fallos al autor.</td></tr>
 </table>
 <p>En el ciclo de vida del producto, AdminOps está al final de la introducción: funciona, lo usa su autor en trabajo real, y todavía no tiene otros usuarios. El siguiente paso natural no es añadirle más, sino ponerlo en manos de otras personas.</p>
 
@@ -190,7 +190,7 @@
   <tr><td>Definición de «terminado»</td><td>A medias. Cada fase tiene su criterio, pero varias se han dado por hechas «sin probar en un entorno real».</td></tr>
   <tr><td>Retroalimentación de usuarios</td><td>No se cumple. El único usuario es el autor. Es la carencia más seria frente al método.</td></tr>
   <tr><td>Retrospectiva</td><td>Se hizo una, tras los fallos de las versiones 1.1.5 y 1.1.6, y de ella salió el plan actual. No es una costumbre.</td></tr>
-  <tr><td>Integración continua</td><td>Existe, pero buena parte del trabajo reciente no está guardado en el control de versiones, así que no pasa por ella.</td></tr>
+  <tr><td>Integración continua</td><td>Existe. Hasta la 1.1.9 buena parte del trabajo no se guardaba en el control de versiones y no pasaba por ella; desde entonces se guarda con cada versión.</td></tr>
   <tr><td>Ritmo sostenible y alcance limitado</td><td>No se cumple. Se han abierto muchas funciones a la vez y algunas han salido sin madurar.</td></tr>
 </table>
 
@@ -216,9 +216,9 @@
       <li>Un solo desarrollador. Si él falta, el proyecto se para.</li>
       <li>Sin firma digital: Windows avisa al instalarlo.</li>
       <li>Las pruebas revisan piezas sueltas, no el programa en marcha.</li>
-      <li>Trabajo reciente sin guardar en el control de versiones.</li>
-      <li>Demasiado ancho para una persona: 406 operaciones, más de treinta pantallas.</li>
-      <li>Funciones sin probar en un entorno real (dominio, Microsoft 365).</li>
+      <li>Hasta la 1.1.9, el trabajo no se guardaba con regularidad en el control de versiones.</li>
+      <li>Demasiado ancho para una persona: 391 operaciones, más de treinta pantallas.</li>
+      <li>Funciones sin probar en un entorno real (dominio, carpetas compartidas).</li>
       <li>Varios archivos de código enormes y datos definidos dos veces.</li>
       <li>Solo Windows y solo en español. Sin actualización automática.</li>
       <li>Ningún usuario aparte del autor.</li>
@@ -243,7 +243,7 @@
       <li>Herramientas gratuitas consolidadas y plataformas de gestión remota con mucho más respaldo.</li>
       <li>Responsabilidad ante un cliente si un cambio daña su equipo.</li>
       <li>Dependencia de componentes ajenos (sensores, instalador de programas de Windows).</li>
-      <li>Pérdida del código: hoy vive, sobre todo, en un disco.</li>
+      <li>Pérdida del trabajo si se vuelve a dejar de guardar en el repositorio remoto.</li>
     </ul>
   </div>
 </div>
@@ -261,8 +261,8 @@
   <tr><td>Debilidad + oportunidad</td><td>Antes de buscar más usuarios, construir la prueba que arranca el programa y recorre sus pantallas. Sin ella, cada usuario nuevo es alguien más que puede encontrarse un fallo grave.</td></tr>
   <tr><td>Debilidad + oportunidad</td><td>Decidir cuál es el núcleo (diagnóstico, ajustes reversibles, sesión e informe) y congelar el resto: se mantiene, pero no crece.</td></tr>
   <tr><td>Fortaleza + amenaza</td><td>Usar la transparencia como defensa ante los departamentos de sistemas: la guía de instalación ya explica qué permisos pide el programa y qué conexiones hace. Mantenerla al día.</td></tr>
-  <tr><td>Debilidad + amenaza</td><td>Guardar todo el código en el repositorio remoto y hacer una copia aparte. Es la acción más barata de todas y la que evita la pérdida más grave.</td></tr>
-  <tr><td>Debilidad + amenaza</td><td>Añadir términos de uso que delimiten la responsabilidad, y presupuestar la firma digital para cuando el programa salga del entorno del autor.</td></tr>
+  <tr><td>Debilidad + amenaza</td><td>Guardar todo el código en el repositorio remoto, con una etiqueta por versión. Hecho en la 1.1.9; falta convertirlo en costumbre y tener una copia aparte.</td></tr>
+  <tr><td>Debilidad + amenaza</td><td>Términos de uso que delimitan la responsabilidad (hechos en la 1.1.10: se aceptan al instalar). Queda presupuestar la firma digital para cuando el programa salga del entorno del autor.</td></tr>
 </table>
 
 <h2>11. Limitaciones que conviene conocer antes de usarlo</h2>
@@ -270,8 +270,7 @@
   <li>Funciona solo en Windows 10 y 11 de 64 bits, y necesita WebView2 (viene con Windows 11 y con las actualizaciones de Windows 10).</li>
   <li>Muchas acciones requieren abrirlo como administrador. Sin eso, el programa lee pero no cambia.</li>
   <li>Al instalarlo, Windows muestra un aviso por no estar firmado.</li>
-  <li>Las funciones de Microsoft 365 necesitan que la organización registre antes una aplicación; sin ese paso no hacen nada.</li>
-  <li>Las funciones de dominio, de Microsoft 365 y de carpetas compartidas no se han probado en una red de empresa distinta de la del autor.</li>
+  <li>Las funciones de dominio y de carpetas compartidas no se han probado en una red de empresa distinta de la del autor.</li>
   <li>El modo usuario oculta opciones, pero no impide a alguien con conocimientos volver al modo técnico.</li>
   <li>El programa no vigila los equipos a distancia ni actúa sobre otros equipos de la red: trabaja sobre el equipo en el que está abierto.</li>
 </ul>
@@ -290,13 +289,13 @@
 
 <h2>Anexo: cifras y glosario</h2>
 <table>
-  <tr><th>Dato</th><th>Valor en la versión 1.1.9</th></tr>
-  <tr><td>Código del motor</td><td>Unas 38.000 líneas de Rust en 97 archivos.</td></tr>
-  <tr><td>Código de la interfaz</td><td>Unas 42.000 líneas de TypeScript en 157 archivos.</td></tr>
-  <tr><td>Operaciones</td><td>406, cada una clasificada como «cambia el equipo» o «solo consulta».</td></tr>
-  <tr><td>Pruebas automáticas</td><td>279 del motor y 64 de la interfaz; 41 más que se ejecutan a mano.</td></tr>
+  <tr><th>Dato</th><th>Valor en la versión 1.1.10</th></tr>
+  <tr><td>Código del motor</td><td>Unas 37.000 líneas de Rust en 96 archivos.</td></tr>
+  <tr><td>Código de la interfaz</td><td>Unas 43.000 líneas de TypeScript en 161 archivos.</td></tr>
+  <tr><td>Operaciones</td><td>391, cada una clasificada como «cambia el equipo» o «solo consulta».</td></tr>
+  <tr><td>Pruebas automáticas</td><td>270 del motor y 71 de la interfaz; 41 más que se ejecutan a mano.</td></tr>
   <tr><td>Tamaño</td><td>Instalador de 10,9 MB; portable de 10,4 MB.</td></tr>
-  <tr><td>Documentación</td><td>Manual del técnico, guía de instalación para sistemas, lista de pruebas, licencias de terceros, guía de desarrollo y archivo de ruta.</td></tr>
+  <tr><td>Documentación</td><td>Guía dentro del programa (con glosario, preguntas frecuentes, novedades y términos de uso), manual del técnico, guía de instalación para sistemas, lista de pruebas, licencias de terceros, guía de desarrollo y archivo de ruta.</td></tr>
 </table>
 <table>
   <tr><th>Término</th><th>Significado</th></tr>

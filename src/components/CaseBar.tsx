@@ -7,14 +7,13 @@
 import { ClipboardCheck, Copy, Crop, Loader2, Pencil, Send, TicketPlus, Trash2, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
-import { casesApi, graphApi, noteApi, peopleApi, portalsApi, type Case, type ClipRedacted } from "../lib/api";
+import { casesApi, noteApi, portalsApi, type Case, type ClipRedacted } from "../lib/api";
 import { CASE_CHANGED_EVENT, caseChanged, elapsed, OPEN_CASE_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { lastPortalKey } from "../lib/portalState";
 import { usePrefs } from "../lib/prefs";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { useToast } from "./feedback";
-import { useGraph } from "./M365";
 import { Button, inputClass, Modal } from "./ui";
 
 /** Botón de la cabecera para abrir un caso cuando no hay ninguno. */
@@ -171,7 +170,6 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
       )}
       {dialog?.kind === "close" && current && (
         <CloseDialog
-          current={current}
           onClose={() => setDialog(null)}
           onClosed={() => {
             setDialog(null);
@@ -249,15 +247,8 @@ function CaseEditor({ mode, prefill, onClose, onSaved }: { mode: "new" | "edit";
 }
 
 /** Cerrar el caso: la resolución redactada, editable, lista para el ticket. */
-function CloseDialog({ current, onClose, onClosed }: { current: Case; onClose: () => void; onClosed: () => void }) {
+function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () => void }) {
   const [text, setText] = useState<string | null>(null);
-  const graph = useGraph();
-  // Avisar por Teams de que ya está: solo con Microsoft 365 conectado y una persona del dominio.
-  const canNotify = !!graph?.connected && !!current.sam;
-  const [notify, setNotify] = useState(false);
-  const [message, setMessage] = useState(
-    () => `Hola${current.person ? ` ${current.person.split(/\s+/)[0]}` : ""}, ya está resuelto${current.ticket ? ` tu caso ${current.ticket}` : " lo que nos comentaste"}. Si vuelve a pasar, dímelo por aquí.`,
-  );
   const [busy, setBusy] = useState<"close" | "paste" | "discard" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -307,17 +298,6 @@ function CloseDialog({ current, onClose, onClosed }: { current: Case; onClose: (
     try {
       await casesApi.close(text ?? "");
       toast("ok", "Caso cerrado. Queda en la ficha de la persona.");
-      if (canNotify && notify && message.trim()) {
-        // El caso ya está cerrado: si el aviso falla, se dice, pero no se deshace nada.
-        try {
-          const p = await peopleApi.details(current.sam);
-          if (!p.upn) throw new Error("Esa persona no tiene usuario de Microsoft 365.");
-          await graphApi.teamsSend(p.upn, message);
-          toast("ok", `Avisado por Teams: ${p.name || p.upn}.`);
-        } catch (e) {
-          toast("error", `No se pudo avisar por Teams: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
       onClosed();
     } catch (e) {
       setError(String(e));
@@ -382,15 +362,6 @@ function CloseDialog({ current, onClose, onClosed }: { current: Case; onClose: (
             Sale del diario: cada línea es algo que se hizo de verdad en AdminOps. Puedes retocarla antes de pegarla. Para «Pegar en Tickets», deja antes seleccionado en el portal el
             campo donde va la resolución.
           </p>
-          {canNotify && (
-            <div className="mt-3 rounded-lg border border-line bg-panel-2 px-3 py-2">
-              <label className="flex items-center gap-2 text-sm text-dim">
-                <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="accent-[var(--color-neon)]" />
-                Avisar a {current.person || current.sam} por Teams al cerrar
-              </label>
-              {notify && <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} maxLength={2000} className={`${inputClass} mt-2 text-sm`} aria-label="Mensaje de Teams" />}
-            </div>
-          )}
         </>
       )}
     </Modal>

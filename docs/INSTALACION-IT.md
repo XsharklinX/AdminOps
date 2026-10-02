@@ -39,30 +39,10 @@ desbloquear usuarios o leer LAPS, AdminOps lo dice y no hace nada.
 | `api.github.com` | Solo con «Avisar de versiones nuevas» activado | Nada (consulta la última versión) |
 | `ipinfo.io` | Solo al pulsar «IP pública» | Nada (GET) |
 | `speed.cloudflare.com` | Solo al hacer el test de velocidad | Tráfico de prueba |
-| `login.microsoftonline.com`, `graph.microsoft.com` | Solo si se conecta Microsoft 365 | Las consultas del técnico con su cuenta |
 | Portales configurados (Outlook, Teams, Tickets…) | Al abrirlos | Lo que enviaría el navegador |
 | Red local: SNMP (UDP 161), mDNS (224.0.0.251:5353), WS-Discovery (239.255.255.250:3702) | Solo al revisar o buscar impresoras | Consultas de solo lectura |
 
 Sin telemetría, sin analítica, sin servidor propio.
-
-## Microsoft 365 (opcional)
-
-Para las funciones de Microsoft 365 (inicios de sesión, MFA, estado del servicio, calendario,
-Teams, presencia y fotos), IT registra **una aplicación** en Entra ID:
-
-1. *Registros de aplicaciones* → Nuevo registro → «Solo este directorio» → plataforma
-   *Aplicaciones móviles y de escritorio*.
-2. *Autenticación* → activar **Permitir flujos de clientes públicos** (inicio de sesión por código).
-3. Permisos **delegados** de Microsoft Graph con consentimiento de administrador: `User.Read`,
-   `AuditLog.Read.All`, `Directory.Read.All`, `UserAuthenticationMethod.ReadWrite.All`,
-   `User.RevokeSessions.All`, `ServiceHealth.Read.All`, `Calendars.ReadWrite`, `Chat.Create`,
-   `ChatMessage.Send`, `Presence.Read.All`, `User.ReadBasic.All`. Los que no se den, esa función
-   avisa y el resto funciona.
-4. Dar al técnico el **inquilino** y el **id de la aplicación** (o ponerlos en el archivo de
-   configuración de empresa). Cada técnico inicia sesión con su cuenta y su MFA.
-
-Al ser permisos delegados, AdminOps nunca puede más de lo que puede la cuenta del técnico por su
-rol (por ejemplo, quitar el MFA de otro exige *Administrador de autenticación*).
 
 ## Antivirus
 

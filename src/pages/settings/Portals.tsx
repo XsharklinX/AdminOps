@@ -5,7 +5,6 @@ import { Button, Card, inputClass } from "../../components/ui";
 import { portalsApi, type Portal, type Settings } from "../../lib/api";
 import { setPrefs, usePrefs } from "../../lib/prefs";
 import type { PageId } from "../../components/Sidebar";
-import { M365Settings } from "../../components/M365";
 
 const KIND = {
   "": { label: "Tickets", icon: Ticket, page: "tickets" as PageId },
@@ -136,8 +135,6 @@ export function PortalSettings({
           </p>
         )}
       </Card>
-
-      <M365Settings />
     </div>
   );
 }

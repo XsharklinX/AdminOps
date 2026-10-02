@@ -4,154 +4,103 @@
 
 # AdminOps
 
-**Diagnóstico, optimización y servicio técnico para Windows 10/11, en una sola app.**
+**Diagnóstico, mantenimiento y soporte técnico para Windows 10 y 11, en una sola aplicación.**
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-1.1.2-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-1.1.10-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
-[![Descargar](https://img.shields.io/badge/descargar-instalador%20%7C%20portable-22c55e?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases/latest)
-
-<img src="docs/screenshots/dashboard.png" alt="Panel de AdminOps" width="860" />
 
 </div>
 
 ---
 
-## ¿Qué es AdminOps?
+## Qué es
 
-AdminOps es una herramienta de escritorio pensada para **técnicos de soporte** y usuarios avanzados.
-Reúne en una sola ventana lo que normalmente exige una docena de programas: ver el estado del equipo
-en vivo, encontrar lo que falla, aplicar optimizaciones seguras **que se pueden deshacer** y entregar
-al cliente un **informe PDF** profesional del trabajo realizado.
+AdminOps es un programa de escritorio para quien da **soporte técnico**: llega a un equipo que va
+lento, que no imprime o que no entra a la red, y tiene que averiguar qué pasa, arreglarlo y dejar
+constancia de lo que hizo.
 
-- ⚡ **Ligera y rápida**: hecha en Rust + WebView2, arranca en segundos y consume poca memoria.
-- 🛟 **Segura**: cada cambio guarda el valor anterior exacto y se puede deshacer; los cambios de riesgo crean un punto de restauración.
-- 🔒 **Privada**: sin cuentas, sin telemetría. Todos los datos se quedan en el equipo.
-- 🧳 **Portable**: llévala en un USB y úsala en cada cliente sin instalar nada (sin dejar rastro).
-- ⌨️ **Rápida de usar**: `Ctrl+K` busca cualquier página, herramienta, ajuste o reparación; fija tus secciones favoritas.
+Reúne en una ventana lo que normalmente se reparte entre una docena de herramientas, lo explica en
+español claro y añade lo que Windows no trae: **memoria** de qué se cambió, cuándo, en qué equipo y
+para qué cliente.
 
-## Funciones
+- **Se puede deshacer.** Cada cambio guarda el valor anterior exacto. Los de riesgo crean antes un punto de restauración.
+- **Privado.** Sin cuentas, sin telemetría y sin servidor. Los datos se quedan en el equipo o en tu pendrive.
+- **Portable.** Va en un pendrive, con tus clientes, contactos y ajustes, y no deja nada en el equipo del cliente.
+- **Ligero.** Rust y WebView2: instalador de unos 11 MB.
+- **Explica.** Cada error dice qué pasó y qué hacer; cada hallazgo trae el botón que lo resuelve.
+- **Dos modos.** Técnico (todo) y usuario (lo esencial, para dejarlo en el equipo de alguien). Es un modo de interfaz, no una barrera de seguridad.
 
-### 📊 Panel en vivo
-CPU por núcleo, memoria, discos, red, temperaturas y los procesos que más consumen, actualizados cada 2 segundos.
+Dentro de la aplicación, **Acerca de → Guía** explica cada pantalla con detalle, con glosario y
+preguntas frecuentes.
 
-### 🩺 Diagnóstico
-Un análisis completo en segundos: salud de discos (SMART), pantallazos azules y apagados inesperados,
-aplicaciones que fallan, drivers con error, batería, Defender, Windows Update, activación y TPM.
-Cada hallazgo viene priorizado y con **un botón para resolverlo**. En los pantallazos azules señala el **driver probable** analizando los volcados de memoria. Los análisis se guardan para comparar el antes y el después.
+## Qué hace
 
-<img src="docs/screenshots/diagnostics.png" alt="Diagnóstico" width="860" />
-
-### 🛡️ Seguridad
-Una **nota de seguridad de 0 a 100** con cada punto explicado y un botón para arreglarlo: antivirus, firewall, UAC, BitLocker, SMB1, escritorio remoto, cuentas y programas de riesgo desactualizados. Guarda las **claves de recuperación de BitLocker** en un USB, busca elementos sospechosos (tareas, servicios e inicio con malware típico, archivo hosts) y lista las extensiones de los navegadores. La nota aparece en el informe con el antes y el después.
-
-### 🖥️ Hardware
-Inventario completo (placa base, BIOS, CPU, RAM por módulo, GPU, discos, monitores), **sensores en vivo**
-(temperaturas, ventiladores, voltajes) con LibreHardwareMonitor, estado SMART detallado de cada disco y resultado de la prueba de memoria de Windows.
-
-<img src="docs/screenshots/hardware.png" alt="Hardware" width="860" />
-
-### 🌐 Red y velocidad
-Test de velocidad profesional (descarga, subida, latencia y jitter con varias conexiones en paralelo),
-datos de la conexión (proveedor, IP pública con opción de ocultarla, servidor), diagnóstico de red (adaptadores, puerta de enlace, DNS y conectividad) y **redes Wi-Fi guardadas con su contraseña**.
-
-<img src="docs/screenshots/network.png" alt="Red y velocidad" width="860" />
-
-### 🛰️ Herramientas de red
-Ping y traza de ruta en vivo, cambio de DNS con un clic (Cloudflare, Google, Quad9…), puertos abiertos por programa y editor del archivo hosts.
-
-### ⚙️ Procesos
-Lista en vivo con CPU, memoria y disco por proceso. Busca por nombre, PID, ruta o usuario y **finaliza procesos**
-(o el árbol completo) desde la propia app. Los procesos críticos del sistema están marcados para no cerrarlos por error.
-
-<img src="docs/screenshots/processes.png" alt="Procesos" width="860" />
-
-### 🎛️ Perfiles
-Aplica decenas de ajustes de una vez: **Oficina**, **Gaming**, **Equipo viejo** y **Privacidad máxima**,
-o crea los tuyos. Un solo punto de restauración por perfil y se puede deshacer entero o ajuste por ajuste.
-
-<img src="docs/screenshots/profiles.png" alt="Perfiles" width="860" />
-
-### 🧹 Optimizar
-| Sección | Qué hace |
+| Área | Lo principal |
 | --- | --- |
-| **Limpieza** | Temporales, caché de Windows Update, papelera, miniaturas, registros y más. |
-| **Rendimiento** | Plan de energía, efectos visuales, indexación, juegos y otros ajustes. |
-| **Privacidad** | Telemetría, publicidad, Copilot, historial de actividad… |
-| **Bloatware** | Quita apps preinstaladas con recomendación por app; las de la Store se pueden reinstalar. |
-| **Servicios** | Desactiva servicios innecesarios con explicación y reversión. |
-| **Inicio** | Controla qué arranca con Windows (igual que el Administrador de tareas, sin borrar nada). |
-| **Actualizar software** | Detecta programas desactualizados y los actualiza con winget. |
-| **Instalar programas** | Tras formatear: marca Chrome, 7-Zip, VLC, AnyDesk… (o una lista guardada) y se instalan todos solos con winget. |
-| **Desinstalar programas** | Desinstala en silencio o con su asistente y envía a la papelera las carpetas que quedan. Limpia entradas huérfanas. |
-| **Windows Update** | Historial con cada error explicado, pausar/reanudar, buscar pendientes y ocultar una actualización problemática. |
-| **Espacio en disco** | Analiza qué carpetas ocupan más, muy rápido incluso en discos grandes. |
+| **Inicio** | Panel del equipo en vivo. Solución guiada de problemas (no hay Internet, no suena, no imprime, va lento…). Sesión de servicio por pasos: motivo, trabajo, informe, cobro y firma del cliente, con el **informe en PDF** que compara el antes y el después. |
+| **Equipo** | Diagnóstico con hallazgos por gravedad. Hardware y temperaturas. Seguridad con nota de 0 a 100. Discos: espacio, salud, reparación y rescate de archivos. Ajustes de Windows reversibles (limpieza, rendimiento, privacidad, servicios, inicio). Procesos agrupados por programa. Historial con el diario de cambios. |
+| **Soporte** | Tickets, Correo y Teams de la empresa dentro de la aplicación. Personas del dominio (cuenta bloqueada, contraseña caducada). Clientes con sus equipos, visitas y garantías. Agenda con vista de mes e historial. Contactos. Soluciones paso a paso y plantillas de texto. |
+| **Red** | Router y Wi‑Fi, dispositivos conectados, prueba de velocidad, reparar la red, y herramientas: ping, traza de ruta, puertos, DNS y archivo hosts. |
+| **Aplicaciones** | Actualizar, instalar en lote y desinstalar programas; Windows Update; quitar aplicaciones preinstaladas. Plantillas para preparar un equipo nuevo de una vez. |
+| **Administración** | Usuarios locales con avisos de lo que conviene revisar. Cuentas y dominio. Impresoras. Carpetas compartidas: permisos, «¿por qué no puede entrar?», unidades de red y copia diaria. Acceso remoto. Puestos e inventario. Herramientas de Windows y atajos de teclado. |
+| **Datos** | Copia de los datos de un usuario a otro equipo, caja fuerte cifrada, borrado seguro, recuperar archivos borrados y control parental. |
 
-### 🧰 Servicio técnico
-| Sección | Qué hace |
-| --- | --- |
-| **Tickets** | Abre la web de tickets de tu empresa (intranet, GLPI, osTicket…) dentro de AdminOps, con la sesión recordada. |
-| **Red** (router, dispositivos, velocidad y herramientas) | La red actual (IP, router, DNS, IP pública), el panel del router dentro de AdminOps con su acceso guardado y cifrado, chequeo de seguridad del router y la Wi-Fi, doble NAT y QR para conectar un móvil. |
-| **Dispositivos en la red** | Todo lo conectado a la red local con IP, MAC, fabricante y nombre; ponles nombre y detecta los nuevos. |
-| **Acceso remoto** | Agenda de conexiones, Escritorio remoto con opciones y contraseña guardada en Windows, prueba de conexión, AnyDesk/RustDesk/TeamViewer con el ID de este equipo, Asistencia remota de Windows y encendido por red. |
-| **Avisos de errores de Windows** | Mientras está abierta, detecta pantallazos azules, discos que fallan, programas que se cierran, falta de memoria o espacio, amenazas… y explica qué son y qué hacer. |
-| **Caja fuerte** | Una unidad cifrada con BitLocker y contraseña guardada en un archivo que se abre con doble clic, aunque no esté AdminOps. En Windows Home, carpetas cifradas en .zip AES-256. |
-| **Borrado seguro** | Borra archivos sin posibilidad de recuperarlos, sobrescribe el espacio libre y guía para dejar el equipo listo antes de venderlo o donarlo. |
-| **Recuperar archivos** | Recupera archivos borrados con Windows File Recovery de Microsoft, sin tocar la consola. |
-| **Control parental** | Filtro de webs para adultos y malware, sitios bloqueados y horario de uso por usuario. |
-| **Dominio** | Estado del dominio, comprobaciones previas, unir o sacar el equipo, reparar la relación de confianza y cambiar el nombre. |
-| **Sesión de servicio** | Registra el trabajo en un equipo: diagnóstico inicial, cambios, checklist, presupuesto o recibo y cierre con la firma del cliente en pantalla. |
-| **Clientes** | Fichas de clientes y sus equipos, historial de visitas, evolución entre visitas, garantías vigentes y recordatorios de mantenimiento. |
-| **Inventario de equipos** | El parque de cada cliente con su hardware y qué conviene hacer con cada equipo (seguir, mejorar o renovar), exportable a Excel. |
-| **Herramientas** | ~90 accesos directos a CMD, services.msc, ncpa.cpl, regedit, visor de eventos, BIOS/UEFI… con buscador, favoritos y tus propios accesos. Incluye la ficha del equipo (serie y clave OEM) para copiar. |
-| **Usuarios locales** | Crea usuarios, cambia contraseñas, hazlos administradores o estándar, desactívalos o elimínalos con su perfil. Funciona también en Windows Home. |
-| **Carpetas compartidas** | Qué comparte el equipo y con quién, quién está conectado; compartir o dejar de compartir en un clic. |
-| **Copia de datos** | Copia Escritorio, Documentos, Imágenes, marcadores y redes Wi-Fi a un USB y restáuralos en el equipo nuevo sin sobrescribir nada. |
-| **Impresoras** | Estado, atascos, vaciar la cola, página de prueba y quitar impresoras fantasma. |
-| **Reparaciones** | SFC, DISM, reinicio de red, Windows Update, cola de impresión, Explorador, hora, caché de iconos y prueba de RAM. |
-| **Informe** | PDF profesional con dos plantillas (cliente y técnica): estado del equipo, problemas resueltos y pendientes, antes/después, presupuesto o recibo con impuestos, garantías, firmas y envío por correo con el PDF adjunto. |
-| **Atajos de teclado** | Unos 150 atajos por categorías (Windows, ventanas, capturas, navegador, Excel, técnico…), modo «descubrir» que dice qué hace la combinación que pulsas y botón para probarlos. |
-| **Historial** | Todo lo aplicado, con opción de deshacer, y el registro técnico de actividad. |
+Dos piezas atraviesan todo: el **diario de cambios**, que anota lo que el programa modifica y
+permite deshacerlo, y el **modo auditoría**, en el que AdminOps solo mira y no cambia nada.
+
+La lista de lo añadido en cada versión está en la aplicación (**Acerca de → Novedades**) y en
+[ROADMAP.md](ROADMAP.md).
 
 ## Descarga e instalación
 
-Descarga la última versión desde **[Releases](https://github.com/XsharklinX/AdminOps/releases/latest)**. Hay dos opciones:
+Descarga la última versión desde **[Releases](https://github.com/XsharklinX/AdminOps/releases/latest)**.
 
 | Archivo | Para qué |
 | --- | --- |
-| `AdminOps-x.y.z-Setup.exe` | **Instalador**: para tu propio equipo. Detecta si ya tienes AdminOps y lo actualiza conservando tus datos. |
-| `AdminOps-x.y.z-instalador-clasico.exe` | **Instalador clásico**: el mismo, con el asistente de siempre. Admite `/S` para instalar en silencio en muchos equipos. |
-| `AdminOps-x.y.z-portable.zip` | **Portable**: descomprímelo en un USB. Guarda los datos al lado del ejecutable (`AdminOps-data\`), separados por equipo. |
+| `AdminOps-x.y.z-Setup.exe` | **Instalador.** Detecta si ya tienes AdminOps y lo actualiza conservando tus datos. Si lo instalas en un pendrive, los datos se guardan junto al programa. |
+| `AdminOps-x.y.z-instalador-clasico.exe` | **Instalador clásico.** El mismo, con el asistente de siempre. Admite `/S` para instalar en silencio en muchos equipos. |
+| `AdminOps-x.y.z-portable.zip` | **Portable.** Se descomprime en una carpeta o un pendrive y guarda ahí sus datos, separados por equipo. |
 
 > [!NOTE]
-> AdminOps todavía no está firmado digitalmente, así que Windows SmartScreen puede mostrar
-> *"Windows protegió su PC"*. Pulsa **Más información → Ejecutar de todas formas**.
+> AdminOps no está firmado digitalmente, así que Windows SmartScreen puede mostrar
+> *«Windows protegió su PC»*. Pulsa **Más información → Ejecutar de todas formas**.
+> Descárgalo solo desde esta página.
 
 ### Requisitos
+
 - Windows 10 u 11 de 64 bits.
-- Microsoft Edge WebView2 (ya incluido en Windows 11 y en Windows 10 actualizado).
-- **Permisos de administrador** para aplicar cambios. Sin ellos la app funciona en modo solo lectura y ofrece *Reiniciar como admin*.
-- Opcional: el driver **PawnIO** para leer temperaturas de CPU y placa base (la app ofrece instalarlo desde la pestaña Hardware).
+- Microsoft Edge WebView2 (incluido en Windows 11 y en Windows 10 actualizado).
+- **Permisos de administrador** para aplicar cambios. Sin ellos la aplicación lee, pero no cambia, y ofrece *Reiniciar como admin*.
 
-## Cómo usarla
+## Cómo empezar
 
-1. **Abre AdminOps como administrador** (o pulsa *Reiniciar como admin* en el aviso superior).
-2. Revisa el **Panel** para ver el estado general del equipo.
-3. Ejecuta un **Diagnóstico** y resuelve los hallazgos con sus botones de acción.
-4. Aplica un **Perfil** o los ajustes que quieras en **Optimizar**. Todo queda en el **Historial** y se puede deshacer.
-5. Si atiendes a un cliente: abre una **Sesión de servicio**, asígnala al cliente y al terminar genera el **Informe PDF**.
+1. Abre AdminOps como administrador (o pulsa *Reiniciar como admin* en el aviso de arriba).
+2. Mira el **Panel** y lanza un **Diagnóstico**.
+3. Resuelve los hallazgos con sus botones. Todo queda en **Historial → Diario de cambios**, con su *Deshacer*.
+4. Si atiendes a un cliente, abre una **Sesión de servicio** y al terminar genera el informe.
+5. `Ctrl+K` busca cualquier página, herramienta, ajuste o problema.
 
-> [!TIP]
-> Antes de cambios importantes, AdminOps crea un punto de restauración de Windows automáticamente.
-> Si algo no te convence, ve a **Historial** y pulsa *Deshacer*.
+## Privacidad y responsabilidad
 
-## Privacidad
+- No hay cuentas, anuncios ni telemetría.
+- Los datos se guardan en local: en la carpeta del usuario si está instalado, o junto al programa en un pendrive. Las contraseñas que decidas guardar se cifran.
+- Solo se conecta a Internet para lo que le pides: comprobar si hay versión nueva, la prueba de velocidad, instalar o actualizar programas con winget y las webs que abras dentro.
+- **Reportar un problema** prepara un correo para el autor con un archivo de diagnóstico; no sale nada si tú no lo envías.
+- Usa AdminOps solo en equipos tuyos o en los que tengas autorización. El programa se entrega sin garantía: los **[términos de uso](src-tauri/terminos.txt)** se aceptan al instalar y están en *Acerca de*.
 
-- No hay cuentas, anuncios ni telemetría. Nada sale del equipo.
-- Los datos (historial, clientes, informes) se guardan en local: `%APPDATA%` con el instalador o `AdminOps-data\` en modo portable.
-- Conexiones externas solo cuando las pides: el test de velocidad (Cloudflare y `ipinfo.io` para mostrar el proveedor) y las actualizaciones de software (winget).
+## Documentación
+
+| Documento | Para quién |
+| --- | --- |
+| [Manual del técnico](docs/MANUAL.md) | Quien usa AdminOps. |
+| [Documento del sistema](docs/AdminOps-Documento-del-sistema.pdf) | Qué es, cómo funciona, cómo está hecho y análisis FODA. |
+| [Guía de instalación para sistemas](docs/INSTALACION-IT.md) | Qué permisos pide y qué conexiones hace. |
+| [Guía de desarrollo](docs/DEVELOPMENT.md) | Compilar y extender AdminOps. |
+| [Lista de pruebas](docs/PRUEBAS.md) | Lo que hay que comprobar a mano antes de publicar. |
+| [Componentes de terceros](docs/TERCEROS.md) | Licencias de lo que AdminOps incluye. |
 
 ## Compilar desde el código
 
@@ -161,19 +110,14 @@ npm run tauri dev        # modo desarrollo
 npm run build:release    # instalador + portable en release/v<versión>/
 ```
 
-Requiere Node.js 22+, Rust estable y las herramientas de compilación de C++ de Visual Studio.
-Arquitectura, catálogo de ajustes y pruebas: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
-Próximas versiones: **[ROADMAP.md](ROADMAP.md)**.
+Requiere Node.js 22 o posterior, Rust estable y las herramientas de compilación de C++ de Visual Studio.
 
-## Componentes de terceros
-
-AdminOps incluye [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) (MPL-2.0)
-y sus dependencias para la lectura de sensores. Licencias completas en
-[`src-tauri/resources/lhm/THIRD-PARTY-NOTICES.txt`](src-tauri/resources/lhm/THIRD-PARTY-NOTICES.txt)
-(también accesibles desde la pestaña *Hardware* de la app).
+**Tecnologías:** Tauri 2 · Rust · React 19 · TypeScript · Vite · Tailwind CSS 4 · WebView2 ·
+PowerShell y WMI para las consultas a Windows · LibreHardwareMonitor para los sensores.
 
 ## Autor
 
-Creado por **David Bonilla**.
+Creado por **David Bonilla**. Para informar de un fallo, usa *Acerca de → Reportar un problema*
+dentro de la aplicación, o escribe a Contactoyerlindavid@gmail.com.
 
 © 2026 David Bonilla. Todos los derechos reservados.

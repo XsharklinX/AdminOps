@@ -25,6 +25,7 @@ import { openCase } from "./lib/currentCase";
 import { SPLIT_LEFT, SPLIT_RIGHT } from "./lib/split";
 import { SYMPTOMS } from "./lib/symptoms";
 import { Loading } from "./components/ui";
+import { openHelp, useHelp } from "./lib/help";
 
 // Solo el Panel se carga al abrir la app; el resto de páginas, al visitarlas.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cada página tiene sus propias props
@@ -44,6 +45,7 @@ function PaintMark({ page }: { page: string }) {
 }
 // Ventanas que se abren poco: se cargan al usarlas.
 const About = lazyPage("About", () => import("./components/About"));
+const HelpCenter = lazyPage("HelpCenter", () => import("./components/HelpCenter"));
 const CommandPalette = lazyPage("CommandPalette", () => import("./components/CommandPalette"));
 const Onboarding = lazyPage("Onboarding", () => import("./components/Onboarding"));
 const TweaksPage = lazyPage("TweaksPage", () => import("./pages/TweaksPage"));
@@ -254,6 +256,8 @@ export default function App() {
   const [targetUser, setTargetUser] = useState<TargetUser | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  // La ayuda es una ventana encima de todo: los portales (vistas nativas) se ocultan mientras.
+  const helpOpen = useHelp() !== null;
   const [alertsOpen, setAlertsOpen] = useState(false);
   // Un diálogo del caso está abierto: tapa los portales como cualquier otro diálogo.
   const [caseDialog, setCaseDialog] = useState(false);
@@ -405,6 +409,10 @@ export default function App() {
     () => [
       ...(isAdmin === false ? [{ id: "admin", title: "Reiniciar AdminOps como administrador", run: () => void api.relaunchAsAdmin() }] : []),
       { id: "support", title: "Crear paquete de soporte", subtitle: "Registro y último diagnóstico en un .zip", run: () => void appApi.supportPackage() },
+      { id: "help-guide", title: "Guía de AdminOps", subtitle: "Qué hace cada pantalla y cómo se usa", keywords: "ayuda manual glosario como usar documentacion", run: () => openHelp("guide") },
+      { id: "help-news", title: "Novedades de cada versión", subtitle: "Lo que se ha añadido desde la primera", keywords: "cambios version changelog nuevo", run: () => openHelp("news") },
+      { id: "help-report", title: "Reportar un problema", subtitle: "Prepara el correo para el autor con el diagnóstico adjunto", keywords: "fallo error bug soporte contacto", run: () => openHelp("report") },
+      { id: "help-terms", title: "Términos de uso", keywords: "licencia responsabilidad garantia legal", run: () => openHelp("terms") },
       { id: "diag", title: "Ejecutar un diagnóstico", run: () => navigate("diagnostics") },
       { id: "report", title: "Generar informe PDF", run: () => navigate("report") },
       { id: "shortcut", title: "Añadir un acceso directo propio", run: () => navigate("tools") },
@@ -486,14 +494,14 @@ export default function App() {
     if (p === "contacts") return <Contacts focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "recipes") return <RecipesAndProfiles isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "stations") return <Workstations covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "stations") return <Workstations covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "users") return <Users isAdmin={!!isAdmin} />;
     if (p === "accounts") return <AccountsAndDomain isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "printers") return <PrintersAndShares isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "tickets") return <Tickets split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
-    if (p === "mail") return <Tickets kind="mail" split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
-    if (p === "teams") return <Tickets kind="teams" split={split} onSplit={setSplit} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
-    if (p === "router") return <MyNetwork isAdmin={!!isAdmin} covered={aboutOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "tickets") return <Tickets split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
+    if (p === "mail") return <Tickets kind="mail" split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
+    if (p === "teams") return <Tickets kind="teams" split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
+    if (p === "router") return <MyNetwork isAdmin={!!isAdmin} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "remote") return <Remote isAdmin={!!isAdmin} />;
     if (p === "settings") return <SettingsPage appInfo={appInfo} onNavigate={(x: PageId) => navigate(x)} focus={p === page ? focus : null} />;
     if (category) return <TweaksPage category={category} isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
@@ -585,6 +593,7 @@ export default function App() {
       </div>
       <Suspense fallback={null}>
         {aboutOpen && <About open onClose={() => setAboutOpen(false)} appInfo={appInfo} />}
+        {helpOpen && <HelpCenter version={appInfo?.version ?? ""} />}
         {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} onNavigate={navigate} actions={actions} />}
       </Suspense>
       {onboarding && (

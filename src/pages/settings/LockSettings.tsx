@@ -153,7 +153,7 @@ export function LockSettings() {
         </p>
         {portable && (
           <p className="mb-4 rounded-lg border border-neon/30 bg-neon/5 px-3 py-2 text-xs text-dim">
-            <b className="text-ink">En el pendrive, el PIN también protege tus contraseñas guardadas</b> (portales, routers, Microsoft 365): si pierdes el pendrive,
+            <b className="text-ink">En el pendrive, el PIN también protege tus contraseñas guardadas</b> (portales y routers): si pierdes el pendrive,
             nadie puede leerlas sin él. Por eso, si olvidas el PIN, esas contraseñas no se pueden recuperar (con la contraseña de Windows se abre AdminOps, pero no
             ellas): tendrías que volver a guardarlas.
           </p>

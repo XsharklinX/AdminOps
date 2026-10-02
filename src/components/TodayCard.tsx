@@ -7,8 +7,8 @@
 // En modo usuario no se enseña: el Panel lo ve el cliente y esto es del técnico.
 import { listen } from "@tauri-apps/api/event";
 import { CalendarCheck, CalendarClock, Check, Clock, Loader2, Plus, TicketCheck, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { agendaApi, alertsApi, casesApi, followupsApi, graphApi, tomorrowMorning, type Case, type Followup, type ServiceIssue, type Visit, type WindowsAlert } from "../lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { agendaApi, alertsApi, casesApi, followupsApi, tomorrowMorning, type Case, type Followup, type Visit, type WindowsAlert } from "../lib/api";
 import { CASE_CHANGED_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { usePageActive } from "../lib/pageActive";
@@ -54,9 +54,6 @@ export function TodayCard() {
   const [openCase, setOpenCase] = useState<Case | null>(null);
   const [alerts, setAlerts] = useState<WindowsAlert[]>([]);
   const [adding, setAdding] = useState(false);
-  const [issues, setIssues] = useState<ServiceIssue[]>([]);
-  /** El estado de Microsoft 365 cambia despacio: se pregunta cada 10 minutos, no cada minuto. */
-  const healthAt = useRef(0);
 
   const load = useCallback(() => {
     const today = [startOfToday(), endOfToday()];
@@ -73,15 +70,6 @@ export function TodayCard() {
       .list()
       .then((l) => setAlerts(l.filter((x) => !x.read && x.level !== "info")))
       .catch(() => {});
-    if (Date.now() - healthAt.current > 600_000) {
-      healthAt.current = Date.now();
-      // Sin Microsoft 365 conectado, o sin permiso para verlo, simplemente no sale.
-      void graphApi
-        .status()
-        .then((g) => (g.connected ? graphApi.serviceHealth() : []))
-        .then(setIssues)
-        .catch(() => setIssues([]));
-    }
   }, []);
 
   // Al entrar, al volver a la ventana, cuando otra parte (o la nota) cambia algo, y cada minuto.
@@ -188,32 +176,6 @@ export function TodayCard() {
       when: "ahora",
       rank: peor.level === "bad" ? 1 : 4,
       onOpen: () => goToPage("history"),
-    });
-  }
-
-  // Incidencias de Microsoft 365: lo que no funciona, una a una; los avisos, juntos.
-  const incidents = issues.filter((i) => i.classification === "incident");
-  for (const i of incidents.slice(0, 3)) {
-    items.push({
-      key: `m365-${i.id}`,
-      tone: "bad",
-      source: "Microsoft 365",
-      title: `${i.service}: ${i.title}`,
-      detail: i.impact || undefined,
-      when: i.start ? new Date(i.start).toLocaleDateString("es", { day: "numeric", month: "short" }) : "",
-      rank: 1,
-    });
-  }
-  const advisories = issues.length - Math.min(incidents.length, 3);
-  if (advisories > 0) {
-    items.push({
-      key: "m365-more",
-      tone: "mute",
-      source: "Microsoft 365",
-      title: `${advisories} ${advisories === 1 ? "aviso abierto" : "avisos abiertos"} en el estado del servicio`,
-      detail: "Funcionan con limitaciones. El detalle está en el centro de administración de Microsoft 365.",
-      when: "ahora",
-      rank: 6,
     });
   }
 

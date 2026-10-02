@@ -46,6 +46,17 @@
   .opts { margin-top: 12px; display: flex; gap: 20px; font-size: 13px; color: var(--dim); }
   .opts label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
   .opts input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .accept { margin-top: 14px; display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--dim); }
+  .accept input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .accept button { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
+  .terms { position: fixed; inset: 40px 0 0 0; background: var(--void); display: none; flex-direction: column; padding: 22px 34px 24px; z-index: 5; }
+  .terms.on { display: flex; }
+  .terms h2 { font-size: 18px; }
+  .terms .text { flex: 1; margin-top: 12px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 14px 18px; font-size: 12.5px; line-height: 1.6; color: var(--dim); user-select: text; }
+  .terms .text h3 { margin: 14px 0 4px; font-size: 13px; color: var(--ink); }
+  .terms .text h3:first-child { margin-top: 0; }
+  .terms .text p { margin-bottom: 8px; }
+  .terms .actions { margin-top: 16px; }
   .actions { margin-top: 26px; display: flex; align-items: center; gap: 12px; }
   .btn { height: 36px; border: 1px solid var(--line2); background: transparent; color: var(--ink); border-radius: 8px; padding: 0 16px; font: inherit; font-size: 13px; cursor: pointer; }
   .btn:hover { background: var(--panel2); }
@@ -105,9 +116,13 @@
         <label><input type="checkbox" id="desktop" checked /> Acceso directo en el escritorio</label>
         <label><input type="checkbox" id="launch" checked /> Abrir al terminar</label>
       </div>
+      <label class="accept">
+        <input type="checkbox" id="accept" />
+        <span>He leído y acepto los <button type="button" id="read-terms">términos de uso</button></span>
+      </label>
       <div class="note" id="w-note"></div>
       <div class="actions">
-        <button class="btn primary" id="install">Instalar</button>
+        <button class="btn primary" id="install" disabled>Instalar</button>
         <button class="link" id="classic">Usar el instalador clásico</button>
       </div>
     </div>
@@ -143,6 +158,16 @@
     </div>
   </section>
 </main>
+
+<!-- Términos de uso: se leen aquí mismo, sin salir del instalador. -->
+<div class="terms" id="terms">
+  <h2>Términos de uso</h2>
+  <div class="text" id="terms-text"></div>
+  <div class="actions">
+    <button class="btn primary" id="terms-accept">Acepto</button>
+    <button class="btn" id="terms-close">Volver</button>
+  </div>
+</div>
 
 <script>
   const { invoke } = window.__TAURI__.core;
@@ -181,7 +206,7 @@
       if (info.downgrade) {
         $("w-title").textContent = "Ya tienes una versión más nueva";
         $("w-lead").textContent = `Está instalada la ${info.installedVersion} y este instalador es de la ${info.version}.`;
-        $("install").disabled = true;
+        blocked = true;
       } else if (info.installedVersion === info.version) {
         $("w-title").textContent = "Reinstalar AdminOps";
         $("w-lead").textContent = `La versión ${info.version} ya está instalada. Puedes reinstalarla si algo no funciona.`;
@@ -200,6 +225,25 @@
       $("install").textContent = "Actualizar";
     }
     if (info.appRunning) note("warn", "AdminOps está abierto: se cerrará para continuar.");
+    refresh();
+  }
+
+  // No se instala sin aceptar los términos (ni una versión más vieja encima de una más nueva).
+  let blocked = false;
+  const refresh = () => { $("install").disabled = blocked || !$("accept").checked; };
+
+  async function showTerms() {
+    const box = $("terms-text");
+    if (!box.childElementCount) {
+      const raw = await invoke("terms");
+      // Texto plano: el título y las líneas «N. Título» son encabezados; el resto, párrafos.
+      raw.replace(/^\uFEFF/, "").split(/\r?\n\s*\r?\n/).map((p) => p.trim()).filter(Boolean).slice(1).forEach((p) => {
+        const el = document.createElement(/^\d+\.\s/.test(p) && p.length < 80 ? "h3" : "p");
+        el.textContent = p;
+        box.appendChild(el);
+      });
+    }
+    $("terms").classList.add("on");
   }
 
   async function doInstall() {
@@ -239,6 +283,10 @@
   });
 
   $("install").onclick = doInstall;
+  $("accept").onchange = refresh;
+  $("read-terms").onclick = (e) => { e.preventDefault(); showTerms().catch((err) => note("bad", String(err))); };
+  $("terms-close").onclick = () => $("terms").classList.remove("on");
+  $("terms-accept").onclick = () => { $("accept").checked = true; refresh(); $("terms").classList.remove("on"); };
   $("retry").onclick = () => { show("s-welcome"); init(); };
   $("browse").onclick = async () => { const d = await invoke("pick_dir"); if (d) $("dir").value = d; };
   $("classic").onclick = $("classic2").onclick = () => invoke("classic").catch((e) => note("bad", String(e)));

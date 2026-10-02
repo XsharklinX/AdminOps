@@ -246,7 +246,7 @@ pub struct PersonHit {
 #[serde(rename_all = "camelCase", default)]
 pub struct Person {
     pub sam: String,
-    /// Usuario de Microsoft 365 (normalmente el correo): el que usa Graph.
+    /// Nombre de inicio de sesión completo (normalmente el correo).
     pub upn: String,
     pub name: String,
     pub department: String,

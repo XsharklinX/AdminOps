@@ -30,11 +30,10 @@ import {
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { AgendaHistory } from "../components/AgendaHistory";
-import { MonthView, daysBetween, monthGrid } from "../components/AgendaMonth";
-import { OutlookButton, useGraph } from "../components/M365";
+import { MonthView, daysBetween } from "../components/AgendaMonth";
 import type { PageId } from "../components/Sidebar";
 import { Button, Card, inputClass, Loading, Modal } from "../components/ui";
-import { agendaApi, followupsApi, graphApi, portalsApi, REPEATS, workApi, type AgendaKind, type Client, type DueClient, type Followup, type OutlookEvent, type Settings, type Visit } from "../lib/api";
+import { agendaApi, followupsApi, portalsApi, REPEATS, workApi, type AgendaKind, type Client, type DueClient, type Followup, type Settings, type Visit } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 const DAY_MS = 86_400_000;
@@ -142,10 +141,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
     }
   };
   const [month, setMonth] = useState(() => new Date());
-  // Outlook: lo que hay en tu calendario (en gris) y lo que cambió allí.
-  const graph = useGraph();
-  const [outlook, setOutlook] = useState<OutlookEvent[]>([]);
-  const pulled = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -161,48 +156,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
   useEffect(() => {
     void load();
   }, [load]);
-
-  // Al abrir la Agenda con Microsoft 365 conectado: primero lo que se movió o
-  // borró en Outlook de lo que salió de aquí, luego se recarga.
-  useEffect(() => {
-    if (!graph?.connected || pulled.current) return;
-    pulled.current = true;
-    graphApi
-      .calendarPull()
-      .then((r) => {
-        if (r.updated.length || r.unlinked.length) {
-          const parts = [r.updated.length && `${r.updated.length} ${r.updated.length === 1 ? "cambió" : "cambiaron"} en Outlook y se actualizaron aquí`, r.unlinked.length && `${r.unlinked.length} se borraron en Outlook (aquí siguen)`].filter(Boolean);
-          toast("info", `Agenda y Outlook: ${parts.join("; ")}.`);
-          void load();
-        }
-      })
-      .catch(() => {});
-  }, [graph, load, toast]);
-
-  // Los eventos de Outlook del rango que se ve (lista: 30 días; mes: su cuadrícula).
-  const range = useMemo(() => {
-    if (mode === "month") {
-      const g = monthGrid(month);
-      return [g[0] / 1000, g[41] / 1000 + 86_400];
-    }
-    const t = todayKey() / 1000;
-    return [t, t + 31 * 86_400];
-  }, [mode, month]);
-  useLiveEffect(
-    (vigente) => {
-      if (!graph?.connected) return;
-      graphApi
-        .calendarView(range[0], range[1])
-        .then((e) => vigente() && setOutlook(e))
-        .catch(() => vigente() && setOutlook([]));
-    },
-    [graph, range, data],
-  );
-
-  /** Si la visita está en Outlook, que allí también cambie (los dos calendarios, iguales). */
-  const pushOutlook = (id: string, linked: boolean) => {
-    if (linked && graph?.connected) void graphApi.calendarSync(id).catch(() => toast("info", "Guardado aquí; Outlook no se pudo actualizar ahora."));
-  };
 
   const byId = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
 
@@ -222,18 +175,17 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
     const past = visits.filter((v) => dayKey(v.start) < today || v.status === "done").sort((a, b) => b.start - a.start);
     // Lo que se quedó sin marcar: ni hecho ni cancelado, y su día ya pasó.
     const overdue = visits.filter((v) => v.status === "planned" && dayKey(v.start) < today).sort((a, b) => a.start - b.start);
-    const days = new Map<number, { visits: Visit[]; followups: Followup[]; outlook: OutlookEvent[] }>();
+    const days = new Map<number, { visits: Visit[]; followups: Followup[] }>();
     const slot = (k: number) => {
       let d = days.get(k);
-      if (!d) days.set(k, (d = { visits: [], followups: [], outlook: [] }));
+      if (!d) days.set(k, (d = { visits: [], followups: [] }));
       return d;
     };
     for (const v of upcoming) slot(dayKey(v.start)).visits.push(v);
     // Los seguimientos atrasados cuentan como de hoy: siguen pendientes.
     for (const f of followups) slot(Math.max(dayKey(f.due), today)).followups.push(f);
-    for (const o of outlook) if (dayKey(o.start) >= today) slot(dayKey(o.start)).outlook.push(o);
     return { days: [...days.entries()].sort((a, b) => a[0] - b[0]), past, overdue };
-  }, [data, followups, outlook]);
+  }, [data, followups]);
 
   const setStatus = async (v: Visit, status: Visit["status"]) => {
     try {
@@ -261,7 +213,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
     try {
       await agendaApi.postpone(v.id, days);
       toast("ok", days > 0 ? `Aplazada ${days === 1 ? "a mañana" : `${days} días`}.` : days === -1 ? "Adelantada un día." : `Adelantada ${-days} días.`);
-      pushOutlook(v.id, !!v.outlookEvent);
       void load();
     } catch (e) {
       toast("error", String(e));
@@ -304,7 +255,7 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
 
   const today = todayKey();
   const tomorrow = today + DAY_MS;
-  const dayData = (k: number) => groups.days.find(([d]) => d === k)?.[1] ?? { visits: [], followups: [], outlook: [] };
+  const dayData = (k: number) => groups.days.find(([d]) => d === k)?.[1] ?? { visits: [], followups: [] };
   const weekCount = groups.days.filter(([k]) => k < today + 7 * DAY_MS).reduce((n, [, d]) => n + d.visits.length + d.followups.length, 0);
   const shown = dayFilter === null ? groups.days : groups.days.filter(([k]) => k === dayFilter);
 
@@ -317,7 +268,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
     onEdit: () => setEditing(v),
     onRemind: () => void remind(v),
     onPostpone: (d: number) => void postpone(v, d),
-    onChanged: () => void load(),
   });
 
   return (
@@ -346,7 +296,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
           onMonth={setMonth}
           visits={(data.visits ?? []).filter((v) => v.status !== "cancelled")}
           followups={followups}
-          outlook={outlook}
           onMove={(v, k) => void postpone(v, daysBetween(dayKey(v.start), k))}
           onOpenDay={(k) => {
             setMode("list");
@@ -363,7 +312,7 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
           followups={allFollowups}
           onReopen={(v) => void setStatus(v, "planned")}
           onDone={(v) => void setStatus(v, "done")}
-          onRepeat={(v) => setEditing({ ...v, id: "", status: "planned", reminded: false, outlookEvent: "", doneAt: 0, start: proposedStart(todayKey() + DAY_MS) })}
+          onRepeat={(v) => setEditing({ ...v, id: "", status: "planned", reminded: false, doneAt: 0, start: proposedStart(todayKey() + DAY_MS) })}
           onRemove={(v) => void remove(v)}
           onReopenFollowup={(f) =>
             void followupsApi
@@ -486,7 +435,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
                   {dayLabel(key)}
                   <span className="font-normal text-mute">
                     {d.visits.length > 0 && `${d.visits.length} en la agenda`}
-                    {d.outlook.length > 0 && `${d.visits.length > 0 ? " · " : ""}${d.outlook.length} en Outlook`}
                     {d.visits.length > 0 && d.followups.length > 0 && " · "}
                     {d.followups.length > 0 && `${d.followups.length} ${d.followups.length === 1 ? "seguimiento" : "seguimientos"}`}
                   </span>
@@ -500,9 +448,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
                   ))}
                   {d.followups.map((f) => (
                     <FollowupRow key={f.id} f={f} onDone={() => void followup(f, "done")} onSnooze={() => void followup(f, "snooze")} />
-                  ))}
-                  {d.outlook.map((o) => (
-                    <OutlookRow key={o.id} o={o} />
                   ))}
                 </ul>
               </section>
@@ -531,7 +476,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
               : undefined
           }
           onSaved={(conflict: string) => {
-            if (editing.id) pushOutlook(editing.id, !!editing.outlookEvent);
             setEditing(null);
             // Se guarda igual (a veces se solapan a propósito), pero hay que saberlo.
             toast(conflict ? "info" : "ok", conflict ? `Guardado, pero se pisa con «${conflict}».` : "Guardado en la agenda.");
@@ -541,19 +485,6 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
       )}
       {dialog}
     </div>
-  );
-}
-
-/** Algo de tu Outlook (solo se ve: se cambia en Outlook). */
-function OutlookRow({ o }: { o: OutlookEvent }) {
-  return (
-    <li className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-panel/40 py-2 pr-3 pl-4 text-sm">
-      <div className="w-14 shrink-0 text-center font-mono text-xs text-mute">{o.allDay ? "Todo el día" : time(o.start)}</div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-dim">{o.subject}</div>
-        <div className="truncate text-[11px] text-mute">Outlook{o.location ? ` · ${o.location}` : ""}</div>
-      </div>
-    </li>
   );
 }
 
@@ -779,7 +710,6 @@ function EntryRow({
   onEdit,
   onRemind,
   onPostpone,
-  onChanged,
   overdue = false,
 }: {
   v: Visit;
@@ -790,7 +720,6 @@ function EntryRow({
   onEdit: () => void;
   onRemind: () => void;
   onPostpone: (days: number) => void;
-  onChanged: () => void;
   /** Su día ya pasó: se enseña la fecha y «a hoy» en vez de «a mañana». */
   overdue?: boolean;
 }) {
@@ -857,7 +786,6 @@ function EntryRow({
         >
           <Sunrise size={14} />
         </button>
-        <OutlookButton visitId={v.id} inOutlook={!!v.outlookEvent} onDone={onChanged} className={btn} />
         <button onClick={onEdit} className={btn} title="Cambiar día, hora, sitio o repetición">
           <Pencil size={14} />
         </button>

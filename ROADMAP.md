@@ -74,7 +74,7 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   hoy, los clientes con el mantenimiento vencido y los avisos de Windows sin leer, ordenados por lo que
   corre más prisa, con la acción de cada cosa. No sale en modo usuario (ahí el Panel lo ve el cliente).
 
-### Microsoft 365 e impresoras que hablan (hecho, sin probar en un inquilino real)
+### Microsoft 365 e impresoras que hablan (lo de Microsoft 365 se quitó en la 1.1.10)
 
 - **Microsoft 365 con Graph**, con la cuenta del técnico. Se conecta en Ajustes → Portales y correo
   con el inicio de sesión **por código** (microsoft.com/devicelogin en el navegador de siempre, con
@@ -106,6 +106,35 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
 - **La ayuda «?» de las pestañas salía vacía** (una raya bajo el icono) en todas las páginas con
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
+
+### v1.1.10 — Guía, novedades, términos, reportar fallos, y fuera Microsoft 365 (hecho, sin build)
+
+- **Todo guardado en Git y subido**, con una etiqueta por versión (`v1.1.9`). Primera parte de la
+  Fase 31.
+- **Ayuda de AdminOps**, una ventana con seis apartados que se abre desde Acerca de (los cuatro
+  botones bajo el logo), desde Ajustes → Acerca de y desde Ctrl+K:
+  - **Guía**: 12 capítulos y 62 apartados. De cada pantalla, qué es, cómo se usa paso a paso y qué
+    hay que tener en cuenta (lo que no se deshace, lo que necesita administrador), con «Abrir esta
+    pantalla». Incluye cómo cuida AdminOps el equipo y un capítulo de responsabilidad y buenas
+    prácticas. Una prueba comprueba que cada enlace lleva a una pantalla que existe.
+  - **Glosario** (43 términos) y **preguntas frecuentes** (12). El buscador busca en los tres.
+  - **Novedades**: lo que trae cada versión desde la 0.1, sin fechas (`lib/changelog.ts`). Una
+    prueba exige que la primera entrada sea la versión actual: no se puede publicar sin escribirla.
+  - **Términos de uso** (`src-tauri/terminos.txt`, una sola fuente): licencia, autorización sobre
+    los equipos, qué no se deshace, sin garantía, limitación de responsabilidad y datos. En la
+    ayuda, en el **instalador** (no instala sin aceptarlos; se leen dentro) y en el instalador
+    clásico (página de licencia).
+  - **Reportar un problema**: qué pasó, cómo se repite y cómo contestar. Prepara un correo para el
+    autor con el paquete de soporte adjunto (ahora lleva `descripcion.txt`) y lo abre en el
+    programa de correo; o sin adjunto, para correo web. AdminOps no envía nada por su cuenta.
+- **Fuera Microsoft 365 (Graph)**: dependía de que la organización registrase una aplicación.
+  Se quitan `graph.rs` y sus 17 comandos, la tarjeta de Ajustes, los inicios de sesión y el MFA en
+  Personas, el calendario de Outlook en la Agenda, la presencia y las fotos en Contactos y
+  Personas, las incidencias en «Hoy», el aviso por Teams al cerrar un caso y su parte de la
+  configuración de empresa. El Correo y Teams (las webs dentro de AdminOps) siguen igual. Los
+  datos guardados antes (visitas enlazadas, archivos de empresa) se siguen leyendo.
+- **README** al día en español e inglés: ya no enseña capturas de la 0.10 ni dice 1.1.2.
+- En la vista de mes, «y N más» contaba también los seguimientos, que ya salen con su reloj.
 
 ### v1.1.9 — Lavado de cara y repaso de fallos
 
@@ -227,7 +256,7 @@ Windows y el usuario de quien usa el equipo: AdminOps no guarda contraseñas ni 
   **aviso arriba de la ficha** cuando la cuenta tiene un problema (bloqueada, contraseña caducada,
   desactivada, caduca pronto) con el botón que lo arregla ahí mismo.
 
-### Listo para el equipo, Agenda de mes con Outlook y presencia de Teams (hecho, sin build)
+### Listo para el equipo y Agenda de mes (Outlook y la presencia de Teams se quitaron en la 1.1.10)
 
 - **Fase 34, cerrada en lo que depende del código**:
   - **Primeros pasos** en el Panel (modo técnico): tus datos y los de la empresa, portales,

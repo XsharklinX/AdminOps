@@ -1,10 +1,9 @@
 // Agenda: vista de mes. Seis semanas de lunes a domingo, con lo de cada día
-// (lo propio con el color de su tipo, lo de Outlook en gris). Para cambiar
-// algo de día basta con arrastrarlo a otro; si estaba en Outlook, allí
-// también se mueve.
+// (con el color de su tipo). Para cambiar algo de día basta con arrastrarlo
+// a otro.
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useState } from "react";
-import type { Followup, OutlookEvent, Visit } from "../lib/api";
+import type { Followup, Visit } from "../lib/api";
 
 const DAY_MS = 86_400_000;
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -29,7 +28,6 @@ export function MonthView({
   onMonth,
   visits,
   followups,
-  outlook,
   onMove,
   onOpenDay,
   onAdd,
@@ -39,7 +37,6 @@ export function MonthView({
   onMonth: (d: Date) => void;
   visits: Visit[];
   followups: Followup[];
-  outlook: OutlookEvent[];
   onMove: (v: Visit, toDay: number) => void;
   onOpenDay: (day: number) => void;
   onAdd: (day: number) => void;
@@ -51,7 +48,6 @@ export function MonthView({
   const byDay = (k: number) => ({
     v: visits.filter((x) => keyOf(x.start) === k).sort((a, b) => a.start - b.start),
     f: followups.filter((x) => keyOf(x.due) === k),
-    o: outlook.filter((x) => keyOf(x.start) === k),
   });
   const title = month.toLocaleDateString("es", { month: "long", year: "numeric" });
 
@@ -81,12 +77,9 @@ export function MonthView({
         {days.map((k) => {
           const d = new Date(k);
           const inMonth = d.getMonth() === month.getMonth();
-          const { v, f, o } = byDay(k);
-          const items = v.length + f.length + o.length;
+          const { v, f } = byDay(k);
           const shownV = v.slice(0, 3);
-          const room = Math.max(0, 3 - shownV.length);
-          const shownO = o.slice(0, room);
-          const more = items - shownV.length - shownO.length;
+          const more = v.length - shownV.length;
           return (
             <div
               key={k}
@@ -133,13 +126,6 @@ export function MonthView({
                     </button>
                   </li>
                 ))}
-                {shownO.map((x) => (
-                  <li key={x.id} className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[11px] text-mute" title={`Outlook: ${x.subject}${x.location ? ` · ${x.location}` : ""}`}>
-                    <span className="size-1.5 shrink-0 rounded-full border border-mute" />
-                    {!x.allDay && <span className="shrink-0 font-mono">{time(x.start)}</span>}
-                    <span className="min-w-0 truncate">{x.subject}</span>
-                  </li>
-                ))}
                 {more > 0 && (
                   <li>
                     <button onClick={() => onOpenDay(k)} className="px-1 text-[10px] text-neon hover:underline">
@@ -153,7 +139,7 @@ export function MonthView({
         })}
       </div>
       <p className="border-t border-line px-4 py-2 text-[11px] text-mute">
-        Puntos de color: lo tuyo (visita, tarea, llamada, reunión). Puntos huecos: lo de tu Outlook. El reloj: seguimientos de ese día.
+        El color del punto dice el tipo: visita, tarea, llamada o reunión. El reloj: seguimientos de ese día.
       </p>
     </div>
   );

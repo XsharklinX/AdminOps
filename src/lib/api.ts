@@ -398,6 +398,10 @@ export const appApi = {
   cancelTask: (task: string) => invoke<boolean>("cancel_task", { task }),
   readLog: (lines = 400) => invoke<string>("read_log", { lines }),
   supportPackage: () => invoke<string>("support_package"),
+  /** Prepara el correo para el autor con la descripción y el paquete de soporte. `manual`: sin adjunto (correo web). */
+  reportProblem: (what: string, steps: string, contact: string, manual: boolean) => invoke<void>("report_problem", { what, steps, contact, manual }),
+  /** Los términos de uso, en texto plano. */
+  terms: () => invoke<string>("terms_of_use"),
   logError: (message: string) => invoke<void>("log_frontend_error", { message }).catch(() => {}),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
   openFolder: (kind: "data" | "reports" | "logs") => invoke<void>("open_app_folder", { kind }),
@@ -735,8 +739,6 @@ export interface Visit {
   repeatEvery: string;
   /** Dónde es: sede, planta, sala. */
   place: string;
-  /** Id del evento de Outlook, si se puso en el calendario ("" si no). */
-  outlookEvent?: string;
   /** Cuándo se marcó como hecha (segundos); 0 o ausente si no se sabe. */
   doneAt?: number;
 }
@@ -1486,7 +1488,7 @@ export interface PersonHit {
 /** La ficha de una persona del dominio. Fechas en segundos Unix (0 = no se sabe). */
 export interface Person {
   sam: string;
-  /** Usuario de Microsoft 365 (normalmente el correo). */
+  /** Nombre de inicio de sesión completo (normalmente el correo). */
   upn: string;
   name: string;
   department: string;
@@ -1535,105 +1537,6 @@ export const peopleApi = {
   bitlocker: (computer: string | null, keyId: string | null) => invoke<RecoveryKey[]>("bitlocker_recovery", { computer, keyId }),
 };
 
-// ---------- Microsoft 365 (Graph) ----------
-
-export interface GraphStatus {
-  /** Hay inquilino e id de aplicación. */
-  configured: boolean;
-  /** Hay sesión guardada. */
-  connected: boolean;
-  account: string;
-  tenant: string;
-  clientId: string;
-}
-
-export interface DeviceCode {
-  userCode: string;
-  verificationUri: string;
-  expiresIn: number;
-  interval: number;
-}
-
-export interface LoginPoll {
-  state: "pending" | "done" | "expired" | "declined" | "error";
-  message: string;
-  account: string;
-}
-
-/** Un inicio de sesión de Entra ID, con el motivo explicado. */
-export interface SignIn {
-  when: string;
-  ok: boolean;
-  code: number;
-  reason: string;
-  app: string;
-  client: string;
-  ip: string;
-  place: string;
-  mfa: string;
-  conditionalAccess: string;
-}
-
-export interface AuthMethod {
-  kind: string;
-  id: string;
-  label: string;
-  /** La contraseña no se quita: el resto sí. */
-  removable: boolean;
-}
-
-export interface ServiceIssue {
-  id: string;
-  service: string;
-  title: string;
-  /** incident (no funciona) · advisory (funciona con limitaciones) */
-  classification: string;
-  status: string;
-  impact: string;
-  start: string;
-}
-
-export const graphApi = {
-  status: () => invoke<GraphStatus>("graph_status"),
-  configure: (tenant: string, clientId: string) => invoke<void>("graph_configure", { tenant, clientId }),
-  loginStart: () => invoke<DeviceCode>("graph_login_start"),
-  loginPoll: () => invoke<LoginPoll>("graph_login_poll"),
-  logout: () => invoke<void>("graph_logout"),
-  /** Abre microsoft.com/devicelogin en el navegador. */
-  openDeviceLogin: () => invoke<void>("graph_open_devicelogin"),
-  signins: (upn: string) => invoke<SignIn[]>("graph_signins", { upn }),
-  mfaMethods: (upn: string) => invoke<AuthMethod[]>("graph_mfa_methods", { upn }),
-  mfaRemove: (upn: string, kind: string, id: string) => invoke<void>("graph_mfa_remove", { upn, kind, id }),
-  revokeSessions: (upn: string) => invoke<void>("graph_revoke_sessions", { upn }),
-  serviceHealth: () => invoke<ServiceIssue[]>("graph_service_health"),
-  /** Devuelve el id del evento de Outlook. */
-  calendarSync: (visitId: string) => invoke<string>("graph_calendar_sync", { visitId }),
-  teamsSend: (upn: string, text: string) => invoke<void>("graph_teams_send", { upn, text }),
-  /** Trae a la Agenda lo que se movió o borró en Outlook. */
-  calendarPull: () => invoke<{ updated: string[]; unlinked: string[] }>("graph_calendar_pull"),
-  /** Eventos de Outlook entre dos fechas (segundos), sin los que ya son visitas. */
-  calendarView: (from: number, to: number) => invoke<OutlookEvent[]>("graph_calendar_view", { from, to }),
-  /** Presencia de Teams por correo (en minúsculas). */
-  presence: (emails: string[]) => invoke<Record<string, TeamsPresence>>("graph_presence", { emails }),
-  /** Fotos de Microsoft 365 (data URL) por correo; las que no hay, no vienen. */
-  photos: (emails: string[]) => invoke<Record<string, string>>("graph_photos", { emails }),
-};
-
-export interface OutlookEvent {
-  id: string;
-  subject: string;
-  start: number;
-  end: number;
-  location: string;
-  allDay: boolean;
-}
-
-export interface TeamsPresence {
-  /** Available · Busy · DoNotDisturb · Away · BeRightBack · Offline · PresenceUnknown */
-  availability: string;
-  activity: string;
-}
-
 // ---------- Configuración de empresa ----------
 
 export interface CompanyPreview {
@@ -1642,7 +1545,6 @@ export interface CompanyPreview {
   domain: string;
   portalsNew: string[];
   portalsExisting: number;
-  graph: boolean;
   visitTypes: number;
   catalog: number;
 }
@@ -1651,7 +1553,7 @@ export const companyApi = {
   /** Nombre del archivo guardado, o null si se canceló. */
   export: () => invoke<string | null>("company_export"),
   preview: () => invoke<CompanyPreview | null>("company_import_preview"),
-  apply: (path: string, settings: boolean, portals: boolean, graph: boolean) => invoke<string>("company_import_apply", { path, settings, portals, graph }),
+  apply: (path: string, settings: boolean, portals: boolean) => invoke<string>("company_import_apply", { path, settings, portals }),
 };
 
 // ---------- Seguimientos y nota de llamada ----------

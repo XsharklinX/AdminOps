@@ -3,11 +3,11 @@
 //! Para que otro técnico empiece sin que se lo expliquen: el responsable
 //! exporta una vez los datos de la empresa (nombre, logo, condiciones, precios,
 //! tipos de visita y checklist), los portales (Tickets, Correo, Teams,
-//! inventario), el dominio y la aplicación de Microsoft 365, y el nuevo técnico
+//! inventario), y el dominio, y el nuevo técnico
 //! importa el archivo en la bienvenida o en Ajustes.
 //!
 //! **Nunca lleva contraseñas ni sesiones**: ni las cuentas guardadas de los
-//! portales, ni el token de Microsoft 365, ni la firma o el nombre del técnico.
+//! portales, ni la firma o el nombre del técnico.
 //! Cada uno entra con su cuenta.
 
 use serde::{Deserialize, Serialize};
@@ -48,15 +48,6 @@ pub struct CompanyFile {
     pub created: u64,
     pub settings: serde_json::Map<String, Value>,
     pub portals: Vec<serde_json::Map<String, Value>>,
-    /// Inquilino e id de la aplicación de Microsoft 365 (no el inicio de sesión).
-    pub graph: Option<GraphApp>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
-#[serde(rename_all = "camelCase", default)]
-pub struct GraphApp {
-    pub tenant: String,
-    pub client_id: String,
 }
 
 fn pick(v: &Value, keys: &[&str]) -> serde_json::Map<String, Value> {
@@ -64,14 +55,13 @@ fn pick(v: &Value, keys: &[&str]) -> serde_json::Map<String, Value> {
 }
 
 /// Lo exportable, a partir de los ajustes y portales actuales.
-pub fn build(settings: &Value, portals: &[Value], graph: Option<GraphApp>) -> CompanyFile {
+pub fn build(settings: &Value, portals: &[Value]) -> CompanyFile {
     CompanyFile {
         kind: KIND.into(),
         version: env!("CARGO_PKG_VERSION").into(),
         created: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()),
         settings: pick(settings, COMPANY_KEYS),
         portals: portals.iter().filter(|p| p["kind"].as_str() != Some("router")).map(|p| pick(p, PORTAL_KEYS)).collect(),
-        graph: graph.filter(|g| !g.tenant.is_empty() && !g.client_id.is_empty()),
     }
 }
 
@@ -100,18 +90,13 @@ pub fn new_portals<'a>(file: &'a CompanyFile, existing: &[Value]) -> Vec<&'a ser
         .collect()
 }
 
-fn current_graph(app: &tauri::AppHandle) -> Option<GraphApp> {
-    let v = serde_json::to_value(crate::graph::graph_status(app.clone())).ok()?;
-    Some(GraphApp { tenant: v["tenant"].as_str()?.to_string(), client_id: v["clientId"].as_str()?.to_string() })
-}
-
 /// Guarda la configuración de empresa en un archivo. None si se cancela.
 #[tauri::command(async)]
 pub fn company_export(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
     let settings = serde_json::to_value(crate::workflow::settings(&app)).map_err(|e| e.to_string())?;
     let portals: Vec<Value> = crate::portals::list_portals(app.clone()).iter().filter_map(|p| serde_json::to_value(p).ok()).collect();
-    let file = build(&settings, &portals, current_graph(&app));
+    let file = build(&settings, &portals);
     let name = format!("AdminOps-empresa-{}.json", chrono::Local::now().format("%Y-%m-%d"));
     let Some(path) = app.dialog().file().set_file_name(&name).add_filter("Configuración de AdminOps", &["json"]).blocking_save_file().and_then(|p| p.into_path().ok()) else {
         return Ok(None);
@@ -132,7 +117,6 @@ pub struct ImportPreview {
     /// Portales nuevos y ya existentes.
     portals_new: Vec<String>,
     portals_existing: usize,
-    graph: bool,
     visit_types: usize,
     catalog: usize,
 }
@@ -164,15 +148,14 @@ pub fn company_import_preview(app: tauri::AppHandle) -> Result<Option<ImportPrev
         domain: s("defaultDomain"),
         portals_new: fresh.iter().filter_map(|p| p.get("name").and_then(Value::as_str).map(String::from)).collect(),
         portals_existing: f.portals.len() - fresh.len(),
-        graph: f.graph.is_some(),
         visit_types: n("visitTypes"),
         catalog: n("catalog"),
     }))
 }
 
-/// Aplica lo elegido del archivo: datos de empresa, portales y Microsoft 365.
+/// Aplica lo elegido del archivo: datos de empresa y portales.
 #[tauri::command(async)]
-pub fn company_import_apply(app: tauri::AppHandle, path: String, settings: bool, portals: bool, graph: bool) -> Result<String, String> {
+pub fn company_import_apply(app: tauri::AppHandle, path: String, settings: bool, portals: bool) -> Result<String, String> {
     let f = read_file(&PathBuf::from(&path))?;
     let mut done = Vec::new();
     if settings && !f.settings.is_empty() {
@@ -197,12 +180,6 @@ pub fn company_import_apply(app: tauri::AppHandle, path: String, settings: bool,
             done.push(format!("{n} {}", if n == 1 { "portal" } else { "portales" }));
         }
     }
-    if graph {
-        if let Some(g) = &f.graph {
-            crate::graph::graph_configure(app.clone(), g.tenant.clone(), g.client_id.clone())?;
-            done.push("la aplicación de Microsoft 365 (falta que conectes tu cuenta)".into());
-        }
-    }
     log::info!("Configuración de empresa importada: {}", done.join(", "));
     Ok(if done.is_empty() { "No había nada nuevo que importar.".into() } else { format!("Importado: {}.", done.join(", ")) })
 }
@@ -220,18 +197,17 @@ mod tests {
             json!({ "id": "p1", "name": "Tickets", "url": "https://tickets.example.com/", "kind": "", "autofill": true }),
             json!({ "id": "r1", "name": "Router", "url": "http://192.168.1.1", "kind": "router" }),
         ];
-        let f = build(&settings, &portals, Some(GraphApp { tenant: "empresa.onmicrosoft.com".into(), client_id: "x".into() }));
+        let f = build(&settings, &portals);
         assert_eq!(f.settings.keys().cloned().collect::<Vec<_>>(), ["company", "taxRate", "visitTypes"]);
         assert_eq!(f.portals.len(), 1);
         assert!(!f.portals[0].contains_key("id"));
         let text = serde_json::to_string(&f).unwrap();
         assert!(!text.contains("David") && !text.contains("techSignature"));
-        assert!(build(&settings, &[], Some(GraphApp::default())).graph.is_none(), "sin Microsoft 365 configurado no se exporta");
     }
 
     #[test]
     fn import_merges_and_skips_existing_portals() {
-        let f = build(&json!({ "company": "Soporte DB", "currency": "RD$" }), &[json!({ "name": "Tickets", "url": "https://Tickets.example.com" }), json!({ "name": "Correo", "url": "https://outlook.office.com/mail/" })], None);
+        let f = build(&json!({ "company": "Soporte DB", "currency": "RD$" }), &[json!({ "name": "Tickets", "url": "https://Tickets.example.com" }), json!({ "name": "Correo", "url": "https://outlook.office.com/mail/" })]);
         let cur = json!({ "technician": "Ana", "company": "", "currency": "€", "watchWindows": false });
         let m = merge_settings(&cur, &f);
         assert_eq!((m["technician"].as_str(), m["company"].as_str(), m["currency"].as_str()), (Some("Ana"), Some("Soporte DB"), Some("RD$")));

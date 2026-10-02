@@ -1,7 +1,7 @@
 import { Briefcase, Clock, History, ClipboardCopy, Copy, Mail, MessageSquare, Pencil, Phone, PhoneCall, Smartphone, Star, Trash2, UserRound, Users, X } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Client, Contact } from "../../lib/api";
-import { Avatar, hueOf, presenceText, usePresenceOf } from "./Avatar";
+import { Avatar, hueOf } from "./Avatar";
 import { colorOf, TagChip, type TagColors } from "./Tags";
 
 /** Lo que se puede hacer con un contacto (lo implementa la página: cuenta el uso). */
@@ -67,7 +67,6 @@ export function ContactDetail({
 }) {
   const sub = c.substituteId ? byId.get(c.substituteId) : undefined;
   const mainNumber = c.extension || c.phone || c.mobile;
-  const presence = presenceText(usePresenceOf(c.email));
   const client = c.clientId ? clients.find((x) => x.id === c.clientId) : undefined;
   const phone = (label: string, value: string, icon: ReactNode) => (
     <Line key={label + value} icon={icon} label={label} value={<span className="font-mono">{value}</span>}>
@@ -110,7 +109,6 @@ export function ContactDetail({
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold break-words text-ink">{c.name}</h3>
             {(c.role || c.company) && <p className="text-xs text-dim">{[c.role, c.company].filter(Boolean).join(" · ")}</p>}
-            {presence && <p className="text-[11px] text-dim">Teams: {presence}</p>}
             {c.extension && (
               <button onClick={() => a.copy(c, c.extension, "Extensión")} className="mt-1 font-mono text-xl leading-none font-semibold text-ink hover:text-neon" title="Copiar extensión">
                 <span className="mr-1 text-[11px] font-normal text-mute">ext.</span>

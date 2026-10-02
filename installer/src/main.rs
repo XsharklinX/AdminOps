@@ -286,6 +286,12 @@ fn run_classic() -> Result<(), String> {
     std::process::Command::new(&tmp).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// Los términos de uso: el mismo texto que enseña AdminOps en «Acerca de».
+#[tauri::command]
+fn terms() -> &'static str {
+    include_str!("../../src-tauri/terminos.txt")
+}
+
 #[tauri::command]
 fn quit(app: tauri::AppHandle) {
     app.exit(0);
@@ -299,7 +305,7 @@ fn main() {
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![setup_info, pick_dir, install, launch, classic, quit])
+        .invoke_handler(tauri::generate_handler![setup_info, pick_dir, install, launch, classic, terms, quit])
         .run(tauri::generate_context!())
         .expect("no se pudo abrir el instalador");
 }
