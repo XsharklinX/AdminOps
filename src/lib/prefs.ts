@@ -23,25 +23,23 @@ export interface NavLayout {
 
 /** Aspecto y comportamiento de la barra lateral. */
 export interface SidebarPrefs {
-  /** full: iconos y nombres; mini: solo iconos (las páginas van en pestañas arriba). */
+  /** full: las áreas y, al lado, sus pantallas y secciones; mini: solo la columna de áreas
+   *  (las pantallas del área van en pestañas bajo el título). */
   mode: "full" | "mini";
   position: "left" | "right";
   width: "narrow" | "normal" | "wide";
   /** Ancho exacto en píxeles si se ajustó arrastrando el borde; `null`: el de `width`. */
   widthPx: number | null;
   density: "compact" | "normal" | "comfortable";
-  /** current: solo la sección actual; remember: las que dejes abiertas; all: todas siempre. */
-  expand: "current" | "remember" | "all";
-  /** Al pulsar una sección: su última página usada o la primera. */
+  /** Al pulsar un área: su última pantalla usada o la primera. */
   areaClick: "last" | "first";
-  /** Páginas de la sección actual como pestañas bajo el título. */
-  headerTabs: boolean;
-  showAreaIcons: boolean;
+  /** El buscador en la barra de arriba (Ctrl+K y F1 funcionan igual). */
   showSearch: boolean;
   showSession: boolean;
-  showFooter: boolean;
-  /** Páginas fijadas arriba (★). */
-  favorites: PageId[];
+  /** El estado al lado de cada sección («3» en Diagnóstico, «unido» en Dominio). */
+  showBadges: boolean;
+  /** Fijados arriba de la barra: pantallas («users») o secciones («users:domain»). */
+  favorites: string[];
   /** Cuántas páginas recientes mostrar (0: sección oculta). */
   recents: number;
 }
@@ -52,13 +50,10 @@ export const DEFAULT_SIDEBAR: SidebarPrefs = {
   width: "normal",
   widthPx: null,
   density: "normal",
-  expand: "remember",
   areaClick: "last",
-  headerTabs: false,
-  showAreaIcons: true,
   showSearch: true,
   showSession: true,
-  showFooter: true,
+  showBadges: true,
   favorites: [],
   recents: 0,
 };
@@ -75,6 +70,9 @@ export const DEFAULT_SIDEBAR: SidebarPrefs = {
  * cambiarlo (por eso conviene poner un PIN en Ajustes → Seguridad).
  */
 export type AppMode = "admin" | "user";
+
+/** Cómo se abren Teams y el Correo: preguntar (la primera vez), dentro de AdminOps, en el navegador o en su aplicación. */
+export type CommMode = "ask" | "adminops" | "browser" | "app";
 
 export interface Prefs {
   mode: AppMode;
@@ -100,10 +98,12 @@ export interface Prefs {
   preloadPortals: boolean;
   /** Zoom con el que se abren los portales nuevos (1 = 100 %). */
   portalZoom: number;
+  /** Cómo se abren Teams y el Correo desde la barra de arriba. */
+  comms: { teams: CommMode; mail: CommMode };
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1 };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" } };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -138,7 +138,11 @@ export function getPrefs(): Prefs {
   if (!p.shortcuts || typeof p.shortcuts !== "object") p.shortcuts = {};
   p.sidebar = { ...DEFAULT_SIDEBAR, ...(p.sidebar && typeof p.sidebar === "object" ? p.sidebar : {}) };
   if (!Array.isArray(p.sidebar.favorites)) p.sidebar.favorites = [];
+  p.sidebar.favorites = p.sidebar.favorites.filter((f): f is string => typeof f === "string");
   if (!p.pageLabels || typeof p.pageLabels !== "object") p.pageLabels = {};
+  const modes = ["ask", "adminops", "browser", "app"];
+  const c = (p.comms && typeof p.comms === "object" ? p.comms : {}) as Partial<Prefs["comms"]>;
+  p.comms = { teams: modes.includes(c.teams as string) ? c.teams! : "ask", mail: modes.includes(c.mail as string) ? c.mail! : "ask" };
   // AdminOps abre siempre en el Panel salvo que el técnico haya elegido otra
   // página. Antes venía «la última que usé» de fábrica, y como las preferencias
   // se guardan enteras al tocar cualquier ajuste, ese valor quedaba escrito

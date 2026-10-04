@@ -226,7 +226,9 @@ mod tests {
     }
 
     /// Solo lectura: historial real.
+    /// Equipo real (depende de su estado): `cargo test real_history -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn real_history() {
         let h = history().unwrap();
         println!("{} entradas; fallidas: {}", h.len(), h.iter().filter(|e| e.result == "failed").count());

@@ -32,7 +32,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Modal } from "../components/ui";
-import { lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
+import { logQuietly, lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
 import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
 import { DataTable } from "../components/DataTable";
 
@@ -176,14 +176,14 @@ export function Devices() {
   const toast = useToast();
 
   useEffect(() => {
-    officeApi.conflicts().then(setConflicts).catch(() => {});
+    officeApi.conflicts().then(setConflicts).catch(logQuietly("Devices"));
     workApi
       .clients()
       .then((c) => {
         setClients(c);
         setClientId((x) => x || c[0]?.id || "");
       })
-      .catch(() => {});
+      .catch(logQuietly("Devices"));
   }, []);
 
   const run = async () => {
@@ -193,7 +193,7 @@ export function Devices() {
       setScan(s);
       // El DHCP cambia las IP: se actualizan las de los dispositivos anotados.
       if (s.key !== office.key) office.setKey(s.key);
-      officeMapApi.refreshIps(s.key, s.devices.filter((d) => d.mac).map((d) => [d.mac, d.ip] as [string, string])).then(() => office.reload(s.key)).catch(() => {});
+      officeMapApi.refreshIps(s.key, s.devices.filter((d) => d.mac).map((d) => [d.mac, d.ip] as [string, string])).then(() => office.reload(s.key)).catch(logQuietly("Devices"));
       // Segunda fase: qué es cada dispositivo (UPnP, mDNS, NetBIOS, puertos…).
       setBusy("identify");
       setScan({ ...s, devices: await lanApi.identify(s.key, s.devices) });
@@ -539,7 +539,7 @@ function DeviceDetail({ d, actions, office, onRename }: { d: LanDevice; actions:
       <div className="flex items-center gap-2 text-dim">
         <Icon size={16} /> {K.label}
       </div>
-      <dl className="grid grid-cols-[150px_1fr] gap-x-3 gap-y-1.5">
+      <dl className="grid grid-cols-[minmax(110px,150px)_1fr] gap-x-3 gap-y-1.5">
         {rows
           .filter(([, v]) => v)
           .map(([k, v]) => (

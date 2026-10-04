@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
 import { Button, Card, inputClass } from "../../components/ui";
 import { portalsApi, type Portal, type Settings } from "../../lib/api";
-import { setPrefs, usePrefs } from "../../lib/prefs";
+import { setPrefs, usePrefs, type CommMode } from "../../lib/prefs";
+import { COMM_MODES } from "../../lib/comms";
 import type { PageId } from "../../components/Sidebar";
 
 const KIND = {
   "": { label: "Tickets", icon: Ticket, page: "tickets" as PageId },
-  inventory: { label: "Inventario web", icon: Globe, page: "stations" as PageId },
+  inventory: { label: "Inventario web", icon: Globe, page: "inventory" as PageId },
   mail: { label: "Correo", icon: Mail, page: "mail" as PageId },
   teams: { label: "Teams", icon: MessagesSquare, page: "teams" as PageId },
 };
@@ -77,9 +78,30 @@ export function PortalSettings({
             ))}
           </select>
         </Row>
+        <Row title="Cómo se abren Teams y el Correo" sub="Desde sus iconos de la barra de arriba. «Preguntar» lo pregunta la próxima vez que se pulsen.">
+          <div className="flex flex-col gap-1.5">
+            {(["teams", "mail"] as const).map((k) => (
+              <label key={k} className="flex items-center justify-end gap-2 text-xs text-dim">
+                {k === "teams" ? "Teams" : "Correo"}
+                <select
+                  value={prefs.comms[k]}
+                  onChange={(e) => setPrefs({ comms: { ...prefs.comms, [k]: e.target.value as CommMode } })}
+                  className="rounded-md border border-line bg-void/60 px-2 py-1 text-sm text-ink outline-none focus:border-neon/50"
+                >
+                  <option value="ask">Preguntar</option>
+                  {COMM_MODES.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </Row>
         <Row
           title="Dominio de la empresa"
-          sub="Las webs de este dominio entran con tu cuenta de Windows sin pedir contraseña (intranets con dominio, por ejemplo pgr.gob.do). Se aplica al volver a abrir AdminOps."
+          sub="Las webs de este dominio entran con tu cuenta de Windows sin pedir contraseña (intranets con dominio, por ejemplo empresa.local). Se aplica al volver a abrir AdminOps."
         >
           <input
             value={s.defaultDomain}
@@ -95,7 +117,7 @@ export function PortalSettings({
           <p className="text-sm text-mute">Leyendo…</p>
         ) : portals.length === 0 ? (
           <p className="text-sm text-mute">
-            Todavía no hay ninguno. Añádelos desde Soporte → Tickets, Soporte → Correo, Soporte → Teams u Oficina → Puestos → Inventario web.
+            Todavía no hay ninguno. Añádelos desde Soporte → Tickets, Soporte → Inventario, o desde los iconos de Correo y Teams de la barra de arriba.
           </p>
         ) : (
           <ul className="divide-y divide-line/60">

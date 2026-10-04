@@ -4,6 +4,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Loading } from "../components/ui";
 import { WindowsTools } from "../components/WindowsTools";
 import { accountsApi, troubleshootApi, usersApi, type AccountsStatus } from "../lib/api";
+import { NeedsAdmin } from "../components/AdminBanner";
 
 const KIND = {
   local: { label: "Cuenta local", color: "text-ok" },
@@ -172,7 +173,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </li>
           </ol>
-          {!isAdmin && <p className="mt-3 text-xs text-warn">Para estos pasos hay que abrir AdminOps como administrador.</p>}
+          {!isAdmin && <NeedsAdmin className="mt-3">Estos pasos requieren administrador.</NeedsAdmin>}
         </Card>
       )}
 

@@ -297,7 +297,9 @@ mod tests {
     }
 
     /// Solo lectura. En equipos sin Wi-Fi devuelve el error explicativo.
+    /// Equipo real (depende de su estado): `cargo test lists_real_profiles -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn lists_real_profiles() {
         match list() {
             Ok(v) => println!("{} redes", v.len()),

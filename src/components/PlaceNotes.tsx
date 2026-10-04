@@ -43,7 +43,7 @@ export function PlaceNotes({ onChanged, compact }: { onChanged?: () => void; com
     }
   };
   const remove = async (n: PlaceNote) => {
-    await libraryApi.remove("notes", n.id).catch(() => {});
+    await libraryApi.remove("notes", n.id).catch((e) => toast("error", String(e)));
     void load();
     onChanged?.();
   };
@@ -108,7 +108,7 @@ export function PlaceNotes({ onChanged, compact }: { onChanged?: () => void; com
       {compact && (
         <p className="mt-2 text-[11px] text-mute">
           <BookOpen size={10} className="mr-1 inline" />
-          Notas guardadas la última vez · Soporte → Conocimiento
+          Notas guardadas la última vez · Soporte → Soluciones
         </p>
       )}
     </div>

@@ -46,7 +46,7 @@ export function ContactEditor({
     <Modal
       title={c.id ? `Editar · ${initial.name}` : "Nuevo contacto"}
       onClose={onClose}
-      width="w-[760px] max-w-[95vw]"
+      width="w-[760px]"
       footer={
         <>
           <span className="mr-auto text-[11px] text-mute">Ctrl+Enter para guardar</span>

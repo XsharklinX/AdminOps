@@ -32,18 +32,17 @@ import { useConfirm, useToast } from "../components/feedback";
 import { AgendaHistory } from "../components/AgendaHistory";
 import { MonthView, daysBetween } from "../components/AgendaMonth";
 import type { PageId } from "../components/Sidebar";
-import { Button, Card, inputClass, Loading, Modal } from "../components/ui";
-import { agendaApi, followupsApi, portalsApi, REPEATS, workApi, type AgendaKind, type Client, type DueClient, type Followup, type Settings, type Visit } from "../lib/api";
+import { Button, Card, inputClass, Loading, Modal, iconBtn } from "../components/ui";
+import { logQuietly, agendaApi, followupsApi, portalsApi, REPEATS, workApi, type AgendaKind, type Client, type DueClient, type Followup, type Settings, type Visit } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { timeOfDay as time, shortDate } from "../lib/format";
 
 const DAY_MS = 86_400_000;
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const dayKey = (ts: number) => startOfDay(new Date(ts * 1000)).getTime();
 const todayKey = () => startOfDay(new Date()).getTime();
-const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 const longDate = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
-const shortDate = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { day: "numeric", month: "short" });
 const equipos = (n: number) => (n === 1 ? "1 equipo" : `${n} equipos`);
 
 /** «Hoy», «Mañana», o el día de la semana y la fecha. */
@@ -245,7 +244,7 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
     try {
       const inApp = await portalsApi.compose(c.email, subject, body);
       if (inApp) onNavigate("mail");
-      else toast("info", "Configura el Correo (Soporte → Correo) para escribirlo desde AdminOps.");
+      else toast("info", "Configura el Correo (su icono, en la barra de arriba) para escribirlo desde AdminOps.");
     } catch (e) {
       toast("error", String(e));
     }
@@ -723,7 +722,6 @@ function EntryRow({
   /** Su día ya pasó: se enseña la fecha y «a hoy» en vez de «a mañana». */
   overdue?: boolean;
 }) {
-  const btn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink";
   const k = KINDS[kindOf(v)];
   const place = v.place || client?.address;
   return (
@@ -772,24 +770,24 @@ function EntryRow({
           </Button>
         )}
         {client?.email && (
-          <button onClick={onRemind} className={btn} title="Enviar recordatorio al cliente">
+          <button onClick={onRemind} className={iconBtn} title="Enviar recordatorio al cliente">
             <Mail size={14} />
           </button>
         )}
-        <button onClick={onDone} className={`${btn} hover:text-ok`} title="Hecho">
+        <button onClick={onDone} className={`${iconBtn} hover:text-ok`} title="Hecho">
           <Check size={14} />
         </button>
         <button
           onClick={() => onPostpone(overdue ? Math.max(1, daysBetween(dayKey(v.start), todayKey())) : 1)}
-          className={btn}
+          className={iconBtn}
           title={overdue ? "Pasarlo a hoy" : "Pasarlo a mañana (sin abrir el editor)"}
         >
           <Sunrise size={14} />
         </button>
-        <button onClick={onEdit} className={btn} title="Cambiar día, hora, sitio o repetición">
+        <button onClick={onEdit} className={iconBtn} title="Cambiar día, hora, sitio o repetición">
           <Pencil size={14} />
         </button>
-        <button onClick={onCancel} className={`${btn} hover:text-bad`} title="Cancelar">
+        <button onClick={onCancel} className={`${iconBtn} hover:text-bad`} title="Cancelar">
           <X size={14} />
         </button>
       </div>
@@ -798,7 +796,6 @@ function EntryRow({
 }
 
 function FollowupRow({ f, onDone, onSnooze }: { f: Followup; onDone: () => void; onSnooze: () => void }) {
-  const btn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink";
   const atrasado = f.due * 1000 < todayKey();
   return (
     <li className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-dashed border-line bg-panel/60 py-2.5 pr-3 pl-4">
@@ -811,10 +808,10 @@ function FollowupRow({ f, onDone, onSnooze }: { f: Followup; onDone: () => void;
         </div>
         <div className="text-[11px] text-mute">{[atrasado ? "Seguimiento atrasado" : "Seguimiento", f.person, f.machine].filter(Boolean).join(" · ")}</div>
       </div>
-      <button onClick={onDone} className={`${btn} hover:text-ok`} title="Hecho">
+      <button onClick={onDone} className={`${iconBtn} hover:text-ok`} title="Hecho">
         <Check size={14} />
       </button>
-      <button onClick={onSnooze} className={btn} title="Mañana">
+      <button onClick={onSnooze} className={iconBtn} title="Mañana">
         <Sunrise size={14} />
       </button>
     </li>
@@ -836,7 +833,7 @@ function EntryEditor({ entry, clients, onClose, onSaved, onDelete }: { entry: Vi
     workApi
       .settings()
       .then((s) => vigente() && setTypes(s.visitTypes ?? []))
-      .catch(() => {});
+      .catch(logQuietly("Agenda"));
   }, []);
 
   const save = async () => {

@@ -2,7 +2,7 @@ import { KeyRound, Lock, LockOpen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
 import { Button, Card, inputClass, Loading } from "../../components/ui";
-import { appApi, lockApi, type LockStatus } from "../../lib/api";
+import { logQuietly, appApi, lockApi, type LockStatus } from "../../lib/api";
 
 const IDLE = [
   [0, "Solo al abrir AdminOps"],
@@ -23,7 +23,7 @@ export function LockSettings() {
     appApi
       .info()
       .then((i) => setPortable(i.portable))
-      .catch(() => {});
+      .catch(logQuietly("LockSettings"));
   }, []);
   const [status, setStatus] = useState<LockStatus | null>(null);
   const [kind, setKind] = useState<"pin" | "password">("pin");
@@ -42,7 +42,7 @@ export function LockSettings() {
         setIdle(s.idleMinutes);
         setKind(s.kind === "password" ? "password" : "pin");
       }
-    }).catch(() => {});
+    }).catch(logQuietly("LockSettings"));
   }, []);
   useEffect(load, [load]);
 

@@ -101,16 +101,14 @@
 <p>AdminOps responde a las tres: junta la información, registra cada cambio con su valor anterior para poder deshacerlo, y convierte la visita en un informe en PDF.</p>
 
 <h2>3. Qué hace</h2>
-<p>Las funciones se agrupan en siete áreas, que son las secciones de la barra lateral. La tabla resume lo principal de cada una; el manual del técnico (<code>docs/MANUAL.md</code>) las recorre con detalle.</p>
+<p>Las funciones se agrupan en cinco áreas, que son las secciones de la barra lateral. La tabla resume lo principal de cada una; la guía incluida en el programa (Acerca de → Guía) las recorre con detalle.</p>
 <table>
   <tr><th>Área</th><th>Para qué sirve</th></tr>
   <tr><td>Inicio</td><td>Panel con el equipo en vivo (procesador, memoria, discos, red, temperaturas). Solución guiada de problemas comunes. Sesión de servicio: una visita de principio a fin, con diagnóstico antes y después, lista de comprobación, presupuesto o recibo, firma del cliente e informe.</td></tr>
-  <tr><td>Equipo</td><td>Diagnóstico con hallazgos ordenados por gravedad y un botón para resolver cada uno. Inventario de hardware y sensores. Salud y reparación de discos. Seguridad con una nota de 0 a 100. Ajustes de Windows (limpieza, rendimiento, privacidad, servicios, inicio), todos reversibles. Procesos. Espacio en disco.</td></tr>
-  <tr><td>Soporte</td><td>El sistema de tickets, el correo y Teams de la empresa dentro de la aplicación. Personas del dominio (cuenta bloqueada, contraseña caducada) y clientes con sus equipos, visitas y garantías. Agenda. Contactos. Base de conocimiento con soluciones y plantillas de texto.</td></tr>
-  <tr><td>Red</td><td>El router y la Wi‑Fi, los dispositivos conectados, prueba de velocidad, reparación de la red y herramientas (ping, traza de ruta, puertos, DNS, archivo hosts).</td></tr>
-  <tr><td>Aplicaciones</td><td>Actualizar, instalar en lote y desinstalar programas; Windows Update; quitar aplicaciones preinstaladas; recetas que encadenan varios pasos.</td></tr>
-  <tr><td>Administración</td><td>Estaciones de la oficina e inventario. Usuarios locales. Cuentas de Microsoft. Impresoras y carpetas compartidas. Acceso remoto. Accesos directos a las herramientas de Windows.</td></tr>
-  <tr><td>Datos</td><td>Caja fuerte cifrada, borrado seguro, recuperación de archivos borrados y copia de los datos de un usuario a otro equipo.</td></tr>
+  <tr><td>Equipo</td><td>Diagnóstico con hallazgos ordenados por gravedad y un botón para resolver cada uno. Hardware y sensores. Seguridad con una nota de 0 a 100. Ajustes de Windows reversibles. Procesos. Discos: espacio, salud y reparación. Red: router y Wi‑Fi, dispositivos conectados, velocidad y herramientas. Datos del usuario: copia a otro equipo, caja fuerte cifrada, borrado seguro y recuperación de archivos.</td></tr>
+  <tr><td>Soporte</td><td>Agenda. Teams y el correo de la empresa dentro de la aplicación. Contactos. El sistema de tickets y la web de inventario, que se usan como en un navegador. Personas del dominio (cuenta bloqueada, contraseña caducada) y clientes con sus equipos, visitas y garantías. Soluciones paso a paso y plantillas de texto.</td></tr>
+  <tr><td>Aplicaciones</td><td>Actualizar, instalar en lote y desinstalar programas; Windows Update; quitar aplicaciones preinstaladas; plantillas que encadenan varios pasos para preparar un equipo.</td></tr>
+  <tr><td>Administración</td><td>Puestos de la oficina. Usuarios locales. Cuentas y dominio. Impresoras y carpetas compartidas. Acceso remoto. Accesos directos a las herramientas de Windows.</td></tr>
 </table>
 <p>Dos piezas atraviesan todas las áreas. El <b>diario de cambios</b> anota todo lo que el programa modifica en el equipo y permite deshacerlo. Y el <b>modo auditoría</b> bloquea en un único punto cualquier acción que cambie el equipo, para poder mirar sin tocar.</p>
 
@@ -119,7 +117,7 @@
 <figure>
   <div class="capas">
     <div class="capa"><b>Interfaz</b>Lo que se ve. Páginas, botones, tablas. No puede tocar el sistema por sí misma: solo puede pedir.</div>
-    <div class="flecha">▼ pide por nombre una de las 391 operaciones permitidas ▲ recibe datos o un error explicado</div>
+    <div class="flecha">▼ pide por nombre una de las 393 operaciones permitidas ▲ recibe datos o un error explicado</div>
     <div class="capa gris"><b>Punto de control</b>Comprueba que la operación existe, que el modo auditoría no la bloquea y si hace falta ser administrador.</div>
     <div class="flecha">▼</div>
     <div class="capa"><b>Motor</b>Hace el trabajo: lee sensores, consulta a Windows, cambia un ajuste, lanza una reparación. Guarda el valor anterior antes de cambiar nada.</div>
@@ -133,7 +131,7 @@
 <h3>Dónde se guardan los datos</h3>
 <p>Todo se guarda en archivos locales: en la carpeta de datos del usuario si está instalado, o junto al ejecutable si es portable. No hay servidor, ni cuenta, ni telemetría. Las contraseñas que el técnico decide guardar (routers, portales) se cifran con el mecanismo de Windows para ese usuario; en el pendrive, con una clave propia que además puede protegerse con un PIN.</p>
 <h3>Las webs de la empresa</h3>
-<p>Tickets, correo y Teams son páginas web que se abren dentro de la ventana, cada una limitada a los sitios de su portal. Esas páginas no tienen acceso a las operaciones del programa: están aisladas de él.</p>
+<p>Tickets, la web de inventario, el correo y Teams son páginas web que se abren dentro de la ventana. Tickets e inventario se usan como un navegador; el correo y Teams se quedan en los sitios de Microsoft. Ninguna de esas páginas tiene acceso a las operaciones del programa: están aisladas de él.</p>
 
 <h2>5. Cómo está hecho</h2>
 <p>AdminOps está construido con <b>Tauri 2</b>. El motor está escrito en <b>Rust</b> y la interfaz en <b>React con TypeScript</b>, y se muestra con WebView2, el componente de Microsoft Edge que Windows ya trae. Esa combinación explica dos características del resultado: el instalador pesa unos 11 MB y el programa consume poca memoria, porque no carga un navegador propio.</p>
@@ -150,8 +148,8 @@
 <div class="cifras">
   <div><b>≈ 37.000</b>líneas de Rust en 96 archivos</div>
   <div><b>≈ 43.000</b>líneas de interfaz en 161 archivos</div>
-  <div><b>391</b>operaciones que la interfaz puede pedir</div>
-  <div><b>341</b>pruebas automáticas (270 + 71)</div>
+  <div><b>393</b>operaciones que la interfaz puede pedir</div>
+  <div><b>350</b>pruebas automáticas (274 + 76)</div>
 </div>
 <p class="nota">Cifras de la versión 1.1.10. Otras 41 pruebas existen pero solo se ejecutan a mano, porque necesitan un equipo real o permisos de administrador.</p>
 
@@ -174,7 +172,7 @@
   <tr><td>Diseño</td><td>La arquitectura de dos mitades se fijó al principio y se ha mantenido. El diseño de cada pantalla, en cambio, se ha hecho sobre la marcha, y por eso ha habido que rehacer varias (la versión 0.18 y la 1.1.9 son rediseños).</td></tr>
   <tr><td>Construcción</td><td>Por fases cortas. Cada fase es una versión con un objetivo y un criterio de «terminado cuando…». Van 34 fases.</td></tr>
   <tr><td>Pruebas</td><td>Automáticas para las piezas, y una lista de comprobación manual (<code>docs/PRUEBAS.md</code>) para lo que hay que ver funcionando. Es la etapa más floja: se explica en la sección 9.</td></tr>
-  <tr><td>Despliegue</td><td>Un solo comando genera el instalador, el instalador clásico y el portable. El instalador pide aceptar los términos de uso. No hay actualización automática ni firma digital.</td></tr>
+  <tr><td>Despliegue</td><td>Un solo comando genera el instalador, el instalador clásico y el portable. El instalador pide aceptar los términos de uso. El programa puede descargar la versión nueva y abrir su instalador, si la versión está publicada. No hay firma digital.</td></tr>
   <tr><td>Mantenimiento</td><td>Es donde está hoy el proyecto. Las últimas versiones corrigen fallos encontrados al usarlo y repasan pantallas, más que añadir funciones. Cada versión deja escrito lo que cambió («Novedades») y el programa trae un canal para reportar fallos al autor.</td></tr>
 </table>
 <p>En el ciclo de vida del producto, AdminOps está al final de la introducción: funciona, lo usa su autor en trabajo real, y todavía no tiene otros usuarios. El siguiente paso natural no es añadirle más, sino ponerlo en manos de otras personas.</p>
@@ -217,10 +215,10 @@
       <li>Sin firma digital: Windows avisa al instalarlo.</li>
       <li>Las pruebas revisan piezas sueltas, no el programa en marcha.</li>
       <li>Hasta la 1.1.9, el trabajo no se guardaba con regularidad en el control de versiones.</li>
-      <li>Demasiado ancho para una persona: 391 operaciones, más de treinta pantallas.</li>
+      <li>Demasiado ancho para una persona: 393 operaciones, más de treinta pantallas.</li>
       <li>Funciones sin probar en un entorno real (dominio, carpetas compartidas).</li>
       <li>Varios archivos de código enormes y datos definidos dos veces.</li>
-      <li>Solo Windows y solo en español. Sin actualización automática.</li>
+      <li>Solo Windows y solo en español. La actualización desde el programa depende de publicar cada versión.</li>
       <li>Ningún usuario aparte del autor.</li>
     </ul>
   </div>
@@ -292,8 +290,8 @@
   <tr><th>Dato</th><th>Valor en la versión 1.1.10</th></tr>
   <tr><td>Código del motor</td><td>Unas 37.000 líneas de Rust en 96 archivos.</td></tr>
   <tr><td>Código de la interfaz</td><td>Unas 43.000 líneas de TypeScript en 161 archivos.</td></tr>
-  <tr><td>Operaciones</td><td>391, cada una clasificada como «cambia el equipo» o «solo consulta».</td></tr>
-  <tr><td>Pruebas automáticas</td><td>270 del motor y 71 de la interfaz; 41 más que se ejecutan a mano.</td></tr>
+  <tr><td>Operaciones</td><td>393, cada una clasificada como «cambia el equipo» o «solo consulta».</td></tr>
+  <tr><td>Pruebas automáticas</td><td>274 del motor y 76 de la interfaz; 41 más que se ejecutan a mano.</td></tr>
   <tr><td>Tamaño</td><td>Instalador de 10,9 MB; portable de 10,4 MB.</td></tr>
   <tr><td>Documentación</td><td>Guía dentro del programa (con glosario, preguntas frecuentes, novedades y términos de uso), manual del técnico, guía de instalación para sistemas, lista de pruebas, licencias de terceros, guía de desarrollo y archivo de ruta.</td></tr>
 </table>

@@ -1,4 +1,4 @@
-// Usuarios locales: qué conviene revisar de cada cuenta. Solo con lo que
+// Usuarios de este equipo: qué conviene revisar de cada cuenta. Solo con lo que
 // Windows ya dice de ella; nada de probar contraseñas.
 import type { LocalUser } from "./api";
 

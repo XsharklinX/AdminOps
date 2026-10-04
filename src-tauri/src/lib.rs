@@ -1,4 +1,8 @@
 mod agenda;
+mod bootlog;
+mod comms;
+mod context;
+mod perfhistory;
 mod apps;
 mod boottime;
 mod diagnostics;
@@ -115,7 +119,7 @@ pub fn run() {
     }
 
     let context = boottime::step("Configuración de la ventana", || tauri::generate_context!());
-    // Intranets de la empresa (p. ej. *.pgr.gob.do): el navegador interno entra
+    // Intranets de la empresa (p. ej. *.empresa.local): el navegador interno entra
     // con la cuenta de Windows sin pedir usuario y contraseña. Solo los dominios
     // de los portales del técnico. Mismos argumentos para todas las vistas: WebView2
     // no admite dos configuraciones distintas en la misma carpeta de datos.
@@ -201,6 +205,8 @@ pub fn run() {
             // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
             agenda::start(app.handle().clone());
             disks::start_watch(app.handle().clone());
+            // Historial de rendimiento de 7 días: una muestra por minuto mientras AdminOps está abierta.
+            perfhistory::start(app.handle().clone());
             appbackup::start(app.handle().clone());
             // Nota de llamada con Ctrl+Alt+N, aunque AdminOps esté minimizado.
             quicknote::start(app.handle().clone());
@@ -303,6 +309,7 @@ pub fn run() {
             portals::portal_download_reveal,
             paths::read_log,
             support::support_package,
+            diagnostics::report::export_journal_pdf,
             support::report_problem,
             support::terms_of_use,
             paths::log_frontend_error,
@@ -358,7 +365,9 @@ pub fn run() {
             space::cancel_space_scan,
             space::space_freeable,
             space::space_recycle,
-            space::space_children,
+            space::space_folder,
+            space::space_files,
+            space::space_kind_files,
             space::reveal_in_explorer,
             software::list_software_updates,
             software::upgrade_software,
@@ -366,6 +375,7 @@ pub fn run() {
             software::cached_software_updates,
             software::set_update_ignored,
             apps::app_catalog,
+            apps::set_catalog_view,
             apps::installed_apps,
             apps::search_apps,
             apps::install_preflight,
@@ -505,12 +515,26 @@ pub fn run() {
             appcare::data_usage,
             appcare::data_cleanup,
             appcare::check_update,
+            appcare::install_update,
             appcare::open_release_page,
             winwatch::list_windows_alerts,
             troubleshoot::troubleshoot_check,
             troubleshoot::troubleshoot_fix,
             troubleshoot::repair_network,
             troubleshoot::quick_net_check,
+            context::machine_context,
+            context::internet_probe,
+            perfhistory::perf_history,
+            bootlog::boot_history,
+            diagnostics::diag_accepted,
+            diagnostics::diag_accept,
+            diagnostics::diag_unaccept,
+            comms::comm_apps,
+            comms::open_comm,
+            network::watch::netwatch_start,
+            network::watch::netwatch_stop,
+            network::watch::netwatch_status,
+            network::watch::netwatch_clear,
             timeline::machine_timeline,
             contacts::list_contacts,
             contacts::save_contact,
@@ -531,6 +555,10 @@ pub fn run() {
             contacts::write_email,
             winwatch::mark_windows_alerts_read,
             winwatch::clear_windows_alerts,
+            winwatch::dismiss_windows_alert,
+            winwatch::mute_windows_alert,
+            winwatch::unmute_windows_alert,
+            winwatch::muted_windows_alerts,
             winwatch::check_windows_now,
             winwatch::unread_windows_alerts,
             remote::list_connections,

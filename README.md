@@ -8,7 +8,7 @@
 
 🇪🇸 **Español** · [🇬🇧 English](README.en.md)
 
-[![Versión](https://img.shields.io/badge/versión-1.1.10-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Versión](https://img.shields.io/badge/versión-1.2.3-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Plataforma](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requisitos)
 [![Hecho con Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 
@@ -40,13 +40,17 @@ preguntas frecuentes.
 
 | Área | Lo principal |
 | --- | --- |
-| **Inicio** | Panel del equipo en vivo. Solución guiada de problemas (no hay Internet, no suena, no imprime, va lento…). Sesión de servicio por pasos: motivo, trabajo, informe, cobro y firma del cliente, con el **informe en PDF** que compara el antes y el después. |
-| **Equipo** | Diagnóstico con hallazgos por gravedad. Hardware y temperaturas. Seguridad con nota de 0 a 100. Discos: espacio, salud, reparación y rescate de archivos. Ajustes de Windows reversibles (limpieza, rendimiento, privacidad, servicios, inicio). Procesos agrupados por programa. Historial con el diario de cambios. |
-| **Soporte** | Tickets, Correo y Teams de la empresa dentro de la aplicación. Personas del dominio (cuenta bloqueada, contraseña caducada). Clientes con sus equipos, visitas y garantías. Agenda con vista de mes e historial. Contactos. Soluciones paso a paso y plantillas de texto. |
-| **Red** | Router y Wi‑Fi, dispositivos conectados, prueba de velocidad, reparar la red, y herramientas: ping, traza de ruta, puertos, DNS y archivo hosts. |
-| **Aplicaciones** | Actualizar, instalar en lote y desinstalar programas; Windows Update; quitar aplicaciones preinstaladas. Plantillas para preparar un equipo nuevo de una vez. |
-| **Administración** | Usuarios locales con avisos de lo que conviene revisar. Cuentas y dominio. Impresoras. Carpetas compartidas: permisos, «¿por qué no puede entrar?», unidades de red y copia diaria. Acceso remoto. Puestos e inventario. Herramientas de Windows y atajos de teclado. |
-| **Datos** | Copia de los datos de un usuario a otro equipo, caja fuerte cifrada, borrado seguro, recuperar archivos borrados y control parental. |
+| **Inicio** | Panel del equipo en vivo. Solución guiada de problemas (no hay Internet, no suena, no imprime, va lento…). Sesión de servicio por pasos: motivo, trabajo, informe, cobro y firma del cliente, con el **informe en PDF** que compara el antes y el después, con tu propia plantilla si quieres. |
+| **Este equipo** | Diagnóstico con hallazgos por gravedad. Hardware y temperaturas. Seguridad con nota de 0 a 100. Rendimiento de los últimos 7 días, arranques y pantallazos azules explicados, y prueba de periféricos. Optimizar Windows con ajustes reversibles. Procesos agrupados por programa. Discos: espacio (con mapa), salud, reparación y rescate de archivos. **Datos**: copia a otro equipo, caja fuerte cifrada, borrado seguro, recuperar archivos y control parental. Historial con el diario de cambios, exportable a PDF y Excel. |
+| **Red** | Router y Wi‑Fi, dispositivos de la red, velocidad, reparar la red, vigilante de cortes de la conexión, ping, traza de ruta, puertos, DNS, hosts y calculadora de red. |
+| **Programas** | Actualizar, instalar en lote y desinstalar programas; Windows Update; quitar aplicaciones preinstaladas. |
+| **Administración** | Puestos de la oficina. Usuarios y cuentas: los usuarios de este equipo con avisos de lo que conviene revisar, las cuentas y el dominio. Impresoras. Carpetas compartidas: permisos, «¿por qué no puede entrar?», unidades de red y copia diaria. Acceso remoto. Plantillas para preparar un equipo nuevo de una vez. |
+| **Soporte** | Agenda con vista de mes e historial. Tickets e Inventario web, que se usan como un navegador. Inventario propio de equipos. Personas del dominio y Clientes con sus equipos, visitas y garantías. Contactos. Soluciones paso a paso y plantillas de texto. |
+
+La barra lateral enseña cada pantalla con sus secciones, sin nada escondido en pestañas; la barra de
+arriba, el equipo en una línea (nombre, dominio, permisos, Internet, disco y avisos), con Teams y
+Correo a un clic; y **Todo AdminOps** (Ctrl+K o F1) el programa entero en una pantalla, con un
+buscador que entiende otras formas de decirlo («AD», «no imprime»).
 
 Dos piezas atraviesan todo: el **diario de cambios**, que anota lo que el programa modifica y
 permite deshacerlo, y el **modo auditoría**, en el que AdminOps solo mira y no cambia nada.

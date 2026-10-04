@@ -5,6 +5,7 @@ import { Button, inputClass, Modal, Loading } from "../ui";
 import { contactsApi, type Contact } from "../../lib/api";
 import { findDuplicates, norm } from "../../lib/contacts";
 import { ColorPicker, colorOf, TagChip, type TagColors } from "./Tags";
+import { dateTime as when } from "../../lib/format";
 
 export type ToolTab = "tags" | "duplicates" | "trash" | "backups";
 
@@ -15,8 +16,6 @@ const TABS: [ToolTab, string, typeof Tags][] = [
   ["backups", "Copias", History],
 ];
 
-const when = (secs: number) => new Date(secs * 1000).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" });
-
 /** Mantenimiento de la agenda. */
 export function ContactTools({ tab: initial, contacts, colors, onChanged, onClose }: { tab: ToolTab; contacts: Contact[]; colors: TagColors; onChanged: () => void; onClose: () => void }) {
   const [tab, setTab] = useState<ToolTab>(initial);
@@ -26,7 +25,7 @@ export function ContactTools({ tab: initial, contacts, colors, onChanged, onClos
   const count = { tags: 0, duplicates: dups.length, trash: trash.length, backups: 0 };
 
   return (
-    <Modal title="Gestionar contactos" onClose={onClose} width="w-[720px] max-w-[95vw]">
+    <Modal title="Gestionar contactos" onClose={onClose} width="w-[720px]">
       <div className="-mt-1 mb-4 flex gap-1 border-b border-line">
         {TABS.map(([id, label, Icon]) => (
           <button

@@ -1,7 +1,7 @@
 import { Eye, EyeOff, GripVertical, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm } from "../../components/feedback";
-import { AREA_ICONS, effectiveAreas, NAV, type PageId } from "../../components/Sidebar";
+import { AREA_ICONS, effectiveAreas, NAV, navLabel, type PageId } from "../../components/Sidebar";
 import { Button, Card } from "../../components/ui";
 import { DEFAULT_SIDEBAR, setPrefs, setSidebar, usePrefs, type NavArea, type SidebarPrefs } from "../../lib/prefs";
 
@@ -97,7 +97,7 @@ export function NavEditor() {
     const ok = await confirm({
       title: "¿Volver a la navegación de fábrica?",
       confirmLabel: "Restablecer todo",
-      body: <p>Se pierden el orden, los nombres, las secciones propias, las páginas ocultas, los favoritos y las opciones de la barra lateral.</p>,
+      body: <p>Se pierden el orden, los nombres, las áreas propias, las pantallas ocultas, los fijados y las opciones de la barra lateral.</p>,
     });
     if (ok) setPrefs({ layout: null, pageLabels: {}, sidebar: DEFAULT_SIDEBAR });
   };
@@ -111,7 +111,8 @@ export function NavEditor() {
           <div className="flex flex-wrap items-center gap-2">
             <p className="min-w-0 flex-1 text-xs text-dim">
               Arrastra las secciones y las páginas (por el asa ⋮⋮) para ordenarlas o moverlas de sección. Pulsa el icono de una sección para cambiarlo y escribe
-              encima de cualquier nombre para renombrarlo. ★ fija la página en Favoritos; el ojo la oculta de la barra (sigue en Ctrl+K).
+              encima de cualquier nombre para renombrarlo. ★ fija la pantalla arriba de la barra (las secciones se fijan con la chincheta, en la propia barra); el ojo
+              la oculta de la barra (sigue en «Todo» y en Ctrl+K).
             </p>
             <Button kind="ghost" onClick={() => save([...areas, { id: `custom-${Date.now().toString(36)}`, label: "Mi sección", icon: "Star", pages: [] }])}>
               <Plus size={14} /> Nueva sección
@@ -249,13 +250,13 @@ export function NavEditor() {
 
       <div className="col-span-12 space-y-3 lg:col-span-5">
         <Card title="Barra lateral">
-          <Opt title="Modo" sub="Solo iconos deja más espacio; las páginas de cada sección aparecen como pestañas bajo el título.">
-            <Segmented value={sb.mode} onChange={s("mode")} options={[["full", "Completa"], ["mini", "Solo iconos"]]} />
+          <Opt title="Modo" sub="Completa: las áreas y, al lado, cada pantalla con sus secciones. Solo áreas deja más espacio; las pantallas del área van como pestañas bajo el título.">
+            <Segmented value={sb.mode} onChange={s("mode")} options={[["full", "Completa"], ["mini", "Solo áreas"]]} />
           </Opt>
           <Opt title="Posición">
             <Segmented value={sb.position} onChange={s("position")} options={[["left", "Izquierda"], ["right", "Derecha"]]} />
           </Opt>
-          <Opt title="Ancho">
+          <Opt title="Ancho de las pantallas">
             <div className="flex items-center gap-2">
               {/* Elegir un ancho aquí manda sobre el que se haya ajustado arrastrando. */}
               <Segmented value={sb.width} onChange={(v) => setSidebar({ width: v, widthPx: null })} options={[["narrow", "Estrecha"], ["normal", "Normal"], ["wide", "Ancha"]]} />
@@ -270,48 +271,35 @@ export function NavEditor() {
             <Segmented value={sb.density} onChange={s("density")} options={[["compact", "Compacta"], ["normal", "Normal"], ["comfortable", "Espaciosa"]]} />
           </Opt>
           <Opt title="Elementos visibles">
-            <Check checked={sb.showAreaIcons} onChange={s("showAreaIcons")} label="Iconos de las secciones" />
-            <Check checked={sb.showSearch} onChange={s("showSearch")} label="Buscador (Ctrl+K sigue funcionando)" />
+            <Check checked={sb.showBadges} onChange={s("showBadges")} label="Estado al lado de cada sección (avisos, dominio, espacio)" />
+            <Check checked={sb.showSearch} onChange={s("showSearch")} label="Buscador en la barra de arriba (Ctrl+K y F1 funcionan igual)" />
             <Check checked={sb.showSession} onChange={s("showSession")} label="Aviso de sesión de servicio en curso" />
-            <Check checked={sb.showFooter} onChange={s("showFooter")} label="Usuario y permisos en el pie" />
           </Opt>
-        </Card>
-
-        <Card title="Comportamiento">
-          <Opt title="Secciones desplegadas">
-            <Segmented
-              value={sb.expand}
-              onChange={s("expand")}
-              options={[
-                ["current", "Solo la actual"],
-                ["remember", "Las que deje abiertas"],
-                ["all", "Todas siempre"],
-              ]}
-            />
-          </Opt>
-          <Opt title="Al pulsar una sección, ir a…">
-            <Segmented value={sb.areaClick} onChange={s("areaClick")} options={[["last", "La última página usada"], ["first", "Su primera página"]]} />
-          </Opt>
-          <Opt title="Pestañas bajo el título" sub="Las páginas de la sección actual como pestañas (siempre activas en modo solo iconos).">
-            <Check checked={sb.headerTabs} onChange={s("headerTabs")} label="Mostrar pestañas" />
+          <Opt title="Al pulsar un área, ir a…">
+            <Segmented value={sb.areaClick} onChange={s("areaClick")} options={[["last", "La última pantalla usada"], ["first", "Su primera pantalla"]]} />
           </Opt>
         </Card>
 
         <Card title="Accesos rápidos en la barra">
-          <Opt title="Favoritos" sub="Sección fija arriba con las páginas marcadas con ★ (aquí o pasando el ratón por la barra lateral).">
+          <Opt title="Fijados" sub="Arriba de la barra: las pantallas marcadas con ★ aquí y lo que fijes con la chincheta al pasar el ratón por la barra (también secciones, como Dominio).">
             {sb.favorites.length === 0 ? (
               <p className="text-xs text-mute">Ninguna todavía.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {sb.favorites.map((p) => (
-                  <button key={p} onClick={() => toggleFav(p)} className="rounded-full bg-panel-2 px-2.5 py-0.5 text-xs text-ink hover:text-bad" title="Quitar de favoritos">
-                    {prefs.pageLabels[p] ?? defaultLabel(p)} ×
+                {sb.favorites.map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setSidebar({ favorites: sb.favorites.filter((x) => x !== k) })}
+                    className="rounded-full bg-panel-2 px-2.5 py-0.5 text-xs text-ink hover:text-bad"
+                    title="Quitar de fijados"
+                  >
+                    {navLabel(k)} ×
                   </button>
                 ))}
               </div>
             )}
           </Opt>
-          <Opt title="Recientes" sub="Las últimas páginas que has abierto.">
+          <Opt title="Recientes" sub="Las últimas pantallas que has abierto.">
             <Segmented
               value={String(sb.recents)}
               onChange={(v) => setSidebar({ recents: Number(v) })}

@@ -154,6 +154,19 @@ pub fn cached_or_refresh(max_age: Duration) -> Result<Vec<SoftwareUpdate>, Strin
     }
 }
 
+/// Espera a que termine la búsqueda en curso y devuelve la lista (None si pasa
+/// el tope sin que llegue). Para completar un diagnóstico que no la esperó.
+pub fn wait_for_list(max: Duration) -> Option<Vec<SoftwareUpdate>> {
+    use std::sync::atomic::Ordering;
+    let start = Instant::now();
+    // Un momento para que la búsqueda que acaba de pedirse llegue a marcarse.
+    std::thread::sleep(Duration::from_millis(500));
+    while LISTING.load(Ordering::SeqCst) && start.elapsed() < max {
+        std::thread::sleep(Duration::from_secs(1));
+    }
+    CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().map(|(_, v)| v.clone())
+}
+
 fn forget(id: &str) {
     if let Some((_, v)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
         v.retain(|u| u.id != id);

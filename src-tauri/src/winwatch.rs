@@ -312,6 +312,20 @@ struct Store {
     alerts: Vec<Alert>,
     /// Dispositivos con error en la última comprobación (id:código): solo se avisa de los nuevos.
     bad_devices: Vec<String>,
+    /// Avisos silenciados en este equipo: no se guardan ni se notifican.
+    muted: Vec<MutedAlert>,
+}
+
+/// Un aviso que el técnico ya conoce y no quiere volver a ver en este equipo
+/// (un programa viejo que se cierra siempre, un lector de tarjetas sin driver).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MutedAlert {
+    pub key: String,
+    pub title: String,
+    pub detail: String,
+    /// Cuándo se silenció (segundos Unix).
+    pub at: u64,
 }
 
 fn store_path(app: &tauri::AppHandle) -> std::path::PathBuf {
@@ -322,6 +336,9 @@ fn store_path(app: &tauri::AppHandle) -> std::path::PathBuf {
 fn merge(store: &mut Store, fresh: Vec<Alert>) -> Vec<Alert> {
     let mut new = Vec::new();
     for mut a in fresh {
+        if store.muted.iter().any(|m| m.key == a.key) {
+            continue;
+        }
         if let Some(existing) = store.alerts.iter_mut().find(|x| x.key == a.key && a.time.saturating_sub(x.time) < 6 * 3600) {
             existing.count += 1;
             existing.time = existing.time.max(a.time);
@@ -435,6 +452,15 @@ fn notify(app: &tauri::AppHandle, a: &Alert) {
     use tauri_plugin_notification::NotificationExt;
     let focused = app.get_webview_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false);
     if focused {
+        return;
+    }
+    // Ajustes → General: de todos, solo de los graves o de ninguno. A la campana llegan siempre.
+    let wanted = match crate::workflow::settings(app).notify_alerts.as_str() {
+        "none" => false,
+        "bad" => a.level == "bad",
+        _ => true,
+    };
+    if !wanted {
         return;
     }
     let body = if a.detail.is_empty() { a.explanation.clone() } else { format!("{} · {}", a.detail, a.explanation) };
@@ -564,14 +590,14 @@ pub fn start(app: tauri::AppHandle) {
     });
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_windows_alerts(app: tauri::AppHandle) -> Vec<Alert> {
     let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let store: Store = crate::paths::read_json(&store_path(&app));
     store.alerts
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mark_windows_alerts_read(app: tauri::AppHandle) -> Result<(), String> {
     let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut store: Store = crate::paths::read_json(&store_path(&app));
@@ -579,12 +605,57 @@ pub fn mark_windows_alerts_read(app: tauri::AppHandle) -> Result<(), String> {
     crate::paths::write_json(&store_path(&app), &store)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_windows_alerts(app: tauri::AppHandle) -> Result<(), String> {
     let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut store: Store = crate::paths::read_json(&store_path(&app));
     store.alerts.clear();
     crate::paths::write_json(&store_path(&app), &store)
+}
+
+/// Quita un aviso de la campana. Si vuelve a pasar, avisará otra vez.
+#[tauri::command(async)]
+pub fn dismiss_windows_alert(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut store: Store = crate::paths::read_json(&store_path(&app));
+    store.alerts.retain(|a| a.id != id);
+    crate::paths::write_json(&store_path(&app), &store)
+}
+
+/// Silencia un aviso en este equipo: se quita (con sus repeticiones) y no vuelve
+/// a salir ni en la campana ni como notificación, hasta que se deshaga.
+fn mute(store: &mut Store, id: &str, at: u64) -> bool {
+    let Some(a) = store.alerts.iter().find(|a| a.id == id).cloned() else { return false };
+    if !store.muted.iter().any(|m| m.key == a.key) {
+        store.muted.insert(0, MutedAlert { key: a.key.clone(), title: a.title, detail: a.detail, at });
+    }
+    store.alerts.retain(|x| x.key != a.key);
+    true
+}
+
+#[tauri::command(async)]
+pub fn mute_windows_alert(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut store: Store = crate::paths::read_json(&store_path(&app));
+    if !mute(&mut store, &id, now()) {
+        return Err("Ese aviso ya no está en la lista.".into());
+    }
+    crate::paths::write_json(&store_path(&app), &store)
+}
+
+#[tauri::command(async)]
+pub fn unmute_windows_alert(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut store: Store = crate::paths::read_json(&store_path(&app));
+    store.muted.retain(|m| m.key != key);
+    crate::paths::write_json(&store_path(&app), &store)
+}
+
+#[tauri::command(async)]
+pub fn muted_windows_alerts(app: tauri::AppHandle) -> Vec<MutedAlert> {
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let store: Store = crate::paths::read_json(&store_path(&app));
+    store.muted
 }
 
 /// Comprobar ahora (botón del centro de avisos).
@@ -594,7 +665,7 @@ pub fn check_windows_now(app: tauri::AppHandle) -> Result<Vec<Alert>, String> {
 }
 
 /// Para el centro de avisos: cuántos avisos quedan por leer.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn unread_windows_alerts(app: tauri::AppHandle) -> usize {
     let store: Store = crate::paths::read_json(&store_path(&app));
     store.alerts.iter().filter(|a| !a.read).count()
@@ -632,6 +703,31 @@ mod tests {
         assert_eq!(s.alerts[0].count, 2);
         // Pasadas 6 h, es un aviso nuevo.
         assert_eq!(merge(&mut s, vec![crash(2000 + 7 * 3600)]).len(), 1);
+    }
+
+    #[test]
+    fn a_muted_alert_goes_away_and_stays_away() {
+        let mut s = Store::default();
+        let crash = |t| Alert { key: "crash:x.exe".into(), title: "x.exe se cerró por un error".into(), time: t, count: 1, ..Default::default() };
+        let other = Alert { key: "crash:y.exe".into(), time: 1000, count: 1, ..Default::default() };
+        merge(&mut s, vec![crash(1000), other.clone()]);
+        merge(&mut s, vec![crash(1000 + 7 * 3600)]);
+        assert_eq!(s.alerts.len(), 3);
+        let id = s.alerts.iter().find(|a| a.key == "crash:x.exe").unwrap().id.clone();
+        assert!(mute(&mut s, &id, 5000));
+        // Se van todas sus repeticiones; lo demás se queda.
+        assert_eq!(s.alerts.len(), 1);
+        assert_eq!(s.alerts[0].key, "crash:y.exe");
+        assert_eq!(s.muted.len(), 1);
+        assert_eq!(s.muted[0].title, "x.exe se cerró por un error");
+        // Vuelve a pasar: ni se guarda ni se da por nuevo (no hay notificación).
+        assert!(merge(&mut s, vec![crash(90_000)]).is_empty());
+        assert_eq!(s.alerts.len(), 1);
+        // Un aviso que ya no existe no silencia nada.
+        assert!(!mute(&mut s, "no-existe", 5000));
+        // Al deshacerlo, vuelve a avisar.
+        s.muted.clear();
+        assert_eq!(merge(&mut s, vec![crash(95_000)]).len(), 1);
     }
 
     #[test]

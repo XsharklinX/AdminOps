@@ -1,6 +1,7 @@
 import { Save, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { tweaksApi, workApi, type ProfileDef, type TweakView } from "../lib/api";
+import { logQuietly, tweaksApi, workApi, type ProfileDef, type TweakView } from "../lib/api";
+import { Overlay, softBtn } from "./ui";
 
 const CATEGORY: Record<string, string> = {
   privacy: "Privacidad",
@@ -33,7 +34,7 @@ export function ProfileEditor({
     void tweaksApi
       .list()
       .then(setCatalog)
-      .catch(() => {});
+      .catch(logQuietly("ProfileEditor"));
   }, []);
 
   const groups = useMemo(() => {
@@ -59,8 +60,8 @@ export function ProfileEditor({
   const input = "w-full rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50";
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/55" onClick={onClose}>
-      <div className="flex max-h-[88vh] w-[760px] flex-col rounded-xl border border-line-2 bg-panel shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <Overlay onClose={onClose}>
+      <div className="flex max-h-[88vh] w-[760px] max-w-full flex-col rounded-xl border border-line-2 bg-panel shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <h3 className="font-semibold">{initial ? "Editar perfil" : "Nuevo perfil"}</h3>
           <button onClick={onClose} className="text-mute hover:text-ink">
@@ -113,12 +114,12 @@ export function ProfileEditor({
           <button
             onClick={save}
             disabled={saving}
-            className="ml-auto flex items-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-4 py-1.5 text-sm text-neon hover:bg-neon/20 disabled:opacity-50"
+            className={`${softBtn} ml-auto`}
           >
             <Save size={13} /> Guardar perfil
           </button>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

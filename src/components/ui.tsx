@@ -1,5 +1,6 @@
 import { ChevronDown, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { loadColor } from "../lib/format";
 
 export function Card({
@@ -25,7 +26,7 @@ export function Card({
     <section
       id={id}
       data-setting={title}
-      className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 [contain:layout_paint] ${
+      className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 ${
         collapsed ? "py-3" : ""
       } ${className}`}
     >
@@ -142,6 +143,79 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
   );
 }
 
+/** Capas abiertas, de abajo arriba. */
+const OPEN: object[] = [];
+
+/**
+ * Capa que cubre la ventana entera, con su contenido centrado. Se pinta en el
+ * `body`, fuera de quien la abre: dentro de una tarjeta o de una página con
+ * `@container`, «fixed» deja de referirse a la ventana y el diálogo salía
+ * cortado o descolocado. Clic fuera o Escape la cierran.
+ */
+export function Overlay({ onClose, children, z = "z-40", label }: { onClose: () => void; children: ReactNode; z?: string; /** Nombre del diálogo para los lectores de pantalla. */ label?: string }) {
+  // `onClose` suele ser una función nueva en cada pintado: se guarda la última.
+  const close = useRef(onClose);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    close.current = onClose;
+  });
+  useEffect(() => {
+    // Con dos capas abiertas (una confirmación sobre un diálogo), Escape cierra solo la de arriba.
+    const me = {};
+    OPEN.push(me);
+    // El foco entra en el diálogo (salvo que algo de dentro ya lo haya pedido con autoFocus)
+    // y, al cerrarlo, vuelve a donde estaba.
+    const before = document.activeElement as HTMLElement | null;
+    const t = window.setTimeout(() => {
+      const el = box.current;
+      if (el && !el.contains(document.activeElement)) (focusables(el)[0] ?? el).focus();
+    }, 0);
+    const onKey = (e: KeyboardEvent) => {
+      if (OPEN[OPEN.length - 1] !== me) return;
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close.current();
+      } else if (e.key === "Tab" && box.current) {
+        // Tab y Mayús+Tab dan la vuelta dentro del diálogo, sin salir a la página de detrás.
+        const items = focusables(box.current);
+        if (!items.length) {
+          e.preventDefault();
+          return;
+        }
+        const first = items[0];
+        const last = items[items.length - 1];
+        const inside = box.current.contains(document.activeElement);
+        if (e.shiftKey && (document.activeElement === first || !inside)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+      OPEN.splice(OPEN.indexOf(me), 1);
+      if (before && document.contains(before)) before.focus();
+    };
+  }, []);
+  return createPortal(
+    <div ref={box} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} className={`fixed inset-0 ${z} grid place-items-center bg-black/55 p-4 outline-none`} onClick={onClose}>
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+/** Lo que se puede alcanzar con Tab dentro de un elemento, en orden. */
+function focusables(root: HTMLElement): HTMLElement[] {
+  const sel = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return Array.from(root.querySelectorAll<HTMLElement>(sel)).filter((el) => el.offsetParent !== null || el === document.activeElement);
+}
+
 /** Ventana modal con cabecera y botón de cerrar. Clic fuera o Escape la cierran. */
 export function Modal({
   title,
@@ -157,12 +231,8 @@ export function Modal({
   width?: string;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/55"
-      onClick={onClose}
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
-    >
-      <div className={`flex max-h-[88vh] ${width} flex-col rounded-xl border border-line-2 bg-panel shadow-2xl`} onClick={(e) => e.stopPropagation()}>
+    <Overlay onClose={onClose} label={typeof title === "string" ? title : undefined}>
+      <div className={`flex max-h-[88vh] ${width} max-w-full flex-col rounded-xl border border-line-2 bg-panel shadow-2xl`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <h3 className="font-semibold">{title}</h3>
           <button onClick={onClose} className="text-mute hover:text-ink" title="Cerrar">
@@ -172,7 +242,37 @@ export function Modal({
         <div className="overflow-y-auto px-5 py-4">{children}</div>
         {footer && <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
       </div>
-    </div>
+    </Overlay>
+  );
+}
+
+/** Botón de solo icono (editar, borrar, copiar…). Lleva siempre `title` o `aria-label`. */
+export const iconBtn = "rounded-md p-1.5 text-mute transition-colors hover:bg-panel-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30";
+/** Botón pequeño con borde, para acciones secundarias dentro de una tarjeta o una fila. */
+export const smallBtn =
+  "inline-flex items-center justify-center gap-1.5 rounded-md border border-line-2 px-2.5 py-1.5 text-xs text-dim transition-colors hover:border-neon/40 hover:text-ink disabled:pointer-events-none disabled:opacity-40";
+/** Botón pequeño con el acento suave: la acción principal de una fila o un panel. */
+export const softBtn =
+  "inline-flex items-center justify-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/20 disabled:pointer-events-none disabled:opacity-40";
+
+/** Botón de solo icono, con su nombre para el ratón y para los lectores de pantalla. */
+export function IconButton({
+  label,
+  onClick,
+  disabled,
+  danger,
+  children,
+}: {
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} title={label} aria-label={label} className={`${iconBtn} ${danger ? "hover:text-bad" : ""}`}>
+      {children}
+    </button>
   );
 }
 
@@ -185,24 +285,28 @@ export function Button({
   disabled,
   kind = "primary",
   title,
+  size = "md",
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  kind?: "primary" | "danger" | "ghost";
+  kind?: "primary" | "danger" | "ghost" | "secondary";
   title?: string;
+  /** "sm": la altura de los botones dentro de una fila o una tarjeta. */
+  size?: "md" | "sm";
 }) {
   const style = {
     primary: "border-neon bg-neon text-on-neon hover:brightness-110",
     danger: "border-bad/50 text-bad hover:bg-bad/10",
     ghost: "border-transparent text-dim hover:bg-panel-2 hover:text-ink",
+    secondary: "border-line-2 text-dim hover:border-neon/40 hover:text-ink",
   }[kind];
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-[13px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${style}`}
+      className={`flex items-center gap-1.5 rounded-lg border font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-[13px]"} ${style}`}
     >
       {children}
     </button>
@@ -211,10 +315,44 @@ export function Button({
 
 /** Estado de carga igual en toda la app. `page`: ocupa el sitio de una página entera. */
 export function Loading({ text = "Cargando…", page = false }: { text?: string; page?: boolean }) {
+  if (page) return <PageSkeleton text={text} />;
   return (
-    <p className={`flex items-center gap-2 text-sm text-mute ${page ? "p-8" : "py-2"}`}>
+    <p className="flex items-center gap-2 py-2 text-sm text-mute">
       <Loader2 size={14} className="animate-spin" /> {text}
     </p>
+  );
+}
+
+/**
+ * Silueta de una pantalla mientras carga: la forma de lo que viene (cifras arriba,
+ * tarjetas debajo) en vez de un círculo girando. Se nota menos la espera y la
+ * página no salta al llegar los datos.
+ */
+function PageSkeleton({ text }: { text: string }) {
+  const bar = "rounded bg-panel-2 motion-safe:animate-pulse";
+  return (
+    <div className="mx-auto max-w-6xl space-y-4 p-6" role="status" aria-live="polite">
+      <span className="sr-only">{text}</span>
+      <p className="flex items-center gap-2 text-xs text-mute" aria-hidden>
+        <Loader2 size={12} className="animate-spin" /> {text}
+      </p>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="rounded-xl border border-line bg-panel px-3 py-3">
+            <div className={`h-5 w-16 ${bar}`} />
+            <div className={`mt-2 h-2.5 w-24 ${bar}`} />
+          </div>
+        ))}
+      </div>
+      {[0, 1].map((c) => (
+        <div key={c} className="space-y-2.5 rounded-xl border border-line bg-panel p-4" aria-hidden>
+          <div className={`h-3 w-40 ${bar}`} />
+          {[92, 78, 85, 64].map((w, i) => (
+            <div key={i} className={`h-2.5 ${bar}`} style={{ width: `${w - c * 10}%` }} />
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }
 

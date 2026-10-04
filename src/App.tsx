@@ -1,21 +1,25 @@
 import { RotateCw } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AdminBanner } from "./components/AdminBanner";
 import type { PaletteAction } from "./components/CommandPalette";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { LockScreen } from "./components/LockScreen";
 import { NAV, Sidebar, allowedInMode, areaOf, isPageId, pageLabel, resolvePage, visibleAreas, type Area, type PageId } from "./components/Sidebar";
-import { api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { TopBar } from "./components/TopBar";
+import { CommOpener } from "./components/CommOpener";
+import { useMachineState } from "./lib/machineState";
+import { sectionLabel, sectionsOf } from "./lib/sections";
+import { PageIdContext, requestSection, useCurrentSections } from "./lib/sectionState";
+import { logQuietly, api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { analyze } from "./lib/diagRun";
 import { lastPortalKey, watchPortals } from "./lib/portalState";
 import { isModestMachine, machineSummary } from "./lib/machine";
 import { NAVIGATE_EVENT, ONBOARDING_EVENT } from "./lib/navigate";
-import { appStarted, codeLoaded, onPerfChange, pageLoads, pageOpened, pagePainted } from "./lib/perf";
+import { appStarted, appStartMs, codeLoaded, onPerfChange, pageLoads, pageOpened, pagePainted } from "./lib/perf";
 import { Dashboard } from "./pages/Dashboard";
 import { AuditBanner, AuditToggle } from "./components/AuditMode";
 import { PageHelp } from "./components/PageHelp";
@@ -51,7 +55,6 @@ const Onboarding = lazyPage("Onboarding", () => import("./components/Onboarding"
 const TweaksPage = lazyPage("TweaksPage", () => import("./pages/TweaksPage"));
 const Processes = lazyPage("Processes", () => import("./pages/Processes"));
 const DiskTools = lazyPage("DiskTools", () => import("./pages/Merged"));
-const Users = lazyPage("Users", () => import("./pages/Users"));
 const Tickets = lazyPage("Tickets", () => import("./pages/Tickets"));
 const Remote = lazyPage("Remote", () => import("./pages/Remote"));
 const SettingsPage = lazyPage("SettingsPage", () => import("./pages/SettingsPage"));
@@ -67,6 +70,7 @@ const MachineState = lazyPage("MachineState", () => import("./pages/Merged"));
 const PrintersAndShares = lazyPage("PrintersAndShares", () => import("./pages/Merged"));
 const MyNetwork = lazyPage("MyNetwork", () => import("./pages/Merged"));
 const Workstations = lazyPage("Workstations", () => import("./pages/Merged"));
+const InventoryPage = lazyPage("InventoryPage", () => import("./pages/Merged"));
 const Agenda = lazyPage("Agenda", () => import("./pages/Agenda"));
 const PeopleAndClients = lazyPage("PeopleAndClients", () => import("./pages/Merged"));
 const WindowsTweaks = lazyPage("WindowsTweaks", () => import("./pages/Merged"));
@@ -82,9 +86,28 @@ const LAST_PAGE = "adminops.lastPage";
 const SPLIT_KEY = "adminops.split";
 
 /** Página donde vive el portal de cada tipo (para precargar solo el que toca). */
-const PORTAL_PAGE = { inventory: "stations", mail: "mail", teams: "teams" } as const;
+const PORTAL_PAGE = { inventory: "inventory", mail: "mail", teams: "teams" } as const;
 /** Páginas que se mantienen vivas a la vez; la menos usada se descarta al pasar de aquí. */
 const MAX_ALIVE = 12;
+/** Si la interfaz tardó más que esto en empezar, el arranque fue lento y no se precarga nada. */
+const SLOW_START_MS = 5000;
+
+/** La última versión con la que se abrió AdminOps (para enseñar sus novedades una vez). */
+const SEEN_VERSION_KEY = "adminops-seen-version";
+function seenVersion(): string | null {
+  try {
+    return localStorage.getItem(SEEN_VERSION_KEY);
+  } catch {
+    return null;
+  }
+}
+function rememberVersion(v: string) {
+  try {
+    localStorage.setItem(SEEN_VERSION_KEY, v);
+  } catch {
+    /* sin almacenamiento: se volverán a enseñar, sin más */
+  }
+}
 
 /** Página de inicio elegida en Ajustes, o la última visitada (Diagnóstico no: se ejecuta solo al abrirlo). */
 function initialPage(): PageId {
@@ -132,6 +155,14 @@ export default function App() {
     setPage(p);
     setFocus(f);
   }, []);
+  /** Ir a una pantalla y, si se dice, a una de sus secciones. */
+  const goTo = useCallback(
+    (to: PageId, section: string | null = null) => {
+      navigate(to, section);
+      if (section) requestSection(resolvePage(to)[0], section);
+    },
+    [navigate],
+  );
   const goHistory = useCallback((dir: "back" | "forward") => {
     const from = dir === "back" ? back : forward;
     const to = dir === "back" ? forward : back;
@@ -154,7 +185,7 @@ export default function App() {
           // Con el equipo delante: los mismos milisegundos no significan lo mismo
           // en un i7 con 32 GB que en un portátil de hace ocho años.
           .then((t) => appApi.logTiming(`${machineSummary()} · ${startupSummary(t, first)}`))
-          .catch(() => {}),
+          .catch(logQuietly("App")),
       );
     });
     return off;
@@ -215,14 +246,16 @@ export default function App() {
       } catch {
         /* sin almacenamiento */
       }
-      if (!id) return;
+      // Un arranque lento (pendrive, equipo ocupado) no se carga con otro navegador más.
+      if (!id || (appStartMs() ?? 0) > SLOW_START_MS) return;
       const [w, h] = [Math.max(800, window.innerWidth - 260), Math.max(500, window.innerHeight - 140)];
-      void portalsApi.preload(id, w, h).catch(() => {});
-      // Más tarde que antes: primero que termine de abrirse la aplicación.
-    }, 8000);
+      void portalsApi.preload(id, w, h).catch(logQuietly("App"));
+      // Bien entrada la sesión: primero que termine de abrirse la aplicación y
+      // de leer lo del Panel (a los 8 s coincidía con todo lo demás).
+    }, 20_000);
     // Cada vista web es un proceso: las que llevan mucho sin verse se cierran
     // (al volver a entrar se abren de nuevo y la sesión de la web sigue).
-    const idle = setInterval(() => void portalsApi.closeIdle().catch(() => {}), 10 * 60_000);
+    const idle = setInterval(() => void portalsApi.closeIdle().catch(logQuietly("App")), 10 * 60_000);
     return () => {
       clearTimeout(t);
       clearInterval(idle);
@@ -232,7 +265,7 @@ export default function App() {
   // competir con la carga de la primera página.
   useEffect(() => {
     if (!getPrefs().diagnoseOnOpen) return;
-    const t = setTimeout(() => void analyze().catch(() => {}), 2500);
+    const t = setTimeout(() => void analyze().catch(logQuietly("App")), 2500);
     return () => clearTimeout(t);
   }, []);
   // Última pestaña visitada de cada área: la barra lateral vuelve a ella.
@@ -288,11 +321,14 @@ export default function App() {
         .settings()
         .then((s) => (s.checkUpdates ? appcareApi.checkUpdate() : null))
         .then((u) => u?.newer && setUpdate(u))
-        .catch(() => {});
-    }, 8000);
+        .catch(logQuietly("App"));
+      // No corre prisa: que no compita con las primeras lecturas del Panel.
+    }, 30_000);
     return () => window.clearTimeout(t);
   }, []);
   const prefs = usePrefs();
+  const machine = useMachineState();
+  const sections = useCurrentSections();
   // Páginas vivas (las más recientes primero) y cuántas veces se ha recargado cada una.
   const [alive, setAlive] = useState<PageId[]>([page]);
   const [reloads, setReloads] = useState<Partial<Record<PageId, number>>>({});
@@ -365,7 +401,7 @@ export default function App() {
         navigate(target);
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") || (e.key === "F1" && !e.ctrlKey && !e.altKey && !e.shiftKey)) {
         e.preventDefault();
         setPaletteOpen((o) => !o);
       } else if (e.ctrlKey && e.key.toLowerCase() === "l" && lockRef.current) {
@@ -389,7 +425,7 @@ export default function App() {
 
   useEffect(() => {
     api.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
-    systemApi.targetUser().then(setTargetUser).catch(() => {});
+    systemApi.targetUser().then(setTargetUser).catch(logQuietly("App"));
     appApi
       .info()
       .then((info) => {
@@ -399,10 +435,19 @@ export default function App() {
         const seq = (info.startPage ?? "").split(",").filter((p) => NAV.some((n) => n.id === p)) as PageId[];
         seq.forEach((p, i) => window.setTimeout(() => setPage(resolvePage(p)[0]), i * 5000));
         // Primer arranque: asistente (no en las capturas automáticas).
-        if (!info.startPage) workApi.settings().then((s) => setOnboarding(!s.onboarded)).catch(() => {});
+        if (!info.startPage)
+          workApi
+            .settings()
+            .then((s) => {
+              setOnboarding(!s.onboarded);
+              // La primera vez que se abre una versión nueva, sus novedades (una sola vez).
+              if (s.onboarded && seenVersion() !== info.version) openHelp("news");
+              rememberVersion(info.version);
+            })
+            .catch(logQuietly("App"));
       })
-      .catch(() => {});
-    workApi.session().then((s) => setSessionActive(!!s)).catch(() => {});
+      .catch(logQuietly("App"));
+    workApi.session().then((s) => setSessionActive(!!s)).catch(logQuietly("App"));
   }, []);
 
   const actions = useMemo<PaletteAction[]>(
@@ -438,11 +483,11 @@ export default function App() {
       { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },
       { id: "wifistate", title: "Estado de la Wi-Fi", subtitle: "Reiniciar la tarjeta, ahorro de energía, adaptadores fantasma", keywords: "wifi tarjeta adaptador driver codigo 10", run: () => navigate("network") },
       // Páginas que ahora son pestañas de otra: se siguen encontrando por su nombre.
-      { id: "go:webinventory", title: "Inventario web de la empresa", subtitle: "Puestos e inventario → Inventario web", keywords: "inventario web intranet portal pgr", run: () => navigate("stations", "webinventory") },
+      { id: "go:webinventory", title: "Inventario web de la empresa", subtitle: "Soporte → Inventario → Inventario web", keywords: "inventario web intranet portal empresa", run: () => navigate("inventory", "webinventory") },
       { id: "go:localaccount", title: "Pasar el equipo a una cuenta local", subtitle: "Cuentas → salir de Entra ID o de la cuenta de Microsoft", keywords: "cuenta profesional azure entra desconectar local microsoft", run: () => navigate("accounts") },
       { id: "go:winupdate", title: "Windows Update", subtitle: "Actualizaciones → Windows Update", keywords: "parches actualizaciones windows", run: () => navigate("winupdate") },
       { id: "go:devices", title: "Dispositivos en la red", subtitle: "Red → Dispositivos", keywords: "escanear red ip mac intrusos", run: () => navigate("devices") },
-      { id: "go:inventory", title: "Inventario de equipos", subtitle: "Puestos e inventario → Inventario", keywords: "equipos clientes renovar", run: () => navigate("inventory") },
+      { id: "go:inventory", title: "Inventario de equipos", subtitle: "Soporte → Inventario", keywords: "equipos clientes renovar", run: () => navigate("inventory") },
       { id: "go:repair", title: "Reparaciones de Windows", subtitle: "Solucionar problemas → Reparaciones", keywords: "sfc dism reparar winsock", run: () => navigate("repair") },
       { id: "sheet", title: "Ficha del equipo", subtitle: "Modelo, serie, licencia, red… para el inventario", keywords: "inventario serie numero modelo garantia licencia", run: () => navigate("hardware", "sheet") },
       { id: "newsolution", title: "Nueva solución", subtitle: "Apuntar lo que funcionó", keywords: "conocimiento base problema", run: () => navigate("knowledge", "solution:") },
@@ -471,9 +516,11 @@ export default function App() {
 
   const nav = NAV.find((n) => n.id === page)!;
   const area = areaOf(page);
-  // Pestañas de la sección actual: con la barra de solo iconos, o si se activan en Ajustes.
-  const showTabs = prefs.sidebar.mode === "mini" || prefs.sidebar.headerTabs;
+  // Con la barra de solo áreas, las pantallas del área van como pestañas bajo el título.
+  const showTabs = prefs.sidebar.mode === "mini";
   const tabs = showTabs ? (visibleAreas(page).find((a) => a.pages.includes(page))?.pages ?? []) : [];
+  // La ruta de arriba: área › pantalla › sección.
+  const section = sectionLabel(page, sections[page] ?? sectionsOf(page)[0]?.id);
 
   // Cada página se construye una vez y se mantiene viva al cambiar de página (conserva sus datos,
   // su scroll y lo que esté haciendo). Se vuelve a cargar con «Recargar» o al cerrar la app.
@@ -494,9 +541,9 @@ export default function App() {
     if (p === "contacts") return <Contacts focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "recipes") return <RecipesAndProfiles isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "stations") return <Workstations covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
-    if (p === "users") return <Users isAdmin={!!isAdmin} />;
-    if (p === "accounts") return <AccountsAndDomain isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
+    if (p === "stations") return <Workstations />;
+    if (p === "inventory") return <InventoryPage covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "users") return <AccountsAndDomain isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "printers") return <PrintersAndShares isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "tickets") return <Tickets split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
     if (p === "mail") return <Tickets kind="mail" split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
@@ -514,25 +561,66 @@ export default function App() {
         lastActivity.current = Date.now();
         setLocked(false);
       }} />)}
-      <div className={`flex h-full ${prefs.sidebar.position === "right" ? "flex-row-reverse" : ""}`}>
-        <Sidebar active={page} onArea={openArea} onSelect={(p) => navigate(p)} isAdmin={isAdmin} targetUser={targetUser}
-          appInfo={appInfo}
+      <div className="flex h-full flex-col">
+      <TopBar
+        state={machine}
+        isAdmin={isAdmin}
+        targetUser={targetUser}
+        appInfo={appInfo}
+        onAbout={() => setAboutOpen(true)}
+        onSearch={() => setPaletteOpen(true)}
+        onNavigate={goTo}
+        right={
+          <>
+            <NewCaseButton hidden={false} />
+            <TasksIndicator />
+            <AuditToggle />
+            <AlertCenter onNavigate={(p) => navigate(p)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
+          </>
+        }
+      />
+      <div className={`flex min-h-0 flex-1 ${prefs.sidebar.position === "right" ? "flex-row-reverse" : ""}`}>
+        <Sidebar
+          active={page}
+          onArea={openArea}
+          onNavigate={goTo}
+          isAdmin={isAdmin}
+          badges={machine.badges}
           sessionActive={sessionActive}
-          onAbout={() => setAboutOpen(true)}
-          onSearch={() => setPaletteOpen(true)}
+          onTodo={() => setPaletteOpen(true)}
           onLock={lock?.enabled ? () => setLocked(true) : undefined}
           update={update}
           recent={recent}
         />
         <main className="flex min-w-0 flex-1 flex-col">
-          {isAdmin === false && <AdminBanner />}
           <AuditBanner />
           <CaseBar onOpenChange={setCaseDialog} />
-          <header className="flex items-end justify-between border-b border-line px-8 pt-5 pb-4">
+          <header className="flex items-end justify-between border-b border-line px-8 pt-4 pb-4">
             <div className="min-w-0">
-              {area && area.pages.length > 1 && !showTabs && <div className="mb-0.5 text-xs text-mute">{area.label}</div>}
+              {/* Dónde estás: área › pantalla › sección. Cada parte lleva a su sitio. */}
+              <nav aria-label="Dónde estás" className="mb-1 flex min-w-0 flex-wrap items-center gap-1 text-xs text-mute">
+                {area && (
+                  <>
+                    <button onClick={() => openArea(area)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
+                      {area.label}
+                    </button>
+                    <span aria-hidden>›</span>
+                  </>
+                )}
+                {section ? (
+                  <>
+                    <button onClick={() => goTo(page, sectionsOf(page)[0]?.id ?? null)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
+                      {pageLabel(nav.id)}
+                    </button>
+                    <span aria-hidden>›</span>
+                    <span className="px-1 text-dim">{section}</span>
+                  </>
+                ) : (
+                  <span className="px-1 text-dim">{pageLabel(nav.id)}</span>
+                )}
+              </nav>
               <h1 className="flex items-center gap-2 text-[22px] font-semibold tracking-tight">
-                <span className="truncate">{pageLabel(nav.id)}</span>
+                <span className="truncate">{section ?? pageLabel(nav.id)}</span>
                 <PageHelp text={nav.help} />
               </h1>
               {showTabs && tabs.length > 1 && (
@@ -550,9 +638,6 @@ export default function App() {
               )}
             </div>
             <div className="flex items-center gap-2">
-            <NewCaseButton hidden={false} />
-            <TasksIndicator />
-            <AuditToggle />
             {page === "dashboard" ? (
               <span className="text-xs text-mute">En vivo · se actualiza cada {prefs.refreshMs / 1000} s</span>
             ) : (
@@ -566,7 +651,6 @@ export default function App() {
                 </button>
               )
             )}
-              <AlertCenter onNavigate={(p) => navigate(p)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
             </div>
           </header>
           <div className="relative min-h-0 flex-1">
@@ -577,6 +661,7 @@ export default function App() {
               const pos = left ? "inset-y-0 left-0 w-[56%] border-r border-line" : right ? "inset-y-0 right-0 w-[44%]" : "inset-0";
               return (
               <div key={`${p}-${reloads[p] ?? 0}`} hidden={!visible} className={`absolute overflow-y-auto ${pos}`}>
+                <PageIdContext.Provider value={p}>
                 <PageActiveContext.Provider value={visible}>
                   <ErrorBoundary onHome={() => navigate("dashboard")}>
                     <Suspense fallback={<Loading page />}>
@@ -585,17 +670,21 @@ export default function App() {
                     </Suspense>
                   </ErrorBoundary>
                 </PageActiveContext.Provider>
+                </PageIdContext.Provider>
               </div>
               );
             })}
           </div>
         </main>
       </div>
+      </div>
       <Suspense fallback={null}>
         {aboutOpen && <About open onClose={() => setAboutOpen(false)} appInfo={appInfo} />}
         {helpOpen && <HelpCenter version={appInfo?.version ?? ""} />}
-        {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} onNavigate={navigate} actions={actions} />}
+        {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} onNavigate={navigate} onSection={goTo} badges={machine.badges} actions={actions} />}
       </Suspense>
+      {/* Teams y el Correo: como se haya elegido, o pregunta la primera vez. */}
+      <CommOpener onAdminOps={(p) => navigate(p)} />
       {onboarding && (
         <Suspense fallback={null}>
           <Onboarding

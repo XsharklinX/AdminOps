@@ -4,12 +4,11 @@
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useState } from "react";
 import type { Followup, Visit } from "../lib/api";
+import { timeOfDay as time } from "../lib/format";
 
 const DAY_MS = 86_400_000;
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const keyOf = (ts: number) => startOfDay(new Date(ts * 1000)).getTime();
-const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
-
 /** Primer lunes de la cuadrícula del mes (y los 42 días que enseña). */
 export function monthGrid(month: Date): number[] {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);

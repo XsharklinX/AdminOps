@@ -5,6 +5,7 @@ import {
   LifeBuoy,
   Loader2,
   Play,
+  FileDown,
   Plus,
   ScrollText,
   Search,
@@ -17,11 +18,12 @@ import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Card, EmptyLine, ErrorState, Loading } from "../components/ui";
 import { groupByDay, JOURNAL_FILTERS, matchesJournal, type JournalFilter } from "../lib/journalDays";
-import { appApi, tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
+import { appApi, officeApi, toCsv, tweaksApi, type JournalEntry, type RestorePoint } from "../lib/api";
 import { RestoreStorageCard } from "../components/Maintenance";
 import { Timeline } from "../components/Timeline";
 import type { PageId } from "../components/Sidebar";
 import { useOnJournalChange } from "../lib/journalEvents";
+import { timeOfDay as time } from "../lib/format";
 
 const OP = {
   apply: { label: "Aplicado", icon: Wrench },
@@ -30,7 +32,6 @@ const OP = {
   restorePoint: { label: "Punto de restauración", icon: LifeBuoy },
 };
 
-const time = (secs: number) => new Date(secs * 1000).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 /** Cuántos cambios se pintan de una vez (el diario de un equipo muy trabajado es largo). */
 const PAGE = 150;
 
@@ -88,6 +89,34 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
       setCreating(false);
       void loadJournal();
       void loadPoints();
+    }
+  };
+
+  // Se exporta lo que se ve: con un filtro o una búsqueda puestos, solo eso.
+  const [exporting, setExporting] = useState(false);
+  const exportJournal = async (format: "csv" | "pdf") => {
+    setExporting(true);
+    try {
+      let saved: string | null;
+      if (format === "pdf") {
+        saved = await tweaksApi.exportJournalPdf(shown.length === (entries ?? []).length ? [] : shown.map((e) => e.id));
+      } else {
+        const rows = [...shown]
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .map((e) => [
+            new Date(e.timestamp * 1000).toLocaleString("es", { dateStyle: "short", timeStyle: "short" }),
+            OP[e.op].label,
+            e.title,
+            e.message ?? "",
+            !e.ok ? "Error" : e.reverted ? "Deshecho" : "Correcto",
+          ]);
+        saved = await officeApi.exportCsv("Diario de cambios", toCsv([["Fecha", "Acción", "Cambio", "Detalle", "Resultado"], ...rows]));
+      }
+      if (saved) toast("ok", format === "pdf" ? "Diario guardado en PDF." : "Diario guardado para Excel.");
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -160,7 +189,22 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
         title={entries?.length ? `Diario de cambios · ${entries.length}` : "Diario de cambios"}
         icon={<HistoryIcon size={14} />}
         className="col-span-12 lg:col-span-7"
-        right={undoable > 0 ? <span className="text-[11px] text-mute">{undoable === 1 ? "1 cambio se puede deshacer" : `${undoable} cambios se pueden deshacer`}</span> : undefined}
+        right={
+          <div className="flex items-center gap-3 text-[11px] text-mute">
+            {undoable > 0 && <span>{undoable === 1 ? "1 cambio se puede deshacer" : `${undoable} cambios se pueden deshacer`}</span>}
+            {shown.length > 0 && (
+              <span className="flex items-center gap-1.5">
+                {exporting ? <Loader2 size={11} className="animate-spin" /> : <FileDown size={11} />} Exportar{shown.length !== (entries ?? []).length ? " lo filtrado" : ""}:
+                <button onClick={() => void exportJournal("pdf")} disabled={exporting} className="text-neon hover:underline disabled:opacity-40" title="Un PDF con cada cambio, como constancia de lo hecho en este equipo">
+                  PDF
+                </button>
+                <button onClick={() => void exportJournal("csv")} disabled={exporting} className="text-neon hover:underline disabled:opacity-40" title="Un archivo para abrir en Excel">
+                  Excel
+                </button>
+              </span>
+            )}
+          </div>
+        }
       >
         {journalError ? (
           <ErrorState message={journalError} onRetry={() => void loadJournal()} />

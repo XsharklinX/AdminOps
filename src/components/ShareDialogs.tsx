@@ -3,7 +3,7 @@
 // diaria a otro disco.
 import { CalendarClock, Check, CircleCheck, CircleX, FolderOpen, Loader2, Play, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
-import { officeApi, usersApi, vaultApi, type Share, type ShareBackup, type ShareExplain, type ShareRight } from "../lib/api";
+import { logQuietly, officeApi, usersApi, vaultApi, type Share, type ShareBackup, type ShareExplain, type ShareRight } from "../lib/api";
 import { friendlyPath } from "../lib/format";
 import { useToast } from "./feedback";
 import { Button, inputClass, Modal } from "./ui";
@@ -24,7 +24,7 @@ function useLocalUsers(): string[] {
     usersApi
       .list()
       .then((u) => setUsers(u.filter((x) => x.enabled && !x.builtin).map((x) => x.name)))
-      .catch(() => {});
+      .catch(logQuietly("ShareDialogs"));
   }, []);
   return users;
 }

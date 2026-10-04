@@ -3,8 +3,8 @@ import { useState } from "react";
 import { workApi, type MachineChanges } from "../lib/api";
 import { Card } from "./ui";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { fullDate as date } from "../lib/format";
 
-const date = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
 const daysAgo = (ts: number) => Math.max(0, Math.round((Date.now() / 1000 - ts) / 86_400));
 
 /**

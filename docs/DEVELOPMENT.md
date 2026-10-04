@@ -21,6 +21,20 @@ instalador NSIS de AdminOps (`installer/build.rs` lo incrusta) y lo ejecuta en s
 nuevo (`-Setup.exe`), el clásico (`-instalador-clasico.exe`, admite `/S` para despliegues) y el portable.
 Si el equipo no tiene WebView2, el instalador nuevo abre directamente el clásico.
 
+## Publicar una versión
+
+AdminOps busca versiones nuevas en las *Releases* de GitHub y, desde Ajustes → General →
+Actualizaciones, puede descargar el instalador y abrirlo. Para que eso funcione:
+
+1. `npm run setversion X.Y.Z`, añadir la entrada de `src/lib/changelog.ts`, y `npm run build:release`.
+2. Commit y etiqueta `vX.Y.Z`, y subirlos.
+3. En GitHub → Releases → *Draft a new release*, elegir la etiqueta `vX.Y.Z` y adjuntar los tres
+   archivos de `release\vX.Y.Z\` **sin cambiarles el nombre**: `AdminOps-X.Y.Z-Setup.exe`,
+   `AdminOps-X.Y.Z-instalador-clasico.exe` y `AdminOps-X.Y.Z-portable.zip`. AdminOps solo descarga
+   un archivo con ese nombre exacto, de este repositorio, y comprueba su tamaño y su huella.
+4. El repositorio tiene que ser público: si es privado, GitHub no deja consultarlo sin cuenta y
+   AdminOps dirá que no hay versiones publicadas.
+
 ## Modo portable
 
 Si junto a `AdminOps.exe` hay un archivo `AdminOps.portable`, todos los datos van a
@@ -48,7 +62,7 @@ npx tauri icon src-tauri/icons/icon-source.png
 
 ```
 src/                     Frontend React
-  lib/api.ts             Únicos comandos que la UI puede invocar
+  lib/api/               Únicos comandos que la UI puede invocar (un archivo por área)
   hooks/useLiveMetrics   Sondeo de métricas (se pausa con la ventana oculta)
   pages/Dashboard.tsx    Panel en vivo
 src-tauri/src/
@@ -111,7 +125,7 @@ la sesión abierta (dueño de `explorer.exe`, vía `HKEY_USERS\<SID>`), no a la 
   Defender/actualizaciones/activación/TPM). Corren en paralelo; si uno falla, el resto sigue.
 - `diagnostics/mod.rs` convierte los datos en hallazgos priorizados y guarda cada análisis en
   `%APPDATA%\com.adminops.app\snapshots\` para comparar antes/después.
-- `diagnostics/report.rs` arma el informe y `diagnostics/pdf.rs` lo convierte a PDF (A4) con Microsoft
+- `diagnostics/report/` arma el informe y `diagnostics/pdf.rs` lo convierte a PDF (A4) con Microsoft
   Edge en modo headless (incluido en Windows 10/11). Se guarda en `Documentos\AdminOps\Informes` y se
   abre vía `explorer.exe` para que el visor no herede los permisos de administrador. Si Edge no está,
   se guarda como HTML.

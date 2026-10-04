@@ -4,7 +4,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card } from "../components/ui";
-import { recoverApi, wipeApi, type RecoverDrive } from "../lib/api";
+import { logQuietly, recoverApi, wipeApi, type RecoverDrive } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 
 type Step = { title: string; detail: string; action?: { label: string; page?: PageId; settings?: string } };
@@ -39,7 +39,7 @@ export function Wipe({ onNavigate }: { onNavigate: (p: PageId) => void }) {
         setDrives(s.drives);
         setDrive((d) => d || s.drives[0]?.letter || "");
       })
-      .catch(() => {});
+      .catch(logQuietly("Wipe"));
   }, []);
 
   const add = async (folders: boolean) => {

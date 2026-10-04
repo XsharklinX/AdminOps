@@ -759,7 +759,9 @@ mod tests {
     }
 
     /// Solo lectura: lista real (dos veces: la segunda, con la caché).
+    /// Equipo real (depende de su estado): `cargo test lists_real_programs -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn lists_real_programs() {
         let _ = list();
         let t = Instant::now();

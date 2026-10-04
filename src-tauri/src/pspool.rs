@@ -288,9 +288,10 @@ pub fn query(script: &str, timeout: Option<Duration>, detail: &str) -> Result<St
 /// Arranca un proceso en segundo plano para que la primera consulta no espere.
 pub fn warm_up() {
     std::thread::spawn(|| {
-        // Un respiro para que WebView2 tenga la máquina para él mientras crea la
-        // ventana: aun así la consola queda lista mucho antes del primer clic.
-        std::thread::sleep(Duration::from_secs(3));
+        // WebView2 primero: la consola se prepara cuando la interfaz ya está pintada
+        // (o a los 20 s, si tarda), y aun así queda lista antes del primer clic.
+        crate::window_state::wait_until_ready(Duration::from_secs(20));
+        std::thread::sleep(Duration::from_secs(1));
         let _ = query("1", Some(Duration::from_secs(30)), "calentamiento");
         loop {
             std::thread::sleep(Duration::from_secs(60));

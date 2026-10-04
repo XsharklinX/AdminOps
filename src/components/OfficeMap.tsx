@@ -2,7 +2,7 @@ import { Eye, MapPinned, Phone, Save, UserRound } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useToast } from "./feedback";
 import { Button, Card, inputClass } from "./ui";
-import { contactsApi, lanApi, officeMapApi, type Contact, type DeviceMeta, type LanDevice } from "../lib/api";
+import { logQuietly, contactsApi, lanApi, officeMapApi, type Contact, type DeviceMeta, type LanDevice } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 export const macKey = (mac: string) => mac.trim().toLowerCase().replace(/-/g, ":");
@@ -38,11 +38,11 @@ export function useOfficeMap() {
         setKey(i.key);
         void reload(i.key);
       })
-      .catch(() => {});
+      .catch(logQuietly("OfficeMap"));
     contactsApi
       .list()
       .then((l) => vigente() && setContacts(l.filter((c) => !c.deleted)))
-      .catch(() => {});
+      .catch(logQuietly("OfficeMap"));
     // Estado de la vigilancia: se refresca cada minuto mientras la página está abierta.
     const t = window.setInterval(() => reload(), 60_000);
     return () => window.clearInterval(t);

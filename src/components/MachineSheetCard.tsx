@@ -2,7 +2,7 @@ import { ClipboardCopy, Download, ExternalLink, FileSpreadsheet, IdCard, Loader2
 import { useEffect, useState } from "react";
 import { useToast } from "./feedback";
 import { Button, Card } from "./ui";
-import { officeApi, sheetApi, workApi, type Client, type MachineSheet } from "../lib/api";
+import { logQuietly, officeApi, sheetApi, workApi, type Client, type MachineSheet } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 const yesNo = (v: boolean | null) => (v == null ? "Desconocido (requiere administrador)" : v ? "Sí" : "No");
@@ -53,7 +53,7 @@ export function MachineSheetCard({ autoLoad = false }: { autoLoad?: boolean }) {
   useLiveEffect(
     (vigente) => {
       if (autoLoad) void load();
-      workApi.clients().then((c) => vigente() && setClients(c)).catch(() => {});
+      workApi.clients().then((c) => vigente() && setClients(c)).catch(logQuietly("MachineSheetCard"));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `load` se redefine en cada render: incluirlo repetiría la consulta sin parar
     [autoLoad],

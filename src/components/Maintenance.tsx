@@ -4,7 +4,7 @@ import { useConfirm, useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
 import { Button, Card, Modal, Loading } from "./ui";
 import { bytes } from "../lib/format";
-import { maintenanceApi, type BootAnalysis, type MaintenanceSchedule } from "../lib/api";
+import { logQuietly, maintenanceApi, type BootAnalysis, type MaintenanceSchedule } from "../lib/api";
 
 const secs = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
 const KIND = { app: "Programa", driver: "Driver", service: "Servicio", device: "Dispositivo", other: "Otro" };
@@ -72,7 +72,7 @@ export function RestoreStorageCard({ isAdmin }: { isAdmin: boolean }) {
   const { confirm, dialog } = useConfirm();
 
   const load = useCallback(() => {
-    if (isAdmin) maintenanceApi.restoreStorage().then(setS).catch(() => {});
+    if (isAdmin) maintenanceApi.restoreStorage().then(setS).catch(logQuietly("Maintenance"));
   }, [isAdmin]);
   useEffect(load, [load]);
 
@@ -200,7 +200,7 @@ export function ScheduleCard({ isAdmin }: { isAdmin: boolean }) {
         setView(v);
         setS(v.schedule);
       })
-      .catch(() => {});
+      .catch(logQuietly("Maintenance"));
   }, []);
   useEffect(load, [load]);
 

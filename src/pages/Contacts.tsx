@@ -29,7 +29,7 @@ import { colorOf, TagChip, TagInput, type TagColors } from "../components/contac
 import { ChipRow } from "../components/ChipRow";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, EmptyState, inputClass, Loading } from "../components/ui";
-import { contactsApi, officeApi, portalsApi, workApi, type Client, type Contact } from "../lib/api";
+import { logQuietly, contactsApi, officeApi, portalsApi, workApi, type Client, type Contact } from "../lib/api";
 import type { PageId } from "../components/Sidebar";
 import {
   applyFilters,
@@ -104,7 +104,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
   useLiveEffect(
     (vigente) => {
       void load();
-      workApi.clients().then((c) => vigente() && setClients(c)).catch(() => {});
+      workApi.clients().then((c) => vigente() && setClients(c)).catch(logQuietly("Contacts"));
     },
     [load],
   );

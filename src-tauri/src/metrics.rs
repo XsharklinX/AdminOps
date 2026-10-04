@@ -109,7 +109,8 @@ pub struct LiveMetrics {
     top_processes: Vec<ProcessInfo>,
 }
 
-#[tauri::command]
+// Fuera del hilo de la ventana: leer los procesos no debe congelarla ni un instante.
+#[tauri::command(async)]
 pub fn get_system_info(state: tauri::State<MetricsState>) -> SystemInfo {
     let c = state.inner.lock().unwrap_or_else(|e| e.into_inner());
     let cpus = c.sys.cpus();
@@ -129,7 +130,8 @@ pub fn get_system_info(state: tauri::State<MetricsState>) -> SystemInfo {
     }
 }
 
-#[tauri::command]
+// Fuera del hilo de la ventana: leer los procesos no debe congelarla ni un instante.
+#[tauri::command(async)]
 pub fn get_live_metrics(state: tauri::State<MetricsState>) -> LiveMetrics {
     let mut guard = state.inner.lock().unwrap_or_else(|e| e.into_inner());
     collect(&mut guard)

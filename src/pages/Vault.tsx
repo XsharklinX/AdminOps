@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
-import { vaultApi, type VaultStatus, type VaultSupport } from "../lib/api";
+import { logQuietly, vaultApi, type VaultStatus, type VaultSupport } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
@@ -76,7 +76,7 @@ export function Vault() {
 
   useLiveEffect(
     (vigente) => {
-      vaultApi.support().then((s) => vigente() && setSupport(s)).catch(() => {});
+      vaultApi.support().then((s) => vigente() && setSupport(s)).catch(logQuietly("Vault"));
       void load();
     },
     [load],

@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { NetworkDrives, OtherPcShares } from "../components/NetworkDrives";
 import { AccessEditor, ShareBackupDialog, shortAccount, when, WhyNoAccess } from "../components/ShareDialogs";
-import { Button, Card, EmptyLine, ErrorState, inputClass, Modal, Loading } from "../components/ui";
-import { officeApi, usersApi, vaultApi, type Share, type ShareBackup, type ShareRisk, type ShareSize, type SharingStatus } from "../lib/api";
-import { bytes, friendlyPath } from "../lib/format";
+import { Button, Card, EmptyLine, ErrorState, inputClass, Modal, Loading, iconBtn } from "../components/ui";
+import { logQuietly, officeApi, usersApi, vaultApi, type Share, type ShareBackup, type ShareRisk, type ShareSize, type SharingStatus } from "../lib/api";
+import { ago, bytes, friendlyPath } from "../lib/format";
 
 const RIGHT: Record<string, string> = { Full: "Control total", Change: "Leer y modificar", Read: "Solo leer", Custom: "Personalizado" };
 
@@ -37,11 +37,33 @@ function instructions(name: string, unc: string) {
   ].join("\n");
 }
 
+/** Contar archivos en una carpeta grande tarda: lo medido se recuerda un día. */
+const SIZES_KEY = "adminops-share-sizes";
+const SIZES_MAX_AGE = 24 * 60 * 60 * 1000;
+const sizeMap = (list: ShareSize[]) => new Map(list.map((x) => [x.name.toLowerCase(), x]));
+function readSizes(): { at: number; list: ShareSize[] } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(SIZES_KEY) ?? "null") as { at?: unknown; list?: unknown } | null;
+    return v && typeof v.at === "number" && Array.isArray(v.list) ? { at: v.at, list: v.list as ShareSize[] } : null;
+  } catch {
+    return null;
+  }
+}
+function writeSizes(at: number, list: ShareSize[]) {
+  try {
+    localStorage.setItem(SIZES_KEY, JSON.stringify({ at, list }));
+  } catch {
+    /* sin almacenamiento: se medirá la próxima vez */
+  }
+}
+
 type Dialog = { kind: "access"; share: string; user?: string } | { kind: "why"; share: string } | { kind: "backup"; share: string } | null;
 
 export function Shares({ isAdmin }: { isAdmin: boolean }) {
   const [status, setStatus] = useState<SharingStatus | null>(null);
   const [sizes, setSizes] = useState<Map<string, ShareSize> | null>(null);
+  /** Cuándo se midieron los tamaños que se ven. */
+  const [sizesAt, setSizesAt] = useState<number | null>(null);
   const [backups, setBackups] = useState<Map<string, ShareBackup>>(new Map());
   const [failed, setFailed] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -58,20 +80,39 @@ export function Shares({ isAdmin }: { isAdmin: boolean }) {
     }
   }, []);
 
-  const load = useCallback(async () => {
-    try {
-      setStatus(await officeApi.shares());
-      setFailed(null);
-    } catch (e) {
-      setFailed(String(e));
-    }
-    void loadBackups();
-    // Contar archivos tarda: va aparte para no retener la lista.
-    officeApi
-      .shareSizes()
-      .then((z) => setSizes(new Map(z.map((x) => [x.name.toLowerCase(), x]))))
-      .catch(() => setSizes(new Map()));
-  }, [loadBackups]);
+  const load = useCallback(
+    async (remeasure = false) => {
+      let names: string[] = [];
+      try {
+        const st = await officeApi.shares();
+        setStatus(st);
+        names = st.shares.map((x) => x.name.toLowerCase());
+        setFailed(null);
+      } catch (e) {
+        setFailed(String(e));
+      }
+      void loadBackups();
+      // Lo medido hace poco sirve, salvo que haya una carpeta que no estaba.
+      const cached = remeasure ? null : readSizes();
+      if (cached && Date.now() - cached.at < SIZES_MAX_AGE && names.every((n) => cached.list.some((x) => x.name.toLowerCase() === n))) {
+        setSizes(sizeMap(cached.list));
+        setSizesAt(cached.at);
+        return;
+      }
+      // Contar archivos tarda: va aparte para no retener la lista.
+      setSizes(null);
+      officeApi
+        .shareSizes()
+        .then((z) => {
+          const at = Date.now();
+          setSizes(sizeMap(z));
+          setSizesAt(at);
+          writeSizes(at, z);
+        })
+        .catch(() => setSizes(new Map()));
+    },
+    [loadBackups],
+  );
 
   useEffect(() => {
     void load();
@@ -137,7 +178,6 @@ export function Shares({ isAdmin }: { isAdmin: boolean }) {
   }, [status, sizes]);
 
   const selected = dialogOpen && status ? status.shares.find((s) => s.name === dialogOpen.share) : undefined;
-  const iconBtn = "rounded-md p-1.5 text-mute transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-30";
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-6">
@@ -160,13 +200,14 @@ export function Shares({ isAdmin }: { isAdmin: boolean }) {
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <p className="min-w-0 flex-1 text-sm text-dim">
             Qué carpetas ven los demás equipos de la red, con qué permisos, cuánto ocupan y quién tiene archivos abiertos.
+            {sizes !== null && sizesAt !== null && <span className="text-mute"> Tamaños medidos {ago(sizesAt / 1000)}.</span>}
             {review > 0 && (
               <span className="mt-0.5 flex items-center gap-1.5 text-xs text-warn">
                 <ShieldAlert size={12} /> {review === 1 ? "Hay 1 cosa que conviene revisar" : `Hay ${review} cosas que conviene revisar`}, marcadas abajo.
               </span>
             )}
           </p>
-          <Button kind="ghost" onClick={() => void load()} title="Volver a mirar">
+          <Button kind="ghost" onClick={() => void load(true)} title="Volver a mirar (y a medir lo que ocupa cada carpeta)">
             <RotateCw size={14} />
           </Button>
           {status && status.shares.length > 0 && (
@@ -371,7 +412,7 @@ function NewShare({ onClose, onDone }: { onClose: () => void; onDone: () => void
     usersApi
       .list()
       .then((u) => setUsers(u.filter((x) => x.enabled && !x.builtin).map((x) => x.name)))
-      .catch(() => {});
+      .catch(logQuietly("Shares"));
   }, []);
 
   const pick = async () => {

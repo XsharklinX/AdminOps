@@ -90,6 +90,8 @@ const BLOCKED: &[&str] = &[
     "create_share",
     "remove_share",
     "enable_file_sharing",
+    // Descarga la versión nueva y abre su instalador
+    "install_update",
     "share_grant",
     "share_revoke",
     "map_network_drive",
@@ -143,7 +145,7 @@ const SAFE: &[&str] = &[
     // applock
     "lock_status", "lock_verify", "lock_set", "lock_set_idle", "lock_disable", "lock_verify_windows",
     // apps
-    "app_catalog", "installed_apps", "search_apps", "install_preflight", "save_app_list", "delete_app_list",
+    "app_catalog", "set_catalog_view", "installed_apps", "search_apps", "install_preflight", "save_app_list", "delete_app_list",
     // audit
     "audit_mode", "set_audit_mode",
     // boottime
@@ -230,13 +232,15 @@ const SAFE: &[&str] = &[
     // software
     "list_software_updates", "ignored_updates", "cached_software_updates", "set_update_ignored",
     // space
-    "scan_space", "cancel_space_scan", "space_freeable", "space_children", "reveal_in_explorer",
+    "scan_space", "cancel_space_scan", "space_freeable", "space_folder", "space_files", "space_kind_files", "reveal_in_explorer",
     // stations
     "check_stations",
     // support
     "support_package",
     // Prepara un correo (lo envía el técnico) y enseña los términos: no cambian el equipo.
     "report_problem",
+    // Guarda un PDF donde elija el técnico: no cambia el equipo.
+    "export_journal_pdf",
     "terms_of_use",
     // target_user
     "get_target_user",
@@ -248,6 +252,13 @@ const SAFE: &[&str] = &[
     "list_tools", "launch_tool", "set_tool_favorite", "save_custom_tool", "delete_custom_tool", "pick_tool_target",
     // troubleshoot
     "troubleshoot_check", "quick_net_check",
+    // context (barra de arriba)
+    "machine_context", "internet_probe",
+    // historial de rendimiento, arranques, abrir Teams/Correo, vigilante de la conexión
+    "perf_history", "boot_history", "comm_apps", "open_comm",
+    // «Ya lo sé» del diagnóstico: una nota del técnico, no cambia el equipo
+    "diag_accepted", "diag_accept", "diag_unaccept",
+    "netwatch_start", "netwatch_stop", "netwatch_status", "netwatch_clear",
     // tweaks
     "list_tweaks", "tweak_index", "get_journal", "list_restore_points", "open_system_restore",
     // tweaks::appx
@@ -266,6 +277,7 @@ const SAFE: &[&str] = &[
     "update_history", "update_pause_state", "pending_updates",
     // winwatch
     "list_windows_alerts", "mark_windows_alerts_read", "clear_windows_alerts", "check_windows_now", "unread_windows_alerts",
+    "dismiss_windows_alert", "mute_windows_alert", "unmute_windows_alert", "muted_windows_alerts",
     // wipe
     "wipe_pick", "open_ms_settings",
     // workflow

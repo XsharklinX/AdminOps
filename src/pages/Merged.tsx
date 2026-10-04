@@ -1,6 +1,6 @@
 // Páginas que agrupan varias vistas relacionadas en pestañas, para que cada
-// cosa esté en un solo sitio (Actualizaciones, Mi red, Puestos e inventario,
-// Ajustes de Windows).
+// cosa esté en un solo sitio (Red, Usuarios y cuentas, Inventario, Optimizar
+// Windows…).
 import {
   BookCopy,
   ClipboardList,
@@ -22,7 +22,6 @@ import {
   Printer,
   UserRound,
   Lock,
-  MonitorCheck,
   Package,
   PackageMinus,
   PlayCircle,
@@ -38,10 +37,12 @@ import {
   Undo2,
   Wrench,
   X,
+  Users,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { PageTabs, TabPanels, type PageTab } from "../components/PageTabs";
 import type { PageId } from "../components/Sidebar";
+import { onSectionRequest, reportSection, usePageId } from "../lib/sectionState";
 import { Devices } from "./Devices";
 import { Accounts } from "./Accounts";
 import { Diagnostics } from "./Diagnostics";
@@ -79,6 +80,11 @@ import { Stations } from "./Stations";
 import { Tickets } from "./Tickets";
 import { TweaksPage } from "./TweaksPage";
 import { WindowsUpdate } from "./WindowsUpdate";
+import { Users as UsersPage } from "./Users";
+import { PerfHistory } from "./PerfHistory";
+import { Boots } from "./Boots";
+import { Peripherals } from "./Peripherals";
+import { NetWatch } from "./NetWatch";
 
 /** Pestaña elegida (o la que pide un enlace) y las ya visitadas, que se mantienen montadas. */
 function useTabs<T extends string>(
@@ -98,6 +104,18 @@ function useTabs<T extends string>(
     if (focus && tabs.some((t) => t.id === focus)) choose(focus as T);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando llega un foco nuevo; `choose` y `tabs` cambian en cada render
   }, [focus]);
+  // La barra lateral marca la sección a la vista, y puede pedir otra.
+  const page = usePageId();
+  useEffect(() => {
+    if (page) reportSection(page, tab);
+  }, [page, tab]);
+  useEffect(() => {
+    if (!page) return;
+    return onSectionRequest(page, (s) => {
+      if (tabs.some((t) => t.id === s)) choose(s as T);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `choose` y `tabs` cambian en cada render; basta con la página
+  }, [page]);
   return { tab, visited, choose };
 }
 
@@ -141,7 +159,7 @@ const APPS: PageTab<AppsTab>[] = [
     id: "install",
     label: "Instalar",
     icon: <Download size={14} />,
-    help: "Instala programas en lote desde un catálogo comprobado (113 programas, incluidas las utilidades de driver de cada marca) o buscando en winget. Tus listas se guardan para reutilizarlas.",
+    help: "Instala programas en lote desde un catálogo comprobado (147 programas) o buscando en winget. La vista «Empresa» deja fuera juegos y programas de uso personal, y con «Personalizar» eliges qué se muestra. Tus listas se guardan para reutilizarlas.",
   },
   {
     id: "uninstall",
@@ -186,7 +204,7 @@ export function Apps({
   );
 }
 
-type NetTab = "router" | "devices" | "speed" | "tools";
+type NetTab = "router" | "devices" | "speed" | "watch" | "tools";
 const NET: PageTab<NetTab>[] = [
   {
     id: "router",
@@ -207,10 +225,16 @@ const NET: PageTab<NetTab>[] = [
     help: "Test de velocidad, estado de la conexión, reparar la red y controlar la Wi-Fi.",
   },
   {
+    id: "watch",
+    label: "Vigilante de la conexión",
+    icon: <Radar size={14} />,
+    help: "Se deja en marcha y apunta cada corte: cuándo, cuánto duró y si fallaba el router o Internet. El resumen se copia para el proveedor.",
+  },
+  {
     id: "tools",
-    label: "Herramientas",
+    label: "Herramientas de red",
     icon: <Wrench size={14} />,
-    help: "Ping, traceroute, puertos abiertos, DNS y archivo hosts.",
+    help: "Ping, traceroute, puertos abiertos, DNS, archivo hosts y calculadora de red.",
   },
 ];
 
@@ -232,25 +256,34 @@ export function MyNetwork({
       tabs={NET}
       focus={tab}
       render={(t, visible) =>
-        t === "router" ? <Router covered={covered || !visible} /> : t === "devices" ? <Devices /> : t === "speed" ? <Network isAdmin={isAdmin} /> : <NetTools isAdmin={isAdmin} />
+        t === "router" ? (
+          <Router covered={covered || !visible} />
+        ) : t === "devices" ? (
+          <Devices />
+        ) : t === "speed" ? (
+          <Network isAdmin={isAdmin} />
+        ) : t === "watch" ? (
+          <NetWatch />
+        ) : (
+          <NetTools isAdmin={isAdmin} />
+        )
       }
     />
   );
 }
 
-type OfficeTab = "stations" | "inventory" | "webinventory";
-const OFFICE: PageTab<OfficeTab>[] = [
-  {
-    id: "stations",
-    label: "Comprobar puestos",
-    icon: <MonitorCheck size={14} />,
-    help: "Comprueba qué equipos responden y cuáles necesitan atención, y actúa sobre varios a la vez.",
-  },
+/** Los puestos de la oficina: cuáles responden y cuáles necesitan atención. */
+export function Workstations() {
+  return <Stations />;
+}
+
+type InventoryTab = "inventory" | "webinventory";
+const INVENTORY: PageTab<InventoryTab>[] = [
   {
     id: "inventory",
-    label: "Inventario",
+    label: "Mi inventario",
     icon: <ClipboardList size={14} />,
-    help: "Tu inventario de equipos, con la ficha de cada uno.",
+    help: "Tu inventario de equipos, con la ficha de cada uno y qué conviene hacer con él.",
   },
   {
     id: "webinventory",
@@ -260,8 +293,8 @@ const OFFICE: PageTab<OfficeTab>[] = [
   },
 ];
 
-/** Los equipos de la oficina: cuáles responden, su inventario y la web de inventario de la empresa. */
-export function Workstations({
+/** Todo el inventario: el propio y la web de inventario de la empresa. */
+export function InventoryPage({
   covered,
   focus,
 }: {
@@ -270,14 +303,13 @@ export function Workstations({
 }) {
   return (
     <Tabbed
-      tabs={OFFICE}
+      tabs={INVENTORY}
       focus={focus}
       render={(t, visible) =>
-        t === "stations" ? (
-          <Stations />
-        ) : t === "inventory" ? (
+        t === "inventory" ? (
           <Inventory />
         ) : (
+          // La web es una vista nativa: se oculta si su pestaña no está a la vista.
           <Tickets kind="inventory" covered={covered || !visible} />
         )
       }
@@ -576,8 +608,14 @@ export function DataTools({
   );
 }
 
-type IdentityTab = "accounts" | "domain";
+type IdentityTab = "users" | "accounts" | "domain";
 const IDENTITY: PageTab<IdentityTab>[] = [
+  {
+    id: "users",
+    label: "Usuarios de este equipo",
+    icon: <Users size={14} />,
+    help: "Las cuentas locales: crear, cambiar la contraseña, hacer administrador, desactivar y eliminar, con aviso de lo que conviene revisar en cada una.",
+  },
   {
     id: "accounts",
     label: "Cuentas",
@@ -592,7 +630,7 @@ const IDENTITY: PageTab<IdentityTab>[] = [
   },
 ];
 
-/** Con qué cuenta entra este equipo: cuentas conectadas y el dominio de la empresa. */
+/** Las cuentas de este equipo: usuarios locales, cuentas conectadas y el dominio de la empresa. */
 export function AccountsAndDomain({
   isAdmin,
   focus,
@@ -605,7 +643,9 @@ export function AccountsAndDomain({
       tabs={IDENTITY}
       focus={focus}
       render={(t) =>
-        t === "accounts" ? (
+        t === "users" ? (
+          <UsersPage isAdmin={isAdmin} />
+        ) : t === "accounts" ? (
           <Accounts isAdmin={isAdmin} />
         ) : (
           <Domain isAdmin={isAdmin} />
@@ -706,7 +746,7 @@ export function PrintersAndShares({
   );
 }
 
-type MachineTab = "diagnostics" | "hardware" | "security" | "history";
+type MachineTab = "diagnostics" | "hardware" | "performance" | "security" | "boots" | "peripherals" | "history";
 const MACHINE: PageTab<MachineTab>[] = [
   {
     id: "diagnostics",
@@ -721,14 +761,32 @@ const MACHINE: PageTab<MachineTab>[] = [
     help: "Qué piezas lleva el equipo (para el inventario), temperaturas en vivo, salud de los discos (SMART) y prueba de memoria.",
   },
   {
+    id: "performance",
+    label: "Rendimiento",
+    icon: <Gauge size={14} />,
+    help: "Procesador, memoria y disco de los últimos 7 días, minuto a minuto, y qué programa había detrás de cada pico. Se mide mientras AdminOps está abierta.",
+  },
+  {
     id: "security",
     label: "Seguridad",
     icon: <ShieldCheck size={14} />,
     help: "Nota de seguridad, antivirus, BitLocker, cuentas, lo que arranca solo y las extensiones del navegador.",
   },
   {
+    id: "boots",
+    label: "Arranques y cuelgues",
+    icon: <Power size={14} />,
+    help: "Cuándo arrancó y se apagó mal el equipo, los pantallazos azules explicados y cuánto tarda en arrancar (60 días).",
+  },
+  {
+    id: "peripherals",
+    label: "Probar periféricos",
+    icon: <Keyboard size={14} />,
+    help: "Pantalla (píxeles muertos), teclado, altavoces izquierdo y derecho, micrófono y cámara.",
+  },
+  {
     id: "history",
-    label: "Historial",
+    label: "Historial del equipo",
     icon: <HistoryIcon size={14} />,
     help: "Todo lo que ha pasado en este equipo: cambios, avisos, actualizaciones, drivers y apagados, con «Deshacer» y los puntos de restauración.",
   },
@@ -768,6 +826,9 @@ export function MachineState({
           return (
             <Security isAdmin={isAdmin} focus={f} onNavigate={onNavigate} />
           );
+        if (t === "performance") return <PerfHistory />;
+        if (t === "boots") return <Boots isAdmin={isAdmin} />;
+        if (t === "peripherals") return <Peripherals />;
         return <History isAdmin={isAdmin} onNavigate={onNavigate} />;
       }}
     />

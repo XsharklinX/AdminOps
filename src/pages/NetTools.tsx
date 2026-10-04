@@ -1,18 +1,21 @@
 import { listen } from "@tauri-apps/api/event";
-import { CircleCheck, FileText, Loader2, Play, RefreshCw, Route, Save, Search, Server, Square, TriangleAlert, Undo2, Waypoints } from "lucide-react";
+import { Calculator, CircleCheck, FileText, Loader2, Play, RefreshCw, Route, Save, Search, Server, Square, Undo2, Waypoints } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Loading } from "../components/ui";
 import { netApi, type DnsAdapter, type PortEntry, type Probe } from "../lib/api";
 import { DataTable } from "../components/DataTable";
+import { NeedsAdmin } from "../components/AdminBanner";
+import { sameNetwork, subnet } from "../lib/subnet";
 
-type Tab = "probe" | "dns" | "ports" | "hosts";
+type Tab = "probe" | "dns" | "ports" | "hosts" | "calc";
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
   { id: "probe", label: "Ping y traza de ruta", icon: Route },
   { id: "dns", label: "DNS", icon: Server },
   { id: "ports", label: "Puertos en uso", icon: Waypoints },
   { id: "hosts", label: "Archivo hosts", icon: FileText },
+  { id: "calc", label: "Calculadora de red", icon: Calculator },
 ];
 
 export function NetTools({ isAdmin }: { isAdmin: boolean }) {
@@ -36,6 +39,65 @@ export function NetTools({ isAdmin }: { isAdmin: boolean }) {
       {tab === "dns" && <DnsPanel isAdmin={isAdmin} />}
       {tab === "ports" && <PortsPanel />}
       {tab === "hosts" && <HostsPanel isAdmin={isAdmin} />}
+      {tab === "calc" && <SubnetCalc />}
+    </div>
+  );
+}
+
+// ---------- Calculadora de red ----------
+
+function SubnetCalc() {
+  const [ip, setIp] = useState("192.168.1.37");
+  const [mask, setMask] = useState("255.255.255.0");
+  const [other, setOther] = useState("");
+  const s = subnet(ip, mask);
+  const same = s && other.trim() ? sameNetwork(s, other) : null;
+  const row = (label: string, value: string | number, hint?: string) => (
+    <div className="flex items-baseline gap-3 border-b border-line/60 py-1.5 last:border-0">
+      <span className="w-44 shrink-0 text-xs text-mute">{label}</span>
+      <span className="font-mono text-sm text-ink select-text">{value}</span>
+      {hint && <span className="text-[11.5px] text-mute">{hint}</span>}
+    </div>
+  );
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card title="IP y máscara">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">IP (o IP/24)</span>
+            <input value={ip} onChange={(e) => setIp(e.target.value)} className={`${inputClass} font-mono`} spellCheck={false} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Máscara o prefijo</span>
+            <input value={mask} onChange={(e) => setMask(e.target.value)} placeholder="255.255.255.0 o 24" className={`${inputClass} font-mono`} spellCheck={false} />
+          </label>
+        </div>
+        <label className="mt-3 block">
+          <span className="mb-1 block text-xs text-dim">¿Está esta otra IP en la misma red?</span>
+          <input value={other} onChange={(e) => setOther(e.target.value)} placeholder="192.168.1.200" className={`${inputClass} font-mono`} spellCheck={false} />
+        </label>
+        {same !== null && (
+          <p className={`mt-2 text-sm ${same ? "text-ok" : "text-warn"}`}>
+            {same ? "Sí: se ven directamente, sin pasar por el router." : "No: están en redes distintas; para verse hace falta un router entre ellas."}
+          </p>
+        )}
+        {other.trim() && same === null && s && <p className="mt-2 text-xs text-warn">Esa no es una IP válida.</p>}
+      </Card>
+      <Card title="La red">
+        {!s ? (
+          <p className="text-sm text-warn">Escribe una IP (cuatro números del 0 al 255 separados por puntos) y una máscara válida (255.255.255.0) o un prefijo (24).</p>
+        ) : (
+          <>
+            {row("Red", `${s.network}/${s.prefix}`)}
+            {row("Máscara", s.mask)}
+            {row("Primera IP de equipo", s.first, s.prefix <= 30 ? "suele ser el router" : undefined)}
+            {row("Última IP de equipo", s.last)}
+            {row("Difusión (broadcast)", s.broadcast)}
+            {row("Equipos que caben", s.hosts.toLocaleString("es"))}
+            {row("Tipo", s.private ? "Privada (de casa u oficina)" : "Pública (de Internet)")}
+          </>
+        )}
+      </Card>
     </div>
   );
 }
@@ -114,7 +176,7 @@ function ProbePanel() {
           onChange={(e) => setHost(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !running && start()}
           placeholder="IP o nombre (google.com)"
-          className={`${inputClass} w-72 font-mono`}
+          className={`${inputClass} w-72 min-w-40 shrink font-mono`}
           disabled={running}
         />
         {["8.8.8.8", "1.1.1.1", "google.com"].map((h) => (
@@ -233,11 +295,7 @@ function DnsPanel({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="space-y-3">
-      {!isAdmin && (
-        <p className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
-          <TriangleAlert size={13} /> Cambiar los DNS requiere ejecutar AdminOps como administrador.
-        </p>
-      )}
+      {!isAdmin && <NeedsAdmin>Cambiar los DNS requiere administrador.</NeedsAdmin>}
       {list.map((a) => {
         const current = DNS_PRESETS.find((p) => p.servers.length && p.servers.join() === a.dns.slice(0, 2).join());
         return (
@@ -349,7 +407,7 @@ function PortsPanel() {
   return (
     <Card>
       <div className="mb-3 flex items-center gap-3">
-        <div className="relative w-72">
+        <div className="relative w-72 min-w-40 shrink">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input
             value={query}

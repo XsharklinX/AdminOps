@@ -8,7 +8,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { CalendarCheck, CalendarClock, Check, Clock, Loader2, Plus, TicketCheck, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { agendaApi, alertsApi, casesApi, followupsApi, tomorrowMorning, type Case, type Followup, type Visit, type WindowsAlert } from "../lib/api";
+import { logQuietly, agendaApi, alertsApi, casesApi, followupsApi, tomorrowMorning, type Case, type Followup, type Visit, type WindowsAlert } from "../lib/api";
 import { CASE_CHANGED_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { usePageActive } from "../lib/pageActive";
@@ -64,12 +64,12 @@ export function TodayCard() {
         setVisits(a.visits.filter((v) => v.status === "planned" && v.start >= today[0] && v.start <= today[1]));
         setDueClients(a.due.length);
       })
-      .catch(() => {});
-    void casesApi.current().then(setOpenCase).catch(() => {});
+      .catch(logQuietly("TodayCard"));
+    void casesApi.current().then(setOpenCase).catch(logQuietly("TodayCard"));
     void alertsApi
       .list()
       .then((l) => setAlerts(l.filter((x) => !x.read && x.level !== "info")))
-      .catch(() => {});
+      .catch(logQuietly("TodayCard"));
   }, []);
 
   // Al entrar, al volver a la ventana, cuando otra parte (o la nota) cambia algo, y cada minuto.

@@ -171,7 +171,7 @@ export function Onboarding({ onDone }: { onDone: (goTo: "diagnostics" | "dashboa
         {step === "domain" && (
           <div className="space-y-3">
             <p className="text-sm text-dim">
-              Si trabajas con intranets de empresa (por ejemplo <span className="font-mono text-xs">pgr.gob.do</span>), AdminOps entrará en ellas con tu cuenta de
+              Si trabajas con intranets de empresa (por ejemplo <span className="font-mono text-xs">empresa.local</span>), AdminOps entrará en ellas con tu cuenta de
               Windows, sin pedirte contraseña.
             </p>
             <label className="block">

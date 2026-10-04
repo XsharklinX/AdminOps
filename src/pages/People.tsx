@@ -28,7 +28,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "../components/feedback";
 import { Button, Card, EmptyState, inputClass, Modal } from "../components/ui";
-import { casesApi, contactsApi, officeApi, peopleApi, portalsApi, type Case, type LapsPassword, type Person, type PersonHit, type RecoveryKey } from "../lib/api";
+import { logQuietly, casesApi, contactsApi, officeApi, peopleApi, portalsApi, type Case, type LapsPassword, type Person, type PersonHit, type RecoveryKey } from "../lib/api";
 import { openCase } from "../lib/currentCase";
 import { Avatar } from "../components/contacts/Avatar";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -282,7 +282,7 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
           if (!vigente()) return;
           setP(d);
           loaded.current?.(d);
-          void casesApi.forPerson(d.sam, d.name).then((h) => vigente() && setHistory(h)).catch(() => {});
+          void casesApi.forPerson(d.sam, d.name).then((h) => vigente() && setHistory(h)).catch(logQuietly("People"));
         })
         .catch((e) => vigente() && setError(String(e)));
     },

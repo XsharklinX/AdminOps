@@ -1,6 +1,6 @@
 import { ExternalLink, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toolboxApi, type ToolView } from "../lib/api";
+import { logQuietly, toolboxApi, type ToolView } from "../lib/api";
 import { useToast } from "./feedback";
 import { Card } from "./ui";
 
@@ -22,7 +22,7 @@ export function WindowsTools({ title = "Más opciones en Windows", links, classN
     toolboxApi
       .list()
       .then((v) => setTools(Object.fromEntries(v.tools.map((t) => [t.id, t]))))
-      .catch(() => {});
+      .catch(logQuietly("WindowsTools"));
   }, []);
 
   return (

@@ -49,7 +49,7 @@ const CATALOG: Builtin[] = [
    netsh int ip reset
 3. Reinicia el equipo (los dos últimos comandos solo surten efecto tras reiniciar).
 4. Si sigue igual, mira si tiene IP correcta: ipconfig. Una IP 169.254.x.x significa que no llegó respuesta del router (DHCP): reinicia el router o revisa el cable.
-5. Prueba a poner DNS fijos (AdminOps → Red → DNS): 1.1.1.1 y 8.8.8.8. Si con eso funciona, el DNS del router es el que falla.
+5. Prueba a poner DNS fijos (AdminOps → Red → Herramientas de red → DNS): 1.1.1.1 y 8.8.8.8. Si con eso funciona, el DNS del router es el que falla.
 6. Si hay antivirus de empresa o VPN, desactívalo un momento: los filtros de red son causa habitual.`,
     tags: ["red", "internet", "wifi", "dns"],
     actions: [
@@ -73,7 +73,7 @@ const CATALOG: Builtin[] = [
     title: "La impresora no imprime y los trabajos se quedan en la cola",
     problem:
       "Se manda a imprimir, el documento entra en la cola y ahí se queda. A veces pone «Error» o «Eliminando» y no se puede quitar.",
-    solution: `1. Vacía la cola desde AdminOps → Oficina → Impresoras → Vaciar cola. Si no se deja:
+    solution: `1. Vacía la cola desde AdminOps → Impresoras y carpetas → Impresoras → Vaciar cola. Si no se deja:
 2. Como administrador, para el servicio, borra los trabajos y vuelve a arrancarlo:
    net stop spooler
    del /Q /F /S "%systemroot%\\System32\\spool\\PRINTERS\\*.*"
@@ -144,12 +144,12 @@ const CATALOG: Builtin[] = [
     title: "El equipo va muy lento desde hace días",
     problem:
       "Tarda en arrancar, las ventanas se abren despacio y todo se queda «pensando». No hay un error concreto.",
-    solution: `1. Lo primero, mira el disco: AdminOps → Diagnóstico. Si el SMART avisa o el disco es mecánico (HDD), esa es la causa casi siempre. Cambiar a SSD lo arregla de verdad; lo demás son parches.
+    solution: `1. Lo primero, mira el disco: AdminOps → Estado del equipo → Diagnóstico. Si el SMART avisa o el disco es mecánico (HDD), esa es la causa casi siempre. Cambiar a SSD lo arregla de verdad; lo demás son parches.
 2. Mira qué consume ahora mismo (AdminOps → Procesos): ordena por disco y por memoria. Antivirus duplicados, OneDrive sincronizando o un proceso al 100 % explican el problema.
-3. Quita lo que arranca solo y no hace falta (AdminOps → Ajustes de Windows → Inicio de Windows).
+3. Quita lo que arranca solo y no hace falta (AdminOps → Optimizar Windows → Inicio de Windows).
 4. Comprueba la memoria: si está al 90 % en reposo con 4 GB, el equipo pide más RAM.
-5. Libera espacio si a C: le queda menos del 15 % (AdminOps → Ajustes de Windows → Limpieza).
-6. Descarta temperatura: si el ventilador va a tope y la CPU pasa de 90 °C, hay que limpiar y cambiar la pasta térmica (AdminOps → Hardware → Temperaturas).
+5. Libera espacio si a C: le queda menos del 15 % (AdminOps → Optimizar Windows → Limpieza).
+6. Descarta temperatura: si el ventilador va a tope y la CPU pasa de 90 °C, hay que limpiar y cambiar la pasta térmica (AdminOps → Estado del equipo → Hardware → Temperaturas en vivo).
 7. Solo después de lo anterior, aplica los ajustes de rendimiento.`,
     tags: ["lento", "rendimiento", "disco"],
     actions: [
@@ -183,10 +183,10 @@ const CATALOG: Builtin[] = [
     title: "Pantallazos azules que se repiten",
     problem:
       "El equipo se reinicia solo con una pantalla azul, a veces con un código (VIDEO_TDR_FAILURE, MEMORY_MANAGEMENT, IRQL_NOT_LESS_OR_EQUAL…).",
-    solution: `1. Apunta el código: AdminOps → Diagnóstico → Estabilidad lo muestra con su explicación. El código dice por dónde empezar.
+    solution: `1. Apunta el código: AdminOps → Estado del equipo → Diagnóstico → Estabilidad lo muestra con su explicación. El código dice por dónde empezar.
 2. Si los pantallazos empezaron tras instalar algo (driver, actualización, programa), desinstálalo o usa un punto de restauración anterior.
 3. Driver gráfico (VIDEO_TDR_FAILURE, nvlddmkm, atikmdag): desinstálalo por completo y pon el del fabricante, no el de Windows Update.
-4. Memoria (MEMORY_MANAGEMENT, PAGE_FAULT): prueba la RAM (AdminOps → Hardware → Prueba de memoria) y, si hay dos módulos, prueba con uno cada vez.
+4. Memoria (MEMORY_MANAGEMENT, PAGE_FAULT): prueba la RAM (AdminOps → Estado del equipo → Hardware → Prueba de memoria) y, si hay dos módulos, prueba con uno cada vez.
 5. Disco (CRITICAL_PROCESS_DIED, INACCESSIBLE_BOOT_DEVICE): revisa el SMART y pasa chkdsk C: /f /r.
 6. Si no hay patrón claro, repara el sistema: DISM /Online /Cleanup-Image /RestoreHealth y después sfc /scannow.
 7. Temperatura y fuente de alimentación: si se reinicia bajo carga (juegos, render), sospecha de calor o de la fuente.`,
@@ -258,10 +258,10 @@ const CATALOG: Builtin[] = [
     problem:
       "Outlook abre la ventana de la contraseña sin parar aunque se escriba bien, o dice que no puede conectar con el servidor.",
     solution: `1. Comprueba que la cuenta funciona en el correo web con la misma contraseña. Si ahí tampoco entra, la contraseña caducó o la cuenta está bloqueada.
-2. Borra las credenciales guardadas: AdminOps → Oficina → Cuentas → Credenciales guardadas, y quita las que empiecen por MicrosoftOffice o MS.Outlook. También en Panel de control → Administrador de credenciales → Credenciales de Windows.
+2. Borra las credenciales guardadas: AdminOps → Usuarios y cuentas → Cuentas → Credenciales guardadas, y quita las que empiecen por MicrosoftOffice o MS.Outlook. También en Panel de control → Administrador de credenciales → Credenciales de Windows.
 3. Cierra Outlook del todo (comprueba en el Administrador de tareas que no quede OUTLOOK.EXE) y vuelve a abrirlo: pedirá la contraseña una vez y la guardará bien.
 4. Si la cuenta tiene verificación en dos pasos, hay que confirmarla en el móvil al entrar.
-5. Si persiste, cierra la sesión de Office en todos los programas (AdminOps → Oficina → Cuentas → Cerrar sesión de Office) y vuelve a entrar.
+5. Si persiste, cierra la sesión de Office en todos los programas (AdminOps → Usuarios y cuentas → Cuentas → Cerrar sesión de Office) y vuelve a entrar.
 6. Como último paso, crea un perfil de Outlook nuevo (Panel de control → Correo → Mostrar perfiles → Agregar).`,
     tags: ["outlook", "correo", "contraseña", "office"],
     actions: [
@@ -286,10 +286,10 @@ const CATALOG: Builtin[] = [
       "En el Administrador de tareas el disco marca 100 % constantemente, aunque no se esté haciendo nada, y el equipo responde a trompicones.",
     solution: `1. Mira qué proceso lo usa (AdminOps → Procesos, ordenado por disco). Lo más común:
    - Antimalware Service Executable: análisis del antivirus. Espera a que acabe o programa el análisis fuera del horario.
-   - SearchIndexer: indexación. Si el equipo es antiguo, desactiva el indexado (AdminOps → Ajustes de Windows → Servicios).
+   - SearchIndexer: indexación. Si el equipo es antiguo, desactiva el indexado (AdminOps → Optimizar Windows → Servicios).
    - SysMain / Superfetch: en discos mecánicos suele empeorar; se puede desactivar.
    - OneDrive / copias de seguridad: sincronización inicial, déjala terminar.
-2. Si ningún proceso destaca pero el disco sigue al 100 %, sospecha del disco: revisa el SMART (AdminOps → Diagnóstico → Discos). Un disco con sectores pendientes da exactamente este síntoma.
+2. Si ningún proceso destaca pero el disco sigue al 100 %, sospecha del disco: revisa el SMART (AdminOps → Estado del equipo → Diagnóstico → Discos). Un disco con sectores pendientes da exactamente este síntoma.
 3. Comprueba el espacio libre: por debajo del 10 % Windows trabaja mucho peor.
 4. En discos mecánicos, comprueba que no esté en modo PIO ni con el driver genérico (Administrador de dispositivos → Controladoras IDE ATA/ATAPI).`,
     tags: ["disco", "100%", "lento", "smart"],
@@ -353,7 +353,7 @@ const CATALOG: Builtin[] = [
 3. Repara el sistema: DISM /Online /Cleanup-Image /RestoreHealth y luego sfc /scannow.
 4. Si empezó tras una actualización o un driver gráfico, arranca en modo seguro (mantén Mayús al pulsar Reiniciar) y desinstálalo.
 5. Descarta el monitor: si hay dos pantallas, pulsa Win+P y prueba las opciones; a veces el escritorio se fue al monitor apagado.
-6. Si nada de lo anterior, usa un punto de restauración anterior al problema (AdminOps → Historial → Puntos de restauración).`,
+6. Si nada de lo anterior, usa un punto de restauración anterior al problema (AdminOps → Estado del equipo → Historial del equipo → Puntos de restauración).`,
     tags: ["pantalla negra", "explorer", "inicio de sesion"],
     actions: [
       {
@@ -385,7 +385,7 @@ const CATALOG: Builtin[] = [
       "Al iniciar sesión con la cuenta del dominio aparece ese mensaje y no deja entrar. Suele ocurrir tras restaurar el equipo de una imagen o después de mucho tiempo apagado.",
     solution: `1. Entra con una cuenta de administrador local del equipo.
 2. Comprueba que el equipo ve al controlador de dominio (ping al nombre del dominio) y que la fecha y hora coinciden: una diferencia de más de 5 minutos rompe la confianza.
-3. Repara la relación sin sacar el equipo del dominio (AdminOps → Oficina → Dominio → Reparar). Equivale a este comando en PowerShell como administrador:
+3. Repara la relación sin sacar el equipo del dominio (AdminOps → Usuarios y cuentas → Dominio → Reparar). Equivale a este comando en PowerShell como administrador:
    Test-ComputerSecureChannel -Repair -Credential (Get-Credential)
    Pide un usuario con permiso para unir equipos al dominio.
 4. Reinicia e inicia sesión con la cuenta del dominio.
@@ -407,8 +407,8 @@ const CATALOG: Builtin[] = [
     title: "El disco C: se llenó y Windows avisa",
     problem:
       "La barra de C: está en rojo, Windows avisa de poco espacio y ya no deja actualizar ni guardar archivos.",
-    solution: `1. Mira qué ocupa de verdad (AdminOps → Equipo → Espacio en disco): ordena por tamaño antes de borrar nada.
-2. Limpieza segura (AdminOps → Ajustes de Windows → Limpieza): temporales, caché de Windows Update y papelera. Suele liberar varios GB.
+    solution: `1. Mira qué ocupa de verdad (AdminOps → Discos → Espacio): ordena por tamaño antes de borrar nada.
+2. Limpieza segura (AdminOps → Optimizar Windows → Limpieza): temporales, caché de Windows Update y papelera. Suele liberar varios GB.
 3. Windows.old: si hay una actualización de versión reciente, ocupa entre 10 y 25 GB y se puede borrar desde la Limpieza de disco (o esperar a que Windows lo haga a los 10 días).
 4. Hibernación: si es un equipo de sobremesa que no hiberna, como administrador:
    powercfg /h off
@@ -481,7 +481,7 @@ const CATALOG: Builtin[] = [
       "Aparece la marca de agua «Activar Windows» y algunas opciones de personalización están bloqueadas.",
     solution: `1. Mira el estado real como administrador:
    slmgr /xpr
-2. Si el equipo es de marca y venía con Windows, la licencia está en la BIOS: AdminOps → Hardware muestra la clave OEM. Normalmente basta con:
+2. Si el equipo es de marca y venía con Windows, la licencia está en la BIOS: AdminOps → Estado del equipo → Hardware muestra la clave OEM. Normalmente basta con:
    Configuración → Sistema → Activación → Solucionar problemas
 3. Si se cambió la placa base, la licencia digital se pierde: hay que reactivarla con la cuenta de Microsoft vinculada (Solucionar problemas → «He cambiado el hardware de este dispositivo recientemente»).
 4. Con licencia por volumen (empresa), comprueba que llega al servidor KMS:
@@ -540,9 +540,9 @@ const CATALOG: Builtin[] = [
     title: "El navegador abre webs raras y tiene barras que no se quitan",
     problem:
       "Se cambió la página de inicio y el buscador, salen anuncios en sitios donde no los había y aparecen extensiones que nadie instaló.",
-    solution: `1. Revisa las extensiones del navegador y quita todo lo que no reconozcas (AdminOps → Seguridad → Extensiones del navegador las lista todas de una vez).
+    solution: `1. Revisa las extensiones del navegador y quita todo lo que no reconozcas (AdminOps → Estado del equipo → Seguridad → Extensiones del navegador las lista todas de una vez).
 2. Comprueba los accesos directos del navegador: clic derecho → Propiedades → Destino. Si después de chrome.exe o msedge.exe hay una dirección web, bórrala.
-3. Mira lo que arranca solo (AdminOps → Seguridad → Elementos que arrancan solos) y las tareas programadas sospechosas.
+3. Mira lo que arranca solo (AdminOps → Estado del equipo → Seguridad → Elementos que arrancan solos) y las tareas programadas sospechosas.
 4. Desinstala programas raros instalados por esas fechas (AdminOps → Aplicaciones → Desinstalar, ordenado por fecha).
 5. Pasa un análisis completo con Microsoft Defender y, además, Malwarebytes en su versión gratuita: detecta adware que el antivirus normal ignora.
 6. Restablece el navegador (Configuración → Restablecer) y comprueba que no haya un proxy puesto: Configuración de Windows → Red → Proxy.
@@ -578,8 +578,8 @@ const CATALOG: Builtin[] = [
     problem:
       "Al conectar por Escritorio remoto da error de que no se puede contactar con el equipo, o pide credenciales y las rechaza.",
     solution: `1. Comprueba que el equipo de destino esté encendido y responda: ping a su nombre o IP.
-2. Comprueba que el puerto 3389 esté abierto (AdminOps → Oficina → Puestos muestra los puertos abiertos de cada equipo).
-3. En el equipo de destino, activa el Escritorio remoto (AdminOps → Oficina → Acceso remoto) y comprueba que el usuario esté en el grupo «Usuarios de escritorio remoto».
+2. Comprueba que el puerto 3389 esté abierto (AdminOps → Puestos muestra los puertos abiertos de cada equipo).
+3. En el equipo de destino, activa el Escritorio remoto (AdminOps → Acceso remoto) y comprueba que el usuario esté en el grupo «Usuarios de escritorio remoto».
 4. Windows Home no permite recibir conexiones de Escritorio remoto: solo salir. Usa AnyDesk o RustDesk en esos equipos.
 5. Si pide credenciales y las rechaza, escribe el usuario con el dominio delante: DOMINIO\\usuario, o EQUIPO\\usuario si es una cuenta local.
 6. Si conecta y se queda en negro, prueba bajando la resolución y desactivando la composición del escritorio en las opciones de la conexión.
@@ -672,7 +672,7 @@ const CATALOG: Builtin[] = [
     title: "La batería del portátil dura muy poco",
     problem:
       "El portátil aguanta mucho menos que antes o se apaga de golpe aunque marque carga.",
-    solution: `1. Mira el desgaste real (AdminOps → Diagnóstico → Batería): compara la capacidad actual con la de fábrica. Por debajo del 60 % la batería está para cambiar y no hay ajuste que lo arregle.
+    solution: `1. Mira el desgaste real (AdminOps → Estado del equipo → Diagnóstico → Batería): compara la capacidad actual con la de fábrica. Por debajo del 60 % la batería está para cambiar y no hay ajuste que lo arregle.
 2. Genera el informe detallado de Windows como administrador:
    powercfg /batteryreport
    Lo guarda en un HTML con el histórico de ciclos y capacidad.

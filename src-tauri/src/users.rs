@@ -611,7 +611,9 @@ mod tests {
     }
 
     /// Solo lectura: lista los usuarios reales de este equipo.
+    /// Equipo real (depende de su estado): `cargo test lists_real_users -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn lists_real_users() {
         let users = list().unwrap();
         assert!(!users.is_empty());

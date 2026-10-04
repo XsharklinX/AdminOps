@@ -294,7 +294,7 @@ function Schedule() {
             </span>
           </div>
           {!user ? (
-            <p className="text-sm text-mute">No hay otras cuentas locales. Crea una cuenta estándar para el menor en Administración → Usuarios locales.</p>
+            <p className="text-sm text-mute">No hay otras cuentas locales. Crea una cuenta estándar para el menor en Administración → Usuarios y cuentas.</p>
           ) : (
             <div className="overflow-x-auto select-none">
               <table className="border-separate border-spacing-[3px]">

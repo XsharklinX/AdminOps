@@ -1,24 +1,18 @@
 import { listen } from "@tauri-apps/api/event";
 import { Responsible } from "./Responsible";
-import { Bell, RotateCw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { alertsApi, type WindowsAlert } from "../lib/api";
+import { Bell, BellOff, ChevronDown, RotateCw, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { logQuietly, alertsApi, workApi, type MutedAlert, type WindowsAlert } from "../lib/api";
+import { type AlertFilter, countByLevel, filterAlerts, groupByDay, LEVEL_LABEL, worstUnread } from "../lib/alerts";
 import { useToast } from "./feedback";
 import type { PageId } from "./Sidebar";
-import { Button, Modal } from "./ui";
+import { Button, iconBtn, Modal } from "./ui";
+import { ago as when, shortDate, timeOfDay } from "../lib/format";
 
 const DOT = { bad: "bg-bad", warn: "bg-warn", info: "bg-mute" } as Record<string, string>;
+const FILTERS: AlertFilter[] = ["all", "bad", "warn", "info"];
 
-function when(ts: number) {
-  const d = new Date(ts * 1000);
-  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (mins < 1) return "ahora";
-  if (mins < 60) return `hace ${mins} min`;
-  if (mins < 24 * 60) return `hace ${Math.floor(mins / 60)} h`;
-  return d.toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
-}
-
-/** Campana de la cabecera: errores de Windows detectados mientras AdminOps está abierta. */
+/** Campana de la cabecera: lo que AdminOps ha detectado en Windows mientras está abierta. */
 export function AlertCenter({
   onNavigate,
   onOpenChange,
@@ -30,8 +24,16 @@ export function AlertCenter({
   openSignal?: number;
 }) {
   const [alerts, setAlerts] = useState<WindowsAlert[]>([]);
+  const [muted, setMuted] = useState<MutedAlert[]>([]);
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [filter, setFilter] = useState<AlertFilter>("all");
+  const [onlyUnread, setOnlyUnread] = useState(false);
+  const [showMuted, setShowMuted] = useState(false);
+  // Plegados o desplegados a mano; lo demás sigue la regla de `isOpen`.
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  // ¿Está la vigilancia activada en Ajustes? (null: aún no se sabe)
+  const [watching, setWatching] = useState<boolean | null>(null);
 
   // Vuelta desde un aviso de Windows: se abre el panel con lo que hay pendiente.
   useEffect(() => {
@@ -42,7 +44,10 @@ export function AlertCenter({
   const toast = useToast();
 
   const load = useCallback(() => {
-    alertsApi.list().then(setAlerts).catch(() => {});
+    alertsApi.list().then(setAlerts).catch(logQuietly("AlertCenter"));
+  }, []);
+  const loadMuted = useCallback(() => {
+    alertsApi.muted().then(setMuted).catch(logQuietly("AlertCenter"));
   }, []);
 
   useEffect(() => {
@@ -70,19 +75,58 @@ export function AlertCenter({
   const show = (v: boolean) => {
     setOpen(v);
     onOpenChange?.(v);
-    if (!v && alerts.some((a) => !a.read)) void alertsApi.markRead().then(load);
+    if (v) {
+      loadMuted();
+      workApi
+        .settings()
+        .then((s) => setWatching(s.watchWindows))
+        .catch(logQuietly("AlertCenter"));
+    } else {
+      setToggled({});
+      if (alerts.some((a) => !a.read)) void alertsApi.markRead().then(load);
+    }
   };
 
   const unread = alerts.filter((a) => !a.read).length;
-  const worst = alerts.find((a) => !a.read && a.level === "bad") ? "bad" : unread ? "warn" : null;
+  const worst = worstUnread(alerts);
+  const counts = useMemo(() => countByLevel(alerts), [alerts]);
+  const groups = useMemo(() => groupByDay(filterAlerts(alerts, filter, onlyUnread)), [alerts, filter, onlyUnread]);
+
+  // Sin leer o grave: desplegado. Lo ya visto queda en una línea.
+  const isOpen = (a: WindowsAlert) => toggled[a.id] ?? (!a.read || a.level === "bad");
+
+  const dismiss = (a: WindowsAlert) => {
+    setAlerts((l) => l.filter((x) => x.id !== a.id));
+    alertsApi
+      .dismiss(a.id)
+      .catch((e) => toast("error", String(e)))
+      .finally(load);
+  };
+  const mute = (a: WindowsAlert) => {
+    setAlerts((l) => l.filter((x) => x.key !== a.key));
+    alertsApi
+      .mute(a.id)
+      .then(() => toast("ok", `«${a.title}» no volverá a avisar en este equipo. Se deshace en «Silenciados».`))
+      .catch((e) => toast("error", String(e)))
+      .finally(() => {
+        load();
+        loadMuted();
+      });
+  };
+  const unmute = (m: MutedAlert) => {
+    alertsApi
+      .unmute(m.key)
+      .then(loadMuted)
+      .catch((e) => toast("error", String(e)));
+  };
 
   return (
     <>
       <button
         onClick={() => show(true)}
         className="relative grid size-8 place-items-center rounded-md text-mute transition-colors hover:bg-panel-2 hover:text-ink"
-        title="Errores de Windows detectados"
-        aria-label={`Avisos de Windows${unread ? `: ${unread} sin leer` : ""}`}
+        title={unread ? `Avisos: ${unread} sin leer` : "Avisos"}
+        aria-label={`Avisos${unread ? `: ${unread} sin leer` : ""}`}
       >
         <Bell size={16} strokeWidth={1.6} />
         {unread > 0 && (
@@ -93,11 +137,16 @@ export function AlertCenter({
       </button>
       {open && (
         <Modal
-          title="Errores de Windows detectados"
+          title="Avisos de este equipo"
           onClose={() => show(false)}
-          width="w-[640px]"
+          width="w-[680px]"
           footer={
             <>
+              {muted.length > 0 && (
+                <button onClick={() => setShowMuted((v) => !v)} className="mr-auto flex items-center gap-1.5 text-xs text-mute hover:text-ink">
+                  <BellOff size={13} /> Silenciados ({muted.length})
+                </button>
+              )}
               <Button
                 kind="ghost"
                 onClick={() => {
@@ -121,46 +170,133 @@ export function AlertCenter({
             </>
           }
         >
+          {watching === false && (
+            <p className="mb-3 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[13px] text-ink">
+              La vigilancia está desactivada: no llegarán avisos nuevos.{" "}
+              <button
+                onClick={() => {
+                  show(false);
+                  onNavigate("settings");
+                }}
+                className="text-neon hover:underline"
+              >
+                Activarla en Ajustes → General
+              </button>
+            </p>
+          )}
+
+          {showMuted && muted.length > 0 && (
+            <div className="mb-4 rounded-lg border border-line bg-panel-2/40 px-3.5 py-3">
+              <div className="mb-1.5 text-xs font-medium text-mute">Silenciados en este equipo: no avisan aunque vuelvan a pasar</div>
+              <ul className="divide-y divide-line">
+                {muted.map((m) => (
+                  <li key={m.key} className="flex items-center gap-3 py-1.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] text-ink">{m.title}</div>
+                      <div className="truncate text-[11px] text-mute">
+                        {m.detail ? `${m.detail} · ` : ""}desde el {shortDate(m.at)}
+                      </div>
+                    </div>
+                    <button onClick={() => unmute(m)} className="shrink-0 text-xs text-neon hover:underline">
+                      Volver a avisar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {alerts.length === 0 ? (
             <p className="py-6 text-center text-sm text-mute">
-              Sin avisos. Mientras AdminOps está abierta, revisa cada minuto el Visor de eventos: pantallazos azules, discos con fallos, programas que se
-              cierran, drivers de vídeo, falta de memoria o de espacio, amenazas, Windows Update…
+              Sin avisos. Mientras AdminOps está abierta, vigila el Visor de eventos: pantallazos azules, discos con fallos, programas que se cierran,
+              drivers de vídeo, falta de memoria o de espacio, amenazas, Windows Update…
             </p>
           ) : (
-            <ul className="space-y-3">
-              {alerts.map((a) => (
-                <li key={a.id} className={`rounded-lg border px-3.5 py-3 ${a.read ? "border-line" : "border-line-2 bg-panel-2/40"}`}>
-                  <div className="flex items-start gap-2.5">
-                    <span className={`mt-1.5 size-2 shrink-0 rounded-full ${DOT[a.level] ?? "bg-mute"}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline gap-x-2">
-                        <span className="text-sm font-medium text-ink">{a.title}</span>
-                        {a.count > 1 && <span className="text-xs text-mute">×{a.count}</span>}
-                        <span className="ml-auto text-xs text-mute">{when(a.time)}</span>
-                      </div>
-                      {a.detail && <div className="truncate font-mono text-[11px] text-dim">{a.detail}</div>}
-                      <p className="mt-1 text-[13px] text-dim">{a.explanation}</p>
-                      <p className="mt-1 text-[13px] text-ink">
-                        <span className="text-mute">Qué hacer: </span>
-                        {a.advice}
-                      </p>
-                      {a.page && (
-                        <button
-                          onClick={() => {
-                            show(false);
-                            onNavigate(a.page as PageId);
-                          }}
-                          className="mt-1.5 text-xs text-neon hover:underline"
-                        >
-                          Ir a revisarlo →
-                        </button>
-                      )}
-                      {a.level !== "info" && a.page && <Responsible topic={a.page} className="mt-1.5" />}
-                    </div>
-                  </div>
-                </li>
+            <>
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                {FILTERS.filter((f) => f === "all" || counts[f] > 0).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    aria-pressed={filter === f}
+                    className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                      filter === f ? "border-neon/50 bg-neon/10 text-neon" : "border-line-2 text-dim hover:text-ink"
+                    }`}
+                  >
+                    {f !== "all" && <span className={`size-1.5 rounded-full ${DOT[f]}`} />}
+                    {f === "all" ? "Todos" : LEVEL_LABEL[f]} <span className="text-mute">{counts[f]}</span>
+                  </button>
+                ))}
+                <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-dim">
+                  <input type="checkbox" checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} className="size-3.5 accent-[var(--color-neon)]" />
+                  Solo sin leer
+                </label>
+              </div>
+
+              {groups.length === 0 && <p className="py-6 text-center text-sm text-mute">Nada con este filtro.</p>}
+
+              {groups.map((g) => (
+                <section key={g.label} className="mb-4 last:mb-0">
+                  <h4 className="mb-1.5 text-[11px] font-medium tracking-wide text-mute uppercase">{g.label}</h4>
+                  <ul className="space-y-2">
+                    {g.items.map((a) => {
+                      const expanded = isOpen(a);
+                      return (
+                        <li key={a.id} className={`group rounded-lg border ${a.read ? "border-line" : "border-line-2 bg-panel-2/40"}`}>
+                          <div className="flex items-start gap-2.5 px-3.5 py-2.5">
+                            <span className={`mt-1.5 size-2 shrink-0 rounded-full ${DOT[a.level] ?? "bg-mute"}`} />
+                            <button
+                              onClick={() => setToggled((t) => ({ ...t, [a.id]: !expanded }))}
+                              aria-expanded={expanded}
+                              className="min-w-0 flex-1 text-left"
+                            >
+                              <div className="flex flex-wrap items-baseline gap-x-2">
+                                <span className={`text-sm text-ink ${a.read ? "" : "font-medium"}`}>{a.title}</span>
+                                {a.count > 1 && <span className="text-xs text-mute">×{a.count}</span>}
+                                <span className="ml-auto text-xs text-mute" title={when(a.time)}>
+                                  {timeOfDay(a.time)}
+                                </span>
+                              </div>
+                              {a.detail && <div className="truncate font-mono text-[11px] text-dim">{a.detail}</div>}
+                            </button>
+                            <div className="flex shrink-0 items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                              <button onClick={() => mute(a)} className={iconBtn} title="No avisar más de esto en este equipo" aria-label="No avisar más de esto en este equipo">
+                                <BellOff size={14} />
+                              </button>
+                              <button onClick={() => dismiss(a)} className={iconBtn} title="Descartar" aria-label="Descartar">
+                                <X size={14} />
+                              </button>
+                            </div>
+                            <ChevronDown size={14} className={`mt-1 shrink-0 text-mute transition-transform ${expanded ? "rotate-180" : ""}`} />
+                          </div>
+                          {expanded && (
+                            <div className="border-t border-line px-3.5 py-2.5 pl-[34px]">
+                              <p className="text-[13px] text-dim">{a.explanation}</p>
+                              <p className="mt-1 text-[13px] text-ink">
+                                <span className="text-mute">Qué hacer: </span>
+                                {a.advice}
+                              </p>
+                              {a.page && (
+                                <button
+                                  onClick={() => {
+                                    show(false);
+                                    onNavigate(a.page as PageId);
+                                  }}
+                                  className="mt-1.5 text-xs text-neon hover:underline"
+                                >
+                                  Ir a revisarlo →
+                                </button>
+                              )}
+                              {a.level !== "info" && a.page && <Responsible topic={a.page} className="mt-1.5" />}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </>
           )}
         </Modal>
       )}

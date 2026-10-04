@@ -7,6 +7,30 @@ Ctrl+K → «paquete de soporte»).
 Hazlo dos veces: **sin administrador** (lo que requiere permisos debe explicarlo, no fallar) y **como
 administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un segundo equipo.
 
+## Discos → Espacio (1.2.3)
+- [ ] Las unidades salen con su barra de ocupación (naranja desde el 75 %, roja desde el 90 %). Doble clic en una la analiza; Intro en el cuadro de ruta también.
+- [ ] Tras analizar C: la barra de colores de arriba reparte el total por tipos y la leyenda suma lo mismo que la carpeta. Al entrar en una carpeta, la barra cambia a lo de esa carpeta.
+- [ ] Pulsar un color (por ejemplo «Vídeo») → en «Archivos» aparece una pestaña con ese nombre y los más grandes de ese tipo, con la carpeta donde está cada uno (sin el nombre del usuario: «Carpeta personal»).
+- [ ] Mapa: un clic señala (borde claro) y enseña la ficha con tamaño, porcentajes, archivos y último cambio. Doble clic entra. La flecha y las migas suben. «Copiar ruta» y «Ver en el Explorador» funcionan.
+- [ ] En Descargas (o cualquier carpeta con muchos archivos sueltos): sale un rectángulo rayado «Archivos sueltos y carpetas pequeñas»; al pulsarlo, la pestaña «De esta carpeta» lista sus archivos de mayor a menor.
+- [ ] Lista: ordenar por «Lo más antiguo» pone arriba lo que lleva más tiempo sin cambios. La casilla marca la carpeta.
+- [ ] Buscar «.iso» o un nombre con tilde escrito sin ella filtra la lista. La casilla de arriba marca todos los de la lista.
+- [ ] La flecha de un archivo («Ir a su carpeta en el mapa») lleva el mapa a su carpeta.
+- [ ] Marcar una carpeta de prueba y dos archivos → abajo «3 marcados · N GB» → «A la papelera»: el aviso nombra los elementos y dice que incluye una carpeta entera. Al aceptar: desaparecen del mapa y de las listas, el total de la carpeta y de las de arriba baja, y la barra de colores cambia, todo sin volver a analizar. Están en la papelera de Windows.
+- [ ] Marcar `C:\Windows`, `C:\Program Files\<algo>` o `C:\Users\<un usuario>` → «A la papelera» se niega y dice desde dónde se quita. No se borra nada de lo marcado.
+- [ ] Con el modo auditoría activo, «A la papelera» no hace nada y lo dice.
+
+## Avisos (campana) y arranque (1.2.3)
+- [ ] Campana: los avisos salen por días (Hoy, Ayer, día de la semana, fecha). Los filtros de nivel solo aparecen si hay avisos de ese nivel y llevan su número. «Solo sin leer» funciona junto al filtro.
+- [ ] Un aviso sin leer o grave sale desplegado; uno leído, en una línea. Pulsarlo lo pliega o despliega.
+- [ ] Al pasar el ratón por un aviso: «Descartar» (la X) quita solo ese. «No avisar más» lo quita con sus repeticiones, sale el mensaje, y aparece «Silenciados (1)» abajo.
+- [ ] Provocar otra vez un aviso silenciado (cerrar a la fuerza el mismo programa) → no llega nada. «Silenciados» → «Volver a avisar» → vuelve a llegar.
+- [ ] Ajustes → General → «Notificaciones de Windows de los avisos»: con «Solo los graves», un aviso amarillo llega a la campana pero no salta notificación; con «Ninguno», ninguna. Con la vigilancia desactivada, el desplegable queda apagado y la campana enseña el aviso con enlace a Ajustes.
+- [ ] 🔌 Arranque desde el pendrive: en Ajustes → Acerca de → rendimiento, `this_place` baja a milisegundos a partir del segundo arranque en la misma red; `latest_findings` baja a milisegundos tras la primera llamada. En el registro, «Consola de PowerShell lista» sale después de «Interfaz lista».
+- [ ] Cambiar de red (Wi-Fi a cable, u otra oficina): las notas del Panel pasan a ser las de la red nueva.
+- [ ] Analizar → el Panel y la barra de arriba enseñan los hallazgos del análisis nuevo, no los del anterior.
+- [ ] Portales: con «precargar» activado, el último portal se precarga unos 20 s después de abrir, no antes.
+
 ## General
 - [ ] Arranca sin avisos raros en la campana ni en Windows Defender.
 - [ ] Ninguna tira de pestañas muestra barra de desplazamiento; con muchas pestañas se desplazan con la rueda.
@@ -27,8 +51,8 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Espacio en disco: «Qué puedes liberar» muestra tamaños reales; la pestaña «Sin usar» lista archivos de más de un año; marcar dos y «A la papelera» los envía y aparecen en la papelera de Windows.
 - [ ] Barra lateral: 7 secciones (Inicio, Equipo, Aplicaciones, Red, Oficina, Soporte, Datos); Oficina tiene 6 páginas.
 - [ ] Barra lateral: el botón de la esquina la acopla a solo iconos y otro la devuelve; arrastrar su borde cambia el ancho y se mantiene al cerrar y abrir; doble clic en el borde lo devuelve al de Ajustes.
-- [ ] Cuentas y dominio tiene las dos pestañas; Impresoras y carpetas también. Desde Ctrl+K, «Unir el equipo a un dominio» abre Cuentas en la pestaña Dominio.
-- [ ] Aplicaciones: pestañas Actualizar, Windows Update, Instalar, Desinstalar y Bloatware. Ajustes de Windows tiene además la pestaña Inicio de Windows. Herramientas tiene Herramientas y Atajos. Sesión de servicio tiene Sesión e Informe. Datos del equipo tiene las cinco pestañas, con Copia de datos primero.
+- [ ] Usuarios y cuentas tiene tres pestañas (Usuarios de este equipo, Cuentas, Dominio); Impresoras y carpetas tiene dos. Desde Ctrl+K, «Unir el equipo a un dominio» abre Usuarios y cuentas en la pestaña Dominio.
+- [ ] Aplicaciones: pestañas Actualizar, Windows Update, Instalar, Desinstalar y Bloatware. Optimizar Windows tiene además la pestaña Inicio de Windows. Herramientas de Windows tiene Herramientas y Atajos. Sesión de servicio tiene Sesión e Informe. Datos del equipo tiene las cinco pestañas, con Copia de datos primero.
 - [ ] Soluciones: con la lista vacía ya aparecen las de AdminOps; buscar «impresora» encuentra la suya; «Duplicar para editarla» crea una copia tuya que sí se puede cambiar y borrar; Ctrl+K encuentra las de AdminOps y abre la correcta.
 - [ ] Ajustes: buscar «diagnostico» (sin tilde) lleva a General y resalta la fila; la sección Portales y correo lista los portales y permite marcar sesión privada; el zoom por defecto se aplica a un portal nuevo.
 - [ ] El «?» junto al título de cada página explica qué hace.
@@ -54,7 +78,7 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Historial: línea de tiempo con filtros y 7/30/90 días.
 
 ## Mantener
-- [ ] Ajustes de Windows: cuatro pestañas; buscar «telemetria» (sin tilde) encuentra el ajuste en Privacidad; borrar la búsqueda vuelve a las pestañas; aplicar y deshacer desde la búsqueda.
+- [ ] Optimizar Windows: cuatro pestañas; buscar «telemetria» (sin tilde) encuentra el ajuste en Privacidad; borrar la búsqueda vuelve a las pestañas; aplicar y deshacer desde la búsqueda.
 
 ## Programas
 - [ ] Actualizaciones: pestañas Programas y Windows Update; «ignorar» una actualización y verla con «(ver)».
@@ -131,6 +155,88 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Buscar en la red: las impresoras salen con nombre y modelo; una que este equipo no había visto nunca también aparece.
 - [ ] En una red sin impresoras: «No se ha visto ninguna», sin colgarse.
 
+## Catálogo de programas (1.1.11)
+- [ ] Aplicaciones → Instalar abre en «Empresa»: no salen Telegram, Discord, Spotify, Steam ni la categoría Juegos. «Todo» los enseña. Lo elegido se recuerda al cerrar y abrir.
+- [ ] «Personalizar»: pulsar un programa lo oculta (tachado, con el ojo cerrado) y volver a pulsarlo lo muestra. «Ocultar categoría» esconde la categoría entera. «Listo» vuelve a la vista normal sin lo oculto. «Mostrar todo otra vez» lo restablece.
+- [ ] Con Zoom oculto, buscar «zoom» lo enseña en «Ocultos que coinciden» y se puede marcar e instalar.
+- [ ] Los filtros de categoría enseñan su cantidad y filtran. «Ocultar los ya instalados» quita los que tienen la etiqueta «instalado».
+- [ ] Están los nuevos: Microsoft 365 Apps, PDF24, OpenVPN, Citrix Workspace, Veeam, KeePass. La lista «Puesto de empresa» selecciona sus 8 programas.
+- [ ] Instalar uno de los nuevos (por ejemplo PDF24) funciona.
+- [ ] En el pendrive, lo oculto se conserva al usarlo en otro equipo.
+
+## Diálogos (1.1.11)
+- [ ] Ajustes → General → «Hacer copia cifrada»: el diálogo se ve entero, centrado en la ventana, con su pie y sus botones.
+- [ ] Lo mismo en: Carpetas compartidas («Quién puede entrar», «¿Por qué no puede entrar?», copia diaria), Usuarios (nuevo, contraseña, eliminar), Acceso remoto (nueva conexión), Sesión, Clientes, Vault.
+- [ ] En Usuarios, con la página desplazada hacia abajo, «Nuevo» abre el diálogo a la vista.
+- [ ] Una confirmación sobre un diálogo: Escape cierra la confirmación y deja el diálogo. Clic fuera cierra.
+- [ ] Ajustes → Navegación → cambiar el icono de una sección: el selector se ve entero.
+- [ ] Con la ventana estrecha, los diálogos no se salen por los lados.
+- [ ] Con el teclado: al abrir un diálogo el foco está dentro; Tab da vueltas sin salir; al cerrarlo, el foco vuelve al botón que lo abrió.
+
+## Diagnóstico: niveles, «Ya lo sé» y análisis rápido (1.2)
+- [ ] Los contadores dicen Urgente, Conviene y Sugerencias. La lista principal solo trae lo urgente y lo que conviene; «Sugerencias de mejora» está plegada debajo. No sale «apps promocionales».
+- [ ] Un equipo de oficina sano: «Nada urgente ni que convenga arreglar: solo sugerencias».
+- [ ] «Ya lo sé» (al pasar el ratón por un hallazgo) → escribir un motivo → pasa a «Aceptados», baja el contador, y el dato de avisos de la barra de arriba y el Panel bajan al momento. Tras volver a analizar sigue aceptado. «Volver a avisar» lo devuelve. En el informe PDF sigue saliendo.
+- [ ] «Rápido»: termina en segundos, enseña el aviso de análisis rápido y «No se pudo comprobar: Análisis rápido…». No aparece en la lista de análisis guardados ni cambia el Panel.
+- [ ] Mientras analiza: una marca por parte (Discos, Estabilidad…) que se pone en verde con sus segundos. Al terminar, una línea con el total y lo que más tardó.
+- [ ] Tarjetas Discos y Sistema y seguridad: resumen y enlace (Salud y reparación, Seguridad). Drivers y Batería siguen completas.
+- [ ] Hallazgos nuevos, donde aplique: Windows en disco mecánico (HDD con la marca «Windows»), Windows 10 sin soporte, disco que se llena (tras varios días de análisis), memoria corta (tras unas horas de historial), errores de disco del registro.
+- [ ] Programas de inicio: con menos de diez de terceros no hay aviso aunque en total sean muchos.
+- [ ] Tras varios días: en la lista de análisis para comparar queda uno por día de los días anteriores; los de hoy y ayer, todos.
+
+## Diagnóstico revisado (1.2)
+- [ ] En un equipo con teclado y ratón USB: en Drivers no sale «Teclado PS/2» ni «Mouse PS/2».
+- [ ] En un equipo sin driver gráfico (Administrador de dispositivos: «Adaptador de pantalla básico de Microsoft»): hallazgo «La tarjeta gráfica no tiene su driver instalado», en ámbar.
+- [ ] Primer análisis tras abrir AdminOps: en «No se pudo comprobar» sale «Programas con actualización pendiente… se añaden solas». Sin tocar nada, en uno o dos minutos desaparece esa línea y aparece (si las hay) el hallazgo de programas por actualizar. El informe hecho después las incluye.
+- [ ] «No se pudo comprobar»: sin administrador, lista temperatura, arranques y volcados con «Hace falta abrir AdminOps como administrador»; con administrador y sin PawnIO, la temperatura dice que falta ese driver y lleva a Hardware.
+- [ ] Estabilidad (tarjeta del diagnóstico): tres cifras, los programas que fallan (sin adminops.exe) y el enlace a «Arranques y cuelgues». Los hallazgos de pantallazos y apagones llevan allí.
+- [ ] Arranques y cuelgues, como administrador, en un equipo con pantallazos: cada uno con su nombre, la explicación y «driver probable: …».
+- [ ] Seguridad en un sobremesa sin BitLocker: el punto sale con el icono de información y no baja la nota. «Ejecución automática de USB» en verde con «Como viene Windows».
+- [ ] Calibrar un cambio de reglas: `ADMINOPS_SNAPSHOTS="carpeta1;carpeta2" cargo test recalibrate -- --ignored --nocapture` dice qué hallazgos dejan de salir y cuáles nuevos, con análisis reales guardados.
+
+## Herramientas de 1.2 (rendimiento, arranques, periféricos, vigilante, espacio)
+- [ ] Estado del equipo → Rendimiento: con AdminOps abierta un rato, la gráfica muestra procesador, memoria y disco; al pasar el ratón dice la hora y el programa que más gastaba. Tramos 6 h, 24 h y 7 días. Los ratos con AdminOps cerrada salen como hueco.
+- [ ] Estado del equipo → Arranques y cuelgues: cifras de arranques, apagones y pantallazos; sin administrador, aviso con «Reiniciar como administrador» en «Cuánto tarda en arrancar»; con administrador, barras de cada arranque.
+- [ ] Estado del equipo → Probar periféricos: pantalla a pantalla completa con los cinco colores (clic o tecla, Esc sale); teclado marca en verde cada tecla (Esc dos veces termina); pitido por el altavoz izquierdo, los dos y el derecho; barra del micrófono se mueve al hablar; cámara en vivo. Al cambiar de pestaña, el micrófono y la cámara se apagan.
+- [ ] Red → Vigilante de la conexión: «Poner en marcha»; quitar el cable o la Wi‑Fi medio minuto: aparece un corte «Sin red» o «El router»; al volver se cierra con su duración. «Copiar resumen» pega un texto con los cortes. «Detener» y volver a ponerlo en marcha seguido no duplica comprobaciones.
+- [ ] Discos → Espacio → Analizar: «Carpetas» se ve como mapa; clic en una carpeta grande entra en ella; «Lista» vuelve a la vista de siempre.
+- [ ] Red → Herramientas de red → Calculadora de red: 192.168.1.37 con 255.255.255.0 da 192.168.1.0/24, 254 equipos; 192.168.2.5 dice «No».
+- [ ] Teams y Correo: la primera vez que se pulsa su icono pregunta (AdminOps, navegador, aplicación; la aplicación sale desactivada si no está instalada). Lo elegido se recuerda y se cambia en Ajustes → Portales y correo.
+- [ ] Al abrir una pantalla que tarda, se ve su silueta (cifras y tarjetas grises) en lugar del círculo girando.
+- [ ] Desinstalar e Inicio de Windows: la segunda vez que se abren, la lista sale al momento.
+- [ ] Impresoras: la lista sale al momento y cuadra con la de Configuración de Windows (predeterminada, cola, sin conexión).
+- [ ] Arranque: Ajustes → Rendimiento de AdminOps → «Lista para usar» del Panel por debajo de 2,5 s en un arranque normal.
+- [ ] Análisis de espacio o prueba de velocidad de más de 20 s con AdminOps en segundo plano: aviso de Windows con su nombre.
+- [ ] Actualizar con AdminOps abierta: abrir el Setup.exe nuevo con AdminOps abierta (y con Teams o el Correo cargados) → «Actualizar»: termina sin pedir reiniciar y la versión nueva abre bien, con Teams y el Correo funcionando.
+- [ ] Desde la app (Ajustes → Actualizaciones, con una versión publicada): al aceptar el aviso de Windows, AdminOps se cierra sola y el instalador actualiza. Si se cancela el aviso, AdminOps sigue abierta.
+
+## Navegación de 1.2
+- [ ] Barra lateral: a la izquierda las áreas (Inicio, Este equipo, Red, Programas, Administración, Soporte); al lado, las pantallas del área con sus secciones debajo. Pulsar una sección (p. ej. Administración → Usuarios y cuentas → Dominio) abre esa pestaña; cambiar de pestaña en la página mueve el resaltado de la barra.
+- [ ] Pulsar dos veces seguidas la misma sección después de haber cambiado de pestaña a mano: vuelve a esa sección.
+- [ ] Al pie de la columna: Herramientas, Bloquear (si hay PIN), Ajustes y el botón de ocultar las pantallas (modo «Solo áreas», con las pantallas del área como pestañas bajo el título).
+- [ ] Barra de arriba: nombre del equipo, «Dominio …» o «Sin dominio», «Administrador» o «Solo lectura», «Internet N ms», «C: N GB libres», avisos. Cada dato lleva a su sitio (dominio → Dominio, disco → Espacio, avisos → Diagnóstico, Internet → Velocidad). Sin Internet, el dato sale en rojo y lleva a Solucionar problemas.
+- [ ] «Solo lectura» (sin administrador) reinicia como administrador al pulsarlo, con la confirmación de Windows.
+- [ ] Teams y Correo se abren desde sus iconos de arriba; no están en la barra lateral.
+- [ ] Marcas: junto a Diagnóstico el número de avisos; junto a Dominio «unido» o «no»; junto a Espacio los GB si queda poco; junto a Red «sin red» sin Internet. El área con algo que atender lleva un punto. Ajustes → Navegación → «Estado al lado de cada sección» las quita.
+- [ ] Chincheta al pasar el ratón por una línea: queda en «Fijados» arriba (también una sección). Se quita igual, o desde Ajustes → Navegación.
+- [ ] Encima del título: área › pantalla › sección, y cada parte lleva a su sitio.
+- [ ] «Todo» (botón, Ctrl+K o F1): sin escribir, fijados, una tarjeta por área con sus pantallas y secciones, y «Siempre a mano». Escribiendo «AD» sale Dominio; «arranque», Inicio de Windows; «no imprime», Impresoras. Flechas e Intro funcionan.
+- [ ] Barra a la derecha (Ajustes → Navegación → Posición): la columna de áreas queda en el borde y el arrastre del ancho funciona.
+- [ ] Una navegación personalizada de antes (Ajustes → Navegación) se conserva; «Restablecer» deja la de 1.2.
+
+## Repaso de 1.1.11 (menú, Ajustes, Ctrl+K, tablas)
+- [ ] Menú: «Optimizar Windows», «Usuarios y cuentas» (tres pestañas: Usuarios de este equipo, Cuentas, Dominio), «Herramientas de Windows». En Red, la pestaña «Herramientas de red»; en Estado del equipo, «Historial del equipo». Preparar equipos está en Administración.
+- [ ] Ajustes: cambiar cualquier cosa (un texto, un interruptor) y esperar: abajo sale «Guardando…» y luego «Guardado». Cambiar y salir enseguida a otra página: al volver, el cambio sigue. Ya no hay barra «Guardar ajustes».
+- [ ] Ctrl+K → escribir «deshacer» o «pendrive»: salen apartados de la guía (etiqueta «Guía»); al elegir uno se abre la ayuda en ese apartado, resaltado.
+- [ ] Novedades: con la versión nueva instalada sobre una anterior, al abrir AdminOps se abre Novedades una vez; al volver a abrir, ya no.
+- [ ] Acceso remoto: al abrir, los equipos salen «Sin comprobar»; el botón de recargar los comprueba; al ir a otra página y volver, se ve lo comprobado.
+- [ ] Carpetas compartidas: la segunda vez que se abre, los tamaños salen al momento con «Tamaños medidos hace…»; el botón de recargar los vuelve a medir.
+- [ ] Sin administrador: Usuarios, Dominio, Discos, Bloatware, Perfiles, Preparar equipos, Cuentas y DNS enseñan el aviso con «Reiniciar como administrador», y el botón pide UAC.
+- [ ] Impresoras, Desinstalar e Inicio de Windows: pulsar la cabecera de una columna ordena; «Revisar» de una impresora abre su resultado bajo la fila; en Desinstalar, seleccionar varios y la reparación al pasar el ratón siguen funcionando.
+- [ ] Inicio de Windows: las rutas no enseñan el nombre del usuario («Carpeta personal\…»).
+- [ ] Panel a media pantalla: las cifras pasan a dos columnas y las secciones a una; nada se sale.
+- [ ] Ajustes → Buscar actualizaciones sin versiones publicadas: dice «Todavía no hay ninguna versión publicada en GitHub…», sin error.
+
 ## Guía, novedades, términos y reportar fallos (1.1.10)
 - [ ] Acerca de (pulsando el logo): cuatro botones. «Guía» abre la ayuda con los capítulos a la izquierda; «Abrir esta pantalla» cierra la ayuda y lleva a esa pantalla y pestaña.
 - [ ] Buscar «deshacer», «pendrive», «pin»: salen apartados de la guía, preguntas y glosario. Sin tildes también encuentra.
@@ -143,9 +249,17 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Ya no hay nada de Microsoft 365: ni en Ajustes → Portales y correo, ni en Personas, ni el icono de Outlook en la Agenda, ni puntos de presencia en Contactos, ni «Avisar por Teams» al cerrar un caso. El Correo y Teams siguen abriendo.
 - [ ] Una agenda guardada con visitas que estaban en Outlook sigue abriendo y editándose con normalidad.
 - [ ] Importar un archivo de empresa antiguo (con Microsoft 365 dentro): importa lo demás sin error.
+- [ ] Tickets: añadir un portal con una dirección y cargarlo; desde la página se puede ir a cualquier otro sitio sin que se abra el navegador de fuera; escribir otra dirección en la barra navega dentro. Guardar un segundo portal y cambiar entre los dos. Iniciar sesión en la intranet funciona.
+- [ ] Inventario web: lo mismo. El panel de datos del equipo sigue apareciendo al lado.
+- [ ] El Correo y Teams siguen abriendo y entrando como antes.
+- [ ] Barra lateral de fábrica: Inicio, Equipo (con Red y Datos del equipo dentro), Soporte (Agenda, Teams, Correo, Contactos, Tickets, Inventario, Personas y clientes, Soluciones), Aplicaciones y Administración (con Puestos). Ctrl+K «Inventario web» y «Comprobar puestos» llevan a su sitio.
+- [ ] Con una barra personalizada de antes: sigue como estaba, e Inventario aparece en Soporte. «Restablecer toda la navegación» deja el orden nuevo.
+- [ ] Ajustes → Informes y cobros → «Tu plantilla de informe»: quitar secciones, cambiar el orden, guardar. Al generar un informe con esa plantilla, el PDF lleva solo esas secciones y en ese orden. Las dos plantillas de fábrica salen igual que antes.
+- [ ] Historial → Diario → Exportar PDF: pide dónde guardar y abre un PDF con todos los cambios. Con el filtro «Con error», exporta solo esos. Exportar Excel: el .csv abre en Excel con tildes.
+- [ ] Ajustes → General → Actualizaciones → «Buscar ahora»: sin versiones publicadas dice «Todavía no hay ninguna versión publicada». Con una versión nueva publicada con su `-Setup.exe`: «Descargar e instalar» muestra el progreso, se puede cancelar, y abre el instalador. En el portable deja el .zip en Descargas. En modo auditoría se bloquea.
 
 ## Lavado de cara (1.1.9)
-- [ ] Usuarios locales: las cuatro cifras cuadran; pulsar «Con algo que revisar» filtra. Una cuenta sin contraseña sale con el punto de color y, en la ficha, el aviso con «Cambiar contraseña». Buscar por nombre. Los botones apagados dicen por qué al pasar el ratón (único administrador, sesión iniciada…). Al borrar a alguien, la ficha pasa a otra cuenta.
+- [ ] Usuarios y cuentas → Usuarios de este equipo: las cuatro cifras cuadran; pulsar «Con algo que revisar» filtra. Una cuenta sin contraseña sale con el punto de color y, en la ficha, el aviso con «Cambiar contraseña». Buscar por nombre. Los botones apagados dicen por qué al pasar el ratón (único administrador, sesión iniciada…). Al borrar a alguien, la ficha pasa a otra cuenta.
 - [ ] Procesos: agrupado, Chrome/Edge salen una vez con «× N»; la flecha enseña sus procesos. «Finalizar el programa» los cierra todos. Los dos avisos de arriba (CPU y memoria) seleccionan el programa. Quitar «Agrupar por programa» vuelve a la lista de siempre y se recuerda. Ordenar por cada columna.
 - [ ] Acceso remoto: escribir un equipo y Enter conecta. Las fichas guardadas enseñan «Contesta · N ms» o «No contesta» con el motivo; el botón de recargar vuelve a comprobar. Con más de 6, aparece el buscador.
 - [ ] Sesión de servicio: empieza en «Motivo»; con el motivo escrito, al volver abre en «Trabajo». Cada paso enseña lo que lleva (3/8, «Apuntado», «Sin cobro»…). «Firma y cierre» avisa de lo que falta y genera el informe. Descartar sigue pidiendo confirmación.

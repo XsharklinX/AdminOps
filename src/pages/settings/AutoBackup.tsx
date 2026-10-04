@@ -7,10 +7,11 @@ import { CloudUpload, FolderOpen, Loader2, RefreshCw, TriangleAlert } from "luci
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
 import { Button, Card, inputClass } from "../../components/ui";
-import { autoBackupApi, disksApi, type AutoBackupInfo } from "../../lib/api";
+import { logQuietly, autoBackupApi, disksApi, type AutoBackupInfo } from "../../lib/api";
 import { withoutUserPaths } from "../../lib/errors";
+import { fullDate } from "../../lib/format";
 
-const when = (t: number | null) => (t ? new Date(t * 1000).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" }) : "nunca");
+const when = (t: number | null) => (t ? fullDate(t) : "nunca");
 
 export function AutoBackup() {
   const [info, setInfo] = useState<AutoBackupInfo | null>(null);
@@ -31,7 +32,7 @@ export function AutoBackup() {
           setEvery(i.everyDays);
           setKeep(i.keep);
         })
-        .catch(() => {}),
+        .catch(logQuietly("AutoBackup")),
     [],
   );
   useEffect(() => {

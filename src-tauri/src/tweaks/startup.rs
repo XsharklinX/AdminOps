@@ -249,6 +249,19 @@ fn list() -> Result<Vec<StartupItem>, String> {
     Ok(items)
 }
 
+/// Lo que arranca con Windows: los nombres (para el informe) y cuántos son de
+/// terceros. Lo de Microsoft (OneDrive, Seguridad, Teams…) viene con Windows u
+/// Office: lo que alarga el arranque y se puede quitar es lo demás.
+pub fn enabled_overview() -> Result<(Vec<String>, usize), String> {
+    let items: Vec<StartupItem> = list()?.into_iter().filter(|i| i.enabled).collect();
+    let third_party = items.iter().filter(|i| !is_microsoft(i.publisher.as_deref())).count();
+    Ok((items.into_iter().map(|i| i.description.unwrap_or(i.name)).collect(), third_party))
+}
+
+fn is_microsoft(publisher: Option<&str>) -> bool {
+    publisher.is_some_and(|p| p.to_lowercase().starts_with("microsoft"))
+}
+
 /// Nombres visibles de lo que arranca con Windows (para el informe).
 pub fn enabled_names() -> Result<Vec<String>, String> {
     Ok(list()?.into_iter().filter(|i| i.enabled).map(|i| i.description.unwrap_or(i.name)).collect())

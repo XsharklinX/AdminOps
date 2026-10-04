@@ -6,11 +6,19 @@ import { FAQ, GLOSSARY, GUIDE, type FaqEntry, type GlossaryEntry, type GuideChap
 export type HelpTab = "guide" | "glossary" | "faq" | "news" | "terms" | "report";
 
 let current: HelpTab | null = null;
+/** Apartado de la guía al que llevar al abrirla (un objeto nuevo cada vez, para que se note). */
+let focus: { chapter: string; topic: string } | null = null;
 let subs: (() => void)[] = [];
 
 export function openHelp(tab: HelpTab = "guide") {
   current = tab;
   subs.forEach((s) => s());
+}
+
+/** Abre la guía por un apartado concreto (desde Ctrl+K). */
+export function openHelpTopic(chapter: string, topic: string) {
+  focus = { chapter, topic };
+  openHelp("guide");
 }
 
 export function closeHelp() {
@@ -27,6 +35,8 @@ const subscribe = (cb: () => void) => {
 
 /** La pestaña abierta, o null si la ayuda está cerrada. */
 export const useHelp = () => useSyncExternalStore(subscribe, () => current);
+/** El apartado de la guía que se ha pedido abrir, si lo hay. */
+export const useHelpFocus = () => useSyncExternalStore(subscribe, () => focus);
 
 /** A dónde llegan los avisos de fallos (el mismo que usa el programa al preparar el correo). */
 export const SUPPORT_EMAIL = "Contactoyerlindavid@gmail.com";

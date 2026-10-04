@@ -3,11 +3,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "../components/contacts/Avatar";
 import { useToast } from "../components/feedback";
 import { Button, EmptyLine, EmptyState, ErrorState, Loading, Modal, Tile, inputClass } from "../components/ui";
-import { bytes } from "../lib/format";
+import { bytes, ago, dateTime } from "../lib/format";
 import { usersApi, type LocalUser, type NewUser } from "../lib/api";
 import { WindowsTools } from "../components/WindowsTools";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { userIssues, worstIssue, type UserIssue } from "../lib/userIssues";
+import { NeedsAdmin } from "../components/AdminBanner";
 
 type Action = "delete" | "disable" | "enable" | "demote" | "promote" | "password" | "rename";
 
@@ -42,19 +43,10 @@ function nameError(name: string): string | null {
   return null;
 }
 
-const when = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" }) : null;
+const when = (iso: string | null) => (iso ? dateTime(iso) : null);
 
 /** «hace 3 días», para la lista: la fecha exacta está en la ficha. */
-function ago(iso: string | null): string | null {
-  if (!iso) return null;
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return "hoy";
-  if (days === 1) return "ayer";
-  if (days < 60) return `hace ${days} días`;
-  if (days < 730) return `hace ${Math.floor(days / 30)} meses`;
-  return `hace ${Math.floor(days / 365)} años`;
-}
+const agoOrNull = (iso: string | null) => (iso ? ago(iso) : null);
 
 type Filter = "all" | "admins" | "disabled" | "review";
 
@@ -139,11 +131,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
 
       {failed && <ErrorState message={failed} onRetry={() => void load()} />}
 
-      {!isAdmin && (
-        <p className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
-          <TriangleAlert size={13} className="shrink-0" /> Sin administrador solo puedes ver los usuarios. Para crearlos o modificarlos, reinicia AdminOps como administrador.
-        </p>
-      )}
+      {!isAdmin && <NeedsAdmin>Sin administrador solo puedes ver los usuarios: crearlos o modificarlos requiere administrador.</NeedsAdmin>}
 
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 @3xl:col-span-5">
@@ -186,7 +174,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
                             {u.admin && <ShieldCheck size={12} className="shrink-0 text-neon" aria-label="Administrador" />}
                           </span>
                           <span className="block truncate text-[11px] text-mute">
-                            {!u.enabled ? "Desactivada" : u.signedIn ? "Sesión iniciada" : ago(u.lastLogon) ? `Entró ${ago(u.lastLogon)}` : u.hasProfile ? "Sin fecha de último inicio" : "Nunca ha entrado"}
+                            {!u.enabled ? "Desactivada" : u.signedIn ? "Sesión iniciada" : agoOrNull(u.lastLogon) ? `Entró ${agoOrNull(u.lastLogon)}` : u.hasProfile ? "Sin fecha de último inicio" : "Nunca ha entrado"}
                           </span>
                         </span>
                         {worst && <span className={`size-2 shrink-0 rounded-full ${worst === "bad" ? "bg-bad" : "bg-warn"}`} title="Tiene algo que revisar" />}

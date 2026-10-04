@@ -36,6 +36,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { section: "general", title: "Precargar los portales", keywords: "tickets inventario correo teams rapido" },
   { section: "general", title: "Diagnosticar al abrir AdminOps", keywords: "diagnostico automatico analisis" },
   { section: "general", title: "Vigilar errores de Windows", keywords: "avisos eventos campana pantallazos" },
+  { section: "general", title: "Notificaciones de Windows de los avisos", keywords: "notificacion campana graves silenciar molestar" },
   { section: "general", title: "Avisar al terminar tareas largas", keywords: "notificacion tareas" },
   { section: "general", title: "Punto de restauración antes de cambiar el sistema", keywords: "restaurar seguridad deshacer" },
   { section: "general", title: "Abrir AdminOps al iniciar Windows", keywords: "arranque automatico inicio" },
@@ -57,13 +58,13 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   // Navegación
   { section: "navigation", title: "Atajos para abrir páginas", keywords: "teclado combinacion ctrl propios" },
   { section: "navigation", title: "Estructura", keywords: "secciones paginas ocultar ordenar areas renombrar icono" },
-  { section: "navigation", title: "Barra lateral", keywords: "ancho posicion iconos densidad acoplar" },
-  { section: "navigation", title: "Comportamiento", keywords: "secciones desplegadas pestañas bajo el titulo al pulsar" },
-  { section: "navigation", title: "Accesos rápidos en la barra", keywords: "favoritos recientes" },
+  { section: "navigation", title: "Barra lateral", keywords: "ancho posicion iconos densidad acoplar solo areas estado marcas buscador al pulsar un area" },
+  { section: "navigation", title: "Accesos rápidos en la barra", keywords: "favoritos fijados chincheta recientes" },
   // Portales
   { section: "portals", title: "Cómo se abren los portales", keywords: "precargar cerrar zoom tickets correo teams" },
   { section: "portals", title: "Precargar el último portal", keywords: "rapido tickets correo teams inventario" },
   { section: "portals", title: "Zoom de los portales", keywords: "tamaño letra web" },
+  { section: "portals", title: "Cómo se abren Teams y el Correo", keywords: "navegador aplicacion outlook teams abrir fuera preguntar" },
   { section: "portals", title: "Dominio de la empresa", keywords: "intranet cuenta windows autenticacion integrada" },
   { section: "portals", title: "Portales configurados", keywords: "tickets inventario correo teams web sesion privada privacidad rellenar inicio de sesion cuenta guardada" },
   // Seguridad
@@ -73,6 +74,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { section: "reports", title: "Tu marca en los informes", keywords: "empresa telefono correo web logotipo" },
   { section: "reports", title: "Logo", keywords: "imagen marca" },
   { section: "reports", title: "Checklist de servicio", keywords: "visita pasos" },
+  { section: "reports", title: "Tu plantilla de informe", keywords: "secciones orden pdf personalizar propia quitar informe" },
   { section: "reports", title: "Tipos de visita", keywords: "checklist propia mantenimiento instalacion sesion" },
   { section: "reports", title: "Tu firma", keywords: "firmar informe" },
   { section: "reports", title: "Presupuestos, recibos y garantías", keywords: "impuesto itbis iva numeracion mantenimiento" },

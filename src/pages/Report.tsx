@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { BillingEditor, SendReportModal, TemplatePicker } from "../components/service";
 import { Button, Card, inputClass, Loading } from "../components/ui";
-import { diagApi, EMPTY_BILLING, tweaksApi, workApi, type Billing, type Client, type Settings, type SnapshotInfo, type Template } from "../lib/api";
+import { logQuietly, diagApi, EMPTY_BILLING, tweaksApi, workApi, type Billing, type Client, type Settings, type SnapshotInfo, type Template } from "../lib/api";
+import { dateTime as when } from "../lib/format";
 
 const TECH_KEY = "adminops.technician";
 
@@ -14,8 +15,6 @@ function readTech() {
     return "";
   }
 }
-
-const when = (ts: number) => new Date(ts * 1000).toLocaleString("es", { dateStyle: "medium", timeStyle: "medium" });
 
 export function Report() {
   const [snapshots, setSnapshots] = useState<SnapshotInfo[] | null>(null);
@@ -50,11 +49,11 @@ export function Report() {
     void workApi
       .clients()
       .then(setClients)
-      .catch(() => {});
+      .catch(logQuietly("Report"));
     workApi.settings().then((s) => {
       setSettings(s);
       setTechnician((t) => t || s.technician);
-    }).catch(() => {});
+    }).catch(logQuietly("Report"));
   }, []);
 
   const picked = clients.find((c) => c.id === clientId) ?? null;
@@ -161,7 +160,7 @@ export function Report() {
           )}
           <div>
             <span className="mb-1 block text-xs text-dim">Tipo de informe</span>
-            <TemplatePicker value={template} onChange={setTemplate} />
+            <TemplatePicker value={template} onChange={setTemplate} custom={settings?.reportLayout?.name} />
           </div>
           {text("Motivo de la visita", problem, setProblem, "Lo que cuenta el cliente: va lento, no enciende, virus…", 2)}
           {text("Observaciones del técnico", notes, setNotes, "Qué se encontró y qué se hizo, piezas cambiadas…", 4)}

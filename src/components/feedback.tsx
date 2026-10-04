@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { AlertTriangle, CheckCircle2, Info, Loader2, Undo2, X, XCircle } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { tweaksApi } from "../lib/api";
+import { Overlay } from "./ui";
 import { notifyJournalChange } from "../lib/journalEvents";
 
 // ---------- Toasts ----------
@@ -141,9 +142,9 @@ export function ConfirmDialog({
 }) {
   if (!options) return null;
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/55" onClick={() => onClose(false)}>
+    <Overlay onClose={() => onClose(false)} z="z-50" label={typeof options.title === "string" ? options.title : undefined}>
       <div
-        className="w-[440px] rounded-xl border border-line-2 bg-panel p-5 shadow-2xl"
+        className="w-[440px] max-w-full rounded-xl border border-line-2 bg-panel p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center gap-2.5">
@@ -171,7 +172,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }
 

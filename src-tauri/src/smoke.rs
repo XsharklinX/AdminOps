@@ -79,7 +79,7 @@ mod tests {
         // 1.1.2
         check("ficha del equipo", &mut f, crate::sheet::machine_sheet);
         check("este equipo y esta red (notas)", &mut f, || {
-            let p = crate::library::this_place();
+            let p = crate::library::place_uncached();
             if p.machine.is_empty() { Err("sin clave de equipo") } else { Ok(p) }
         });
         check("comprobar puestos (este equipo)", &mut f, || crate::stations::check_stations(vec!["127.0.0.1".into()], false));

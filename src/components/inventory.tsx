@@ -1,6 +1,7 @@
 import { MonitorSmartphone, Power } from "lucide-react";
 import { officeApi, type Machine, type MachineInventory } from "../lib/api";
 import { useToast } from "./feedback";
+import { iconBtn } from "./ui";
 
 export const VERDICT: Record<MachineInventory["verdict"], { label: string; cls: string }> = {
   ok: { label: "Bien", cls: "bg-ok/10 text-ok" },
@@ -22,7 +23,6 @@ export function VerdictChip({ inv }: { inv: MachineInventory | null }) {
 export function MachineActions({ machine }: { machine: Machine }) {
   const toast = useToast();
   const inv = machine.inventory;
-  const btn = "rounded-md p-1.5 text-mute transition-colors hover:bg-panel-2 hover:text-ink";
   return (
     <span className="inline-flex gap-0.5">
       {inv?.mac && (
@@ -33,13 +33,13 @@ export function MachineActions({ machine }: { machine: Machine }) {
               .then(() => toast("ok", `Señal de encendido enviada a ${machine.host}.`))
               .catch((e) => toast("error", String(e)))
           }
-          className={btn}
+          className={iconBtn}
           title="Encender por la red (Wake-on-LAN). El equipo debe estar en esta misma red y tenerlo activado."
         >
           <Power size={14} />
         </button>
       )}
-      <button onClick={() => officeApi.rdp(inv?.ip || machine.host).catch((e) => toast("error", String(e)))} className={btn} title="Conectar por Escritorio remoto">
+      <button onClick={() => officeApi.rdp(inv?.ip || machine.host).catch((e) => toast("error", String(e)))} className={iconBtn} title="Conectar por Escritorio remoto">
         <MonitorSmartphone size={14} />
       </button>
     </span>

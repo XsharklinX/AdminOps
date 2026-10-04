@@ -47,10 +47,138 @@ $r = @(Get-CimInstance Win32_Printer -ErrorAction Stop | ForEach-Object {
 ConvertTo-Json -InputObject $r -Compress
 "#;
 
+/// Impresoras de software: PDF, XPS, OneNote y Fax (por su puerto o su driver).
+fn is_virtual(port: &str, driver: &str) -> bool {
+    let port = port.to_ascii_uppercase();
+    let driver = driver.to_ascii_lowercase();
+    ["PORTPROMPT:", "NUL:", "SHRFAX:", "XPSPORT:"].iter().any(|p| port.starts_with(p))
+        || ["microsoft print to pdf", "microsoft xps document writer", "onenote", "fax"].iter().any(|d| driver.contains(d))
+}
+
+/// Qué le pasa, según los bits de estado del spooler (los mismos textos que con WMI).
+fn status_error(status: u32) -> Option<&'static str> {
+    const PAPER_JAM: u32 = 0x8;
+    const PAPER_OUT: u32 = 0x10;
+    const PAPER_PROBLEM: u32 = 0x40;
+    const OUTPUT_BIN_FULL: u32 = 0x800;
+    const NO_TONER: u32 = 0x40000;
+    const TONER_LOW: u32 = 0x20000;
+    const USER_INTERVENTION: u32 = 0x100000;
+    const DOOR_OPEN: u32 = 0x400000;
+    const ERROR: u32 = 0x2;
+    [
+        (PAPER_JAM, "Atasco de papel"),
+        (PAPER_OUT, "Sin papel"),
+        (DOOR_OPEN, "Puerta abierta"),
+        (NO_TONER, "Sin tóner"),
+        (TONER_LOW, "Poco tóner"),
+        (OUTPUT_BIN_FULL, "Bandeja de salida llena"),
+        (PAPER_PROBLEM, "Problema con el papel"),
+        (USER_INTERVENTION, "Requiere atención"),
+        (ERROR, "Otro error"),
+    ]
+    .iter()
+    .find(|(bit, _)| status & bit != 0)
+    .map(|(_, t)| *t)
+}
+
+/// Código como el de Win32_Printer.PrinterStatus, que es lo que entiende la interfaz.
+fn status_code(status: u32, offline: bool) -> u32 {
+    const PAUSED: u32 = 0x1;
+    const PRINTING: u32 = 0x400;
+    const WARMING_UP: u32 = 0x10000;
+    if offline {
+        7
+    } else if status & PRINTING != 0 {
+        4
+    } else if status & WARMING_UP != 0 {
+        5
+    } else if status & PAUSED != 0 {
+        6
+    } else {
+        3
+    }
+}
+
+unsafe fn wstr(p: *const u16) -> Option<String> {
+    if p.is_null() {
+        return None;
+    }
+    let mut n = 0;
+    while *p.add(n) != 0 {
+        n += 1;
+    }
+    let s = String::from_utf16_lossy(std::slice::from_raw_parts(p, n));
+    (!s.is_empty()).then_some(s)
+}
+
+/// La lista leyendo el spooler directamente (milisegundos, sin PowerShell).
+fn list_native() -> Result<Vec<Printer>, String> {
+    use windows_sys::Win32::Graphics::Printing::{EnumPrintersW, GetDefaultPrinterW, PRINTER_INFO_2W};
+    const ENUM_LOCAL: u32 = 0x2;
+    const ENUM_CONNECTIONS: u32 = 0x4;
+    const ATTR_SHARED: u32 = 0x8;
+    const ATTR_NETWORK: u32 = 0x10;
+    const ATTR_WORK_OFFLINE: u32 = 0x400;
+    const STATUS_OFFLINE: u32 = 0x80;
+    const STATUS_NOT_AVAILABLE: u32 = 0x1000;
+
+    let default = unsafe {
+        let mut len: u32 = 0;
+        GetDefaultPrinterW(std::ptr::null_mut(), &mut len);
+        let mut buf = vec![0u16; len.max(1) as usize];
+        if len > 0 && GetDefaultPrinterW(buf.as_mut_ptr(), &mut len) != 0 {
+            wstr(buf.as_ptr())
+        } else {
+            None
+        }
+    };
+    let flags = ENUM_LOCAL | ENUM_CONNECTIONS;
+    let (mut needed, mut count) = (0u32, 0u32);
+    unsafe { EnumPrintersW(flags, std::ptr::null(), 2, std::ptr::null_mut(), 0, &mut needed, &mut count) };
+    if needed == 0 {
+        return Ok(Vec::new());
+    }
+    // u64 para que el búfer quede alineado para PRINTER_INFO_2W.
+    let mut buf = vec![0u64; (needed as usize).div_ceil(8)];
+    let ok = unsafe { EnumPrintersW(flags, std::ptr::null(), 2, buf.as_mut_ptr().cast(), needed, &mut needed, &mut count) };
+    if ok == 0 {
+        return Err(format!("Windows no dio la lista de impresoras (error {}).", std::io::Error::last_os_error()));
+    }
+    let items = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const PRINTER_INFO_2W, count as usize) };
+    let mut out = Vec::with_capacity(items.len());
+    for it in items {
+        let Some(name) = (unsafe { wstr(it.pPrinterName) }) else { continue };
+        let driver = unsafe { wstr(it.pDriverName) };
+        let port = unsafe { wstr(it.pPortName) };
+        let offline = it.Attributes & ATTR_WORK_OFFLINE != 0 || it.Status & (STATUS_OFFLINE | STATUS_NOT_AVAILABLE) != 0;
+        out.push(Printer {
+            is_virtual: is_virtual(port.as_deref().unwrap_or(""), driver.as_deref().unwrap_or("")),
+            default: default.as_deref().is_some_and(|d| d.eq_ignore_ascii_case(&name)),
+            network: it.Attributes & ATTR_NETWORK != 0 || name.starts_with("\\\\"),
+            shared: it.Attributes & ATTR_SHARED != 0,
+            status: status_code(it.Status, offline),
+            error: status_error(it.Status).map(String::from),
+            jobs: it.cJobs,
+            offline,
+            name,
+            driver,
+            port,
+        });
+    }
+    Ok(out)
+}
+
 #[tauri::command(async)]
 pub fn list_printers() -> Result<Vec<Printer>, String> {
-    let out = crate::ps::powershell_opts(LIST_SCRIPT, crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: None })?;
-    let mut v: Vec<Printer> = serde_json::from_str(&out).map_err(|e| format!("Respuesta inesperada: {e}"))?;
+    let mut v = match list_native() {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!("Impresoras: {e}; se lee con PowerShell");
+            let out = crate::ps::powershell_opts(LIST_SCRIPT, crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: None })?;
+            serde_json::from_str(&out).map_err(|e| format!("Respuesta inesperada: {e}"))?
+        }
+    };
     v.sort_by_key(|p| (p.is_virtual, !p.default, p.name.to_lowercase()));
     Ok(v)
 }
@@ -385,11 +513,41 @@ mod tests {
     use super::*;
 
     /// Solo lectura: lista las impresoras reales.
+    /// Equipo real (depende de su estado): `cargo test lists_real_printers -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn lists_real_printers() {
         let v = super::list_printers().unwrap();
         println!("{v:#?}");
         assert!(v.iter().any(|p| p.is_virtual), "Microsoft Print to PDF suele existir siempre");
+    }
+
+    /// La lista nativa y la de PowerShell dicen lo mismo de cada impresora.
+    /// Equipo real: `cargo test native_matches_wmi -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn native_matches_wmi() {
+        let t = std::time::Instant::now();
+        let native = super::list_native().unwrap();
+        println!("nativa: {:?}", t.elapsed());
+        let out = crate::ps::powershell(super::LIST_SCRIPT).unwrap();
+        let wmi: Vec<Printer> = serde_json::from_str(&out).unwrap();
+        for p in &wmi {
+            let n = native.iter().find(|n| n.name == p.name).unwrap_or_else(|| panic!("falta {}", p.name));
+            assert_eq!((n.default, n.is_virtual, n.shared, n.jobs), (p.default, p.is_virtual, p.shared, p.jobs), "{}", p.name);
+        }
+    }
+
+    #[test]
+    fn virtual_and_status_bits() {
+        assert!(super::is_virtual("PORTPROMPT:", "Microsoft Print To PDF"));
+        assert!(super::is_virtual("nul:", "Send to Microsoft OneNote 16 Driver"));
+        assert!(!super::is_virtual("IP_192.168.1.30", "HP LaserJet Pro M404"));
+        assert_eq!(super::status_error(0x8), Some("Atasco de papel"));
+        assert_eq!(super::status_error(0), None);
+        assert_eq!(super::status_code(0x400, false), 4);
+        assert_eq!(super::status_code(0, true), 7);
+        assert_eq!(super::status_code(0, false), 3);
     }
 
     #[test]

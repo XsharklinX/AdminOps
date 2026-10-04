@@ -16,22 +16,9 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, EmptyState, inputClass, Loading, Modal } from "../components/ui";
-import {
-  appsApi,
-  diagApi,
-  domainApi,
-  libraryApi,
-  profilesApi,
-  sheetApi,
-  systemApi,
-  tweaksApi,
-  usersApi,
-  type AppCatalog,
-  type ProfileView,
-  type Recipe,
-  type RecipeStep,
-} from "../lib/api";
+import { logQuietly, appsApi, diagApi, domainApi, libraryApi, profilesApi, sheetApi, systemApi, tweaksApi, usersApi, type AppCatalog, type ProfileView, type Recipe, type RecipeStep } from "../lib/api";
 import { norm } from "../lib/contacts";
+import { NeedsAdmin } from "../components/AdminBanner";
 
 type Kind = RecipeStep["kind"];
 
@@ -108,7 +95,7 @@ export function Recipes({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
+    <div className="mx-auto max-w-6xl space-y-4 p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-dim">
           Una plantilla reúne todo lo que haces en un equipo nuevo (quitar bloatware, instalar programas, crear el usuario, unir al dominio…) para hacerlo de una
@@ -118,7 +105,7 @@ export function Recipes({ isAdmin }: { isAdmin: boolean }) {
           <Plus size={14} /> Nueva plantilla
         </Button>
       </div>
-      {!isAdmin && <p className="rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-sm text-warn">Para preparar un equipo con una plantilla hay que abrir AdminOps como administrador.</p>}
+      {!isAdmin && <NeedsAdmin>Preparar un equipo con una plantilla requiere administrador.</NeedsAdmin>}
       {list === null ? (
         <Loading />
       ) : list.length === 0 ? (
@@ -188,9 +175,9 @@ function RecipeEditor({ initial, onClose, onSaved }: { initial: Recipe; onClose:
   const toast = useToast();
 
   useEffect(() => {
-    appsApi.catalog().then(setCatalog).catch(() => {});
-    profilesApi.list().then(setProfiles).catch(() => {});
-    tweaksApi.index().then(setTweaks).catch(() => {});
+    appsApi.catalog().then(setCatalog).catch(logQuietly("Recipes"));
+    profilesApi.list().then(setProfiles).catch(logQuietly("Recipes"));
+    tweaksApi.index().then(setTweaks).catch(logQuietly("Recipes"));
   }, []);
 
   const setStep = (i: number, s: RecipeStep) => setR((x) => ({ ...x, steps: x.steps.map((y, j) => (j === i ? s : y)) }));
@@ -311,7 +298,7 @@ function RecipeEditor({ initial, onClose, onSaved }: { initial: Recipe; onClose:
     <Modal
       title={r.id ? "Editar plantilla" : "Nueva plantilla"}
       onClose={onClose}
-      width="w-[760px] max-w-[95vw]"
+      width="w-[760px]"
       footer={
         <>
           <Button kind="ghost" onClick={onClose}>
@@ -429,7 +416,7 @@ function RecipeRunner({ recipe, onClose }: { recipe: Recipe; onClose: () => void
     <Modal
       title={`Preparar el equipo · ${recipe.name}`}
       onClose={phase === "run" ? () => {} : onClose}
-      width="w-[640px] max-w-[95vw]"
+      width="w-[640px]"
       footer={
         phase === "ask" ? (
           <>

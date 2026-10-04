@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useToast } from "../components/feedback";
-import { Button, Card, inputClass, Loading, Modal } from "../components/ui";
+import { Button, Card, inputClass, Loading, Modal, iconBtn } from "../components/ui";
 import { lanApi, portalsApi, type LanInfo, type PublicIp, type RouterCheck, type RouterProfile } from "../lib/api";
 import { windowRect } from "../lib/prefs";
 import { stowPortal } from "../lib/portalState";
@@ -209,7 +209,6 @@ export function Router({ covered = false }: { covered?: boolean }) {
   // Panel del router dentro de la app, a toda la altura.
   if (panel) {
     const nav = (a: "back" | "forward" | "reload" | "home") => portalsApi.nav(panel, a).catch((e) => toast("error", String(e)));
-    const iconBtn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink";
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center gap-1 border-b border-line px-4 py-2">

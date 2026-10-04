@@ -49,6 +49,21 @@ fn default_name(key: &str) -> &'static str {
         "profile" => "Aplicar perfil",
         "session" => "Sesión de servicio",
         "pawnio" => "Instalación de PawnIO",
+        "diagnostics" => "Diagnóstico",
+        "app-backup" => "Copia cifrada de AdminOps",
+        "encrypt" | "decrypt" | "vault" => "Caja fuerte",
+        "disk-rescue" => "Rescate de archivos",
+        "drivers-restore" => "Restaurar drivers",
+        "inventory" => "Inventario",
+        "lan-scan" | "lan-identify" => "Búsqueda en la red",
+        "recover" | "recover-install" => "Recuperar archivos",
+        "remote-install" => "Instalar herramienta remota",
+        "update" => "Actualización de AdminOps",
+        "wipe" | "wipe-free" => "Borrado seguro",
+        "wu-search" => "Buscar actualizaciones de Windows",
+        "uninstall" => "Desinstalar",
+        "space" => "Análisis de espacio",
+        "speedtest" => "Prueba de velocidad",
         _ => "Tarea",
     }
 }
@@ -117,6 +132,15 @@ impl Drop for Task {
 fn human(d: Duration) -> String {
     let s = d.as_secs();
     if s >= 60 { format!("{} min {} s", s / 60, s % 60) } else { format!("{s} s") }
+}
+
+/// Para lo largo que no va por `Task` (análisis de espacio, prueba de velocidad):
+/// el mismo aviso, con las mismas reglas (más de 20 s, activado en Ajustes, y
+/// solo si el técnico está en otra ventana).
+pub fn notify_if_long(app: &tauri::AppHandle, name: &str, elapsed: Duration, cancelled: bool) {
+    if elapsed >= NOTIFY_AFTER && crate::workflow::settings(app).notify_tasks {
+        notify_done(app, name, elapsed, cancelled);
+    }
 }
 
 /// Notificación de Windows, solo si el técnico está en otra ventana.

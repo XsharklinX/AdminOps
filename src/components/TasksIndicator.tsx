@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { CheckCircle2, ListChecks, Loader2, Square, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { appApi } from "../lib/api";
+import { useToast } from "./feedback";
 
 interface Running {
   task: string;
@@ -25,6 +26,7 @@ const human = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` 
  * actualizar, diagnosticar…): qué hacen, cuánto llevan y cancelarlas.
  */
 export function TasksIndicator() {
+  const toast = useToast();
   const [running, setRunning] = useState<Record<string, Running>>({});
   const [done, setDone] = useState<Done[]>([]);
   const [open, setOpen] = useState(false);
@@ -96,7 +98,7 @@ export function TasksIndicator() {
                       <span className="block truncate text-xs text-dim">{t.message || "Trabajando…"}</span>
                       <span className="font-mono text-[11px] text-mute">{human(Math.floor((Date.now() - t.started) / 1000))}</span>
                     </span>
-                    <button onClick={() => appApi.cancelTask(t.task).catch(() => {})} className="shrink-0 rounded p-1 text-mute hover:text-bad" title="Cancelar">
+                    <button onClick={() => appApi.cancelTask(t.task).catch((e) => toast("error", String(e)))} className="shrink-0 rounded p-1 text-mute hover:text-bad" title="Cancelar">
                       <Square size={12} />
                     </button>
                   </li>

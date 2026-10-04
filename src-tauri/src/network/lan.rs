@@ -81,6 +81,39 @@ fn network_key(gateway: &str, gateway_mac: &str) -> String {
     }
 }
 
+/// La red en la que está el equipo, sin PowerShell: la puerta de enlace y su
+/// dirección física («192.168.1.1|aa:bb:cc:dd:ee:ff»). Milisegundos. Sirve para
+/// reconocer una red ya vista; el nombre y el resto los da `current`.
+pub fn fingerprint() -> Option<String> {
+    use windows_sys::Win32::NetworkManagement::IpHelper::SendARP;
+    let gw = super::watch::gateway()?;
+    let mut mac = [0u8; 8];
+    let mut len = mac.len() as u32;
+    let rc = unsafe { SendARP(u32::from_ne_bytes(gw.octets()), 0, mac.as_mut_ptr().cast(), &mut len) };
+    if rc != 0 || len < 6 {
+        return None;
+    }
+    let mac: Vec<String> = mac[..6].iter().map(|b| format!("{b:02x}")).collect();
+    Some(format!("{gw}|{}", mac.join(":")))
+}
+
+/// Lo último leído de la red y cuándo: al cambiar de red se nota en dos minutos.
+static RECENT: std::sync::Mutex<Option<(std::time::Instant, Option<LanInfo>)>> = std::sync::Mutex::new(None);
+const RECENT_FOR: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// Como `current`, pero si se leyó hace menos de dos minutos devuelve eso. Para
+/// lo que se consulta a menudo (las notas de esta red en el Panel).
+pub fn current_recent() -> Result<Option<LanInfo>, String> {
+    if let Some((at, info)) = RECENT.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if at.elapsed() < RECENT_FOR {
+            return Ok(info.clone());
+        }
+    }
+    let info = current()?;
+    *RECENT.lock().unwrap_or_else(|e| e.into_inner()) = Some((std::time::Instant::now(), info.clone()));
+    Ok(info)
+}
+
 pub fn current() -> Result<Option<LanInfo>, String> {
     // Proceso propio: tarda y no debe ocupar el PowerShell compartido de la app.
     let out = crate::ps::powershell_opts(INFO_SCRIPT, crate::ps::Opts { timeout: Some(std::time::Duration::from_secs(60)), task: Some("lan-info") })?;

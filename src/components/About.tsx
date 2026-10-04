@@ -14,7 +14,7 @@ export function About({ open, onClose, appInfo }: { open: boolean; onClose: () =
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/55" onClick={onClose}>
-      <div className="relative w-[440px] rounded-2xl border border-line-2 bg-panel p-7 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative w-[440px] max-w-[95vw] rounded-2xl border border-line-2 bg-panel p-7 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-mute hover:text-ink" title="Cerrar">
           <X size={16} />
         </button>

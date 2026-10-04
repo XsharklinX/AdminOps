@@ -2,15 +2,11 @@ import { AlertTriangle, CheckCircle2, HardDrive, KeyRound, Loader2, RefreshCw, S
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../../components/feedback";
 import { Button, Card, inputClass, Modal } from "../../components/ui";
-import { appBackupApi, type StorageHealth } from "../../lib/api";
-import { bytes } from "../../lib/format";
+import { logQuietly, appBackupApi, type StorageHealth } from "../../lib/api";
+import { bytes, ago } from "../../lib/format";
 import { exportPrefs, importPrefs } from "../../lib/prefs";
 
-const ago = (t: number | null) => {
-  if (!t) return "Nunca";
-  const d = Math.floor((Date.now() / 1000 - t) / 86400);
-  return d === 0 ? "Hoy" : d === 1 ? "Ayer" : `Hace ${d} días`;
-};
+const lastTime = (t: number | null) => (t ? ago(t) : "nunca");
 
 /** Salud de la unidad de datos y copia de seguridad cifrada (a otra unidad o a la nube). */
 export function DataSafety() {
@@ -24,7 +20,7 @@ export function DataSafety() {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
-  const load = useCallback(() => appBackupApi.health().then(setH).catch(() => {}), []);
+  const load = useCallback(() => appBackupApi.health().then(setH).catch(logQuietly("DataSafety")), []);
   useEffect(() => {
     void load();
   }, [load]);
@@ -128,8 +124,8 @@ export function DataSafety() {
             </div>
             <div>
               <p className="text-[11px] text-mute">Copias</p>
-              <p className="text-ink">Cifrada: {ago(h.lastBackup)}</p>
-              <p className="text-[11px] text-dim">Contactos: {ago(h.lastContactsBackup)}</p>
+              <p className="text-ink">Cifrada: {lastTime(h.lastBackup)}</p>
+              <p className="text-[11px] text-dim">Contactos: {lastTime(h.lastContactsBackup)}</p>
             </div>
           </div>
           {h.warnings.length > 0 ? (

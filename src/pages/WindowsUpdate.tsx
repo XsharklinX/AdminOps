@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Loading } from "../components/ui";
-import { bytes } from "../lib/format";
+import { bytes, fullDate } from "../lib/format";
 import { toolboxApi, tweaksApi, updateApi, type PendingUpdate, type UpdateHistoryEntry } from "../lib/api";
 
 const RESULT = {
@@ -14,7 +14,7 @@ const RESULT = {
   progress: { label: "En curso", icon: Loader2, color: "text-neon" },
 };
 
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" }) : "—");
+const when = (iso: string | null) => (iso ? fullDate(iso) : "—");
 
 export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
   const [history, setHistory] = useState<UpdateHistoryEntry[] | null>(null);

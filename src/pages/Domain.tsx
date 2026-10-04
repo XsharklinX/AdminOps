@@ -2,7 +2,8 @@ import { Building2, CircleCheck, CircleX, Eye, EyeOff, Loader2, Pencil, Power, R
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, Modal, inputClass } from "../components/ui";
-import { domainApi, toolboxApi, tweaksApi, workApi, type DomainCheck, type DomainStatus } from "../lib/api";
+import { logQuietly, domainApi, toolboxApi, tweaksApi, workApi, type DomainCheck, type DomainStatus } from "../lib/api";
+import { NeedsAdmin } from "../components/AdminBanner";
 
 const LAST_DOMAIN = "adminops.lastDomain";
 
@@ -70,12 +71,8 @@ export function Domain({ isAdmin }: { isAdmin: boolean }) {
   const skewBad = s.timeOffset !== null && Math.abs(s.timeOffset) > 300;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
-      {!isAdmin && (
-        <p className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
-          <TriangleAlert size={13} /> Sin administrador solo puedes ver el estado. Unir, salir, reparar o renombrar requiere administrador.
-        </p>
-      )}
+    <div className="mx-auto max-w-6xl space-y-4 p-6">
+      {!isAdmin && <NeedsAdmin>Sin administrador solo puedes ver el estado. Unir, salir, reparar o renombrar requiere administrador.</NeedsAdmin>}
       {needsRestart && (
         <div className="flex items-center gap-3 rounded-lg border border-neon/40 bg-neon/5 px-4 py-3">
           <CircleCheck size={16} className="text-ok" />
@@ -241,7 +238,7 @@ function JoinCard({ status, isAdmin, onJoined }: { status: DomainStatus; isAdmin
     workApi
       .settings()
       .then((s) => setDomain((d) => d || s.defaultDomain))
-      .catch(() => {});
+      .catch(logQuietly("Domain"));
   }, []);
 
   const check = async () => {
@@ -293,7 +290,7 @@ function JoinCard({ status, isAdmin, onJoined }: { status: DomainStatus; isAdmin
                   setDomain(e.target.value);
                   setChecks(null);
                 }}
-                placeholder="pgr.gob.do"
+                placeholder="empresa.local"
                 className={`${inputClass} font-mono`}
               />
             </label>
@@ -319,7 +316,7 @@ function JoinCard({ status, isAdmin, onJoined }: { status: DomainStatus; isAdmin
           {advanced ? (
             <label className="block">
               <span className="mb-1 block text-xs text-dim">Unidad organizativa (opcional)</span>
-              <input value={ou} onChange={(e) => setOu(e.target.value)} placeholder="OU=Equipos,OU=Soporte,DC=pgr,DC=gob,DC=do" className={`${inputClass} font-mono text-xs`} />
+              <input value={ou} onChange={(e) => setOu(e.target.value)} placeholder="OU=Equipos,OU=Soporte,DC=empresa,DC=local" className={`${inputClass} font-mono text-xs`} />
             </label>
           ) : (
             <button onClick={() => setAdvanced(true)} className="text-xs text-mute hover:text-ink">

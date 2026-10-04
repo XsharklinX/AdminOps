@@ -7,7 +7,7 @@
 import { ClipboardCheck, Copy, Crop, Loader2, Pencil, Send, TicketPlus, Trash2, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
-import { casesApi, noteApi, portalsApi, type Case, type ClipRedacted } from "../lib/api";
+import { logQuietly, casesApi, noteApi, portalsApi, type Case, type ClipRedacted } from "../lib/api";
 import { CASE_CHANGED_EVENT, caseChanged, elapsed, OPEN_CASE_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { lastPortalKey } from "../lib/portalState";
@@ -51,7 +51,7 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
     void casesApi
       .current()
       .then((c) => setCurrent(c))
-      .catch(() => {});
+      .catch(logQuietly("CaseBar"));
   }, []);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
             setCount(a.length);
             setLast(a.length ? a[a.length - 1].title : null);
           })
-          .catch(() => {});
+          .catch(logQuietly("CaseBar"));
       leer();
       const poll = window.setInterval(leer, 10_000);
       window.addEventListener("focus", leer);

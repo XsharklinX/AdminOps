@@ -41,6 +41,10 @@ pub struct Extra {
     pub rdp_enabled: Option<bool>,
     pub rdp_nla: Option<bool>,
     pub autorun_off: Option<bool>,
+    /// La ejecución automática está más abierta que como viene Windows (alguien la activó).
+    pub autorun_open: bool,
+    /// El equipo tiene batería: es un portátil, y puede salir de la oficina.
+    pub portable: Option<bool>,
     /// `None` sin administrador.
     pub bitlocker: Option<Vec<Volume>>,
     pub defender_active: Option<bool>,
@@ -70,6 +74,10 @@ $smb = try { (Get-SmbServerConfiguration -ErrorAction Stop).EnableSMB1Protocol }
   rdpEnabled = if ($null -ne $deny) { [int]$deny -eq 0 } else { $null }
   rdpNla = if ($null -ne $nla) { [int]$nla -eq 1 } else { $null }
   autorunOff = if ($null -ne $ar) { [int]$ar -eq 255 } else { $false }
+  # De fábrica es 145 (0x91): sin ejecución automática en unidades de red ni desconocidas.
+  # Menos que eso es que alguien la abrió.
+  autorunOpen = if ($null -ne $ar) { ([int]$ar -band 0x91) -ne 0x91 } else { $false }
+  portable = [bool](Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue)
 } | ConvertTo-Json -Compress
 "#;
 
@@ -121,6 +129,8 @@ struct FastExtra {
     rdp_enabled: Option<bool>,
     rdp_nla: Option<bool>,
     autorun_off: Option<bool>,
+    autorun_open: bool,
+    portable: Option<bool>,
 }
 
 #[derive(Deserialize, Default)]
@@ -179,6 +189,8 @@ pub fn extra() -> Result<Extra, String> {
         rdp_enabled: fast.rdp_enabled,
         rdp_nla: fast.rdp_nla,
         autorun_off: fast.autorun_off,
+        autorun_open: fast.autorun_open,
+        portable: fast.portable,
         bitlocker,
         defender_active: defender.defender_active,
         pua: defender.pua,
@@ -191,7 +203,9 @@ pub fn extra() -> Result<Extra, String> {
 pub fn warm_up() {
     std::thread::spawn(|| {
         // Primero que abra la app: estas consultas son de las más pesadas y, en
-        // un equipo justo de recursos, retrasaban la primera pantalla.
+        // un equipo justo de recursos, retrasaban la primera pantalla. Se cuenta
+        // desde que la interfaz está pintada, no desde que arranca el programa.
+        crate::window_state::wait_until_ready(std::time::Duration::from_secs(120));
         std::thread::sleep(std::time::Duration::from_secs(12));
         let _ = query::<DefenderExtra>(DEFENDER_SCRIPT, 60);
         let _ = bitlocker_for_audit();
@@ -226,7 +240,7 @@ fn tool_fix(label: &str, tool: &str) -> Option<Fix> {
 pub struct Check {
     pub id: String,
     pub label: String,
-    /// ok | warn | bad | unknown
+    /// ok | warn | bad | unknown | info (un dato: no suma ni resta en la nota)
     pub status: String,
     pub detail: String,
     pub weight: u32,
@@ -334,7 +348,10 @@ pub fn evaluate(sys: Option<&SystemHealth>, x: &Extra, acc: Option<&Accounts>, v
             match vols.iter().find(|v| v.drive.eq_ignore_ascii_case(&sys_drive)) {
                 Some(v) if v.protection == 1 => check("bitlocker", "Cifrado del disco (BitLocker)", "ok", "Disco del sistema cifrado. Guarda la clave de recuperación.", 8, page_fix("Ver BitLocker", "security")),
                 Some(v) if v.conversion == 1 || v.conversion == 2 => check("bitlocker", "Cifrado del disco (BitLocker)", "warn", format!("Cifrado al {}% pero la protección está suspendida", v.percent), 8, page_fix("Ver BitLocker", "security")),
-                _ => check("bitlocker", "Cifrado del disco (BitLocker)", "warn", "El disco del sistema no está cifrado: si roban el equipo, se leen los datos", 8, None),
+                // Sin cifrar pesa en un portátil, que sale de la oficina y se puede perder.
+                // En un sobremesa es lo habitual: se dice, pero no baja la nota.
+                _ if x.portable == Some(false) => check("bitlocker", "Cifrado del disco (BitLocker)", "info", "Sin cifrar. En un equipo de sobremesa es lo habitual; conviene cifrarlo si guarda datos delicados.", 8, None),
+                _ => check("bitlocker", "Cifrado del disco (BitLocker)", "warn", "El disco del sistema no está cifrado: si roban o se pierde el equipo, se leen los datos", 8, None),
             }
         }
     });
@@ -360,9 +377,17 @@ pub fn evaluate(sys: Option<&SystemHealth>, x: &Extra, acc: Option<&Accounts>, v
         None => {}
     }
 
-    // Ejecución automática de USB
+    // Ejecución automática de USB. Desde Windows 7, Windows no ejecuta programas
+    // de un pendrive al conectarlo: solo pregunta qué hacer. Tal como viene de
+    // fábrica está bien; solo es un aviso si alguien la abrió más que eso.
     if let Some(off) = x.autorun_off {
-        c.push(check("autorun", "Ejecución automática de USB", if off { "ok" } else { "warn" }, if off { "Desactivada" } else { "Activa: un USB infectado puede ejecutar programas" }, 3, (!off).then(|| tweak_fix("Desactivar", "security.autorun-off")).flatten()));
+        c.push(if off {
+            check("autorun", "Ejecución automática de USB", "ok", "Desactivada del todo", 3, None)
+        } else if x.autorun_open {
+            check("autorun", "Ejecución automática de USB", "warn", "Más abierta que como viene Windows: alguien la activó", 3, tweak_fix("Desactivar", "security.autorun-off"))
+        } else {
+            check("autorun", "Ejecución automática de USB", "ok", "Como viene Windows: no ejecuta programas de un USB, solo pregunta qué hacer", 3, None)
+        });
     }
 
     // Cuentas
@@ -762,6 +787,8 @@ mod tests {
             rdp_enabled: Some(false),
             rdp_nla: Some(true),
             autorun_off: Some(true),
+            autorun_open: false,
+            portable: Some(false),
             bitlocker: Some(vec![Volume { drive: "C:".into(), protection: 1, conversion: 1, percent: 100, has_recovery_key: true }]),
             defender_active: Some(true),
             pua: Some(true),
@@ -807,6 +834,33 @@ mod tests {
         assert_eq!(a.score, 100);
     }
 
+    /// Lo que salía como aviso en todos los equipos: la ejecución automática tal
+    /// como viene Windows, y un sobremesa sin cifrar. Ninguno baja la nota ya.
+    #[test]
+    fn factory_autorun_and_unencrypted_desktop_do_not_warn() {
+        let acc = Accounts { active_admins: 1, builtin_admin_enabled: false, guest_enabled: false };
+        let status = |x: &Extra, id: &str| evaluate(Some(&sys()), x, Some(&acc), vec![]).checks.into_iter().find(|c| c.id == id).unwrap().status;
+        let plain = Volume { drive: "C:".into(), protection: 0, conversion: 0, percent: 0, has_recovery_key: false };
+
+        let mut desktop = safe();
+        desktop.autorun_off = Some(false); // de fábrica
+        desktop.bitlocker = Some(vec![plain.clone()]);
+        assert_eq!(status(&desktop, "autorun"), "ok");
+        assert_eq!(status(&desktop, "bitlocker"), "info");
+        assert_eq!(evaluate(Some(&sys()), &desktop, Some(&acc), vec![]).score, 100);
+
+        // En un portátil, sin cifrar sí es un aviso.
+        let mut laptop = desktop.clone();
+        laptop.portable = Some(true);
+        assert_eq!(status(&laptop, "bitlocker"), "warn");
+        assert!(evaluate(Some(&sys()), &laptop, Some(&acc), vec![]).score < 100);
+
+        // Y si alguien abrió la ejecución automática, también.
+        let mut open = desktop.clone();
+        open.autorun_open = true;
+        assert_eq!(status(&open, "autorun"), "warn");
+    }
+
     #[test]
     fn risky_software_list() {
         assert!(is_risky("Google.Chrome"));
@@ -824,7 +878,9 @@ mod tests {
     }
 
     /// Solo lectura: auditoría real de este equipo.
+    /// Equipo real (depende de su estado): `cargo test real_audit -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn real_audit() {
         let a = audit().unwrap();
         println!("NOTA {}", a.score);

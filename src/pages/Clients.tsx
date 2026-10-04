@@ -6,13 +6,13 @@ import { SendReportModal } from "../components/service";
 import { Button, Card, inputClass, Tile } from "../components/ui";
 import { VisitChanges } from "../components/VisitChanges";
 import { MachineCompare } from "../components/MachineCompare";
-import { contactsApi, diagApi, EMPTY_CLIENT_REPORT, workApi, type Client, type ClientReport, type Contact, type SessionRecord, type VisitMetrics } from "../lib/api";
-import { bytes, money } from "../lib/format";
+import { logQuietly, contactsApi, diagApi, EMPTY_CLIENT_REPORT, workApi, type Client, type ClientReport, type Contact, type SessionRecord, type VisitMetrics } from "../lib/api";
+import { bytes, money, fullDate as date } from "../lib/format";
 import { goToPage } from "../lib/navigate";
 import { Avatar } from "../components/contacts/Avatar";
+import { DataTable, type Column } from "../components/DataTable";
 
 const DAY = 86400;
-const date = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { dateStyle: "medium" });
 // Segundos enteros: el backend guarda las fechas como u64.
 const now = () => Math.floor(Date.now() / 1000);
 const EMPTY = { id: "", name: "", contact: "", phone: "", email: "", address: "", notes: "", created: 0, machines: [], sessions: [], network: null, report: EMPTY_CLIENT_REPORT } as Client;
@@ -50,7 +50,7 @@ export function Clients() {
     contactsApi
       .list()
       .then((l) => setContacts(l.filter((c) => !c.deleted)))
-      .catch(() => {});
+      .catch(logQuietly("Clients"));
   }, []);
   const { confirm, dialog } = useConfirm();
 
@@ -378,7 +378,7 @@ export function Clients() {
               {form.id && tab === "machines" && (
                 <Card title={`Equipos · ${form.machines.length}`} icon={<Monitor size={14} />}>
                   {form.machines.length === 0 ? (
-                    <p className="text-sm text-mute">Los equipos se registran al finalizar una sesión de servicio o desde Puestos e inventario.</p>
+                    <p className="text-sm text-mute">Los equipos se registran al finalizar una sesión de servicio o desde Soporte → Inventario.</p>
                   ) : (
                     <ul className="divide-y divide-line/60 text-sm">
                       {form.machines.map((m) => (
@@ -512,7 +512,6 @@ const ROWS: Row[] = [
   { label: "Memoria", get: (m) => m.ramTotal || null, fmt: (v) => bytes(v, 0), upBetter: null },
 ];
 
-/** Cómo ha evolucionado el equipo del cliente de una visita a otra. */
 /** Personas de la agenda enlazadas a este cliente (se enlazan desde Contactos). */
 function ClientContacts({ people }: { people: Contact[] }) {
   const toast = useToast();
@@ -597,6 +596,7 @@ function ClientReportFields({ value, onChange }: { value: ClientReport; onChange
   );
 }
 
+/** Cómo ha evolucionado el equipo del cliente de una visita a otra. */
 function Evolution({ sessions }: { sessions: SessionRecord[] }) {
   const visits = sessions.filter((s) => s.metrics).slice(0, 5).reverse();
   if (visits.length < 2) return null;
@@ -610,37 +610,33 @@ function Evolution({ sessions }: { sessions: SessionRecord[] }) {
   return (
     <Card title="Evolución entre visitas" icon={<History size={14} />}>
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="text-xs text-mute">
-              <th className="pb-2 text-left font-medium" />
-              {visits.map((v) => (
-                <th key={v.id} className="pb-2 pl-3 text-right font-medium">
-                  <span className="block text-dim">{date(v.ended)}</span>
-                  <span className="block font-mono text-[10px]">{v.host}</span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.label} className="border-t border-line/60">
-                <td className="py-1.5 text-dim">{r.label}</td>
-                {visits.map((v, i) => {
+        <DataTable
+          rows={rows}
+          rowKey={(r) => r.label}
+          columns={[
+            { id: "label", header: "", cell: (r) => r.label, className: "text-dim" },
+            ...visits.map((v, i): Column<Row> => {
+              // Se compara con la visita anterior del mismo equipo, no con la de otro.
+              const before = visits.slice(0, i).reverse().find((x) => x.host.toLowerCase() === v.host.toLowerCase());
+              const prevOf = (r: Row) => (before ? r.get(before.metrics!) : null);
+              return {
+                id: v.id,
+                align: "right",
+                header: (
+                  <span className="flex flex-col items-end">
+                    <span className="text-dim">{date(v.ended)}</span>
+                    <span className="font-mono text-[10px]">{v.host}</span>
+                  </span>
+                ),
+                cell: (r) => {
                   const cur = r.get(v.metrics!);
-                  // Se compara con la visita anterior del mismo equipo, no con la de otro.
-                  const before = visits.slice(0, i).reverse().find((x) => x.host.toLowerCase() === v.host.toLowerCase());
-                  const prev = before ? r.get(before.metrics!) : null;
-                  return (
-                    <td key={v.id} className={`py-1.5 pl-3 text-right font-mono text-xs ${tone(r, cur, prev)}`}>
-                      {cur === null ? "—" : r.fmt(cur)}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  return cur === null ? "—" : r.fmt(cur);
+                },
+                className: (r) => `font-mono text-xs ${tone(r, r.get(v.metrics!), prevOf(r))}`,
+              };
+            }),
+          ]}
+        />
       </div>
       <p className="mt-2 text-[11px] text-mute">Cifras al terminar cada visita. En verde lo que mejoró respecto a la visita anterior del mismo equipo; en rojo lo que empeoró.</p>
     </Card>

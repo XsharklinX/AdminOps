@@ -338,7 +338,9 @@ mod tests {
         assert_eq!(from, Some(Ipv4Addr::LOCALHOST));
     }
 
+    /// Equipo real (depende de su estado): `cargo test reads_real_state -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn reads_real_state() {
         assert!(read_hosts().is_ok());
         let dns = dns_adapters().unwrap();

@@ -669,7 +669,9 @@ mod tests {
         assert_eq!(long(Path::new(r"\\server\share")), PathBuf::from(r"\\server\share"));
     }
 
+    /// Equipo real (depende de su estado): `cargo test real_profiles_and_folders -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn real_profiles_and_folders() {
         let list = profiles();
         assert!(!list.is_empty());

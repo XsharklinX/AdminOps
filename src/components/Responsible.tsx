@@ -1,7 +1,7 @@
 import { PhoneCall } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "./feedback";
-import { contactsApi, type Contact } from "../lib/api";
+import { logQuietly, contactsApi, type Contact } from "../lib/api";
 import { responsibleFor, TOPIC_OF } from "../lib/contacts";
 
 let cache: { at: number; list: Contact[] } | null = null;
@@ -17,7 +17,7 @@ function useContacts() {
         cache = { at: Date.now(), list: l };
         setList(l);
       })
-      .catch(() => {});
+      .catch(logQuietly("Responsible"));
   }, []);
   return list;
 }

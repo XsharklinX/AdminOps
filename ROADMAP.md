@@ -107,7 +107,229 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
-### v1.1.10 — Guía, novedades, términos, reportar fallos, y fuera Microsoft 365 (hecho, sin build)
+### v1.2.3 — Avisos y arranque (hecho, sin build)
+
+**Avisos (campana)**
+- `AlertCenter.tsx` rehecho sobre `lib/alerts.ts` (con pruebas): por días, filtro por nivel y «solo
+  sin leer», avisos leídos plegados, descartar uno, silenciar un tipo.
+- `winwatch.rs`: `Store.muted` (`MutedAlert`: clave, título, detalle, fecha), por equipo. `merge`
+  ignora lo silenciado, así que no llega ni a la campana ni a la notificación. Comandos
+  `dismiss_windows_alert`, `mute_windows_alert`, `unmute_windows_alert`, `muted_windows_alerts`.
+  Los de la campana pasan a `async` (leían un archivo en el hilo principal).
+- Ajuste `notify_alerts` (all | bad | none): de qué avisos salta notificación de Windows.
+
+**Arranque** (medido en un arranque de 46 s desde un pendrive)
+- `window_state::wait_until_ready`: la consola de PowerShell (`pspool::warm_up`) y la seguridad
+  (`security::warm_up`) esperan a que la interfaz esté pintada; antes usaban esperas fijas de 3 y
+  12 s desde el inicio del programa, que en un arranque lento caían en plena carga de WebView2.
+- `library::this_place`: fuera el precalentado al segundo cero. El número de serie y las redes ya
+  vistas se guardan en `lugar.json` (por equipo); la red se reconoce con `lan::fingerprint` (puerta
+  de enlace y su MAC, sin PowerShell). Solo la primera vez en cada red se pregunta a Windows.
+- `diagnostics::latest_snapshot`: último análisis en memoria, renovado en `save_snapshot`.
+- `useSensors`: `nextSensorWait` espacia las lecturas tras una lenta (hasta 60 s).
+- `App.tsx`: precarga de portal a los 20 s (no si el arranque fue lento); versión nueva a los 30 s.
+- **Sin tocar, a decisión del autor**: el perfil del navegador en el pendrive (Ajustes → General).
+  Es lo que más pesa en el arranque desde USB, y está así a propósito: no deja sesiones en el
+  equipo del cliente.
+
+**Discos → Espacio, de mirar a manejar**
+- `space.rs`: cada carpeta del análisis guarda lo que ocupa cada tipo de archivo (`KINDS`, por
+  extensión) y su cambio más reciente; se apartan además los más grandes de cada tipo (`Tops`).
+  El recorrido cuesta lo mismo: todo sale del mismo listado.
+- Comandos: `space_folder` (sustituye a `space_children`: subcarpetas y tipos de una carpeta),
+  `space_files` (archivos sueltos de una carpeta, leídos al momento) y `space_kind_files`.
+- `space_recycle` acepta carpetas. `Protected` se niega con la unidad entera, Windows, los archivos
+  de paginación e hibernación, Archivos de programa y ProgramData (ellos y su primer nivel) y la
+  carpeta de perfiles (ella y cada perfil). Tras borrar, `forget` descuenta lo que se fue en toda
+  la rama (tamaño, archivos, tipos, listas): no hace falta volver a analizar.
+- `pages/Space.tsx` rehecha sobre `lib/spaceView.ts` (con pruebas): barra de tipos por carpeta,
+  ficha de la carpeta señalada, lista ordenable, archivos de la carpeta actual, buscador, y una
+  sola selección para carpetas y archivos con su barra fija abajo.
+- **Ideas que quedan**: archivos duplicados; comparar con el análisis anterior («qué ha crecido»).
+
+### v1.2.2 — Todo a la vista: navegación nueva (compilada)
+
+Diseñada con el autor sobre un prototipo (artifact «AdminOps, todo a la vista»). El problema: con
+unas 80 pestañas, muchas funciones (Dominio era la tercera pestaña de «Usuarios y cuentas») solo
+existían para quien ya sabía dónde estaban.
+
+- **Barra lateral en dos columnas**: áreas a la izquierda; al lado, cada pantalla con sus secciones
+  como líneas. Registro único de secciones en `lib/sections.ts`, con sinónimos para el buscador; una
+  prueba lo compara con las pestañas de `Merged.tsx` y `Knowledge.tsx`. Las pestañas anuncian cuál
+  está a la vista (`reportSection`) y obedecen a la barra (`requestSection`).
+- **Áreas nuevas**: Inicio, Este equipo, Red, Programas, Administración, Soporte. Teams y Correo
+  pasan a la barra de arriba; Herramientas de Windows, Bloquear y Ajustes, al pie de la columna.
+- **Barra de arriba**: nombre del equipo, dominio o grupo de trabajo, permisos, Internet, espacio en
+  el disco del sistema y avisos del último diagnóstico, cada uno con su destino. Comando nuevo
+  `context.rs` (`NetGetJoinInformation`, `GetComputerNameExW`, `GetDiskFreeSpaceExW` y una conexión
+  TCP de prueba con tope de 2 s): milisegundos, sin PowerShell. Se refresca cada minuto con la
+  ventana a la vista.
+- **Todo AdminOps** (Ctrl+K o F1): mapa del programa por áreas (tarjetas con pantallas y secciones),
+  fijados y «siempre a mano»; al escribir, resultados con secciones y sinónimos.
+- **Marcas de estado** junto a las secciones (avisos, dominio, espacio, Internet) y un punto en el
+  área si dentro hay algo que atender. **Fijados** de pantallas o secciones. **Ruta** área › pantalla
+  › sección sobre el título.
+- Fuera: la franja de solo lectura (ahora es un dato de la barra de arriba) y las opciones de la
+  barra que ya no aplican (secciones desplegadas, pestañas bajo el título, iconos, pie de usuario).
+- Arreglado: el dominio de una organización real que quedaba en un mensaje de Dominio y en pruebas
+  de Rust.
+
+**Segunda tanda de 1.2.2** (lista de mejoras de interfaz, gráficas, herramientas y rendimiento):
+
+- **Rendimiento (7 días)**: `perfhistory.rs` toma una muestra por minuto (procesador, memoria, disco
+  del sistema y el programa que más gasta) mientras AdminOps está abierta; `perf-history.json` en los
+  datos del equipo, recortado a 7 días. Pantalla en Estado del equipo → Rendimiento, con `TimeChart`
+  (gráfica SVG propia, sin librerías, que corta la línea en los huecos).
+- **Arranques y cuelgues**: `bootlog.rs` lee el registro de Windows (eventos 12, 13, 41 y 1001, y el
+  100 de Diagnostics-Performance para la duración). Sin administrador Windows no da error al leer la
+  duración: dice que no hay eventos; por eso, sin administrador y vacío se trata como «hace falta
+  administrador». Códigos de pantallazo explicados en `lib/bugchecks.ts`.
+- **Probar periféricos**: pantalla, teclado (por posición física, distribución española), altavoces
+  con `StereoPanner`, micrófono y cámara con `getUserMedia` (en vivo; se apagan al salir).
+- **Vigilante de la conexión**: `network/watch.rs`, ping ICMP cada 5 s al router (`GetBestRoute`) y a
+  1.1.1.1/8.8.8.8; un corte empieza tras dos fallos seguidos; culpa router/Internet/sin red. Cada
+  puesta en marcha lleva su número para que un hilo anterior no siga en paralelo.
+- **Mapa del espacio**: `lib/treemap.ts` (squarified) en Discos → Espacio → Carpetas.
+- **Calculadora de red**: `lib/subnet.ts`, en Herramientas de red.
+- **Siluetas** en `Loading page` (todas las pantallas). **Memoria de lecturas lentas**:
+  `lib/cachedRead.ts`, en Desinstalar e Inicio de Windows.
+- **Sin PowerShell**: impresoras con `EnumPrintersW` (31 ms frente a ~1,9 s en este equipo; una
+  prueba manual compara con WMI), además de la barra de arriba (`context.rs`).
+- **Arranque medido** con el registro real del equipo: ventana ~0,9 s y primera página ~1,2 s, pero
+  el Panel tardaba 3-6 s en quedar listo esperando «este equipo y esta red» (PowerShell de red de
+  1-4 s y número de serie por CIM). Ahora se calcula en segundo plano al abrir y se recuerda
+  (`library::warm_up`, `lan::current_recent`). Las métricas en vivo pasan a comando asíncrono
+  (antes iban en el hilo de la ventana). La barra de arriba espera 1,2 s a su primera lectura.
+- **Teams y Correo**: `comms.rs` (`open_comm`, `comm_apps`) y `CommOpener`: la primera vez pregunta
+  (AdminOps, navegador o aplicación) y se recuerda en `prefs.comms`; se cambia en Ajustes → Portales.
+- **Avisos al terminar**: nombres de todas las tareas en `task.rs` y `notify_if_long` para el análisis
+  de espacio y la prueba de velocidad.
+
+**Diagnóstico, revisado con datos reales** (51 análisis de 9 equipos guardados en el pendrive)
+
+Lo que se vio: casi todo lo que señalaba salía en todos los equipos. Diez fallos arreglados:
+
+1. Puertos PS/2 vacíos (código 24, ACPI) contados como «faltan drivers» en 4 de 9: se filtran al
+   recoger (`collect::is_empty_port`).
+2. «Adaptador de pantalla básico de Microsoft» salía como driver antiguo (informativo): ahora es
+   el aviso «La tarjeta gráfica no tiene su driver instalado».
+3. El análisis se guardaba con «se están buscando las actualizaciones…» (5 de 9) y así se quedaba:
+   `complete_later` espera a winget, completa el análisis guardado (hallazgos y nota de seguridad)
+   y emite `diagnostics-updated`.
+4. SMART «Incompatible»/«Not supported» (5 de 9) es una lista vacía, no un error.
+5. Temperaturas ausentes en 7 de 9 sin explicación.
+6. Errores en crudo y secciones enteras perdidas: `explain_error`, reintento de los fallos
+   pasajeros (RPC), y «Sistema y seguridad» en dos lecturas (lo básico no depende de lo lento).
+   Los puntos 4 a 6 se ven en un bloque nuevo, **«No se pudo comprobar»** (`Diagnostics.unchecked`).
+7. Arranque lento: mediana de los arranques apuntados, no el último.
+8. «Arranques y cuelgues» duplicaba Estabilidad: una sola tabla de códigos (`bugcheck_info`), el
+   análisis de volcados (driver probable) también allí, y la tarjeta Estabilidad enlaza en vez de
+   repetir. Se quitó `lib/bugchecks.ts`.
+9. AdminOps y su instalador no se cuentan entre los programas que fallan (quedan en el registro).
+10. Seguridad: «Ejecución automática de USB» avisaba en 9 de 9 (medía el valor 255, no lo que
+    Windows hace desde la versión 7); BitLocker en un sobremesa pasa a estado «info», que no cuenta
+    en la nota (en portátil sigue siendo aviso).
+
+Y uno más encontrado al leer: sin administrador, la tarjeta Estabilidad decía «sin registros» de
+arranque en vez de «requiere administrador».
+
+Medido volviendo a pasar las reglas por los análisis guardados (`cargo test recalibrate`, prueba
+manual nueva): de 66 hallazgos a 57; los 8 de PS/2 desaparecen; el arranque lento pasa de 5 equipos
+a 4.
+
+**Diagnóstico: ruido fuera, niveles y lo que faltaba** (segunda parte del repaso)
+
+- **Ruido**: fuera el hallazgo de apps promocionales (salía en 9 de 9); programas de inicio solo si
+  hay 10 o más de terceros (`startup::enabled_overview`, `Diagnostics.startup_third_party`). Con los
+  análisis reales: de 66 hallazgos a 41 (`cargo test recalibrate`).
+- **Tres niveles** en la pantalla: Urgente (`Bad`), Conviene (`Warn`) y Sugerencias (`Info`), estas
+  en un bloque plegado. El modelo no cambia: informe, Panel y análisis guardados siguen igual.
+- **«Ya lo sé»**: `accepted-findings.json` por equipo (clave del problema sin cifras, título, motivo,
+  fecha); comandos `diag_accepted`, `diag_accept`, `diag_unaccept`. `latest_findings` ya no los
+  devuelve (Panel y barra de arriba dejan de contarlos); el informe sí los lleva. `Finding.key`.
+- **Análisis rápido** (`run_diagnostics(quick)`): discos, estabilidad, drivers, batería y sistema; no
+  se guarda ni se compara. **Progreso por partes** con lo que tarda cada una (interfaz).
+- **Hallazgos nuevos**: Windows en disco mecánico (`PhysicalDisk.is_system`), Windows sin soporte
+  (`support_end`, tabla de fechas por compilación y edición; LTSC y Server no se opinan), memoria
+  corta (`perfhistory::memory_pressure`: media ≥ 85 % o más del 25 % del tiempo sobre el 90 %), disco
+  que se llena (`disk_trend`: frente al análisis más antiguo de las últimas tres semanas; avisa si a
+  ese ritmo quedan 45 días o menos) y errores de disco del registro (sucesos 7, 55 graves; 11, 51,
+  153 a partir de cinco).
+- **Tarjetas**: Discos y Sistema y seguridad pasan a resumen con enlace. Drivers se queda entera:
+  es su único sitio.
+- **Análisis guardados**: `to_prune` deja el último de cada día para lo anterior a 48 horas; no toca
+  lo reciente ni el punto de partida de una sesión en curso.
+- **Calibración**: `a_healthy_office_pc_raises_no_warnings` fija el presupuesto de ruido con un
+  equipo inventado pero típico (sin datos reales): un PC de oficina sano no da ningún aviso.
+  **Por comprobar**: las fechas de fin de soporte de Windows están escritas a mano en `support_end`;
+  revisarlas contra la página de ciclo de vida de Microsoft al añadir versiones.
+
+### v1.1.11 — Catálogo a medida, diálogos, y repaso de fallos, aspecto y orden (compilada)
+
+**Instalar programas**, a partir de lo que pidió el supervisor: en una empresa no se instalan
+Telegram ni juegos, y el catálogo tiene que poder ajustarse.
+
+- **Vista «Empresa»** (la de fábrica) y **«Todo»**. 30 programas están marcados como de uso
+  personal u ocio (`home = true` en `apps.toml`): mensajería personal, juegos, torrents,
+  periféricos de jugador, edición de vídeo doméstica. En «Empresa» no salen.
+- **Personalizar**: ocultar programas sueltos o categorías enteras. Se guarda en
+  `app-catalog-view.json` con los datos del técnico (viaja en el pendrive). Lo oculto sigue
+  apareciendo al buscarlo por su nombre, en un bloque aparte.
+- **Catálogo**: de 113 a 147 programas. 34 nuevos de empresa, cada id comprobado con
+  `winget show`: Microsoft 365 Apps, Firefox ESR, PDF24, PDF-XChange, PDF Arranger, NAPS2,
+  draw.io, Power BI, Nextcloud, OpenVPN, Citrix Workspace, Horizon, Windows App, mRemoteNG,
+  Remote Desktop Manager, Veeam, Duplicati, SyncBackFree, KeePass, PowerShell 7, SSMS, Postman,
+  Java 21, .NET 10, y utilidades de HP, Brother, Jabra y Plantronics. Dos categorías nuevas: VPN y
+  escritorios de la empresa, y Copias de seguridad. Lista «Puesto de empresa».
+- **Vista**: filtro por categoría con sus cantidades, «Ocultar los ya instalados», y cuántos
+  programas hay a la vista y cuántos ocultos.
+
+**Diálogos**
+
+Visto al usar la 1.1.10: el diálogo «Copia de seguridad cifrada» de Ajustes salía cortado por el
+borde de su tarjeta.
+
+- **Causa**: las tarjetas (`Card`) llevaban `contain: layout paint`, puesto en su día para pintar
+  más barato. Con eso, un diálogo `fixed` que nace dentro de una tarjeta se coloca respecto a la
+  tarjeta y se recorta en su borde. Lo mismo pasa dentro de una página con `@container` (Usuarios,
+  Acceso remoto, Personas): el diálogo se centraba en la página entera, no en lo que se ve.
+- **Arreglo de raíz**: una capa común (`Overlay` en `ui.tsx`) que se pinta en el `body`, fuera de
+  quien la abre. La usan `Modal` (49 pantallas), las confirmaciones, el editor de perfiles y su
+  importación. Las tarjetas dejan de recortar, así que tampoco se cortan los menús desplegables.
+- Escape cierra solo la capa de arriba; los diálogos no se salen de una ventana estrecha.
+
+**Repaso completo** (la lista del artifact de mejoras, grupos F, V, M y R)
+
+- **Fallos (F)**: ejemplos con `empresa.com` en vez de un dominio real; las rutas de
+  `solutionsCatalog.ts` con los nombres de hoy y una prueba (`solutionPaths.test.ts`) que lo vigila;
+  GIMP solo una vez; los diálogos con el foco dentro (Tab no se escapa, vuelve al cerrar,
+  `role="dialog"`); unos 66 `catch` vacíos pasan a `logQuietly` (registro técnico) o a un aviso;
+  las nueve pruebas que leen el equipo real pasan a `#[ignore]` (se lanzan a mano: eran las
+  intermitentes); «Buscar actualizaciones» sin versiones publicadas lo dice en claro
+  (`UpdateInfo.published`).
+- **Visual (V)**: anchos de página iguales (`max-w-6xl`); `iconBtn`, `smallBtn`, `softBtn`,
+  `IconButton` y `Button size="sm"` en `ui.tsx` en lugar de botones a mano; fechas en
+  `lib/format.ts` (`shortDate`, `fullDate`, `dateTime`, `timeOfDay`, `ago`) en lugar de 18
+  ayudantes sueltos; el Panel con `Card` y `Button`, y su rejilla se adapta al ancho; buscadores y
+  columnas que encogen en ventanas estrechas.
+- **Mecánicas (M)**: Ajustes con guardado automático (600 ms tras el último cambio, y al salir);
+  Acceso remoto comprueba los equipos al pulsar, no al abrir, y recuerda lo comprobado; Ctrl+K
+  busca en la guía (`openHelpTopic`); Novedades se abren una vez por versión nueva; tamaños de
+  carpetas compartidas recordados un día; `NeedsAdmin` con «Reiniciar como administrador» en ocho
+  pantallas; Impresoras, Desinstalar, Inicio de Windows y la evolución de un cliente con
+  `DataTable`.
+- **Reorganizar (R)**: nombres del menú sin choques (Optimizar Windows, Usuarios y cuentas con
+  tres pestañas, Herramientas de Windows, Herramientas de red, Historial del equipo; Preparar
+  equipos en Administración). Archivos grandes partidos sin cambiar nada de lo que hacen:
+  `lib/api.ts` → `lib/api/` (17 áreas e `index.ts`; los `import` siguen igual),
+  `portals.rs` → `portals/` (navegación, correo, inicio de sesión, vistas),
+  `diagnostics/report.rs` → `report/` (formato, estilo, comparación, secciones, correo) y
+  `SettingsPage.tsx` → una sección por archivo en `pages/settings/`. Tipos: `types.test.ts`
+  compara campo a campo las interfaces de `lib/api` con los structs de Rust del mismo nombre.
+  No se generan con `tauri-specta`/`ts-rs`: habría que derivar en unos 300 structs y cambiar
+  cómo se registran los comandos; la prueba caza el mismo fallo sin tocar el programa.
+
+### v1.1.10 — Guía, novedades, términos, reportar fallos, y fuera Microsoft 365 (compilada)
 
 - **Todo guardado en Git y subido**, con una etiqueta por versión (`v1.1.9`). Primera parte de la
   Fase 31.
@@ -134,6 +356,25 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   configuración de empresa. El Correo y Teams (las webs dentro de AdminOps) siguen igual. Los
   datos guardados antes (visitas enlazadas, archivos de empresa) se siguen leyendo.
 - **README** al día en español e inglés: ya no enseña capturas de la 0.10 ni dice 1.1.2.
+- **Tickets e Inventario web navegan con libertad**, como un navegador: la dirección guardada es
+  solo la página de inicio. Limitar la navegación al sitio del portal rompía intranets reales (el
+  inicio de sesión en otro servidor, enlaces entre sistemas). El Correo, Teams y los routers sí se
+  quedan en sus sitios. Las páginas siguen sin acceso a las operaciones de AdminOps.
+- **Barra lateral**: cinco áreas en vez de siete. Red y Datos pasan a **Equipo**. **Inventario**
+  es una página propia en Soporte (el inventario propio y la web de inventario); «Puestos» se queda
+  en Administración. Soporte va en este orden: Agenda, Teams, Correo, Contactos, Tickets,
+  Inventario, Personas, Soluciones. Quien personalizó la barra conserva la suya (se restablece en
+  Ajustes → Navegación).
+- **Actualizar desde la aplicación** (Ajustes → General → Actualizaciones): descarga el instalador
+  de la versión nueva desde las versiones publicadas del repositorio, comprueba tamaño y huella, y
+  lo abre; en el portable, deja el .zip en Descargas. Nada se instala en silencio. **Requiere
+  publicar cada versión en GitHub Releases con sus tres archivos** y que el repositorio sea
+  público: a día de hoy no hay ninguna publicada, así que la función dice «todavía no hay ninguna
+  versión publicada».
+- **Plantilla de informe propia** (Ajustes → Informes y cobros): qué secciones lleva el PDF y en
+  qué orden, con o sin detalle técnico. Aparece como tercera opción al generar un informe.
+- **Exportar el diario de cambios** a PDF o a Excel desde Historial; con un filtro puesto, exporta
+  lo filtrado.
 - En la vista de mes, «y N más» contaba también los seguimientos, que ya salen con su reloj.
 
 ### v1.1.9 — Lavado de cara y repaso de fallos
@@ -459,10 +700,10 @@ volver a la versión anterior es copiar una carpeta.
 **Prioridad: alta.** Quita de raíz una clase entera de fallos.
 
 - **Tipos generados desde Rust** (`tauri-specta`): los datos y los comandos se definen una sola vez y
-  la interfaz los recibe generados. Cambiar un campo en Rust sin actualizar la interfaz deja de
-  compilar, en vez de fallar en el equipo del cliente.
-- **Partir los archivos enormes**, que es donde más fácil es romper algo sin darse cuenta:
-  `api.ts` (2.256 líneas), `portals.rs` (1.511), `SettingsPage.tsx` (1.447), `Tickets.tsx` (893).
+  la interfaz los recibe generados. *En 1.1.11, en su lugar, `types.test.ts` compara los campos de
+  los dos lados.*
+- **Partir los archivos enormes**: *hecho en 1.1.11* con `api.ts`, `portals.rs`, `report.rs` y
+  `SettingsPage.tsx`. Queda `Tickets.tsx`.
 - **Los 9 avisos de promesas sin capturar** que quedan: decidir en cada uno qué hacer con el error.
 
 **Terminado cuando:** no hay ningún tipo escrito dos veces y ningún archivo pasa de ~600 líneas.

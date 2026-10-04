@@ -35,7 +35,7 @@ pub struct Settings {
     pub checklist: Vec<String>,
     /// Ya pasó por el asistente de primer arranque.
     pub onboarded: bool,
-    /// Dominio que se propone al unir equipos (p. ej. pgr.gob.do).
+    /// Dominio que se propone al unir equipos (p. ej. empresa.local).
     pub default_domain: String,
     /// Moneda de presupuestos y recibos (símbolo o código: RD$, €, USD…).
     pub currency: String,
@@ -62,8 +62,12 @@ pub struct Settings {
     pub check_updates: bool,
     /// Vigilar el Visor de eventos y avisar de errores típicos de Windows.
     pub watch_windows: bool,
+    /// De qué avisos llega además notificación de Windows: all | bad | none.
+    pub notify_alerts: String,
     /// Tipos de visita con su checklist (mantenimiento, equipo nuevo…).
     pub visit_types: Vec<VisitType>,
+    /// La plantilla de informe propia: qué secciones lleva y en qué orden.
+    pub report_layout: ReportLayout,
 }
 
 /// Un tipo de visita y lo que hay que hacer en ella.
@@ -202,7 +206,9 @@ impl Default for Settings {
             auto_cleanup_months: 0,
             check_updates: true,
             watch_windows: true,
+            notify_alerts: "all".into(),
             visit_types: default_visit_types(),
+            report_layout: ReportLayout::default(),
         }
     }
 }
@@ -264,6 +270,44 @@ pub enum Template {
     Client,
     /// Todo el detalle del análisis.
     Technical,
+    /// La del técnico: las secciones que elija, en su orden (Ajustes → Informes).
+    Custom,
+}
+
+/// Secciones del informe que se pueden quitar o cambiar de sitio, en su orden
+/// de fábrica. La cabecera va siempre arriba y las firmas y condiciones, abajo.
+pub const REPORT_SECTIONS: [&str; 10] = ["summary", "problem", "work", "findings", "comparison", "recommendations", "billing", "machine", "speed", "notes"];
+
+/// La plantilla propia del técnico.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ReportLayout {
+    pub name: String,
+    /// Con todo el detalle técnico (como la plantilla técnica) o en lenguaje claro.
+    pub technical: bool,
+    /// Las secciones que lleva, en orden.
+    pub sections: Vec<String>,
+}
+
+impl Default for ReportLayout {
+    fn default() -> Self {
+        ReportLayout { name: "Mi plantilla".into(), technical: false, sections: REPORT_SECTIONS.iter().map(|s| s.to_string()).collect() }
+    }
+}
+
+impl ReportLayout {
+    /// Las secciones que de verdad se pintan: conocidas y sin repetir.
+    pub fn valid_sections(&self) -> Vec<&'static str> {
+        let mut out: Vec<&'static str> = Vec::new();
+        for s in &self.sections {
+            if let Some(known) = REPORT_SECTIONS.iter().find(|k| *k == s) {
+                if !out.contains(known) {
+                    out.push(known);
+                }
+            }
+        }
+        out
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]

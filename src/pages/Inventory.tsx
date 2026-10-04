@@ -5,10 +5,9 @@ import { inventoryLines, MachineActions, VerdictChip, VERDICT } from "../compone
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card } from "../components/ui";
 import { officeApi, toCsv, workApi, type Client, type Machine } from "../lib/api";
+import { fullDate as date } from "../lib/format";
 
 type Row = { client: Client; machine: Machine };
-const date = (ts: number) => new Date(ts * 1000).toLocaleDateString("es", { dateStyle: "medium" });
-
 export function Inventory() {
   const [clients, setClients] = useState<Client[] | null>(null);
   const [filter, setFilter] = useState<string>("all");
@@ -131,7 +130,7 @@ export function Inventory() {
           <Button onClick={addThis} disabled={busy || !target}>
             <Plus size={14} /> Añadir
           </Button>
-          {clients?.length === 0 && <span className="text-xs text-mute">Crea antes un cliente en Soporte → Clientes.</span>}
+          {clients?.length === 0 && <span className="text-xs text-mute">Crea antes un cliente en Soporte → Personas y clientes → Clientes.</span>}
         </div>
         <TaskStatus task="inventory" active={busy} fallback="Analizando este equipo…" cancellable={false} className="mt-3" />
       </Card>

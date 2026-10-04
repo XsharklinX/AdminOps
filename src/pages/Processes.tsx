@@ -257,7 +257,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
             </button>
           </>
         )}
-        <div className="relative ml-auto w-72">
+        <div className="relative ml-auto w-72 min-w-40 shrink">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input
             value={query}

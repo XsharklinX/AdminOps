@@ -22,6 +22,8 @@ sha2 = "0.11"
 
 [target."cfg(windows)".dependencies]
 winreg = "0.56.0"
+# Restart Manager: quién tiene abiertos los archivos de AdminOps, para cerrarlo antes de copiar.
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_RestartManager", "Win32_System_Threading"] }
 
 [features]
 # La activa scripts/build-release.ps1: incrusta la interfaz (ui/) en el ejecutable.

@@ -2,8 +2,9 @@ import { BellOff, CheckCircle2, Download, Eye, Loader2, RefreshCw, Search, XCirc
 import { useCallback, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { toolsApi, type SoftwareUpdate } from "../lib/api";
+import { logQuietly, toolsApi, type SoftwareUpdate } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { softBtn } from "../components/ui";
 
 type Result = { id: string; name: string; ok: boolean; message: string };
 
@@ -35,7 +36,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
   useLiveEffect(
     (vigente) => {
       void load();
-      toolsApi.ignoredUpdates().then((i) => vigente() && setIgnored(i)).catch(() => {});
+      toolsApi.ignoredUpdates().then((i) => vigente() && setIgnored(i)).catch(logQuietly("Software"));
     },
     [load],
   );
@@ -86,7 +87,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
+    <div className="mx-auto max-w-6xl p-6">
       <div className="mb-4 flex items-center gap-3">
         <p className="text-sm text-dim">
           {updates === null ? (
@@ -102,7 +103,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
             </>
           )}
         </p>
-        <div className="relative ml-auto w-64">
+        <div className="relative ml-auto w-64 min-w-40 shrink">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input
             value={query}
@@ -166,7 +167,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
                 <div className="truncate text-sm text-ink">{u.name}</div>
                 <div className="truncate font-mono text-[11px] text-mute">{u.id}</div>
               </div>
-              <div className="w-56 text-right font-mono text-xs tabular">
+              <div className="w-40 text-right font-mono text-xs tabular lg:w-56">
                 <span className="text-mute">{u.version}</span> <span className="text-dim">→</span> <span className="text-neon">{u.available}</span>
               </div>
               <button
@@ -198,7 +199,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
             <button
               onClick={upgrade}
               disabled={running}
-              className="flex shrink-0 items-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-4 py-1.5 text-sm font-medium text-neon hover:bg-neon/20 disabled:opacity-50"
+              className={`${softBtn} shrink-0`}
             >
               <Download size={14} /> Actualizar seleccionados
             </button>

@@ -2,7 +2,7 @@ import { Ban, CheckCircle2, Download, Loader2, MessageSquare, Monitor, MonitorPl
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Modal } from "../components/ui";
-import { libraryApi, officeApi, remoteApi, stationsApi, type Station, type StationAction, type StationActionResult, type StationList } from "../lib/api";
+import { logQuietly, libraryApi, officeApi, remoteApi, stationsApi, type Station, type StationAction, type StationActionResult, type StationList } from "../lib/api";
 import { DataTable } from "../components/DataTable";
 
 const ACTION_LABEL: Record<StationAction, string> = {
@@ -38,7 +38,7 @@ export function Stations() {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
-  const load = useCallback(() => libraryApi.list("stations").then(setLists).catch(() => {}), []);
+  const load = useCallback(() => libraryApi.list("stations").then(setLists).catch(logQuietly("Stations")), []);
   useEffect(() => {
     void load();
   }, [load]);
@@ -66,7 +66,7 @@ export function Stations() {
 
   const remove = async (l: StationList) => {
     if (!(await confirm({ title: "Borrar lista", body: `Se borrará la lista «${l.name}».`, confirmLabel: "Borrar", danger: true }))) return;
-    await libraryApi.remove("stations", l.id).catch(() => {});
+    await libraryApi.remove("stations", l.id).catch((e) => toast("error", String(e)));
     if (current?.id === l.id) setCurrent(null);
     void load();
   };

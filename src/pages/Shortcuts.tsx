@@ -118,7 +118,7 @@ export function Shortcuts() {
 
   const row = (s: Shortcut, key: string, context?: string) => (
     <div key={key} className="group flex items-start gap-4 px-4 py-2.5">
-      <div className="w-64 shrink-0 pt-0.5">
+      <div className="w-40 shrink-0 pt-0.5 lg:w-64">
         <Keys keys={s.keys} />
       </div>
       <div className="min-w-0 flex-1">
@@ -147,7 +147,7 @@ export function Shortcuts() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
+    <div className="mx-auto max-w-6xl p-6">
       <div className="mb-4 flex items-center gap-3">
         <div className="relative flex-1">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />

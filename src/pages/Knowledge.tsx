@@ -26,14 +26,7 @@ import {
   Loading,
   Modal,
 } from "../components/ui";
-import {
-  libraryApi,
-  toolboxApi,
-  tweaksApi,
-  type PlaceNote,
-  type Solution,
-  type TextTemplate,
-} from "../lib/api";
+import { logQuietly, libraryApi, toolboxApi, tweaksApi, type PlaceNote, type Solution, type TextTemplate } from "../lib/api";
 import type { PageId } from "../components/Sidebar";
 import {
   BUILTIN_SOLUTIONS,
@@ -47,6 +40,7 @@ import { norm } from "../lib/contacts";
 import { AUTO_VARS, autoValues, fill, questions } from "../lib/templates";
 import { PlaceNotes } from "../components/PlaceNotes";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { onSectionRequest, reportSection, usePageId } from "../lib/sectionState";
 
 type Tab = "solutions" | "templates" | "notes";
 
@@ -101,9 +95,26 @@ export function Knowledge({
     }
   };
 
-  // Desde la búsqueda global: «solution:<id>», «template:<id>» o «notes».
+  // La barra lateral marca la sección a la vista, y puede pedir otra.
+  const page = usePageId();
+  useEffect(() => {
+    if (page) reportSection(page, tab);
+  }, [page, tab]);
+  useEffect(() => {
+    if (!page) return;
+    return onSectionRequest(page, (s) => {
+      if (TABS.some((t) => t.id === s)) choose(s as Tab);
+    });
+  }, [page]);
+
+  // Desde la búsqueda global: «solution:<id>», «template:<id>» o «notes»; y desde la
+  // barra lateral, el nombre de la sección («solutions», «templates»).
   useEffect(() => {
     if (!focus) return;
+    if (TABS.some((t) => t.id === focus)) {
+      choose(focus as Tab);
+      return;
+    }
     // Solo el primer «:»: los ids de las soluciones de AdminOps llevan otro dentro.
     const sep = focus.indexOf(":");
     const kind = sep < 0 ? focus : focus.slice(0, sep);
@@ -119,7 +130,7 @@ export function Knowledge({
 
   const current = TABS.find((t) => t.id === tab)!;
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
+    <div className="mx-auto max-w-6xl space-y-4 p-6">
       <div className="flex gap-1 border-b border-line">
         {TABS.map((t) => (
           <button
@@ -183,7 +194,7 @@ export function SolutionEditor({
     <Modal
       title={s.id ? "Editar solución" : "Nueva solución"}
       onClose={onClose}
-      width="w-[680px] max-w-[95vw]"
+      width="w-[680px]"
       footer={
         <>
           <Button kind="ghost" onClick={onClose}>
@@ -610,7 +621,7 @@ function UseTemplate({ t, onClose }: { t: TextTemplate; onClose: () => void }) {
     <Modal
       title={t.name}
       onClose={onClose}
-      width="w-[640px] max-w-[95vw]"
+      width="w-[640px]"
       footer={
         <>
           <Button kind="ghost" onClick={onClose}>
@@ -685,7 +696,7 @@ function TemplateEditor({
     <Modal
       title={t.id ? "Editar plantilla" : "Nueva plantilla"}
       onClose={onClose}
-      width="w-[720px] max-w-[95vw]"
+      width="w-[720px]"
       footer={
         <>
           <Button kind="ghost" onClick={onClose}>
@@ -942,7 +953,7 @@ function Notes() {
       libraryApi
         .place()
         .then((p) => vigente() && setPlace(p))
-        .catch(() => {});
+        .catch(logQuietly("Knowledge"));
     },
     [load],
   );

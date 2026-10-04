@@ -4,9 +4,7 @@ import { Copy, ExternalLink, Folder, HardDrive, Loader2, Monitor, Plug, Printer,
 import { useCallback, useEffect, useState } from "react";
 import { officeApi, type NetDrives, type RemoteShare } from "../lib/api";
 import { useConfirm, useToast } from "./feedback";
-import { Button, Card, inputClass, Loading } from "./ui";
-
-const iconBtn = "rounded-md p-1.5 text-mute transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-30";
+import { Button, Card, inputClass, Loading, iconBtn } from "./ui";
 
 /** Unidades de red que Windows recuerda: reconectar las rotas, conectar otra, quitar. */
 export function NetworkDrives({ refresh }: { refresh: number }) {

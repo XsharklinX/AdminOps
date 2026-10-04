@@ -4,7 +4,7 @@
 // conexión o el índice de archivos), porque de eso depende qué hacer. Lo que
 // pierde datos va antes que lo que se arregla: con un disco que falla, lo
 // primero es copiar lo que aún se lee, y eso está aquí mismo.
-import { Activity, CheckCircle2, CircleAlert, FolderInput, FolderOutput, HardDrive, Loader2, RefreshCw, ScanSearch, ShieldAlert, Usb, Wrench, XCircle } from "lucide-react";
+import { Activity, CheckCircle2, CircleAlert, FolderInput, FolderOutput, HardDrive, Loader2, RefreshCw, ScanSearch, Usb, Wrench, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { BitLockerChip, DiskTrend, RemovableActions, SpeedTest } from "../components/DiskExtras";
@@ -14,6 +14,7 @@ import { disksApi, type DiskCheck, type DiskReport, type DiskVolume, type Rescue
 import { withoutUserPaths } from "../lib/errors";
 import { bytes } from "../lib/format";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { NeedsAdmin } from "../components/AdminBanner";
 
 const TONE = {
   ok: { box: "border-ok/40 bg-ok/10", text: "text-ok", Icon: CheckCircle2 },
@@ -51,11 +52,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {!isAdmin && (
-        <p className="flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
-          <ShieldAlert size={14} className="mt-0.5 shrink-0" />
-          Sin administrador no se ven los datos SMART, las temperaturas ni si Windows marcó un disco como dañado, y no se puede reparar. Abre AdminOps como
-          administrador para verlo todo.
-        </p>
+        <NeedsAdmin>Sin administrador no se ven los datos SMART, las temperaturas ni si Windows marcó un disco como dañado, y no se puede reparar.</NeedsAdmin>
       )}
 
       {error ? (

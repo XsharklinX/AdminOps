@@ -211,7 +211,7 @@ export function TweaksPage({
   );
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
+    <div className="mx-auto max-w-6xl p-6">
       {catKey === "cleanup" && !query && <ScheduleCard isAdmin={isAdmin} />}
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-dim">

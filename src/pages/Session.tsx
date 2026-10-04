@@ -5,7 +5,7 @@ import { BillingEditor, SendReportModal, SignaturePad, TemplatePicker } from "..
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, ErrorState, inputClass, Loading } from "../components/ui";
 import { VisitChanges } from "../components/VisitChanges";
-import { contactsApi, diagApi, tweaksApi, workApi, type ActiveSession, type Client, type Contact, type JournalEntry, type Settings, type Solution } from "../lib/api";
+import { logQuietly, contactsApi, diagApi, tweaksApi, workApi, type ActiveSession, type Client, type Contact, type JournalEntry, type Settings, type Solution } from "../lib/api";
 import { usePageActive } from "../lib/pageActive";
 import { autoDone } from "../lib/visits";
 import { SolutionEditor } from "./Knowledge";
@@ -73,7 +73,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
       if (marked.some((c, i) => c.done !== s.checklist[i].done)) {
         const next = { ...s, checklist: marked };
         setSession(next);
-        workApi.updateSession(next).catch(() => {});
+        workApi.updateSession(next).catch(logQuietly("Session"));
         return;
       }
     }
@@ -83,11 +83,11 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
   useLiveEffect(
     (vigente) => {
       void load();
-      workApi.settings().then((s) => vigente() && setSettings(s)).catch(() => {});
+      workApi.settings().then((s) => vigente() && setSettings(s)).catch(logQuietly("Session"));
       contactsApi
         .list()
         .then((l) => vigente() && setContacts(l.filter((c) => !c.deleted)))
-        .catch(() => {});
+        .catch(logQuietly("Session"));
     },
     [load],
   );
@@ -291,7 +291,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
   const small = "w-24 rounded-md border border-line bg-void/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-neon/50";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
+    <div className="mx-auto max-w-6xl space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-4 rounded-xl border border-line bg-panel px-5 py-3">
         <span className="size-2.5 animate-pulse rounded-full bg-ok" />
         <div className="min-w-0 flex-1">
@@ -426,7 +426,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
           <div className="space-y-5">
             <section>
               <h4 className="mb-2 text-xs font-medium text-dim">Tipo de informe</h4>
-              <TemplatePicker value={session.template} onChange={(template) => update({ ...session, template })} />
+              <TemplatePicker value={session.template} onChange={(template) => update({ ...session, template })} custom={settings?.reportLayout?.name} />
             </section>
 
             <section className="flex flex-wrap gap-6">

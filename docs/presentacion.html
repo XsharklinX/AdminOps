@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AdminOps. Presentación</title>
+<style>
+  @page { size: A4; margin: 20mm 19mm 19mm 19mm;
+    @bottom-left { content: "AdminOps · Presentación"; font-family: "Segoe UI", sans-serif; font-size: 8pt; color: #8a94a3; }
+    @bottom-right { content: counter(page); font-family: "Segoe UI", sans-serif; font-size: 8pt; color: #8a94a3; } }
+  @page :first { margin: 0; @bottom-left { content: ""; } @bottom-right { content: ""; } }
+  :root { --azul: #2F63D8; --tinta: #16202e; --gris: #55606f; --linea: #d9dee6; --fondo: #f4f6fa; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.4pt; line-height: 1.5; color: var(--tinta); margin: 0; }
+  h2 { font-size: 17pt; font-weight: 600; letter-spacing: -0.3px; margin: 0 0 1mm; break-after: avoid; }
+  h2 .n { color: var(--azul); font-weight: 700; margin-right: 2.5mm; }
+  .lead { font-size: 11pt; color: var(--gris); margin: 0 0 5mm; max-width: 150mm; }
+  h3 { font-size: 11.2pt; font-weight: 600; margin: 5.5mm 0 1.5mm; break-after: avoid; }
+  p { margin: 0 0 2.6mm; }
+  ul { margin: 0 0 2.6mm; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  section { break-before: page; }
+  section.sigue { break-before: auto; margin-top: 8mm; }
+  b { font-weight: 600; }
+
+  .portada { height: 297mm; padding: 26mm 24mm 22mm; display: flex; flex-direction: column; justify-content: space-between; background: var(--tinta); color: #fff; break-before: auto; }
+  .portada svg { width: 26mm; height: 26mm; }
+  .portada h1 { font-size: 46pt; font-weight: 600; letter-spacing: -1.5px; margin: 10mm 0 3mm; }
+  .portada .sub { font-size: 16pt; color: #c9d3e3; max-width: 130mm; line-height: 1.35; }
+  .portada .tres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; margin-top: 16mm; }
+  .portada .tres div { border-top: 1.5px solid var(--azul); padding-top: 3mm; font-size: 9.6pt; color: #c9d3e3; }
+  .portada .tres b { display: block; color: #fff; font-size: 11pt; margin-bottom: 1mm; }
+  .portada .pie { font-size: 9.5pt; color: #9aa7ba; line-height: 1.7; }
+
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4.5mm; font-size: 9.5pt; }
+  th { text-align: left; font-size: 8.3pt; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gris); border-bottom: 1.4px solid var(--tinta); padding: 1.6mm 2.2mm; font-weight: 600; }
+  td { vertical-align: top; padding: 2mm 2.2mm; border-bottom: 0.7px solid var(--linea); }
+  tr { break-inside: avoid; }
+  td.k { font-weight: 600; width: 38mm; }
+  td.antes { color: var(--gris); width: 50%; }
+
+  .cifras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; margin: 4mm 0 6mm; break-inside: avoid; }
+  .cifras div { background: var(--fondo); border-radius: 2.5mm; padding: 3.5mm 4mm; font-size: 8.8pt; color: var(--gris); }
+  .cifras b { display: block; font-size: 19pt; color: var(--azul); font-weight: 600; line-height: 1.1; margin-bottom: 1mm; }
+
+  .tarjetas { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin: 3mm 0 5mm; }
+  .tarjeta { border: 0.8px solid var(--linea); border-radius: 2.5mm; padding: 3.8mm 4.5mm; break-inside: avoid; font-size: 9.6pt; }
+  .tarjeta h4 { margin: 0 0 1.5mm; font-size: 10.6pt; font-weight: 600; }
+  .tarjeta p:last-child, .tarjeta ul:last-child { margin-bottom: 0; }
+  .tarjeta .et { display: inline-block; font-size: 7.6pt; text-transform: uppercase; letter-spacing: 0.5px; color: var(--azul); font-weight: 600; margin-bottom: 1mm; }
+
+  .area { break-inside: avoid; border-left: 2.5px solid var(--azul); padding: 0.5mm 0 0.5mm 5mm; margin: 0 0 5.5mm; }
+  .area h3 { margin: 0 0 1mm; font-size: 12pt; }
+  .area .que { color: var(--gris); margin-bottom: 1.8mm; }
+  .area ul { columns: 2; column-gap: 8mm; font-size: 9.4pt; margin: 0; }
+  .area li { break-inside: avoid; }
+
+  .caso { break-inside: avoid; background: var(--fondo); border-radius: 2.5mm; padding: 4mm 5mm; margin: 0 0 4mm; font-size: 9.7pt; }
+  .caso h4 { margin: 0 0 1.5mm; font-size: 10.8pt; font-weight: 600; }
+  .caso ol { margin: 0; padding-left: 5mm; }
+  .caso .res { margin: 2mm 0 0; color: var(--azul); font-weight: 600; }
+
+  .nota { border: 0.8px solid var(--azul); border-radius: 2.5mm; padding: 3.5mm 4.5mm; margin: 3mm 0 5mm; font-size: 9.7pt; break-inside: avoid; }
+  .nota b.t { display: block; color: var(--azul); font-size: 8.4pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1mm; }
+  .nota p:last-child { margin-bottom: 0; }
+
+  .capas { font-size: 9.2pt; margin: 3mm 0 5mm; break-inside: avoid; }
+  .capa { border: 1px solid var(--tinta); border-radius: 2mm; padding: 2mm 4mm; }
+  .capa b { display: block; font-size: 10pt; }
+  .capa.g { background: var(--fondo); }
+  .flecha { text-align: center; font-size: 8.3pt; color: var(--gris); padding: 0.8mm 0; }
+
+  .horizonte { display: grid; grid-template-columns: 30mm 1fr; gap: 5mm; padding: 3.5mm 0; border-bottom: 0.7px solid var(--linea); break-inside: avoid; }
+  .horizonte .cuando { font-weight: 600; color: var(--azul); font-size: 10pt; }
+  .horizonte ul { margin: 0; }
+  .peq { font-size: 8.9pt; color: var(--gris); }
+  .compacta h3 { margin-top: 4mm; }
+  .compacta td { padding: 1.3mm 2.2mm; }
+  .compacta table { margin-bottom: 3mm; font-size: 9.2pt; }
+  .compacta p, .compacta li { font-size: 9.8pt; }
+  .compacta ul.dos { columns: 2; column-gap: 8mm; }
+  .compacta ul.dos li { break-inside: avoid; }
+  .compacta .nota { margin: 3mm 0 0; }
+</style>
+</head>
+<body>
+
+<div class="portada">
+  <div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect x="4" y="4" width="92" height="92" rx="22" fill="#2F63D8"/>
+      <path d="M24 70 A30 30 0 1 1 76 70" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+      <line x1="50" y1="58" x2="64" y2="42" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="68" cy="37" r="9" fill="#FFFFFF"/>
+      <rect x="65" y="24" width="7" height="13" rx="1" fill="#2F63D8" transform="rotate(41 68.5 30.5)"/>
+      <circle cx="50" cy="58" r="5.5" fill="#FFFFFF"/>
+    </svg>
+    <h1>AdminOps</h1>
+    <p class="sub">Diagnóstico, mantenimiento y soporte técnico de equipos Windows, en una sola aplicación.</p>
+    <div class="tres">
+      <div><b>Encuentra</b>Qué le pasa al equipo, ordenado por gravedad y explicado en claro.</div>
+      <div><b>Arregla</b>Con cambios que quedan anotados y se pueden deshacer.</div>
+      <div><b>Deja constancia</b>Un informe en PDF de lo que se hizo, listo para entregar.</div>
+    </div>
+  </div>
+  <div class="pie">
+    Presentación del producto · versión 1.1.10<br>
+    Autor: David Bonilla<br>
+    Contactoyerlindavid@gmail.com
+  </div>
+</div>
+
+<section>
+  <h2><span class="n">1</span>En una página</h2>
+  <p class="lead">Qué es AdminOps y por qué merece la pena mirarlo.</p>
+  <p>AdminOps es un programa de escritorio para Windows 10 y 11 hecho para quien da soporte técnico. Reúne en una ventana el trabajo completo de atender un equipo: ver cómo está, encontrar lo que falla, arreglarlo y documentar lo que se hizo.</p>
+  <p>Hoy ese trabajo se reparte entre el Administrador de tareas, el Visor de eventos, la consola, el Panel de control, el navegador para los tickets, el correo, una hoja de Excel para el inventario y la memoria del técnico. AdminOps no inventa nada que Windows no sepa hacer: usa las mismas herramientas del sistema, las ordena, las explica en español y pone al lado de cada problema el botón que lo resuelve.</p>
+  <p>Lo que añade, y Windows no trae, es <b>memoria</b>: qué se cambió, cuándo, en qué equipo, para quién, y cómo volver atrás.</p>
+
+  <div class="cifras">
+    <div><b>5</b>áreas de trabajo, con más de treinta pantallas</div>
+    <div><b>393</b>operaciones, cada una clasificada como «consulta» o «cambia el equipo»</div>
+    <div><b>100+</b>ajustes y reparaciones de Windows catalogados y reversibles</div>
+    <div><b>11 MB</b>pesa el instalador; también va en un pendrive</div>
+  </div>
+
+  <h3>Lo que cambia en la práctica</h3>
+  <table>
+    <tr><th>Hoy</th><th>Con AdminOps</th></tr>
+    <tr><td class="antes">Revisar un equipo exige saltar entre muchas herramientas y saber dónde mirar.</td><td>Un diagnóstico repasa discos, errores graves, drivers, seguridad, actualizaciones y arranque, y ordena lo importante.</td></tr>
+    <tr><td class="antes">«Va lento» o «no imprime» se investiga de cero cada vez.</td><td>Se elige el síntoma y el programa revisa las causas típicas y ofrece la reparación.</td></tr>
+    <tr><td class="antes">Lo que se cambió en un equipo se olvida, y deshacerlo es difícil.</td><td>Cada cambio queda en un diario con el valor anterior. «Deshacer» lo devuelve a como estaba.</td></tr>
+    <tr><td class="antes">El informe al usuario o al cliente se escribe a mano, si se escribe.</td><td>El PDF se genera solo, con lo hecho y la comparación del antes y el después.</td></tr>
+    <tr><td class="antes">El inventario se rellena copiando datos a mano.</td><td>La ficha del equipo (modelo, serie, licencia, hardware) sale lista para copiar o pegar en Excel.</td></tr>
+    <tr><td class="antes">Tickets, correo y Teams, cada uno en su ventana.</td><td>Dentro de la misma aplicación, al lado del equipo que se está atendiendo.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">2</span>Lo que ofrece</h2>
+  <p class="lead">Cinco áreas. De cada una, lo que permite hacer.</p>
+
+  <div class="area">
+    <h3>Inicio</h3>
+    <p class="que">Lo primero que se ve, y el trabajo de una visita de principio a fin.</p>
+    <ul>
+      <li><b>Panel en vivo:</b> procesador, memoria, discos, red y temperaturas, con lo pendiente del día.</li>
+      <li><b>Solucionar problemas</b> por síntoma: sin Internet, sin sonido, no imprime, va lento, Wi‑Fi, Bluetooth, pantalla, Windows Update.</li>
+      <li><b>Reparaciones de Windows</b> guiadas: archivos del sistema, imagen de Windows, red, cola de impresión.</li>
+      <li><b>Sesión de servicio</b> por pasos: motivo, trabajo, informe, cobro y firma del cliente en pantalla.</li>
+      <li><b>Informe en PDF</b> con tres plantillas: para el cliente, técnica y la propia del técnico.</li>
+      <li><b>Presupuesto o recibo</b> con impuestos, garantías y próximo mantenimiento.</li>
+    </ul>
+  </div>
+
+  <div class="area">
+    <h3>Equipo</h3>
+    <p class="que">Cómo está este equipo y qué se le puede hacer.</p>
+    <ul>
+      <li><b>Diagnóstico</b> con hallazgos por gravedad; en los pantallazos azules señala el driver probable.</li>
+      <li><b>Hardware:</b> placa, BIOS, memoria por ranura, gráfica, monitores y sensores.</li>
+      <li><b>Seguridad</b> con nota de 0 a 100 y un botón por cada punto flojo. Copia de las claves de BitLocker.</li>
+      <li><b>Ajustes de Windows</b> reversibles: limpieza, rendimiento, privacidad, servicios e inicio.</li>
+      <li><b>Procesos</b> agrupados por programa; finalizar un programa entero.</li>
+      <li><b>Discos:</b> qué ocupa el espacio, salud de cada disco, reparación y rescate de archivos de un disco que falla.</li>
+      <li><b>Red:</b> router y Wi‑Fi, dispositivos conectados, prueba de velocidad, reparar la red, ping, traza de ruta, puertos, DNS.</li>
+      <li><b>Datos del usuario:</b> copia a otro equipo, caja fuerte cifrada, borrado seguro y recuperación de archivos borrados.</li>
+      <li><b>Historial:</b> línea de tiempo del equipo y diario de cambios, exportable a PDF y Excel.</li>
+    </ul>
+  </div>
+
+  <div class="area">
+    <h3>Soporte</h3>
+    <p class="que">El trabajo diario con personas, clientes y solicitudes.</p>
+    <ul>
+      <li><b>Agenda</b> de visitas, tareas, llamadas y reuniones, con vista de mes, historial y aviso antes de cada cita.</li>
+      <li><b>Teams y Correo</b> dentro de la aplicación, sin instalarlos en el equipo que se atiende.</li>
+      <li><b>Contactos</b> con extensiones, sustitutos e importación desde Excel.</li>
+      <li><b>Tickets</b> y la <b>web de inventario</b> de la organización, usados como en un navegador y con la sesión recordada.</li>
+      <li><b>Inventario</b> propio, con un veredicto por equipo: seguir, mejorar o renovar.</li>
+      <li><b>Personas</b> del dominio: cuenta bloqueada o contraseña caducada, con el arreglo a un clic.</li>
+      <li><b>Clientes</b> con sus equipos, visitas, informes y garantías.</li>
+      <li><b>Soluciones</b> paso a paso y plantillas de texto para responder.</li>
+    </ul>
+  </div>
+
+  <div class="area">
+    <h3>Aplicaciones</h3>
+    <p class="que">Los programas del equipo y cómo dejar uno nuevo listo.</p>
+    <ul>
+      <li><b>Actualizar</b> programas en lote y gestionar Windows Update, con cada error explicado.</li>
+      <li><b>Instalar en lote</b> desde un catálogo de más de cien programas o desde listas propias.</li>
+      <li><b>Desinstalar</b> limpiando los restos, y quitar aplicaciones preinstaladas.</li>
+      <li><b>Plantillas de preparación:</b> programas, ajustes, usuario, nombre y dominio, de una vez y siempre igual.</li>
+    </ul>
+  </div>
+
+  <div class="area">
+    <h3>Administración</h3>
+    <p class="que">Usuarios, cuentas, lo que la oficina comparte y cómo llegar a otros equipos.</p>
+    <ul>
+      <li><b>Usuarios locales</b> con avisos: contraseña caducada, administrador sin contraseña, cuentas sin usar.</li>
+      <li><b>Cuentas y dominio:</b> unir, sacar, reparar la relación de confianza, cambiar el nombre.</li>
+      <li><b>Impresoras:</b> estado, cola, página de prueba, niveles de tóner en las de red.</li>
+      <li><b>Carpetas compartidas:</b> permisos, «¿por qué no puede entrar?», unidades de red y copia diaria.</li>
+      <li><b>Acceso remoto:</b> agenda de conexiones que dice qué equipos contestan.</li>
+      <li><b>Puestos:</b> qué equipos de la oficina responden y cuáles necesitan atención.</li>
+      <li><b>Herramientas de Windows</b> a un clic y atajos de teclado.</li>
+    </ul>
+  </div>
+
+  <h3>Lo que trae de fábrica</h3>
+  <div class="cifras">
+    <div><b>100+</b>ajustes y reparaciones de Windows, cada uno con su explicación y su nivel de riesgo</div>
+    <div><b>100+</b>programas en el catálogo de instalación en lote</div>
+    <div><b>20+</b>soluciones paso a paso para los problemas más comunes</div>
+    <div><b>280+</b>atajos de teclado de Windows y de los programas habituales</div>
+  </div>
+  <p>Y lo que cada técnico añade: sus propias soluciones, sus plantillas de preparación, sus listas de programas, sus tipos de visita con su lista de comprobación, y su plantilla de informe. Todo eso viaja con él, y se puede pasar a un compañero con un archivo.</p>
+  <div class="nota">
+    <b class="t">Siempre a mano</b>
+    <p>Con <b>Ctrl+K</b> se busca cualquier cosa desde cualquier pantalla: una página, una herramienta, un ajuste, un contacto o un problema escrito con las palabras del usuario («no suena», «no hay internet»).</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">3</span>Cuatro situaciones reales</h2>
+  <p class="lead">Cómo se resuelve con AdminOps lo que pasa todos los días.</p>
+
+  <div class="caso">
+    <h4>«Mi equipo va muy lento»</h4>
+    <ol>
+      <li>Se lanza un diagnóstico. En menos de un minuto dice que el disco está al 96 %, que arrancan catorce programas con Windows y que hay un driver con error.</li>
+      <li>Espacio en disco muestra qué carpetas ocupan más. Se libera lo que sobra.</li>
+      <li>Se desactivan los programas de inicio innecesarios. No se borra nada: se pueden volver a activar.</li>
+      <li>Segundo diagnóstico. El informe compara los dos.</li>
+    </ol>
+    <p class="res">Resultado: el equipo queda mejor y hay un documento que lo demuestra.</p>
+  </div>
+
+  <div class="caso">
+    <h4>«No puedo entrar a la carpeta compartida»</h4>
+    <ol>
+      <li>Carpetas compartidas → «¿Por qué no puede entrar?». Se eligen la carpeta y la persona.</li>
+      <li>El programa responde en claro: la compartición le deja modificar, pero los permisos del disco no le dejan entrar.</li>
+      <li>«Darle acceso» lo corrige en los dos sitios a la vez.</li>
+    </ol>
+    <p class="res">Resultado: un problema clásico que cuesta media hora se resuelve en dos minutos, sabiendo la causa.</p>
+  </div>
+
+  <div class="caso">
+    <h4>Preparar un equipo nuevo</h4>
+    <ol>
+      <li>Se elige una plantilla: quitar aplicaciones preinstaladas, instalar la lista de programas de la oficina, aplicar los ajustes, crear el usuario, poner el nombre y unir al dominio.</li>
+      <li>Se ejecuta. Cada paso muestra su progreso; las contraseñas se piden en el momento y no se guardan.</li>
+      <li>La ficha del equipo se copia al inventario.</li>
+    </ol>
+    <p class="res">Resultado: todos los equipos quedan preparados igual, sin depender de la memoria de quien los prepara.</p>
+  </div>
+
+  <div class="caso">
+    <h4>Algo dejó de funcionar después de un cambio</h4>
+    <ol>
+      <li>Historial → Diario de cambios. Ahí está todo lo que se tocó en ese equipo, por días.</li>
+      <li>Se busca el cambio sospechoso y se pulsa «Deshacer».</li>
+      <li>Si el equipo no arranca bien, hay un punto de restauración creado antes de los cambios de riesgo.</li>
+    </ol>
+    <p class="res">Resultado: equivocarse deja de ser grave, porque hay vuelta atrás.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">4</span>Lo que lo distingue</h2>
+  <p class="lead">Hay muchas utilidades para Windows. Estas seis cosas no suelen venir juntas.</p>
+  <div class="tarjetas">
+    <div class="tarjeta"><span class="et">Reversible</span><h4>Todo cambio tiene vuelta atrás</h4><p>Antes de cambiar un ajuste se guarda el valor exacto que había. Los de riesgo crean un punto de restauración. Lo que no se puede deshacer (un borrado seguro, un formateo) lo avisa y pide confirmación explícita.</p></div>
+    <div class="tarjeta"><span class="et">Privado</span><h4>Los datos no salen del equipo</h4><p>No hay cuentas, ni servidor, ni telemetría. Clientes, contactos, diagnósticos e informes se guardan en local. Las contraseñas guardadas se cifran.</p></div>
+    <div class="tarjeta"><span class="et">Portable</span><h4>Va en un pendrive</h4><p>Con los clientes, contactos y ajustes del técnico. No deja nada en el equipo que se atiende. Un PIN protege la aplicación y sus contraseñas si el pendrive se pierde.</p></div>
+    <div class="tarjeta"><span class="et">Solo mirar</span><h4>Modo auditoría</h4><p>Un interruptor rechaza, en un único punto del programa, las 96 operaciones que modifican el equipo. Sirve para revisar un equipo que no se debe tocar.</p></div>
+    <div class="tarjeta"><span class="et">Documentado</span><h4>El trabajo queda por escrito</h4><p>Informe en PDF con la marca propia, diario de cambios exportable y ficha de cada cliente con sus visitas. Dentro del programa hay una guía de cada pantalla, con glosario.</p></div>
+    <div class="tarjeta"><span class="et">Explicado</span><h4>Dice qué pasa y qué hacer</h4><p>Los errores se traducen a un mensaje claro. Cada hallazgo trae su explicación y su botón. Está escrito por alguien que hace ese trabajo, para quien lo hace.</p></div>
+  </div>
+  <div class="nota">
+    <b class="t">Dos modos</b>
+    <p>El <b>modo técnico</b> muestra todo. El <b>modo usuario</b> muestra solo el estado del equipo, la solución de problemas, los discos y el acceso remoto, para dejar el programa en el equipo de alguien que no es técnico. Es un modo de interfaz, que simplifica lo que se ve; no es una barrera de seguridad ni sustituye a los permisos de Windows.</p>
+  </div>
+</section>
+
+<section class="compacta">
+  <h2><span class="n">5</span>Seguridad y confianza</h2>
+  <p class="lead">Lo que conviene saber antes de autorizar su uso. Todo es comprobable en el código, y la guía de instalación para sistemas lo detalla.</p>
+
+  <h3>Permisos</h3>
+  <p>Sin permisos de administrador, AdminOps consulta pero no cambia nada. Para aplicar cambios hay que abrirlo como administrador, con el aviso normal de Windows. Trabaja con los permisos que el técnico ya tiene: en el dominio puede ver y hacer exactamente lo que ese técnico puede en las herramientas de Windows, ni más ni menos.</p>
+
+  <h3>Qué conexiones hace</h3>
+  <table>
+    <tr><th>Destino</th><th>Cuándo</th><th>Qué envía</th></tr>
+    <tr><td>GitHub</td><td>Si «Avisar de versiones nuevas» está activado, o al pedir la actualización</td><td>Nada; consulta la última versión publicada</td></tr>
+    <tr><td>Servicio de IP pública</td><td>Solo al pulsar «IP pública»</td><td>Nada; es una consulta</td></tr>
+    <tr><td>Servidor de prueba de velocidad</td><td>Solo al lanzar la prueba</td><td>Tráfico de prueba</td></tr>
+    <tr><td>Instalador de programas de Windows (winget)</td><td>Solo al instalar o actualizar programas</td><td>Lo que envía la propia herramienta de Windows</td></tr>
+    <tr><td>Webs que el técnico abre dentro (tickets, correo, Teams)</td><td>Al abrirlas</td><td>Lo mismo que enviaría un navegador</td></tr>
+    <tr><td>Red local</td><td>Al buscar dispositivos o revisar impresoras</td><td>Consultas de solo lectura que no salen de la red</td></tr>
+  </table>
+  <p>No hay telemetría, analítica ni servidor propio. «Reportar un problema» prepara un correo para el autor con un archivo de diagnóstico; no sale nada si el técnico no lo envía.</p>
+
+  <h3>Las webs incrustadas están aisladas</h3>
+  <p>Tickets, inventario, correo y Teams se muestran dentro de la ventana, pero esas páginas no tienen acceso a ninguna operación de AdminOps: el canal de comunicación con el programa se concede solo a su propia interfaz. Una web comprometida no puede pedirle nada al programa.</p>
+
+  <h3>Contraseñas</h3>
+  <p>Las que el técnico decide guardar se cifran: instalado, con el mecanismo de Windows para ese usuario; en el pendrive, con una clave propia (AES‑256) que el PIN protege. Las de Escritorio remoto no las guarda AdminOps, sino Windows.</p>
+
+  <h3>Lo que AdminOps no hace, a propósito</h3>
+  <ul class="dos">
+    <li>No intenta esquivar al antivirus ni a las herramientas de administración. Si el antivirus bloquea una acción, lo dice.</li>
+    <li>No ejecuta nada en otros equipos de la red ni toma el control de sesiones ajenas.</li>
+    <li>No desactiva el antivirus ni el cortafuegos por su cuenta.</li>
+    <li>No muestra en pantalla rutas con el nombre del usuario.</li>
+    <li>No instala actualizaciones de sí mismo en silencio.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">6</span>Cómo está hecho</h2>
+  <p class="lead">La base técnica, sin entrar en el código.</p>
+  <div class="capas">
+    <div class="capa"><b>Interfaz</b>Lo que se ve. No puede tocar el sistema por sí misma: solo puede pedir.</div>
+    <div class="flecha">▼ pide por nombre una de las 393 operaciones permitidas</div>
+    <div class="capa g"><b>Punto de control</b>Comprueba que la operación existe, que el modo auditoría no la bloquea y si hace falta ser administrador.</div>
+    <div class="flecha">▼</div>
+    <div class="capa"><b>Motor</b>Hace el trabajo y guarda el valor anterior antes de cambiar nada.</div>
+    <div class="flecha">▼</div>
+    <div class="capa g"><b>Windows</b>Sus interfaces nativas, PowerShell, el registro, los servicios y sus propias herramientas.</div>
+  </div>
+  <table>
+    <tr><th>Parte</th><th>Tecnología</th><th>Qué aporta</th></tr>
+    <tr><td class="k">Motor</td><td>Rust</td><td>Rápido, con poco consumo y sin los fallos de memoria típicos de otros lenguajes.</td></tr>
+    <tr><td class="k">Interfaz</td><td>React y TypeScript</td><td>Una interfaz moderna, con comprobación de tipos de extremo a extremo.</td></tr>
+    <tr><td class="k">Contenedor</td><td>Tauri 2 sobre WebView2</td><td>Usa el motor de Edge que Windows ya trae: por eso el instalador pesa 11 MB y no 150.</td></tr>
+    <tr><td class="k">Consultas</td><td>PowerShell y WMI</td><td>Las mismas fuentes que usan las herramientas de Windows.</td></tr>
+    <tr><td class="k">Calidad</td><td>350 pruebas automáticas e integración continua</td><td>Cada cambio se compila, se analiza y se prueba. Una prueba aplica y deshace cada ajuste del catálogo y falla si el equipo no vuelve a su estado. Se revisan las vulnerabilidades conocidas de las dependencias.</td></tr>
+  </table>
+  <p class="peq">Unas 37.000 líneas de Rust y 43.000 de interfaz. Componentes de terceros con licencia abierta, detallados en la documentación.</p>
+</section>
+
+<section>
+  <h2><span class="n">7</span>Ponerlo en marcha</h2>
+  <p class="lead">Qué hace falta y cómo se empezaría.</p>
+  <table>
+    <tr><th>Requisito</th><th>Detalle</th></tr>
+    <tr><td class="k">Sistema</td><td>Windows 10 u 11 de 64 bits, con WebView2 (incluido en Windows 11 y en Windows 10 actualizado).</td></tr>
+    <tr><td class="k">Permisos</td><td>De administrador solo para aplicar cambios.</td></tr>
+    <tr><td class="k">Infraestructura</td><td>Ninguna. No hay servidor que montar, ni base de datos, ni licencias de terceros.</td></tr>
+    <tr><td class="k">Coste</td><td>Ninguno de adquisición.</td></tr>
+  </table>
+  <h3>Tres formas de usarlo</h3>
+  <table>
+    <tr><td class="k">Instalador</td><td>Para el equipo del técnico. Actualiza conservando los datos.</td></tr>
+    <tr><td class="k">Instalador clásico</td><td>Admite instalación en silencio, para desplegarlo en varios equipos.</td></tr>
+    <tr><td class="k">Portable</td><td>En una carpeta o un pendrive, sin instalar nada.</td></tr>
+  </table>
+  <h3>Propuesta: un piloto de dos semanas</h3>
+  <table>
+    <tr><th>Paso</th><th>Qué se hace</th></tr>
+    <tr><td class="k">1. Revisión</td><td>Sistemas revisa la guía de instalación y, si quiere, el código.</td></tr>
+    <tr><td class="k">2. Piloto</td><td>Dos o tres técnicos lo usan en su trabajo real, empezando en modo auditoría y con la versión portable, que no instala nada.</td></tr>
+    <tr><td class="k">3. Medir</td><td>Tiempo por incidencia, incidencias resueltas a la primera y fallos encontrados. «Reportar un problema» los hace llegar al autor.</td></tr>
+    <tr><td class="k">4. Decidir</td><td>Con datos: ampliar, ajustar o descartar.</td></tr>
+  </table>
+  <p>La «configuración de empresa» permite que el segundo técnico empiece con todo listo: se exporta un archivo con los datos de la organización y los portales (sin contraseñas) y el otro lo importa.</p>
+</section>
+
+<section>
+  <h2><span class="n">8</span>Hasta dónde puede llegar</h2>
+  <p class="lead">Lo que ya está, lo siguiente y lo que cabe más adelante.</p>
+  <div class="horizonte">
+    <div class="cuando">Hoy<br><span class="peq">versión 1.1.10</span></div>
+    <ul>
+      <li>Todo lo descrito en este documento, en uso real por su autor.</li>
+      <li>Guía dentro del programa, novedades de cada versión, términos de uso y canal para reportar fallos.</li>
+      <li>Documentación para el técnico, para sistemas y para quien quiera continuar el desarrollo.</li>
+    </ul>
+  </div>
+  <div class="horizonte">
+    <div class="cuando">Siguiente<br><span class="peq">versión 2.0</span></div>
+    <ul>
+      <li><b>Pruebas que recorren el programa en marcha</b> antes de publicar cada versión, para que ningún fallo visible llegue al usuario.</li>
+      <li><b>Actualización desde el propio programa</b>, ya construida, en cuanto las versiones se publiquen.</li>
+      <li>Comparar dos equipos, o el mismo equipo en dos fechas, lado a lado.</li>
+      <li>Todo manejable con teclado y los dos temas revisados pantalla por pantalla.</li>
+    </ul>
+  </div>
+  <div class="horizonte">
+    <div class="cuando">Más adelante</div>
+    <ul>
+      <li><b>Firma digital</b>, que elimina el aviso de Windows al instalar.</li>
+      <li><b>Inglés</b>, para llevarlo fuera del mundo hispanohablante.</li>
+      <li>Estadísticas del trabajo: visitas, tiempos y problemas más frecuentes.</li>
+      <li>Una versión gratuita y otra de pago, con licencias que funcionen sin conexión.</li>
+    </ul>
+  </div>
+  <h3>A quién puede servir</h3>
+  <div class="tarjetas">
+    <div class="tarjeta"><h4>Un equipo de soporte interno</h4><p>Un mismo modo de trabajar para todos: los mismos pasos, los mismos informes, el mismo registro de lo hecho en cada equipo.</p></div>
+    <div class="tarjeta"><h4>Un técnico independiente</h4><p>Lleva su taller en un pendrive: clientes, visitas, garantías, presupuestos y el informe que justifica el cobro.</p></div>
+    <div class="tarjeta"><h4>Una oficina pequeña sin departamento de sistemas</h4><p>En modo usuario, alguien de la oficina resuelve lo común y sabe cuándo llamar al técnico.</p></div>
+    <div class="tarjeta"><h4>Formación</h4><p>Cada pantalla explica lo que hace y por qué. Sirve para aprender soporte técnico con red de seguridad.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">9</span>Límites actuales</h2>
+  <p class="lead">Lo que hoy no hace o no está resuelto. Es mejor saberlo antes.</p>
+  <table>
+    <tr><th>Límite</th><th>Qué significa y qué se prevé</th></tr>
+    <tr><td class="k">Sin firma digital</td><td>Windows muestra un aviso al instalarlo y algún antivirus de empresa puede pedir autorización. Se resuelve comprando un certificado.</td></tr>
+    <tr><td class="k">Un solo desarrollador</td><td>El proyecto depende de su autor. El código está documentado y guardado en un repositorio para que otra persona pueda continuarlo.</td></tr>
+    <tr><td class="k">Probado sobre todo por su autor</td><td>Las funciones de dominio y de carpetas compartidas no se han probado en otras redes. El piloto propuesto sirve justamente para eso.</td></tr>
+    <tr><td class="k">Solo Windows, solo español</td><td>No hay versión para otros sistemas. El inglés está previsto.</td></tr>
+    <tr><td class="k">Un equipo cada vez</td><td>Trabaja sobre el equipo en el que está abierto. No es una consola de gestión remota de todo el parque, ni pretende serlo.</td></tr>
+    <tr><td class="k">Sin garantía</td><td>Se entrega «tal cual», como recogen sus términos de uso. El criterio sobre qué cambiar en cada equipo es del técnico.</td></tr>
+  </table>
+
+  <div class="nota" style="margin-top: 8mm">
+    <b class="t">En resumen</b>
+    <p>AdminOps junta en un programa ligero lo que el soporte técnico hace cada día, lo hace reversible y lo deja documentado, sin sacar un solo dato del equipo y sin exigir infraestructura. Ya funciona y se usa. El paso que le falta es salir de las manos de su autor: un piloto corto, con pocos técnicos y en modo solo lectura, permite comprobarlo sin riesgo.</p>
+  </div>
+  <p class="peq" style="margin-top: 6mm">David Bonilla · Contactoyerlindavid@gmail.com · Documento referido a la versión 1.1.10.</p>
+</section>
+
+</body>
+</html>

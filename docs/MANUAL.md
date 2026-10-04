@@ -53,7 +53,7 @@ urgente: caso abierto, seguimientos, visitas y avisos de Windows.
 
 | Atajo | Qué hace |
 |---|---|
-| Ctrl+K | Buscar cualquier cosa: páginas, acciones, contactos, síntomas, equipos |
+| Ctrl+K o F1 | «Todo AdminOps»: el programa entero por áreas, y buscar cualquier cosa (secciones, acciones, contactos, síntomas, equipos) |
 | Ctrl+Alt+N | Nota de llamada (aunque AdminOps esté minimizado) |
 | Ctrl+L | Bloquear AdminOps |
 | / | Buscar en la página (Contactos, listas) |

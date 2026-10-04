@@ -9,6 +9,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tauri::Emitter;
@@ -33,6 +35,15 @@ fn exe_is_current(dir: &Path) -> bool {
 
 fn parse_version(v: &str) -> Vec<u32> {
     v.split(['.', '-']).map(|p| p.parse().unwrap_or(0)).collect()
+}
+
+/// ¿La versión instalada es más nueva que la de este instalador?
+///
+/// Hubo una build con el número 2.0.0 por un salto de numeración: en realidad es
+/// anterior a la 1.2.2 (la serie sigue en 1.2.x). Quien la tenga instalada debe
+/// poder actualizar; cualquier otra versión mayor sí bloquea, como siempre.
+fn is_downgrade(installed: &str, ours: &str) -> bool {
+    parse_version(installed) != [2, 0, 0] && parse_version(installed) > parse_version(ours)
 }
 
 /// Versión instalada y carpeta, leídas de la entrada que crea el instalador NSIS.
@@ -102,7 +113,7 @@ fn setup_info() -> SetupInfo {
     let other = if current.is_none() { installed_on_other_drive() } else { None };
     SetupInfo {
         version: VERSION.into(),
-        downgrade: current.as_ref().is_some_and(|(v, _)| parse_version(v) > parse_version(VERSION)),
+        downgrade: current.as_ref().is_some_and(|(v, _)| is_downgrade(v, VERSION)),
         install_dir: current.as_ref().map(|(_, d)| d.clone()).or_else(|| other.clone()).unwrap_or_else(default_dir).display().to_string(),
         installed_version: current.map(|(v, _)| v),
         found_on_drive: other.is_some(),
@@ -149,7 +160,7 @@ fn stop_app(dir: &Path) {
     // si queda vivo, el AdminOps nuevo se engancha a él y Correo y Teams no cargan.
     let script = format!(
         r#"Get-Process powershell, pwsh -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne $PID -and ($_.Modules.FileName -like '{d}\*') }} | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction SilentlyContinue | Where-Object {{ $_.CommandLine -like '*\AdminOps\WebView*' -or $_.CommandLine -like '*\AdminOps-data\*' }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"#
+Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction SilentlyContinue | Where-Object {{ $_.CommandLine -like '*\AdminOps\WebView*' -or $_.CommandLine -like '*\AdminOps-data\*' -or $_.CommandLine -like '*\com.adminops.app\*' }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"#
     );
     let _ = std::process::Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
@@ -160,7 +171,134 @@ Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction S
         std::thread::sleep(Duration::from_millis(300));
     }
     std::thread::sleep(Duration::from_millis(500));
+    // Y lo que quede con algún archivo de la carpeta abierto, sea lo que sea.
+    let left = free_files(dir);
+    if !left.is_empty() {
+        eprintln!("Siguen con archivos abiertos: {}", names(&left));
+    }
 }
+
+/// Un programa que tiene abierto algún archivo de la carpeta de AdminOps.
+struct Locker {
+    pid: u32,
+    name: String,
+    /// Servicio o parte de Windows: no se cierra a la fuerza, se dice.
+    protected: bool,
+}
+
+/// Todos los archivos de la carpeta (hasta un tope: con el programa, sus DLL y el
+/// desinstalador sobra).
+fn files_in(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(d) = pending.pop() {
+        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                pending.push(p);
+            } else {
+                out.push(p);
+            }
+            if out.len() >= 2000 {
+                return out;
+            }
+        }
+    }
+    out
+}
+
+/// Pregunta a Windows (Restart Manager, lo que usan los instaladores de Windows)
+/// qué programas tienen abiertos los archivos de la carpeta. Así se cierra lo
+/// que de verdad bloquea, sea lo que sea, y no solo lo que se adivina por nombre.
+#[cfg(windows)]
+fn lockers(dir: &Path) -> Vec<Locker> {
+    use windows_sys::Win32::System::RestartManager::{RmEndSession, RmGetList, RmRegisterResources, RmStartSession, CCH_RM_SESSION_KEY, RM_PROCESS_INFO};
+    let files: Vec<Vec<u16>> = files_in(dir).iter().map(|p| p.as_os_str().encode_wide().chain(std::iter::once(0)).collect()).collect();
+    if files.is_empty() {
+        return Vec::new();
+    }
+    let ptrs: Vec<*const u16> = files.iter().map(|f| f.as_ptr()).collect();
+    let mut session = 0u32;
+    let mut key = [0u16; CCH_RM_SESSION_KEY as usize + 1];
+    unsafe {
+        if RmStartSession(&mut session, 0, key.as_mut_ptr()) != 0 {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        if RmRegisterResources(session, ptrs.len() as u32, ptrs.as_ptr(), 0, std::ptr::null(), 0, std::ptr::null()) == 0 {
+            let (mut needed, mut count, mut reasons) = (0u32, 0u32, 0u32);
+            // Primera vez: cuántos son. Segunda: la lista.
+            let _ = RmGetList(session, &mut needed, &mut count, std::ptr::null_mut(), &mut reasons);
+            if needed > 0 {
+                let mut info: Vec<RM_PROCESS_INFO> = vec![std::mem::zeroed(); needed as usize];
+                count = needed;
+                if RmGetList(session, &mut needed, &mut count, info.as_mut_ptr(), &mut reasons) == 0 {
+                    for i in &info[..count as usize] {
+                        let len = i.strAppName.iter().position(|&c| c == 0).unwrap_or(i.strAppName.len());
+                        // 3 = servicio, 4 = el Explorador, 1000 = crítico para Windows.
+                        let protected = matches!(i.ApplicationType, 3 | 4 | 1000);
+                        out.push(Locker { pid: i.Process.dwProcessId, name: String::from_utf16_lossy(&i.strAppName[..len]), protected });
+                    }
+                }
+            }
+        }
+        RmEndSession(session);
+        out
+    }
+}
+
+#[cfg(not(windows))]
+fn lockers(_: &Path) -> Vec<Locker> {
+    Vec::new()
+}
+
+/// Cierra lo que tiene abiertos los archivos (menos este instalador y lo que es
+/// de Windows). Devuelve lo que no se pudo o no se debía cerrar.
+#[cfg(windows)]
+fn free_files(dir: &Path) -> Vec<Locker> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+    let me = std::process::id();
+    let mut left = Vec::new();
+    for l in lockers(dir) {
+        if l.pid == me {
+            continue;
+        }
+        if l.protected {
+            left.push(l);
+            continue;
+        }
+        let done = unsafe {
+            let h = OpenProcess(PROCESS_TERMINATE, 0, l.pid);
+            if h.is_null() {
+                false
+            } else {
+                let ok = TerminateProcess(h, 1) != 0;
+                CloseHandle(h);
+                ok
+            }
+        };
+        if !done {
+            left.push(l);
+        }
+    }
+    if !left.is_empty() || !lockers(dir).is_empty() {
+        std::thread::sleep(Duration::from_millis(800));
+    }
+    left
+}
+
+#[cfg(not(windows))]
+fn free_files(_: &Path) -> Vec<Locker> {
+    Vec::new()
+}
+
+/// «AdminOps (1234), Explorador de Windows (5678)» para el mensaje de error.
+fn names(list: &[Locker]) -> String {
+    list.iter().map(|l| if l.name.is_empty() { format!("proceso {}", l.pid) } else { format!("{} ({})", l.name, l.pid) }).collect::<Vec<_>>().join(", ")
+}
+
 
 /// Windows guarda en caché los iconos (barra de tareas, accesos del menú Inicio):
 /// sin vaciarla, la barra de tareas sigue mostrando el icono de una versión anterior.
@@ -217,7 +355,14 @@ fn install(app: tauri::AppHandle, dir: String, desktop: bool, close_app: bool) -
         return Err(match code {
             -1 => "No se pudo iniciar la instalación.".into(),
             -2 => "La instalación tardó demasiado y se detuvo.".into(),
-            2 => "No se pudieron reemplazar los archivos de AdminOps: algún programa los tiene abiertos. Reinicia el equipo y vuelve a intentarlo, o usa el instalador clásico.".into(),
+            2 => {
+                let left = lockers(&dir);
+                if left.is_empty() {
+                    "No se pudieron reemplazar los archivos de AdminOps. Vuelve a intentarlo; si se repite, usa el instalador clásico.".into()
+                } else {
+                    format!("No se pudieron reemplazar los archivos de AdminOps: los tiene abiertos {}. Ciérralo (o pulsa «Instalar» otra vez para que el instalador lo cierre) y vuelve a intentarlo.", names(&left))
+                }
+            }
             c => format!("La instalación falló (código {c})."),
         });
     }
@@ -313,6 +458,34 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Windows dice de verdad quién tiene abierto un archivo de la carpeta.
+    #[cfg(windows)]
+    #[test]
+    fn finds_who_holds_a_file() {
+        let dir = std::env::temp_dir().join(format!("adminops-rm-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bloqueado.dll");
+        let held = std::fs::File::create(&path).unwrap();
+        let list = lockers(&dir);
+        assert!(list.iter().any(|l| l.pid == std::process::id()), "debería verse a sí mismo: {:?}", list.iter().map(|l| l.pid).collect::<Vec<_>>());
+        // Este proceso no se cierra a sí mismo.
+        assert!(free_files(&dir).iter().all(|l| l.pid != std::process::id()));
+        drop(held);
+        assert!(lockers(&dir).is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_mislabelled_build_can_be_updated() {
+        // La 2.0.0 fue una build de la serie 1.2 con el número equivocado.
+        assert!(!is_downgrade("2.0.0", "1.2.2"));
+        // El resto, como siempre.
+        assert!(is_downgrade("1.3.0", "1.2.2"));
+        assert!(is_downgrade("2.0.1", "1.2.2"));
+        assert!(!is_downgrade("1.2.2", "1.2.2"));
+        assert!(!is_downgrade("1.1.11", "1.2.2"));
+    }
 
     #[test]
     fn versions_and_dirs() {

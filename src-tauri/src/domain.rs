@@ -90,12 +90,12 @@ pub fn domain_status() -> Result<DomainStatus, String> {
 
 // ---------- Validaciones ----------
 
-/// Nombre DNS del dominio (pgr.gob.do).
+/// Nombre DNS del dominio (empresa.local).
 fn check_domain(d: &str) -> Result<String, String> {
     let d = d.trim().trim_end_matches('.').to_ascii_lowercase();
     let label_ok = |l: &str| !l.is_empty() && l.len() <= 63 && !l.starts_with('-') && !l.ends_with('-') && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
     if d.len() > 253 || !d.contains('.') || !d.split('.').all(label_ok) {
-        return Err("Escribe el nombre DNS completo del dominio (por ejemplo: pgr.gob.do).".into());
+        return Err("Escribe el nombre DNS completo del dominio (por ejemplo: empresa.local).".into());
     }
     Ok(d)
 }
@@ -402,10 +402,10 @@ mod tests {
 
     #[test]
     fn validates_names() {
-        assert_eq!(check_domain(" PGR.gob.do. ").unwrap(), "pgr.gob.do");
-        assert!(check_domain("PGR").is_err());
-        assert!(check_domain("pgr..do").is_err());
-        assert!(check_domain("pgr.gob.do; calc").is_err());
+        assert_eq!(check_domain(" EMPRESA.local. ").unwrap(), "empresa.local");
+        assert!(check_domain("EMPRESA").is_err());
+        assert!(check_domain("empresa..local").is_err());
+        assert!(check_domain("empresa.local; calc").is_err());
         assert_eq!(check_computer_name("pc-soporte-01").unwrap(), "PC-SOPORTE-01");
         assert!(check_computer_name("1234").is_err());
         assert!(check_computer_name("nombre-demasiado-largo").is_err());
@@ -415,17 +415,19 @@ mod tests {
 
     #[test]
     fn credentials_never_appear_in_clear() {
-        let s = credential_script("pgr.gob.do", "jperez", "S3cr3t'$(calc)").unwrap();
+        let s = credential_script("empresa.local", "jperez", "S3cr3t'$(calc)").unwrap();
         assert!(!s.contains("S3cr3t"));
-        assert!(credential_script("pgr.gob.do", "", "x").is_err());
+        assert!(credential_script("empresa.local", "", "x").is_err());
         let out = crate::pspool::query(&format!("{s}$cred.UserName"), None, "t").unwrap();
-        assert_eq!(out, r"pgr.gob.do\jperez");
-        let s = credential_script("pgr.gob.do", "jperez@pgr.gob.do", "x").unwrap();
-        assert_eq!(crate::pspool::query(&format!("{s}$cred.UserName"), None, "t").unwrap(), "jperez@pgr.gob.do");
+        assert_eq!(out, r"empresa.local\jperez");
+        let s = credential_script("empresa.local", "jperez@empresa.local", "x").unwrap();
+        assert_eq!(crate::pspool::query(&format!("{s}$cred.UserName"), None, "t").unwrap(), "jperez@empresa.local");
     }
 
     /// Solo lectura: estado real de este equipo.
+    /// Equipo real (depende de su estado): `cargo test real_status -- --ignored --nocapture`
     #[test]
+    #[ignore]
     fn real_status() {
         let s = status().unwrap();
         println!("{s:#?}");

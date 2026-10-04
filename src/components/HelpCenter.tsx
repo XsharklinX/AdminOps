@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { appApi } from "../lib/api";
 import { RELEASES } from "../lib/changelog";
 import { FAQ, GLOSSARY, GUIDE, type GuideTopic } from "../lib/guide";
-import { closeHelp, openHelp, parseTerms, searchHelp, SUPPORT_EMAIL, useHelp, type HelpTab } from "../lib/help";
+import { closeHelp, openHelp, parseTerms, searchHelp, SUPPORT_EMAIL, useHelp, useHelpFocus, type HelpTab } from "../lib/help";
 import { goToPage } from "../lib/navigate";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { useToast } from "./feedback";
@@ -37,6 +37,20 @@ export function HelpCenter({ version }: { version: string }) {
   useEffect(() => {
     body.current?.scrollTo({ top: 0 });
   }, [tab, chapter, query]);
+
+  // Desde Ctrl+K: el capítulo de ese apartado, y la vista en él.
+  const focus = useHelpFocus();
+  useEffect(() => {
+    if (!focus) return;
+    setQuery("");
+    setChapter(focus.chapter);
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`help-${focus.topic}`);
+      el?.scrollIntoView({ block: "start", behavior: "smooth" });
+      el?.classList.add("setting-flash");
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [focus]);
 
   const results = useMemo(() => searchHelp(query), [query]);
   if (!tab) return null;
@@ -155,7 +169,7 @@ function Chapter({ id, onNext }: { id: string; onNext: (id: string) => void }) {
 
 function Topic({ t, chapter }: { t: GuideTopic; chapter?: string }) {
   return (
-    <article className="rounded-xl border border-line bg-panel-2/30 p-4">
+    <article id={chapter ? undefined : `help-${t.id}`} className="scroll-mt-4 rounded-xl border border-line bg-panel-2/30 p-4">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           {chapter && <div className="text-[10px] tracking-wide text-mute uppercase">{chapter}</div>}

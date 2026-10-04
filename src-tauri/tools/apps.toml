@@ -3,7 +3,9 @@
 # `apps::tests::catalog_ids_exist`, ignorado por defecto porque usa la red).
 # source = "msstore" para las apps de Microsoft Store (por defecto "winget").
 #
-# Categorías: browser compress media chat remote office utils tech security runtime games dev drivers
+# home = true: uso personal u ocio; no sale en la vista «Empresa».
+#
+# Categorías: browser compress media chat remote vpn office utils tech security backup runtime games dev drivers
 
 # ---------- Navegadores ----------
 [[app]]
@@ -18,14 +20,17 @@ category = "browser"
 id = "Brave.Brave"
 name = "Brave"
 category = "browser"
+home = true
 [[app]]
 id = "Opera.Opera"
 name = "Opera"
 category = "browser"
+home = true
 [[app]]
 id = "Vivaldi.Vivaldi"
 name = "Vivaldi"
 category = "browser"
+home = true
 
 # ---------- Compresión ----------
 [[app]]
@@ -50,10 +55,12 @@ category = "media"
 id = "CodecGuide.K-LiteCodecPack.Standard"
 name = "K-Lite Codec Pack"
 category = "media"
+home = true
 [[app]]
 id = "Spotify.Spotify"
 name = "Spotify"
 category = "media"
+home = true
 [[app]]
 id = "IrfanSkiljan.IrfanView"
 name = "IrfanView"
@@ -66,14 +73,17 @@ category = "media"
 id = "Audacity.Audacity"
 name = "Audacity"
 category = "media"
+home = true
 [[app]]
 id = "OBSProject.OBSStudio"
 name = "OBS Studio"
 category = "media"
+home = true
 [[app]]
 id = "HandBrake.HandBrake"
 name = "HandBrake"
 category = "media"
+home = true
 [[app]]
 id = "ShareX.ShareX"
 name = "ShareX"
@@ -88,11 +98,13 @@ category = "media"
 id = "9NKSQGP7F2NH"
 name = "WhatsApp"
 category = "chat"
+home = true
 source = "msstore"
 [[app]]
 id = "Telegram.TelegramDesktop"
 name = "Telegram"
 category = "chat"
+home = true
 [[app]]
 id = "Zoom.Zoom"
 name = "Zoom"
@@ -105,6 +117,7 @@ category = "chat"
 id = "Discord.Discord"
 name = "Discord"
 category = "chat"
+home = true
 [[app]]
 id = "SlackTechnologies.Slack"
 name = "Slack"
@@ -179,6 +192,7 @@ category = "utils"
 id = "qBittorrent.qBittorrent"
 name = "qBittorrent"
 category = "utils"
+home = true
 [[app]]
 id = "Microsoft.WindowsTerminal"
 name = "Windows Terminal"
@@ -187,6 +201,7 @@ category = "utils"
 id = "Logitech.GHUB"
 name = "Logitech G HUB"
 category = "utils"
+home = true
 
 # ---------- Herramientas del técnico ----------
 [[app]]
@@ -289,6 +304,7 @@ category = "runtime"
 id = "Microsoft.DirectX"
 name = "DirectX (runtime de juegos)"
 category = "runtime"
+home = true
 [[app]]
 id = "Oracle.JavaRuntimeEnvironment"
 name = "Java (JRE)"
@@ -299,10 +315,12 @@ category = "runtime"
 id = "Valve.Steam"
 name = "Steam"
 category = "games"
+home = true
 [[app]]
 id = "EpicGames.EpicGamesLauncher"
 name = "Epic Games Launcher"
 category = "games"
+home = true
 
 # ---------- Desarrollo ----------
 [[app]]
@@ -332,10 +350,12 @@ category = "browser"
 id = "Opera.OperaGX"
 name = "Opera GX"
 category = "browser"
+home = true
 [[app]]
 id = "TorProject.TorBrowser"
 name = "Tor Browser"
 category = "browser"
+home = true
 
 # ---------- Compresión ----------
 [[app]]
@@ -348,10 +368,7 @@ category = "compress"
 id = "Gyan.FFmpeg"
 name = "FFmpeg"
 category = "media"
-[[app]]
-id = "GIMP.GIMP"
-name = "GIMP"
-category = "media"
+home = true
 [[app]]
 id = "Inkscape.Inkscape"
 name = "Inkscape"
@@ -360,14 +377,17 @@ category = "media"
 id = "BlenderFoundation.Blender"
 name = "Blender"
 category = "media"
+home = true
 [[app]]
 id = "KDE.Krita"
 name = "Krita"
 category = "media"
+home = true
 [[app]]
 id = "Daum.PotPlayer"
 name = "PotPlayer"
 category = "media"
+home = true
 
 # ---------- Comunicación ----------
 [[app]]
@@ -448,14 +468,17 @@ category = "runtime"
 id = "ElectronicArts.EADesktop"
 name = "EA app"
 category = "games"
+home = true
 [[app]]
 id = "Ubisoft.Connect"
 name = "Ubisoft Connect"
 category = "games"
+home = true
 [[app]]
 id = "GOG.Galaxy"
 name = "GOG Galaxy"
 category = "games"
+home = true
 
 # ---------- Desarrollo ----------
 [[app]]
@@ -498,21 +521,173 @@ category = "drivers"
 id = "Corsair.iCUE.5"
 name = "Corsair iCUE"
 category = "drivers"
+home = true
 [[app]]
 id = "RazerInc.RazerInstaller.Synapse4"
 name = "Razer Synapse"
 category = "drivers"
+home = true
 [[app]]
 id = "MSI.MSICenter"
 name = "MSI Center"
 category = "drivers"
+home = true
 [[app]]
 id = "Asus.ArmouryCrate"
 name = "ASUS Armoury Crate"
 category = "drivers"
+home = true
 [[app]]
 id = "GlennDelahoy.SnappyDriverInstallerOrigin"
 name = "Snappy Driver Installer Origin"
+category = "drivers"
+
+# ---------- Empresa (añadidos en la 1.1.11; ids comprobados con winget) ----------
+[[app]]
+id = "Mozilla.Firefox.ESR"
+name = "Firefox ESR (para empresas)"
+category = "browser"
+
+[[app]]
+id = "Microsoft.Office"
+name = "Microsoft 365 Apps (Office)"
+category = "office"
+[[app]]
+id = "geeksoftwareGmbH.PDF24Creator"
+name = "PDF24 Creator"
+category = "office"
+[[app]]
+id = "TrackerSoftware.PDF-XChangeEditor"
+name = "PDF-XChange Editor"
+category = "office"
+[[app]]
+id = "PDFArranger.PDFArranger"
+name = "PDF Arranger"
+category = "office"
+[[app]]
+id = "Cyanfish.NAPS2"
+name = "NAPS2 (escanear a PDF)"
+category = "office"
+[[app]]
+id = "JGraph.Draw"
+name = "draw.io (diagramas)"
+category = "office"
+[[app]]
+id = "Microsoft.PowerBI"
+name = "Power BI Desktop"
+category = "office"
+[[app]]
+id = "Nextcloud.NextcloudDesktop"
+name = "Nextcloud"
+category = "office"
+
+[[app]]
+id = "OpenVPNTechnologies.OpenVPN"
+name = "OpenVPN"
+category = "vpn"
+[[app]]
+id = "OpenVPNTechnologies.OpenVPNConnect"
+name = "OpenVPN Connect"
+category = "vpn"
+[[app]]
+id = "Citrix.Workspace"
+name = "Citrix Workspace"
+category = "vpn"
+[[app]]
+id = "Omnissa.HorizonClient"
+name = "Horizon Client (escritorios virtuales)"
+category = "vpn"
+[[app]]
+id = "Microsoft.WindowsApp"
+name = "Windows App (escritorios de Microsoft)"
+category = "vpn"
+
+[[app]]
+id = "mRemoteNG.mRemoteNG"
+name = "mRemoteNG"
+category = "remote"
+[[app]]
+id = "Devolutions.RemoteDesktopManager"
+name = "Remote Desktop Manager"
+category = "remote"
+
+[[app]]
+id = "Skillbrains.Lightshot"
+name = "Lightshot (capturas)"
+category = "utils"
+[[app]]
+id = "Flameshot.Flameshot"
+name = "Flameshot (capturas)"
+category = "utils"
+[[app]]
+id = "CodeSector.TeraCopy"
+name = "TeraCopy"
+category = "utils"
+
+[[app]]
+id = "Microsoft.PowerShell"
+name = "PowerShell 7"
+category = "tech"
+[[app]]
+id = "angryziber.AngryIPScanner"
+name = "Angry IP Scanner"
+category = "tech"
+[[app]]
+id = "Piriform.Speccy"
+name = "Speccy"
+category = "tech"
+
+[[app]]
+id = "DominikReichl.KeePass"
+name = "KeePass"
+category = "security"
+
+[[app]]
+id = "Veeam.VeeamAgent"
+name = "Veeam Agent para Windows"
+category = "backup"
+[[app]]
+id = "Duplicati.Duplicati"
+name = "Duplicati"
+category = "backup"
+[[app]]
+id = "2BrightSparks.SyncBackFree"
+name = "SyncBackFree"
+category = "backup"
+
+[[app]]
+id = "Microsoft.DotNet.DesktopRuntime.10"
+name = ".NET Desktop Runtime 10"
+category = "runtime"
+[[app]]
+id = "EclipseAdoptium.Temurin.21.JRE"
+name = "Java 21 (Temurin JRE)"
+category = "runtime"
+
+[[app]]
+id = "Microsoft.SQLServerManagementStudio"
+name = "SQL Server Management Studio"
+category = "dev"
+[[app]]
+id = "Postman.Postman"
+name = "Postman"
+category = "dev"
+
+[[app]]
+id = "HP.ImageAssistant"
+name = "HP Image Assistant"
+category = "drivers"
+[[app]]
+id = "Brother.iPrintScan"
+name = "Brother iPrint&Scan"
+category = "drivers"
+[[app]]
+id = "Jabra.Direct"
+name = "Jabra Direct (auriculares)"
+category = "drivers"
+[[app]]
+id = "Poly.PlantronicsHub"
+name = "Plantronics Hub (auriculares)"
 category = "drivers"
 
 [[list]]
@@ -526,6 +701,12 @@ id = "office"
 name = "Oficina"
 description = "Trabajo diario, documentos y videollamadas."
 apps = ["Google.Chrome", "7zip.7zip", "TheDocumentFoundation.LibreOffice", "Adobe.Acrobat.Reader.64-bit", "Zoom.Zoom", "AnyDesk.AnyDesk", "Microsoft.VCRedist.2015+.x64"]
+
+[[list]]
+id = "company"
+name = "Puesto de empresa"
+description = "Un puesto de oficina con Microsoft 365: navegador, Office, Teams, PDF y lo necesario para dar soporte."
+apps = ["Google.Chrome", "Microsoft.Office", "Microsoft.Teams", "Adobe.Acrobat.Reader.64-bit", "7zip.7zip", "geeksoftwareGmbH.PDF24Creator", "AnyDesk.AnyDesk", "Microsoft.VCRedist.2015+.x64"]
 
 [[list]]
 id = "gaming"
@@ -549,4 +730,4 @@ apps = ["Intel.IntelDriverAndSupportAssistant", "GlennDelahoy.SnappyDriverInstal
 id = "multimedia"
 name = "Multimedia y diseño"
 description = "Ver, editar y grabar: vídeo, imagen y sonido."
-apps = ["VideoLAN.VLC", "GIMP.GIMP", "Inkscape.Inkscape", "Audacity.Audacity", "OBSProject.OBSStudio", "HandBrake.HandBrake", "CodecGuide.K-LiteCodecPack.Standard"]
+apps = ["VideoLAN.VLC", "GIMP.GIMP.3", "Inkscape.Inkscape", "Audacity.Audacity", "OBSProject.OBSStudio", "HandBrake.HandBrake", "CodecGuide.K-LiteCodecPack.Standard"]

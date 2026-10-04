@@ -29,7 +29,8 @@ import { ProfileEditor } from "../components/ProfileEditor";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, profilesApi, workApi, type ProfileDef, type ProfileResult, type ProfileView } from "../lib/api";
 import { useOnJournalChange } from "../lib/journalEvents";
-import { ErrorState, Loading } from "../components/ui";
+import { ErrorState, Loading, Overlay, softBtn } from "../components/ui";
+import { NeedsAdmin } from "../components/AdminBanner";
 
 const ICONS: Record<string, LucideIcon> = {
   briefcase: Briefcase,
@@ -190,11 +191,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="mx-auto max-w-6xl p-6">
-      {!isAdmin && (
-        <p className="mb-4 rounded-lg border border-warn/30 bg-warn/5 px-3.5 py-2.5 text-sm text-warn">
-          Los perfiles modifican el registro y los servicios: requieren ejecutar AdminOps como administrador.
-        </p>
-      )}
+      {!isAdmin && <NeedsAdmin className="mb-4">Los perfiles modifican el registro y los servicios: requieren administrador.</NeedsAdmin>}
 
       {result && (
         <div className="mb-4 rounded-xl border border-neon/30 bg-neon/5 p-4">
@@ -346,8 +343,8 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
         />
       )}
       {importing && (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-black/55" onClick={() => setImporting(false)}>
-          <div className="w-[560px] rounded-xl border border-line-2 bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <Overlay onClose={() => setImporting(false)}>
+          <div className="w-[560px] max-w-full rounded-xl border border-line-2 bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-2 font-semibold">Importar perfiles</h3>
             <p className="mb-3 text-xs text-dim">Pega el JSON exportado desde otro AdminOps.</p>
             <textarea
@@ -363,13 +360,13 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
               <button
                 onClick={doImport}
                 disabled={!importText.trim()}
-                className="rounded-md border border-neon/50 bg-neon/10 px-4 py-1.5 text-sm text-neon hover:bg-neon/20 disabled:opacity-40"
+                className={softBtn}
               >
                 Importar
               </button>
             </div>
           </div>
-        </div>
+        </Overlay>
       )}
     </div>
   );

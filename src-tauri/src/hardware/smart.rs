@@ -88,6 +88,12 @@ struct RawDisk {
     raw: Vec<u8>,
 }
 
+/// Windows dice así que la clase de SMART no existe para los discos del equipo.
+fn not_supported(e: &str) -> bool {
+    let l = e.to_lowercase();
+    ["incompatible", "not supported", "no compatible", "no se admite", "no admitid", "0x8004100c"].iter().any(|k| l.contains(k))
+}
+
 pub fn read() -> Result<Vec<SmartDisk>, String> {
     let out = ps::powershell(
         r#"
@@ -109,7 +115,14 @@ ConvertTo-Json -InputObject $r -Depth 3 -Compress
         } else {
             e
         }
-    })?;
+    });
+    let out = match out {
+        Ok(o) => o,
+        // «Incompatible» / «Not supported»: ningún disco de este equipo da SMART
+        // por esta vía (NVMe, RAID, USB). No es un fallo: no hay nada que listar.
+        Err(e) if not_supported(&e) => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
     let raw: Vec<RawDisk> = if out.is_empty() { vec![] } else { serde_json::from_str(&out).map_err(|e| e.to_string())? };
     Ok(raw
         .into_iter()

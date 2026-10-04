@@ -27,7 +27,7 @@ export function VisitTypesEditor({ s, set }: { s: Settings; set: (p: Partial<Set
         Al iniciar una sesión eliges el tipo y se carga su checklist. Los puntos con <Wand2 size={11} className="inline text-neon" /> se marcan solos cuando haces esa
         tarea con AdminOps.
       </p>
-      <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+      <div className="grid gap-4 md:grid-cols-[minmax(150px,220px)_1fr]">
         <div className="space-y-1">
           {types.map((v, i) => (
             <div key={i} className={`group flex items-center gap-1 rounded-md px-2 py-1.5 ${open === i ? "bg-neon/10" : "hover:bg-panel-2"}`}>

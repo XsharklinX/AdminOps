@@ -1,13 +1,19 @@
-import { AppWindow, CornerDownLeft, FileText, Lightbulb, Search, SlidersHorizontal, Sparkles, UserRound, Wrench, Zap } from "lucide-react";
+import { AppWindow, BookOpen, CornerDownLeft, FileText, Lightbulb, ListTree, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NAV, pageLabel, type PageId } from "./Sidebar";
+import { NAV, allowedInMode, isPageId, navLabel, pageLabel, visibleAreas, type Area, type PageId } from "./Sidebar";
+import type { Badge } from "../lib/machineState";
+import { usePrefs } from "../lib/prefs";
+import { navKey, PAGE_KEYWORDS, parseNavKey, sectionsOf } from "../lib/sections";
 import { useToast } from "./feedback";
-import { contactsApi, lanApi, libraryApi, officeApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
+import { logQuietly, contactsApi, lanApi, libraryApi, officeApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
 import { openCase } from "../lib/currentCase";
 import { recognize, type Recognized } from "../lib/recognize";
 import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { EmptyLine } from "./ui";
+import { GUIDE } from "../lib/guide";
+import { openHelpTopic } from "../lib/help";
+import { openComm } from "../lib/comms";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -19,7 +25,7 @@ const CATEGORY_PAGE: Record<string, PageId> = {
   security: "security",
 };
 
-const KIND_LABEL = { smart: "Sugerido", page: "Página", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla" };
+const KIND_LABEL = { smart: "Sugerido", page: "Pantalla", section: "Sección", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla", help: "Guía" };
 
 type Kind = keyof typeof KIND_LABEL;
 
@@ -55,7 +61,7 @@ function searchEntries(entries: Entry[], q: string): Entry[] {
     .map((e) => {
       const title = norm(e.title);
       if (!words.every((w) => e.search.includes(w))) return null;
-      const score = (title.startsWith(q) ? 4 : title.includes(q) ? 2 : 0) + (e.kind === "page" ? 1 : 0);
+      const score = (title.startsWith(q) ? 4 : title.includes(q) ? 2 : 0) + (e.kind === "page" || e.kind === "section" ? 1 : 0);
       return { e, score };
     })
     .filter((x): x is { e: Entry; score: number } => x !== null)
@@ -101,13 +107,21 @@ export function CommandPalette({
   open,
   onClose,
   onNavigate,
+  onSection,
+  badges = {},
   actions,
 }: {
   open: boolean;
   onClose: () => void;
   onNavigate: (page: PageId, focus?: string | null) => void;
+  /** Ir a una pantalla y, si se dice, a una de sus secciones. */
+  onSection: (page: PageId, section?: string | null) => void;
+  badges?: Record<string, Badge>;
   actions: PaletteAction[];
 }) {
+  const prefs = usePrefs();
+  const areas = visibleAreas("dashboard");
+  const areaOfPage = (p: PageId) => areas.find((a) => a.pages.includes(p)) ?? null;
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const [tools, setTools] = useState(toolsCache);
@@ -125,22 +139,43 @@ export function CommandPalette({
       setQuery("");
       setIndex(0);
       window.setTimeout(() => input.current?.focus(), 0);
-      if (!toolsCache) toolboxApi.list().then((t) => vigente() && setTools((toolsCache = t))).catch(() => {});
-      if (!tweaksCache) tweaksApi.index().then((t) => vigente() && setTweaks((tweaksCache = t))).catch(() => {});
+      if (!toolsCache) toolboxApi.list().then((t) => vigente() && setTools((toolsCache = t))).catch(logQuietly("CommandPalette"));
+      if (!tweaksCache) tweaksApi.index().then((t) => vigente() && setTweaks((tweaksCache = t))).catch(logQuietly("CommandPalette"));
       // Sin caché: la agenda cambia a menudo.
-      contactsApi.list().then((l) => vigente() && setContacts(l.filter((c) => !c.deleted))).catch(() => {});
+      contactsApi.list().then((l) => vigente() && setContacts(l.filter((c) => !c.deleted))).catch(logQuietly("CommandPalette"));
       // Las del técnico y las que trae AdminOps: Ctrl+K encuentra ambas.
       libraryApi
         .list("solutions")
         .then((l) => vigente() && setSolutions([...l, ...BUILTIN_SOLUTIONS]))
         .catch(() => vigente() && setSolutions(BUILTIN_SOLUTIONS));
-      libraryApi.list("templates").then((t) => vigente() && setTemplates(t)).catch(() => {});
+      libraryApi.list("templates").then((t) => vigente() && setTemplates(t)).catch(logQuietly("CommandPalette"));
     },
     [open],
   );
 
   const entries = useMemo<Entry[]>(() => {
-    const out: Entry[] = NAV.map((n) => ({ key: `page:${n.id}`, kind: "page", title: pageLabel(n.id), search: norm(`${pageLabel(n.id)} ${n.label}`), run: () => onNavigate(n.id) }));
+    const out: Entry[] = NAV.filter((n) => allowedInMode(n.id, prefs.mode)).map((n) => ({
+      key: `page:${n.id}`,
+      kind: "page",
+      title: pageLabel(n.id),
+      subtitle: areaOfPage(n.id)?.label,
+      search: norm(`${pageLabel(n.id)} ${n.label} ${PAGE_KEYWORDS[n.id] ?? ""}`),
+      run: () => onNavigate(n.id),
+    }));
+    // Cada sección, con su ruta y sus otros nombres: «AD» lleva a Dominio.
+    for (const n of NAV) {
+      if (!allowedInMode(n.id, prefs.mode)) continue;
+      const where = [areaOfPage(n.id)?.label, pageLabel(n.id)].filter(Boolean).join(" › ");
+      for (const sec of sectionsOf(n.id))
+        out.push({
+          key: `section:${n.id}:${sec.id}`,
+          kind: "section",
+          title: sec.label,
+          subtitle: where,
+          search: norm(`${sec.label} ${pageLabel(n.id)} ${sec.keywords ?? ""}`),
+          run: () => onSection(n.id, sec.id),
+        });
+    }
     for (const a of actions)
       out.push({ key: `action:${a.id}`, kind: "action", title: a.title, subtitle: a.subtitle, search: norm(`${a.title} ${a.subtitle ?? ""} ${a.keywords ?? ""}`), run: a.run });
     for (const t of tweaks ?? []) {
@@ -184,6 +219,10 @@ export function CommandPalette({
       out.push({ key: `solution:${s.id}`, kind: "solution", title: s.title, subtitle: s.problem, search: norm(`${s.title} ${s.problem} ${s.solution} ${s.tags.join(" ")}`), run: () => onNavigate("knowledge", `solution:${s.id}`) });
     for (const t of templates)
       out.push({ key: `template:${t.id}`, kind: "template", title: t.name, subtitle: t.category || "Plantilla de texto", search: norm(`${t.name} ${t.category} ${t.body}`), run: () => onNavigate("knowledge", `template:${t.id}`) });
+    // La guía: «cómo se hace…» lleva al apartado que lo explica.
+    for (const ch of GUIDE)
+      for (const t of ch.topics)
+        out.push({ key: `help:${t.id}`, kind: "help", title: t.title, subtitle: ch.title, search: norm(`${t.title} ${ch.title} ${t.what}`), run: () => openHelpTopic(ch.id, t.id) });
     for (const c of tools?.custom ?? []) {
       out.push({
         key: `tool:${c.id}`,
@@ -195,7 +234,8 @@ export function CommandPalette({
       });
     }
     return out;
-  }, [tools, tweaks, contacts, solutions, templates, actions, onNavigate, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- las áreas salen de las preferencias (prefs.layout), que ya están en la lista
+  }, [tools, tweaks, contacts, solutions, templates, actions, onNavigate, onSection, toast, prefs.mode, prefs.layout, prefs.pageLabels]);
 
   // Lo que se ha escrito es un equipo, una persona, una IP…: sus acciones.
   const smart = useMemo(() => {
@@ -205,7 +245,8 @@ export function CommandPalette({
 
   const results = useMemo(() => {
     const q = norm(query.trim());
-    if (!q) return entries.filter((e) => e.kind === "page" || e.kind === "action").slice(0, 40);
+    // Sin texto se ve el mapa, no una lista.
+    if (!q) return [];
     const found = searchEntries(entries, q);
     if (!smart) return found;
     return (smart.sure ? [...smart.entries, ...found] : [...found, ...smart.entries]).slice(0, 40);
@@ -226,63 +267,204 @@ export function CommandPalette({
   };
 
   const icon = (k: Kind) => {
-    const I = { smart: Sparkles, page: CornerDownLeft, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText }[k];
+    const I = { smart: Sparkles, page: CornerDownLeft, section: ListTree, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText, help: BookOpen }[k];
     return <I size={14} className="shrink-0 text-neon" />;
   };
 
+  const go = (page: PageId, section: string | null = null) => {
+    onClose();
+    onSection(page, section);
+  };
+  const desc = (p: PageId) => (NAV.find((n) => n.id === p)?.help ?? "").split(/(?<=\.)\s/)[0];
+  const pins = prefs.sidebar.favorites.filter((k) => isPageId(parseNavKey(k).page) && allowedInMode(parseNavKey(k).page, prefs.mode));
+  const tone = (b: Badge | undefined) => (!b ? "" : b.tone === "bad" ? "text-bad" : b.tone === "warn" ? "text-warn" : b.tone === "ok" ? "text-ok" : "text-dim");
+  const fixed: { page: PageId; Icon: typeof Mail }[] = (
+    [
+      { page: "tools", Icon: Wrench },
+      { page: "teams", Icon: MessagesSquare },
+      { page: "mail", Icon: Mail },
+      { page: "settings", Icon: SettingsIcon },
+    ] as { page: PageId; Icon: typeof Mail }[]
+  ).filter((f) => allowedInMode(f.page, prefs.mode));
+
+  const areaCard = (a: Area) => {
+    const Icon = a.icon;
+    const nSections = a.pages.reduce((t, p) => t + sectionsOf(p).length, 0);
+    return (
+      <section key={a.id} className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-line bg-panel">
+        <header className="flex items-center gap-2.5 border-b border-line px-3.5 py-2.5">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel-2 text-ink">
+            <Icon size={16} strokeWidth={1.7} />
+          </span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <b className="block text-sm font-semibold text-ink">{a.label}</b>
+            <span className="text-[11px] text-mute">
+              {a.pages.length} {a.pages.length === 1 ? "pantalla" : "pantallas"}
+              {nSections > 0 && ` · ${nSections} secciones`}
+            </span>
+          </span>
+        </header>
+        {a.pages.map((p) => {
+          const list = sectionsOf(p);
+          const b = badges[navKey(p)];
+          return (
+            <div key={p} className="border-b border-line px-3.5 py-2.5 last:border-b-0">
+              <button onClick={() => go(p)} className="group flex w-full items-center gap-2 text-left">
+                <b className="text-[13px] font-semibold text-ink group-hover:text-neon">{pageLabel(p)}</b>
+                {b && <span className={`ml-auto font-mono text-[10.5px] ${tone(b)}`} title={b.title}>{b.text}</span>}
+              </button>
+              <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-mute">{desc(p)}</p>
+              {list.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {list.map((sec) => {
+                    const sb = badges[navKey(p, sec.id)];
+                    return (
+                      <button
+                        key={sec.id}
+                        onClick={() => go(p, sec.id)}
+                        className="flex items-center gap-1 rounded-md border border-line-2 bg-void px-2 py-0.5 text-[11.5px] text-dim transition-colors hover:border-neon/60 hover:text-ink"
+                        title={sb?.title}
+                      >
+                        {sec.label}
+                        {sb && <span className={`font-mono text-[10px] ${tone(sb)}`}>{sb.text}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </section>
+    );
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-center bg-black/50 pt-[12vh]" onClick={onClose}>
-      <div className="flex h-fit max-h-[70vh] w-[620px] flex-col overflow-hidden rounded-xl border border-line-2 bg-panel shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2 border-b border-line px-4">
-          <Search size={16} className="text-mute" />
-          <input
-            ref={input}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setIndex((i) => Math.min(i + 1, results.length - 1));
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setIndex((i) => Math.max(i - 1, 0));
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                pick(results[index]);
-              } else if (e.key === "Escape") {
-                onClose();
-              }
-            }}
-            placeholder="Busca una página, acción, problema, herramienta o ajuste…"
-            className="flex-1 bg-transparent py-3.5 text-sm text-ink outline-none placeholder:text-mute"
-          />
-          <kbd className="rounded border border-line px-1.5 font-mono text-[11px] text-mute">Esc</kbd>
-        </div>
-        <div ref={list} className="overflow-y-auto py-1">
-          {results.map((e, i) => (
-            <button
-              key={e.key}
-              data-i={i}
-              onMouseMove={() => setIndex(i)}
-              onClick={() => pick(e)}
-              className={`flex w-full items-center gap-3 px-4 py-2 text-left ${i === index ? "bg-neon/10" : ""}`}
-            >
-              {icon(e.kind)}
-              <span className="min-w-0 flex-1">
-                <span className={`block truncate text-sm ${i === index ? "text-neon" : "text-ink"}`}>{e.title}</span>
-                {e.subtitle && <span className="block truncate text-[11px] text-mute">{e.subtitle}</span>}
-              </span>
-              <span className="shrink-0 text-[11px] tracking-wide text-mute">{KIND_LABEL[e.kind]}</span>
+    <div className="fixed inset-0 z-50 flex justify-center bg-black/55 pt-[5vh] backdrop-blur-[2px]" onClick={onClose}>
+      <div
+        className="flex h-[88vh] w-[1120px] max-w-[95vw] flex-col overflow-hidden rounded-2xl border border-line-2 bg-void shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Todo AdminOps"
+      >
+        <div className="border-b border-line bg-panel px-5 pt-4 pb-3">
+          <div className="mb-2.5 flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-semibold tracking-tight text-ink">Todo AdminOps</h2>
+            <span className="text-xs text-mute">
+              {areas.reduce((t, a) => t + a.pages.length, 0)} pantallas · {areas.reduce((t, a) => t + a.pages.reduce((n, p) => n + sectionsOf(p).length, 0), 0)} secciones
+            </span>
+            <button onClick={onClose} className="ml-auto rounded-md p-1 text-mute hover:bg-panel-2 hover:text-ink" title="Cerrar (Esc)" aria-label="Cerrar">
+              <X size={16} />
             </button>
-          ))}
-          {results.length === 0 && <EmptyLine>Nada coincide con «{query}».</EmptyLine>}
+          </div>
+          <label className="flex h-11 items-center gap-2.5 rounded-xl border border-line-2 bg-void px-3 focus-within:border-neon focus-within:ring-3 focus-within:ring-neon/15">
+            <Search size={17} className="shrink-0 text-mute" />
+            <input
+              ref={input}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setIndex((i) => Math.min(i + 1, results.length - 1));
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setIndex((i) => Math.max(i - 1, 0));
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  pick(results[index]);
+                } else if (e.key === "Escape") {
+                  onClose();
+                }
+              }}
+              placeholder="Qué quieres hacer: dominio, no imprime, liberar espacio, un equipo, una persona, una IP…"
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-mute"
+              aria-label="Buscar en todo AdminOps"
+            />
+            <span className="hidden shrink-0 items-center gap-1 text-[11px] text-mute md:flex">
+              <kbd className="rounded border border-line-2 px-1 font-mono">↑↓</kbd> elegir <kbd className="rounded border border-line-2 px-1 font-mono">Intro</kbd> abrir{" "}
+              <kbd className="rounded border border-line-2 px-1 font-mono">Esc</kbd> cerrar
+            </span>
+          </label>
         </div>
-        <div className="flex gap-4 border-t border-line px-4 py-2 text-[11px] text-mute">
-          <span>↑↓ moverse</span>
-          <span>Enter abrir</span>
-          <span>Alt+← / Alt+→ página anterior / siguiente</span>
-          <span>Ctrl+, ajustes</span>
-        </div>
+
+        {query.trim() ? (
+          <div ref={list} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            {results.map((e, i) => (
+              <button
+                key={e.key}
+                data-i={i}
+                onMouseMove={() => setIndex(i)}
+                onClick={() => pick(e)}
+                className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left ${i === index ? "border-neon/60 bg-neon/10" : "border-transparent"}`}
+              >
+                <span className={`grid size-7 shrink-0 place-items-center rounded-md ${i === index ? "bg-neon/15" : "bg-panel-2"}`}>{icon(e.kind)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-sm ${i === index ? "text-ink" : "text-ink"} font-medium`}>{e.title}</span>
+                  {e.subtitle && <span className="block truncate text-[11.5px] text-mute">{e.subtitle}</span>}
+                </span>
+                <span className="shrink-0 text-[11px] tracking-wide text-mute">{KIND_LABEL[e.kind]}</span>
+                {i === index && <span className="shrink-0 font-mono text-[10.5px] text-neon">Intro ↵</span>}
+              </button>
+            ))}
+            {results.length === 0 && <EmptyLine>Nada coincide con «{query}». Prueba con otra palabra: «impresora», «contraseña», «espacio».</EmptyLine>}
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {pins.length > 0 && (
+              <>
+                <div className="mb-2 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">Fijados</div>
+                <div className="mb-5 grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2">
+                  {pins.map((k) => {
+                    const { page, section } = parseNavKey(k);
+                    const a = areaOfPage(page);
+                    const Icon = a?.icon ?? Pin;
+                    return (
+                      <button key={k} onClick={() => go(page, section)} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-2 text-left transition-colors hover:border-neon/60">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-neon/10 text-neon">
+                          <Icon size={15} strokeWidth={1.8} />
+                        </span>
+                        <span className="min-w-0">
+                          <b className="block truncate text-[13px] font-semibold text-ink">{navLabel(k)}</b>
+                          <span className="block truncate text-[11px] text-mute">{[a?.label, section ? pageLabel(page) : null].filter(Boolean).join(" › ")}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <div className="mb-2 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">Por áreas</div>
+            <div className="columns-1 gap-3 md:columns-2 xl:columns-3">{areas.map(areaCard)}</div>
+            {fixed.length > 0 && (
+              <>
+                <div className="mt-2 mb-2 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">Siempre a mano</div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2">
+                  {fixed.map(({ page, Icon }) => (
+                    <button
+                      key={page}
+                      onClick={() => {
+                        if (page === "teams" || page === "mail") {
+                          onClose();
+                          openComm(page);
+                        } else go(page);
+                      }}
+                      className="flex items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-2 text-left transition-colors hover:border-neon/60"
+                    >
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel-2 text-ink">
+                        <Icon size={15} strokeWidth={1.7} />
+                      </span>
+                      <span className="min-w-0">
+                        <b className="block truncate text-[13px] font-semibold text-ink">{pageLabel(page)}</b>
+                        <span className="block truncate text-[11px] text-mute">{page === "teams" || page === "mail" ? "También en la barra de arriba" : "Abajo en la columna de áreas"}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

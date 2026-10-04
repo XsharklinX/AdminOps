@@ -1,6 +1,7 @@
 import {
   CircleCheck,
   CircleHelp,
+  Info,
   CircleX,
   Copy,
   Eye,
@@ -27,6 +28,8 @@ const STATUS = {
   warn: { icon: TriangleAlert, color: "text-warn" },
   bad: { icon: CircleX, color: "text-bad" },
   unknown: { icon: CircleHelp, color: "text-mute" },
+  // Un dato: no suma ni resta en la nota.
+  info: { icon: Info, color: "text-dim" },
 };
 
 const scoreColor = (s: number) => (s >= 80 ? "var(--color-ok)" : s >= 60 ? "var(--color-warn)" : "var(--color-bad)");
@@ -80,7 +83,7 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
+    <div className="mx-auto max-w-6xl space-y-4 p-6">
       <Card
         title="Nota de seguridad"
         icon={<ShieldCheck size={14} />}

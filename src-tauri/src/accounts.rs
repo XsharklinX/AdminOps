@@ -346,10 +346,10 @@ mod tests {
 
     #[test]
     fn session_kinds() {
-        let d = DeviceJoin { domain_joined: true, domain_name: "pgr.gob.do".into(), ..Default::default() };
+        let d = DeviceJoin { domain_joined: true, domain_name: "empresa.local".into(), ..Default::default() };
         assert_eq!(session_kind(r"AzureAD\JuanPerez", &DeviceJoin::default(), false), "azuread");
         assert_eq!(session_kind(r"PC-01\juan", &DeviceJoin::default(), true), "microsoft");
-        assert_eq!(session_kind(r"PGR\juan", &d, false), "domain");
+        assert_eq!(session_kind(r"EMPRESA\juan", &d, false), "domain");
         assert_eq!(session_kind(r"PC-01\admin", &d, false), "local");
         assert!(valid_thumbprint("0123456789ABCDEF0123456789abcdef01234567"));
         assert!(!valid_thumbprint("x; rm"));

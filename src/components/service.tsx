@@ -1,8 +1,8 @@
 import { fillTemplate, recipients, reportNumber } from "../lib/reportText";
 import { goToPage } from "../lib/navigate";
-import { Eraser, FileText, Mail, Plus, Trash2, Wrench } from "lucide-react";
+import { Eraser, FileText, Mail, Plus, Trash2, Wrench, LayoutList } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { diagApi, portalsApi, workApi, type Billing, type ClientReport, type DocKind, type Line, type Settings, type Template } from "../lib/api";
+import { logQuietly, diagApi, portalsApi, workApi, type Billing, type ClientReport, type DocKind, type Line, type Settings, type Template } from "../lib/api";
 import { money } from "../lib/format";
 import { useToast } from "./feedback";
 import { Button, inputClass, Modal } from "./ui";
@@ -38,7 +38,7 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
 }
 
 /** Plantilla del informe: resumen para el cliente o detalle técnico. */
-export function TemplatePicker({ value, onChange }: { value: Template; onChange: (t: Template) => void }) {
+export function TemplatePicker({ value, onChange, custom }: { value: Template; onChange: (t: Template) => void; /** Nombre de la plantilla propia (Ajustes → Informes). */ custom?: string }) {
   const option = (t: Template, icon: ReactNode, title: string, sub: string) => (
     <button
       type="button"
@@ -54,9 +54,10 @@ export function TemplatePicker({ value, onChange }: { value: Template; onChange:
     </button>
   );
   return (
-    <div className="flex gap-3">
+    <div className="flex flex-wrap gap-3">
       {option("client", <FileText size={16} />, "Para el cliente", "Estado del equipo en lenguaje claro, trabajo hecho, pendientes y firmas.")}
       {option("technical", <Wrench size={16} />, "Técnico", "Lo mismo más hardware, discos, SMART, estabilidad, drivers y seguridad.")}
+      {option("custom", <LayoutList size={16} />, custom?.trim() || "Mi plantilla", "Las secciones que elegiste, en tu orden (Ajustes → Informes y cobros).")}
     </div>
   );
 }
@@ -320,7 +321,7 @@ export function SendReportModal({
     portalsApi
       .list()
       .then((l) => vigente() && setHasMail(l.some((p) => p.kind === "mail")))
-      .catch(() => {});
+      .catch(logQuietly("service"));
     workApi.settings().then((s) => {
       if (!vigente()) return;
       const brand = s.company.trim() || s.technician.trim();
@@ -345,7 +346,7 @@ export function SendReportModal({
               `En él encontrarás el estado del equipo, el trabajo realizado, lo que queda pendiente y nuestras recomendaciones.\n\n` +
               `Quedo a tu disposición para cualquier consulta.\n\nUn saludo,${sign ? `\n${sign}` : ""}`,
       );
-    }).catch(() => {});
+    }).catch(logQuietly("service"));
     // Solo al abrir: después el texto es del usuario.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- los datos del cliente solo se leen al preparar el mensaje
   }, [path]);
@@ -356,7 +357,7 @@ export function SendReportModal({
     setBusy(true);
     try {
       const ok = await portalsApi.compose(to.replace(/\s+/g, ""), subject, body);
-      if (!ok) throw new Error("Configura antes el Correo (Soporte → Correo).");
+      if (!ok) throw new Error("Configura antes el Correo (su icono, en la barra de arriba).");
       await diagApi.revealReport(path).catch(() => {});
       toast("ok", "Mensaje listo en el Correo: arrastra el PDF desde la carpeta que se abrió y envíalo.");
       onClose();

@@ -14,7 +14,7 @@ use tauri::State;
 
 const CATALOG: &str = include_str!("../tools/apps.toml");
 #[cfg(test)]
-const CATEGORIES: &[&str] = &["browser", "compress", "media", "chat", "remote", "office", "utils", "tech", "security", "runtime", "games", "dev", "drivers"];
+const CATEGORIES: &[&str] = &["browser", "compress", "media", "chat", "remote", "vpn", "office", "utils", "tech", "security", "backup", "runtime", "games", "dev", "drivers"];
 
 /// El paquete ya estaba instalado y al día (winget intenta actualizar y no hay nada nuevo).
 const UPDATE_NOT_APPLICABLE: i64 = 0x8A15002Bu32 as i32 as i64;
@@ -30,6 +30,9 @@ pub struct CatalogApp {
     pub category: String,
     #[serde(default = "default_source")]
     pub source: String,
+    /// Uso personal u ocio (juegos, mensajería personal…): no sale en la vista «Empresa».
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub home: bool,
 }
 
 fn default_source() -> String {
@@ -96,11 +99,55 @@ pub struct AppCatalogView {
     apps: Vec<CatalogApp>,
     presets: Vec<PresetList>,
     lists: Vec<AppList>,
+    view: CatalogView,
+}
+
+/// Qué enseña el catálogo: lo decide el técnico y viaja con sus datos.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CatalogView {
+    /// Solo lo que se usa en una empresa (sin juegos ni programas de uso personal).
+    business: bool,
+    /// Programas que no se quieren ver, por id.
+    hidden_apps: Vec<String>,
+    /// Categorías enteras que no se quieren ver.
+    hidden_categories: Vec<String>,
+}
+
+impl Default for CatalogView {
+    fn default() -> Self {
+        CatalogView { business: true, hidden_apps: Vec::new(), hidden_categories: Vec::new() }
+    }
+}
+
+fn view_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::shared_data_dir(app).join("app-catalog-view.json")
 }
 
 #[tauri::command]
 pub fn app_catalog(app: tauri::AppHandle) -> AppCatalogView {
-    AppCatalogView { apps: CAT.app.clone(), presets: CAT.list.clone(), lists: crate::paths::read_json(&lists_path(&app)) }
+    AppCatalogView { apps: CAT.app.clone(), presets: CAT.list.clone(), lists: crate::paths::read_json(&lists_path(&app)), view: crate::paths::read_json(&view_path(&app)) }
+}
+
+/// Guarda qué enseña el catálogo. Solo se aceptan ids con forma de id y un número razonable.
+#[tauri::command]
+pub fn set_catalog_view(app: tauri::AppHandle, view: CatalogView) -> Result<(), String> {
+    let clean = |list: Vec<String>, ok: fn(&str) -> bool| {
+        let mut out: Vec<String> = Vec::new();
+        for x in list.into_iter().filter(|x| ok(x)).take(500) {
+            if !out.contains(&x) {
+                out.push(x);
+            }
+        }
+        out
+    };
+    let view = CatalogView {
+        business: view.business,
+        hidden_apps: clean(view.hidden_apps, valid_id),
+        hidden_categories: clean(view.hidden_categories, |c| !c.is_empty() && c.len() <= 20 && c.chars().all(|ch| ch.is_ascii_lowercase())),
+    };
+    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    crate::paths::write_json(&view_path(&app), &view)
 }
 
 /// `winget export` tarda: el resultado se reutiliza unos minutos y se olvida al

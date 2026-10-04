@@ -1,5 +1,4 @@
 import {
-  ArrowDownUp,
   ArrowUpCircle,
   CheckCircle2,
   Circle,
@@ -20,13 +19,14 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Modal, ErrorState, Loading, EmptyLine } from "../components/ui";
+import { Button, Modal, ErrorState, Loading, iconBtn } from "../components/ui";
+import { DataTable, type Column } from "../components/DataTable";
 import { bytes, friendlyPath } from "../lib/format";
 import { programKey as key, norm } from "../lib/programs";
 import { officeApi, programsApi, toolsApi, type InstalledProgram, type Leftover, type SoftwareUpdate } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { readCached, remember } from "../lib/cachedRead";
 
-type Sort = "name" | "size" | "date" | "publisher";
 type Filter = "all" | "updates" | "big" | "recent" | "user" | "wizard" | "orphans";
 
 const FILTERS: { id: Filter; label: string; hint: string }[] = [
@@ -48,7 +48,6 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
   const [list, setList] = useState<InstalledProgram[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<Sort>("name");
   const [filter, setFilter] = useState<Filter>("all");
   const [hideComponents, setHideComponents] = useState(true);
   const [hideMicrosoft, setHideMicrosoft] = useState(false);
@@ -62,11 +61,17 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
   const { confirm, dialog } = useConfirm();
 
   const [failed, setFailed] = useState<string | null>(null);
-  const load = useCallback(async () => {
+  /** `fromMemory`: al abrir la pantalla, lo último leído al momento (luego se lee de nuevo). */
+  const load = useCallback(async (fromMemory = false) => {
     setFailed(null);
     setLoading(true);
     try {
-      setList(await programsApi.list());
+      if (fromMemory) await readCached("programs", programsApi.list, (v) => setList(v));
+      else {
+        const v = await programsApi.list();
+        setList(v);
+        remember("programs", v);
+      }
     } catch (e) {
       setFailed(String(e));
       toast("error", String(e));
@@ -77,7 +82,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
 
   useLiveEffect(
     (vigente) => {
-      void load();
+      void load(true);
       // Actualizaciones de winget en segundo plano (se reutiliza la última lista si es reciente).
       toolsApi
         .softwareUpdates()
@@ -116,11 +121,8 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
           return true;
       }
     });
-    if (sort === "size") v.sort((a, b) => (b.size ?? 0) - (a.size ?? 0));
-    else if (sort === "date") v.sort((a, b) => (b.installed ?? "").localeCompare(a.installed ?? ""));
-    else if (sort === "publisher") v.sort((a, b) => (a.publisher ?? "~").localeCompare(b.publisher ?? "~", "es") || a.name.localeCompare(b.name, "es"));
     return v;
-  }, [list, query, sort, filter, hideComponents, hideMicrosoft, updateOf]);
+  }, [list, query, filter, hideComponents, hideMicrosoft, updateOf]);
 
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -222,6 +224,108 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
   const withUpdate = list.filter((p) => updateOf(p)).length;
   const canTouch = (p: InstalledProgram) => p.perUser || isAdmin;
 
+  const columns: Column<InstalledProgram>[] = [
+    {
+      id: "pick",
+      header: "",
+      stopClick: true,
+      headClass: "w-8",
+      cell: (p) => (
+        <input
+          type="checkbox"
+          checked={selected.has(p.id)}
+          onChange={() => toggle(p.id)}
+          disabled={p.orphan}
+          className="size-3.5 accent-[var(--color-neon)]"
+          title="Seleccionar para desinstalar varios"
+          aria-label={`Seleccionar ${p.name}`}
+        />
+      ),
+    },
+    {
+      id: "name",
+      header: "Programa",
+      sortBy: (p) => p.name,
+      className: "max-w-0 w-full",
+      cell: (p) => {
+        const u = updateOf(p);
+        return (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-ink">{p.name}</span>
+              {p.orphan && (
+                <span className="flex shrink-0 items-center gap-1 text-[11px] text-warn" title="El desinstalador ya no existe">
+                  <FileWarning size={10} /> huérfana
+                </span>
+              )}
+              {u && (
+                <span className="flex shrink-0 items-center gap-0.5 rounded border border-neon/40 px-1 text-[10px] text-neon" title={`winget: ${u.id}`}>
+                  <ArrowUpCircle size={10} /> {u.available}
+                </span>
+              )}
+              {p.perUser && <span className="shrink-0 rounded border border-line px-1 text-[10px] text-mute">solo este usuario</span>}
+              {p.component && <span className="shrink-0 rounded border border-line px-1 text-[10px] text-mute">componente</span>}
+            </div>
+            <div className="truncate text-[11px] text-mute">
+              {[p.version && `v${p.version}`, p.silentKind ? `silencioso (${p.silentKind})` : !p.orphan && "con asistente"].filter(Boolean).join(" · ") || "—"}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "publisher",
+      header: "Editor",
+      sortBy: (p) => p.publisher,
+      className: "max-w-40 truncate text-xs text-dim",
+      cell: (p) => <span title={p.publisher ?? undefined}>{p.publisher ?? "—"}</span>,
+    },
+    { id: "installed", header: "Instalado", sortBy: (p) => p.installed, className: "whitespace-nowrap font-mono text-xs text-dim", cell: (p) => p.installed ?? "" },
+    { id: "size", header: "Tamaño", align: "right", sortBy: (p) => p.size ?? null, className: "whitespace-nowrap font-mono text-xs text-dim", cell: (p) => (p.size ? bytes(p.size) : "") },
+    {
+      id: "actions",
+      header: "",
+      align: "right",
+      stopClick: true,
+      cell: (p) => {
+        const u = updateOf(p);
+        return (
+          <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+            {running === p.id ? (
+              <Loader2 size={15} className="animate-spin text-neon" />
+            ) : p.orphan ? (
+              <Button kind="ghost" size="sm" onClick={() => void orphanCleanup(p)} disabled={busy || !canTouch(p)}>
+                Quitar y limpiar restos
+              </Button>
+            ) : (
+              <>
+                {u && (
+                  <button onClick={() => void update(p, u)} disabled={busy || !isAdmin} className="rounded px-2 py-1 text-xs text-neon hover:bg-neon/10 disabled:opacity-40" title={isAdmin ? `Actualizar a ${u.available}` : "Requiere administrador"}>
+                    Actualizar
+                  </button>
+                )}
+                {p.repairable && (
+                  <button
+                    onClick={() => void repair(p)}
+                    disabled={busy || !canTouch(p)}
+                    className={`${iconBtn} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
+                    title="Reparar (reinstala sus archivos)"
+                    aria-label={`Reparar ${p.name}`}
+                  >
+                    <Wrench size={13} />
+                  </button>
+                )}
+                <Button kind="ghost" size="sm" onClick={() => setTarget(p)} disabled={busy || !canTouch(p)} title={!canTouch(p) ? "Requiere administrador" : undefined}>
+                  <Trash2 size={13} /> Desinstalar
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="mx-auto max-w-6xl p-6">
       <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -231,7 +335,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
           {orphans > 0 && <span className="text-warn"> · {orphans} entradas huérfanas</span>}
           {updates === null && <span className="text-mute"> · buscando actualizaciones…</span>}
         </p>
-        <div className="relative ml-auto w-72">
+        <div className="relative ml-auto w-72 min-w-40 shrink">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input
             value={query}
@@ -240,19 +344,10 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
             className="w-full rounded-md border border-line bg-panel py-1.5 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
           />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-dim">
-          <ArrowDownUp size={12} />
-          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="rounded border border-line bg-panel px-1.5 py-1 text-xs text-ink outline-none">
-            <option value="name">Nombre</option>
-            <option value="size">Tamaño</option>
-            <option value="date">Más recientes</option>
-            <option value="publisher">Editor</option>
-          </select>
-        </label>
         <button onClick={exportCsv} className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-dim hover:bg-panel-2 hover:text-ink" title="Inventario de programas en CSV">
           <Download size={13} /> CSV
         </button>
-        <button onClick={load} disabled={loading || busy} className="rounded-md p-1.5 text-dim hover:bg-panel-2 hover:text-ink" title="Volver a leer">
+        <button onClick={() => void load()} disabled={loading || busy} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
@@ -298,69 +393,16 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-line bg-panel">
-        {visible.map((p, i) => {
-          const u = updateOf(p);
-          return (
-            <div key={p.id} className={`group flex items-center gap-3 px-4 py-2 ${i ? "border-t border-line/60" : ""} ${p.orphan ? "opacity-70" : ""} ${selected.has(p.id) ? "bg-neon/5" : ""}`}>
-              <input
-                type="checkbox"
-                checked={selected.has(p.id)}
-                onChange={() => toggle(p.id)}
-                disabled={p.orphan}
-                className="size-3.5 shrink-0 accent-[var(--color-neon)]"
-                title="Seleccionar para desinstalar varios"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-sm text-ink">{p.name}</span>
-                  {p.orphan && (
-                    <span className="flex shrink-0 items-center gap-1 text-[11px] text-warn" title="El desinstalador ya no existe">
-                      <FileWarning size={10} /> huérfana
-                    </span>
-                  )}
-                  {u && (
-                    <span className="flex shrink-0 items-center gap-0.5 rounded border border-neon/40 px-1 text-[10px] text-neon" title={`winget: ${u.id}`}>
-                      <ArrowUpCircle size={10} /> {u.available}
-                    </span>
-                  )}
-                  {p.perUser && <span className="shrink-0 rounded border border-line px-1 text-[10px] text-mute">solo este usuario</span>}
-                  {p.component && <span className="shrink-0 rounded border border-line px-1 text-[10px] text-mute">componente</span>}
-                </div>
-                <div className="truncate text-[11px] text-mute">
-                  {[p.publisher, p.version && `v${p.version}`, p.installed, p.silentKind ? `silencioso (${p.silentKind})` : !p.orphan && "con asistente"].filter(Boolean).join(" · ") || "—"}
-                </div>
-              </div>
-              <div className="w-20 text-right font-mono text-xs text-dim">{p.size ? bytes(p.size) : ""}</div>
-              <div className="flex w-56 items-center justify-end gap-1">
-                {running === p.id ? (
-                  <Loader2 size={15} className="animate-spin text-neon" />
-                ) : p.orphan ? (
-                  <Button kind="ghost" onClick={() => orphanCleanup(p)} disabled={busy || !canTouch(p)}>
-                    Quitar y limpiar restos
-                  </Button>
-                ) : (
-                  <>
-                    {u && (
-                      <button onClick={() => update(p, u)} disabled={busy || !isAdmin} className="rounded px-2 py-1 text-xs text-neon hover:bg-neon/10 disabled:opacity-40" title={isAdmin ? `Actualizar a ${u.available}` : "Requiere administrador"}>
-                        Actualizar
-                      </button>
-                    )}
-                    {p.repairable && (
-                      <button onClick={() => repair(p)} disabled={busy || !canTouch(p)} className="rounded p-1.5 text-mute opacity-0 group-hover:opacity-100 hover:text-ink disabled:opacity-30" title="Reparar (reinstala sus archivos)">
-                        <Wrench size={13} />
-                      </button>
-                    )}
-                    <Button kind="ghost" onClick={() => setTarget(p)} disabled={busy || !canTouch(p)} title={!canTouch(p) ? "Requiere administrador" : undefined}>
-                      <Trash2 size={13} /> Desinstalar
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {visible.length === 0 && <EmptyLine>Ningún programa con esa búsqueda y ese filtro.</EmptyLine>}
+      <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+        <DataTable
+          padded
+          rows={visible}
+          rowKey={(p) => p.id}
+          columns={columns}
+          initialSort={{ id: "name", desc: false }}
+          rowClass={(p) => `group ${p.orphan ? "opacity-70" : ""} ${selected.has(p.id) ? "bg-neon/5" : ""}`}
+          empty="Ningún programa con esa búsqueda y ese filtro."
+        />
       </div>
       <p className="mt-3 text-xs text-mute">
         Las apps de Microsoft Store se quitan desde <span className="text-ink">Bloatware</span>. Tras desinstalar, AdminOps busca carpetas, accesos directos y claves del registro
@@ -466,7 +508,7 @@ function BatchDialog({ programs, onClose }: { programs: InstalledProgram[]; onCl
     <Modal
       title={`Desinstalar ${programs.length} programas`}
       onClose={phase === "run" ? () => {} : () => onClose(found)}
-      width="w-[620px] max-w-[95vw]"
+      width="w-[620px]"
       footer={
         phase === "ask" ? (
           <>
@@ -551,7 +593,7 @@ function LeftoversDialog({ groups, onClose, onDone }: { groups: { program: Insta
     <Modal
       title="Restos de programas"
       onClose={busy ? () => {} : onClose}
-      width="w-[680px] max-w-[95vw]"
+      width="w-[680px]"
       footer={
         <>
           {error && <p className="mr-auto max-w-80 text-xs text-bad">{error}</p>}

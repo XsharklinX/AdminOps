@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-1.1.10-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-1.1.11-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 
@@ -39,12 +39,10 @@ which client.
 | Area | Main features |
 | --- | --- |
 | **Home** | Live dashboard. Guided troubleshooting. Step-by-step service session with a **PDF report** comparing before and after. |
-| **Machine** | Diagnostics ranked by severity. Hardware and temperatures. Security score. Disks: space, health, repair and file rescue. Reversible Windows tweaks. Processes grouped by program. Change journal. |
-| **Support** | Your company's ticketing site, mail and Teams inside the app. Domain people. Clients with their machines, visits and warranties. Calendar. Contacts. Step-by-step solutions. |
-| **Network** | Router and Wi‑Fi, connected devices, speed test, network repair, ping, traceroute, ports, DNS and hosts file. |
+| **Machine** | Diagnostics ranked by severity. Hardware and temperatures. Security score. Reversible Windows tweaks. Processes grouped by program. Disks: space, health, repair and file rescue. Network: router and Wi‑Fi, devices, speed test, repair and tools. User data: migration, encrypted vault, secure erase and recovery. Change journal, exportable to PDF and Excel. |
+| **Support** | Calendar. Teams and mail inside the app. Contacts. Ticketing site and web inventory, used like a browser. Own inventory. Domain people and clients. Step-by-step solutions. |
 | **Apps** | Update, bulk-install and uninstall programs; Windows Update; remove preinstalled apps; templates to prepare a new PC. |
-| **Administration** | Local users, accounts and domain, printers, shared folders, remote access, inventory, Windows tools and keyboard shortcuts. |
-| **Data** | User data migration, encrypted vault, secure erase, deleted file recovery and parental controls. |
+| **Administration** | Office workstations, local users, accounts and domain, printers, shared folders, remote access, Windows tools and keyboard shortcuts. |
 
 ## Download
 

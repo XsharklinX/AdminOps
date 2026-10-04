@@ -6,4 +6,5 @@ pub mod wifictl;
 pub mod lan;
 pub mod speedtest;
 pub mod tools;
+pub mod watch;
 pub mod wifi;

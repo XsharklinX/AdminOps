@@ -1,7 +1,7 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "./feedback";
-import { auditApi } from "../lib/api";
+import { logQuietly, auditApi } from "../lib/api";
 
 const EVENT = "adminops:audit";
 
@@ -9,7 +9,7 @@ const EVENT = "adminops:audit";
 function useAudit(): [boolean, (on: boolean) => Promise<void>] {
   const [on, setOn] = useState(false);
   useEffect(() => {
-    auditApi.get().then(setOn).catch(() => {});
+    auditApi.get().then(setOn).catch(logQuietly("AuditMode"));
     const f = (e: Event) => setOn((e as CustomEvent<boolean>).detail);
     window.addEventListener(EVENT, f);
     return () => window.removeEventListener(EVENT, f);

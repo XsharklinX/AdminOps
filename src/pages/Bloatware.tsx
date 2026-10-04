@@ -4,7 +4,8 @@ import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, systemApi, type Advice, type AppView } from "../lib/api";
 import { useOnJournalChange } from "../lib/journalEvents";
-import { ErrorState, Loading } from "../components/ui";
+import { ErrorState, Loading, smallBtn } from "../components/ui";
+import { NeedsAdmin } from "../components/AdminBanner";
 
 const ADVICE: Record<Advice, { title: string; hint: string; cls: string }> = {
   remove: { title: "Recomendado quitar", hint: "Promocionales o retiradas por Microsoft.", cls: "text-ok" },
@@ -178,12 +179,8 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
   );
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      {!isAdmin && (
-        <p className="mb-4 rounded-lg border border-warn/30 bg-warn/5 px-3.5 py-2.5 text-sm text-warn">
-          Sin administrador solo se ven las apps de tu usuario y no se pueden quitar.
-        </p>
-      )}
+    <div className="mx-auto max-w-6xl p-6">
+      {!isAdmin && <NeedsAdmin className="mb-4">Sin administrador solo se ven las apps de tu usuario y no se pueden quitar.</NeedsAdmin>}
 
       <div className="mb-5 flex items-center gap-2">
         <div className="relative flex-1">
@@ -198,7 +195,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
         <button
           onClick={selectRecommended}
           disabled={!isAdmin}
-          className="rounded-md border border-line-2 px-3 py-1.5 text-xs text-dim transition-colors hover:border-neon/40 hover:text-neon disabled:opacity-40"
+          className={`${smallBtn} hover:text-neon`}
         >
           Seleccionar recomendadas
         </button>

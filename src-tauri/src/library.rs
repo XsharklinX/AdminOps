@@ -5,7 +5,7 @@
 //! Colecciones genéricas de documentos JSON con `id`: la forma de cada una la
 //! define la interfaz; aquí se valida el tamaño y se guarda de forma atómica.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::sync::Mutex;
 
@@ -129,20 +129,92 @@ pub struct Place {
     pub network_label: String,
 }
 
+/// El número de serie no cambia mientras AdminOps está abierta: se lee una vez.
 fn serial() -> String {
-    crate::pspool::query("(Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue).SerialNumber", Some(std::time::Duration::from_secs(15)), "Número de serie")
-        .map(|s| s.trim().to_string())
-        .unwrap_or_default()
+    static SERIAL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    SERIAL
+        .get_or_init(|| {
+            crate::pspool::query("(Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue).SerialNumber", Some(std::time::Duration::from_secs(15)), "Número de serie")
+                .map(|s| s.trim().to_string())
+                .unwrap_or_default()
+        })
+        .clone()
+}
+
+/// Lo que no cambia (el número de serie) y las redes ya vistas desde este equipo,
+/// guardado en disco: identificar «este equipo y esta red» deja de costar un
+/// PowerShell de varios segundos en cada arranque (7 s medidos desde un pendrive).
+#[derive(Serialize, Deserialize, Default)]
+struct PlaceCache {
+    #[serde(default)]
+    serial: Option<String>,
+    /// Huella de la red (puerta de enlace y su MAC) → (clave, nombre).
+    #[serde(default)]
+    networks: std::collections::BTreeMap<String, (String, String)>,
+}
+
+fn place_cache_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::machine_data_dir(app).join("lugar.json")
+}
+
+fn load_place_cache(app: &tauri::AppHandle) -> PlaceCache {
+    std::fs::read_to_string(place_cache_path(app)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+fn save_place_cache(app: &tauri::AppHandle, c: &PlaceCache) {
+    if let Ok(json) = serde_json::to_string(c) {
+        let _ = std::fs::write(place_cache_path(app), json);
+    }
 }
 
 #[tauri::command(async)]
-pub fn this_place() -> Place {
+pub fn this_place(app: tauri::AppHandle) -> Place {
+    let mut cache = load_place_cache(&app);
+    let (place, dirty) = place_with(&mut cache);
+    if dirty {
+        save_place_cache(&app, &cache);
+    }
+    place
+}
+
+/// Sin nada guardado: lo pregunta todo a Windows.
+#[cfg(test)]
+pub(crate) fn place_uncached() -> Place {
+    place_with(&mut PlaceCache::default()).0
+}
+
+fn place_with(cache: &mut PlaceCache) -> (Place, bool) {
     let host = sysinfo::System::host_name().unwrap_or_default();
-    let serial = serial();
+    let mut dirty = false;
+    let serial = match &cache.serial {
+        Some(s) => s.clone(),
+        None => {
+            let s = serial();
+            // Un fallo pasajero no se guarda: se volverá a preguntar.
+            if !s.is_empty() {
+                cache.serial = Some(s.clone());
+                dirty = true;
+            }
+            s
+        }
+    };
     let generic = crate::sheet::generic_serial(&serial);
     let machine = if generic { format!("pc:{}", host.to_lowercase()) } else { format!("pc:{}:{}", host.to_lowercase(), serial.to_lowercase()) };
-    let (network, network_label) = crate::network::lan::current().ok().flatten().map(|i| (i.key, i.network)).unwrap_or_default();
-    Place { machine, machine_label: host, network, network_label }
+    // Una red ya vista se reconoce por su puerta de enlace, sin PowerShell. Solo
+    // la primera vez en cada red se pregunta a Windows su clave y su nombre.
+    let fp = crate::network::lan::fingerprint();
+    let (network, network_label) = match fp.as_ref().and_then(|f| cache.networks.get(f)) {
+        Some(known) => known.clone(),
+        None => {
+            let found = crate::network::lan::current_recent().ok().flatten().map(|i| (i.key, i.network)).unwrap_or_default();
+            if let (Some(f), false) = (fp, found.0.is_empty()) {
+                cache.networks.insert(f, found.clone());
+                dirty = true;
+            }
+            found
+        }
+    };
+    (Place { machine, machine_label: host, network, network_label }, dirty)
 }
 
 #[cfg(test)]

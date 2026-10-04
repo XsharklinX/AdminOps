@@ -1,0 +1,8 @@
+F:\Programacion\AdminOps\installer\../src-tauri/target-ci-installer\debug\deps\darling-6ab22dbfbce8055f.d: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\macros_public.rs
+
+F:\Programacion\AdminOps\installer\../src-tauri/target-ci-installer\debug\deps\libdarling-6ab22dbfbce8055f.rlib: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\macros_public.rs
+
+F:\Programacion\AdminOps\installer\../src-tauri/target-ci-installer\debug\deps\libdarling-6ab22dbfbce8055f.rmeta: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\macros_public.rs
+
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\lib.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\darling-0.24.1\src\macros_public.rs:

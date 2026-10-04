@@ -3,6 +3,7 @@
 import { Briefcase, Check, Clock, CopyPlus, ListTodo, Phone, RotateCcw, Search, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Followup, Visit } from "../lib/api";
+import { iconBtn } from "./ui";
 
 const KIND = {
   visit: { label: "Visita", Icon: Briefcase, text: "text-neon" },
@@ -116,7 +117,6 @@ export function AgendaHistory({
   }
 
   const chip = (on: boolean) => `rounded-full border px-2.5 py-0.5 text-xs transition-colors ${on ? "border-neon/60 bg-neon/10 text-ink" : "border-line text-mute hover:text-ink"}`;
-  const btn = "rounded-md p-1.5 text-mute transition-colors hover:bg-panel-2 hover:text-ink";
 
   return (
     <div className="space-y-4">
@@ -202,27 +202,27 @@ export function AgendaHistory({
                       </span>
                       <span className="flex shrink-0 items-center">
                         {i.visit && i.state === "missed" && (
-                          <button onClick={() => onDone(i.visit!)} className={`${btn} hover:text-ok`} title="Se hizo: marcarla como hecha">
+                          <button onClick={() => onDone(i.visit!)} className={`${iconBtn} hover:text-ok`} title="Se hizo: marcarla como hecha">
                             <Check size={14} />
                           </button>
                         )}
                         {i.visit && i.state !== "missed" && (
-                          <button onClick={() => onReopen(i.visit!)} className={btn} title="Volver a ponerla como pendiente">
+                          <button onClick={() => onReopen(i.visit!)} className={iconBtn} title="Volver a ponerla como pendiente">
                             <RotateCcw size={14} />
                           </button>
                         )}
                         {i.visit && (
-                          <button onClick={() => onRepeat(i.visit!)} className={btn} title="Apuntar otra igual">
+                          <button onClick={() => onRepeat(i.visit!)} className={iconBtn} title="Apuntar otra igual">
                             <CopyPlus size={14} />
                           </button>
                         )}
                         {i.visit && (
-                          <button onClick={() => onRemove(i.visit!)} className={`${btn} hover:text-bad`} title="Borrar del historial">
+                          <button onClick={() => onRemove(i.visit!)} className={`${iconBtn} hover:text-bad`} title="Borrar del historial">
                             <Trash2 size={14} />
                           </button>
                         )}
                         {i.followup && (
-                          <button onClick={() => onReopenFollowup(i.followup!)} className={btn} title="Volver a dejarlo pendiente">
+                          <button onClick={() => onReopenFollowup(i.followup!)} className={iconBtn} title="Volver a dejarlo pendiente">
                             <RotateCcw size={14} />
                           </button>
                         )}

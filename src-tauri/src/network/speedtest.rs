@@ -412,8 +412,10 @@ pub async fn run_speedtest(app: tauri::AppHandle) -> Result<SpeedResult, String>
     let on_meta = move |m: &Meta| {
         let _ = meta_emitter.emit("speedtest-meta", m.clone());
     };
+    let started = std::time::Instant::now();
     let result = run(&on, &on_meta).await;
     RUNNING.store(false, Ordering::SeqCst);
+    crate::task::notify_if_long(&app, "Prueba de velocidad", started.elapsed(), CANCEL.load(Ordering::SeqCst));
     match &result {
         Ok(r) => {
             log::info!(

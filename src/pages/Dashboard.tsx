@@ -4,42 +4,31 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActionPlan } from "../components/ActionPlan";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
-import { Bar, Sparkline, Loading } from "../components/ui";
+import { Bar, Button, Card, Sparkline, Loading } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
-import { api, diagApi, toolboxApi, tweaksApi, type JournalEntry, type SystemInfo } from "../lib/api";
+import { logQuietly, api, diagApi, toolboxApi, tweaksApi, type JournalEntry, type SystemInfo } from "../lib/api";
 import { getPrefs } from "../lib/prefs";
-import { bytes, duration, loadColor, rate } from "../lib/format";
+import { bytes, duration, loadColor, rate, ago } from "../lib/format";
 import { FirstSteps } from "../components/FirstSteps";
 import { TodayCard } from "../components/TodayCard";
+import { DIAG_COUNT_CHANGED, DIAG_UPDATED } from "../lib/diagRun";
 
 type Latest = Awaited<ReturnType<typeof diagApi.latest>>;
 
 const DOT = { bad: "bg-bad", warn: "bg-warn", info: "bg-mute", ok: "bg-ok" };
 
-function ago(ts: number) {
-  const m = Math.round((Date.now() / 1000 - ts) / 60);
-  if (m < 60) return `hace ${Math.max(1, m)} min`;
-  const h = Math.round(m / 60);
-  if (h < 48) return `hace ${h} h`;
-  return `hace ${Math.round(h / 24)} días`;
-}
-
 function Section({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`flex min-w-0 flex-col gap-2 ${className}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[15px] font-semibold">{title}</h2>
-        {action}
-      </div>
-      <div className="border-t border-line">{children}</div>
-    </section>
+    <Card title={title} right={action} className={`min-w-0 ${className}`}>
+      {children}
+    </Card>
   );
 }
 
 function LinkButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
-    <button onClick={onClick} className="shrink-0 text-[13px] whitespace-nowrap text-neon hover:underline">
+    <button onClick={onClick} className="shrink-0 text-xs whitespace-nowrap text-neon hover:underline">
       {children}
     </button>
   );
@@ -47,7 +36,7 @@ function LinkButton({ onClick, children }: { onClick: () => void; children: Reac
 
 function Kpi({ label, value, unit, sub, children }: { label: string; value: string; unit?: string; sub?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 px-5 py-4">
+    <Card className="flex min-w-0 flex-col gap-2">
       <div className="text-[13px] text-dim">{label}</div>
       <div className="flex items-baseline gap-1.5">
         <span className="text-[26px] leading-none font-semibold tracking-tight tabular">{value}</span>
@@ -55,13 +44,13 @@ function Kpi({ label, value, unit, sub, children }: { label: string; value: stri
       </div>
       {children}
       {sub && <div className="truncate text-xs text-mute">{sub}</div>}
-    </div>
+    </Card>
   );
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex gap-4 border-b border-line py-2 text-[13px]">
+    <div className="flex gap-4 border-b border-line py-2 text-[13px] last:border-0">
       <span className="w-24 shrink-0 text-mute">{label}</span>
       <span className="min-w-0 flex-1 truncate text-ink">{children}</span>
     </div>
@@ -86,7 +75,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
       diagApi
         .latest()
         .then(setLatest)
-        .catch(() => {})
+        .catch(logQuietly("Dashboard"))
         .finally(() => setLoaded(true)),
     [],
   );
@@ -110,14 +99,24 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   };
 
   useEffect(() => {
-    api.systemInfo().then(setInfo).catch(() => {});
+    api.systemInfo().then(setInfo).catch(logQuietly("Dashboard"));
     void loadLatest();
     void tweaksApi
         .journal()
         .then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)))
-        .catch(() => {});
+        .catch(logQuietly("Dashboard"));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir el Panel; después se recarga desde los botones
   }, []);
+  // Un análisis nuevo o completado, o un hallazgo aceptado en Diagnóstico: el Panel se pone al día.
+  useEffect(() => {
+    const reload = () => void loadLatest();
+    window.addEventListener(DIAG_COUNT_CHANGED, reload);
+    window.addEventListener(DIAG_UPDATED, reload);
+    return () => {
+      window.removeEventListener(DIAG_COUNT_CHANGED, reload);
+      window.removeEventListener(DIAG_UPDATED, reload);
+    };
+  }, [loadLatest]);
 
   if (error && !m) return <p className="p-8 text-bad">Error leyendo métricas: {error}</p>;
   if (!m) return <Loading page text="Leyendo el equipo…" />;
@@ -131,7 +130,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
       void tweaksApi
         .journal()
         .then((j) => setJournal([...j].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5)))
-        .catch(() => {});
+        .catch(logQuietly("Dashboard"));
     } catch (e) {
       toast("error", `${label}: ${e}`);
     } finally {
@@ -170,16 +169,16 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   ];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-7 px-8 py-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-5 px-8 py-6">
       {/* Lo pendiente del técnico: casos, seguimientos, visitas y avisos (no en modo usuario). */}
       <FirstSteps />
       <TodayCard />
       {/* Lo que se apuntó de este equipo o de esta red la última vez */}
       <PlaceNotes compact />
       {/* Veredicto */}
-      <section className="flex items-center gap-5 rounded-xl border border-line bg-panel px-6 py-5">
+      <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 px-6 py-5">
         <span className={`size-3 shrink-0 rounded-full ${verdict.dot}`} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-60 flex-1">
           <div className="text-xl font-semibold tracking-tight">{verdict.text}</div>
           <div className="mt-0.5 truncate text-[13px] text-dim">
             {verdict.sub}
@@ -195,25 +194,26 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
             )}
           </div>
         </div>
-        <button onClick={() => onNavigate("session")} className="flex h-9 items-center gap-1.5 rounded-lg border border-line-2 px-3.5 text-[13px] text-ink hover:bg-panel-2">
-          <ClipboardCheck size={15} strokeWidth={1.6} /> Sesión de servicio
-        </button>
-        <button onClick={() => onNavigate("report")} className="flex h-9 items-center gap-1.5 rounded-lg border border-line-2 px-3.5 text-[13px] text-ink hover:bg-panel-2">
-          <FileText size={15} strokeWidth={1.6} /> Informe
-        </button>
-        <button
-          onClick={review}
-          disabled={reviewing}
-          title="Diagnóstico completo (discos, estabilidad, drivers, seguridad y actualizaciones) y plan de acción. Tarda alrededor de un minuto."
-          className="flex h-9 items-center gap-1.5 rounded-lg bg-neon px-4 text-[13px] font-medium text-on-neon hover:brightness-110 disabled:opacity-60"
-        >
-          {reviewing ? <Loader2 size={15} className="animate-spin" /> : <Stethoscope size={15} strokeWidth={1.8} />}
-          {reviewing ? "Revisando…" : latest ? "Revisión completa" : "Revisar el equipo"}
-        </button>
-      </section>
+        <div className="flex flex-wrap gap-2">
+          <Button kind="secondary" onClick={() => onNavigate("session")}>
+            <ClipboardCheck size={15} strokeWidth={1.6} /> Sesión de servicio
+          </Button>
+          <Button kind="secondary" onClick={() => onNavigate("report")}>
+            <FileText size={15} strokeWidth={1.6} /> Informe
+          </Button>
+          <Button
+            onClick={() => void review()}
+            disabled={reviewing}
+            title="Diagnóstico completo (discos, estabilidad, drivers, seguridad y actualizaciones) y plan de acción. Tarda alrededor de un minuto."
+          >
+            {reviewing ? <Loader2 size={15} className="animate-spin" /> : <Stethoscope size={15} strokeWidth={1.8} />}
+            {reviewing ? "Revisando…" : latest ? "Revisión completa" : "Revisar el equipo"}
+          </Button>
+        </div>
+      </Card>
 
       {/* En vivo */}
-      <section className="grid grid-cols-4 divide-x divide-line rounded-xl border border-line bg-panel">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           label="Procesador"
           value={`${Math.round(m.cpuTotal)}`}
@@ -245,9 +245,9 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         </Kpi>
       </section>
 
-      <div className="grid grid-cols-3 gap-8">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Section
-          className="col-span-2"
+          className="lg:col-span-2"
           title="Qué hacer ahora"
           action={latest && <LinkButton onClick={() => onNavigate("diagnostics")}>Ver diagnóstico</LinkButton>}
         >
@@ -283,7 +283,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         </Section>
       </div>
 
-      <div className="grid grid-cols-3 gap-8">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Section title="Este equipo" action={<LinkButton onClick={() => onNavigate("hardware")}>Hardware</LinkButton>}>
           <Row label="Modelo">{latest?.model ?? info?.hostName ?? "—"}</Row>
           <Row label="Procesador">{info?.cpuBrand ?? "—"}</Row>
@@ -338,7 +338,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
       </div>
 
       <Section title="Procesos con más carga" action={<LinkButton onClick={() => onNavigate("processes")}>Ver todos</LinkButton>}>
-        <div className="grid grid-cols-2 gap-x-10">
+        <div className="grid gap-x-10 lg:grid-cols-2">
           {m.topProcesses.slice(0, 8).map((p) => (
             <div key={p.pid} className="flex items-center gap-3 border-b border-line py-2 text-[13px]">
               <span className="min-w-0 flex-1 truncate">{p.name}</span>
@@ -369,7 +369,10 @@ function FavoriteTools({ onNavigate }: { onNavigate: (p: PageId) => void }) {
         ]);
         setItems(v.favorites.flatMap((id) => (names.has(id) ? [{ id, ...names.get(id)! }] : [])));
       })
-      .catch(() => setItems([]));
+      .catch((e) => {
+        setItems([]);
+        logQuietly("Dashboard")(e);
+      });
   }, []);
   if (items === null) return null;
   return (

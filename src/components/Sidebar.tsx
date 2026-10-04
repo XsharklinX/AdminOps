@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import logo from "../assets/logo.svg";
-import { appcareApi, type AppInfo, type TargetUser, type UpdateInfo } from "../lib/api";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type UpdateInfo } from "../lib/api";
 import { getPrefs, setSidebar, usePrefs, type NavLayout } from "../lib/prefs";
+import { goToPage } from "../lib/navigate";
+import type { Badge } from "../lib/machineState";
+import { navKey, parseNavKey, sectionLabel, sectionsOf } from "../lib/sections";
+import { useCurrentSections } from "../lib/sectionState";
 import {
   Activity,
   Bookmark,
@@ -11,7 +14,6 @@ import {
   Briefcase,
   Bug,
   Building2,
-  ChevronRight,
   Cloud,
   Cpu,
   Database,
@@ -23,15 +25,16 @@ import {
   Heart,
   Home,
   Layers,
+  LayoutGrid,
   Lock,
   Lock as LockIcon,
   MessagesSquare,
   Monitor,
   Network,
   Package,
+  Pin,
   Printer,
   Rocket,
-  Search,
   Settings as SettingsIcon,
   Shield,
   SlidersHorizontal,
@@ -135,11 +138,11 @@ export const NAV: NavItem[] = [
     tab: "Discos",
     help: "El espacio (qué ocupa y qué se puede liberar) y la salud de cada disco: qué le pasa, repararlo cuando se puede («Reparar disco» de Windows, sectores dañados) y rescatar los archivos de un disco que falla.",
   },
-  // Ajustes de Windows
+  // Optimizar Windows
   {
     id: "tweaks",
-    label: "Ajustes de Windows",
-    tab: "Ajustes",
+    label: "Optimizar Windows",
+    tab: "Optimizar",
     help: "Limpieza, rendimiento, privacidad y servicios en un solo sitio, con buscador. Cada ajuste explica qué hace y se puede deshacer.",
   },
   // Aplicaciones
@@ -160,16 +163,21 @@ export const NAV: NavItem[] = [
   // Administración
   {
     id: "stations",
-    label: "Puestos e inventario",
+    label: "Puestos",
     tab: "Puestos",
-    help: "Qué equipos de la oficina responden y cuáles necesitan atención (disco, reinicios, actualizaciones). Puedes actuar sobre varios a la vez: reiniciar con aviso, actualizar directivas, mandar un mensaje o conectarte. Además, el inventario propio y la web de inventario de tu empresa.",
+    help: "Qué equipos de la oficina responden y cuáles necesitan atención (disco, reinicios, actualizaciones), a partir de tus listas de equipos.",
   },
-  { id: "users", label: "Usuarios locales", tab: "Usuarios", help: "Crear usuarios, cambiar contraseñas, permisos de administrador y quitar cuentas." },
   {
-    id: "accounts",
-    label: "Cuentas y dominio",
-    tab: "Cuentas",
-    help: "Con qué cuenta entra este equipo: cuentas de Microsoft, profesionales (Entra ID), de Office y credenciales guardadas, y el dominio de la empresa (unirlo, sacarlo, repararlo o cambiarle el nombre).",
+    id: "inventory",
+    label: "Inventario",
+    tab: "Inventario",
+    help: "Todo el inventario en un sitio: el tuyo, con la ficha y el veredicto de cada equipo, y la web de inventario de la empresa dentro de AdminOps, con los datos de este equipo a mano para rellenarla.",
+  },
+  {
+    id: "users",
+    label: "Usuarios y cuentas",
+    tab: "Usuarios",
+    help: "Las cuentas de este equipo en un solo sitio: los usuarios locales (crear, contraseñas, administrador), las cuentas de Microsoft y Office con las credenciales guardadas, y el dominio de la empresa.",
   },
   {
     id: "printers",
@@ -180,7 +188,7 @@ export const NAV: NavItem[] = [
   { id: "remote", label: "Acceso remoto", tab: "Acceso remoto", help: "Agenda de conexiones, Escritorio remoto, AnyDesk, RustDesk y TeamViewer." },
   {
     id: "tools",
-    label: "Herramientas y atajos",
+    label: "Herramientas de Windows",
     tab: "Herramientas",
     help: "Las herramientas de Windows de siempre a un clic, tus accesos directos propios y los atajos de teclado de Windows y de los programas habituales.",
   },
@@ -241,8 +249,7 @@ export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   devices: ["router", "devices"],
   network: ["router", "speed"],
   nettools: ["router", "tools"],
-  inventory: ["stations", "inventory"],
-  // Ajustes de Windows
+  // Optimizar Windows
   cleanup: ["tweaks", "cleanup"],
   performance: ["tweaks", "performance"],
   privacy: ["tweaks", "privacy"],
@@ -255,7 +262,7 @@ export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   install: ["apps", "install"],
   uninstall: ["apps", "uninstall"],
   bloatware: ["apps", "bloatware"],
-  // Herramientas y atajos
+  // Herramientas de Windows
   shortcuts: ["tools", "shortcuts"],
   // Estado del equipo
   diagnostics: ["machine", "diagnostics"],
@@ -265,7 +272,8 @@ export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   // Personas y clientes
   clients: ["people", "clients"],
   // Administración
-  domain: ["accounts", "domain"],
+  accounts: ["users", "accounts"],
+  domain: ["users", "domain"],
   shares: ["printers", "shares"],
   // Sesión de servicio
   report: ["session", "report"],
@@ -332,17 +340,24 @@ export const AREA_ICONS: Record<string, LucideIcon> = {
   MessagesSquare,
 };
 
-/** Las áreas de la barra lateral; sus páginas son pestañas. */
+/**
+ * Las áreas de la barra lateral (1.2). Cada una enseña sus pantallas y, debajo de
+ * cada pantalla, sus secciones (lib/sections.ts): nada queda detrás de una pestaña.
+ * Teams y Correo no están: se abren desde la barra de arriba. Herramientas de
+ * Windows y Ajustes van abajo, en la columna de áreas.
+ */
 const DEFAULT_AREAS: Omit<Area, "icon">[] = [
   // Los id se conservan: las navegaciones personalizadas siguen funcionando.
   { id: "panel", label: "Inicio", iconName: "Home", pages: ["dashboard", "troubleshoot", "session"] },
-  { id: "equipo", label: "Equipo", iconName: "Monitor", pages: ["machine", "tweaks", "processes", "space"] },
-  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["tickets", "people", "mail", "teams", "agenda", "contacts", "knowledge"] },
-  { id: "red", label: "Red", iconName: "Network", pages: ["router"] },
-  { id: "programas", label: "Aplicaciones", iconName: "Package", pages: ["apps", "recipes"] },
-  { id: "admin", label: "Administración", iconName: "Building2", pages: ["stations", "users", "accounts", "printers", "remote", "tools"] },
-  { id: "datos", label: "Datos", iconName: "Lock", pages: ["data"] },
+  { id: "equipo", label: "Este equipo", iconName: "Monitor", pages: ["machine", "tweaks", "processes", "space", "data"] },
+  { id: "red", label: "Red", iconName: "Wifi", pages: ["router"] },
+  { id: "programas", label: "Programas", iconName: "Package", pages: ["apps"] },
+  { id: "admin", label: "Administración", iconName: "Building2", pages: ["stations", "users", "printers", "remote", "recipes"] },
+  { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["agenda", "tickets", "inventory", "people", "contacts", "knowledge"] },
 ];
+
+/** Pantallas que no van en ningún área: tienen su sitio fijo (barra de arriba o pie de la columna). */
+export const OUTSIDE_AREAS: PageId[] = ["teams", "mail", "tools", "settings"];
 
 const withIcon = (a: Omit<Area, "icon">): Area => ({ ...a, icon: AREA_ICONS[a.iconName] ?? Folder });
 
@@ -400,25 +415,19 @@ export function visibleAreas(active: PageId): Area[] {
     .filter((a) => a.pages.length > 0);
 }
 
-const OPEN_KEY = "adminops.navOpen";
-
-function readOpen(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
+/** Nombre de una línea fijada: la pantalla, o «Sección» de una pantalla. */
+export function navLabel(key: string): string {
+  const { page, section } = parseNavKey(key);
+  return sectionLabel(page, section) ?? pageLabel(page);
 }
 
-const WIDTH = { narrow: "w-52", normal: "w-60", wide: "w-72" } as const;
-/** Ancho en píxeles de cada tamaño, para empezar a arrastrar desde el actual. */
-const WIDTH_PX = { narrow: 208, normal: 240, wide: 288 } as const;
-const ROW = { compact: "h-8", normal: "h-9", comfortable: "h-10" } as const;
-const SUBROW = { compact: "h-7", normal: "h-8", comfortable: "h-9" } as const;
+/** Ancho del árbol (la columna de áreas va aparte). */
+const WIDTH_PX = { narrow: 216, normal: 248, wide: 296 } as const;
+const RAIL_W = 84;
+const ROW = { compact: "h-7", normal: "h-8", comfortable: "h-9" } as const;
 
-/** Hasta dónde se puede estrechar o ensanchar arrastrando. */
-const MIN_W = 170;
+/** Hasta dónde se puede estrechar o ensanchar el árbol arrastrando. */
+const MIN_W = 180;
 const MAX_W = 440;
 
 /**
@@ -436,7 +445,7 @@ function useSidebarResize(position: "left" | "right") {
   useEffect(() => {
     if (!dragging) return;
     const move = (e: PointerEvent) => {
-      const raw = position === "right" ? window.innerWidth - e.clientX : e.clientX;
+      const raw = (position === "right" ? window.innerWidth - e.clientX : e.clientX) - RAIL_W;
       const w = Math.round(Math.min(MAX_W, Math.max(MIN_W, raw)));
       latest.current = w;
       setDragW(w);
@@ -470,29 +479,46 @@ function useSidebarResize(position: "left" | "right") {
   };
 }
 
+const TONE = {
+  ok: "bg-ok/12 text-ok",
+  warn: "bg-warn/15 text-warn",
+  bad: "bg-bad/15 text-bad",
+  neutral: "bg-panel-2 text-dim",
+} as const;
+
+function BadgeTag({ b }: { b: Badge }) {
+  return (
+    <span title={b.title} className={`shrink-0 rounded px-1.5 font-mono text-[10.5px] leading-[17px] ${TONE[b.tone]}`}>
+      {b.text}
+    </span>
+  );
+}
+
+/**
+ * La barra lateral de 1.2: una columna con las áreas y, a su lado, el árbol del
+ * área: cada pantalla y, debajo, sus secciones como líneas. Lo que antes estaba
+ * en una pestaña (Dominio, Inicio de Windows, Carpetas compartidas…) se ve aquí.
+ */
 export function Sidebar({
   active,
   onArea,
-  onSelect,
+  onNavigate,
   isAdmin,
-  targetUser,
-  appInfo,
+  badges,
   sessionActive,
-  onAbout,
-  onSearch,
+  onTodo,
   onLock,
   update,
   recent = [],
 }: {
   active: PageId;
   onArea: (area: Area) => void;
-  onSelect: (id: PageId) => void;
+  onNavigate: (page: PageId, section?: string | null) => void;
   isAdmin: boolean | null;
-  targetUser: TargetUser | null;
-  appInfo: AppInfo | null;
+  badges: Record<string, Badge>;
   sessionActive: boolean;
-  onAbout: () => void;
-  onSearch: () => void;
+  /** Abre «Todo AdminOps» (el mapa y el buscador). */
+  onTodo: () => void;
   onLock?: () => void;
   update?: UpdateInfo | null;
   recent?: PageId[];
@@ -500,315 +526,211 @@ export function Sidebar({
   const prefs = usePrefs();
   const sb = prefs.sidebar;
   const resize = useSidebarResize(sb.position);
+  const sections = useCurrentSections();
   const areas = visibleAreas(active);
-  const current = areas.find((a) => a.pages.includes(active)) ?? null;
-  // Áreas que el usuario dejó abiertas con la flecha (además de la actual).
-  const [pinned, setPinned] = useState<string[]>(readOpen);
-  const [closedCurrent, setClosedCurrent] = useState<string | null>(null);
-  const isOpen = (a: Area) => {
-    if (a.pages.length < 2) return false;
-    if (sb.expand === "all") return true;
-    const isCurrent = current?.id === a.id && closedCurrent !== a.id;
-    return sb.expand === "current" ? isCurrent : pinned.includes(a.id) || isCurrent;
-  };
-  const toggle = (a: Area) => {
-    const open = isOpen(a);
-    if (sb.expand === "current") {
-      setClosedCurrent(open ? a.id : null);
-      if (!open) onArea(a);
-      return;
-    }
-    let next = pinned.filter((id) => id !== a.id);
-    if (!open) next = [...next, a.id];
-    setPinned(next);
-    setClosedCurrent(open && current?.id === a.id ? a.id : null);
-    try {
-      localStorage.setItem(OPEN_KEY, JSON.stringify(next));
-    } catch {
-      /* sin almacenamiento */
-    }
-  };
-  const toggleFavorite = (p: PageId) => {
-    const favs = sb.favorites.includes(p) ? sb.favorites.filter((x) => x !== p) : [...sb.favorites, p];
-    setSidebar({ favorites: favs });
-  };
-
-  const border = sb.position === "right" ? "border-l" : "border-r";
+  const activeArea = areas.find((a) => a.pages.includes(active)) ?? null;
+  // El área que enseña el árbol: la de la pantalla actual; en Ajustes, Teams o
+  // Herramientas (que no son de ningún área) se queda la última.
+  const activeAreaId = activeArea?.id ?? null;
+  const [shownId, setShownId] = useState<string | null>(activeAreaId);
+  useEffect(() => {
+    if (activeAreaId) setShownId(activeAreaId);
+  }, [activeAreaId]);
+  const shown = areas.find((a) => a.id === shownId) ?? activeArea ?? areas[0] ?? null;
   const mini = sb.mode === "mini";
+  const badgeOf = (k: string) => (sb.showBadges ? badges[k] : undefined);
+  const areaAlert = (a: Area) =>
+    a.pages.some((p) => [navKey(p), ...sectionsOf(p).map((s) => navKey(p, s.id))].some((k) => {
+      const b = badgeOf(k);
+      return b && (b.tone === "warn" || b.tone === "bad");
+    }));
+  const pinned = sb.favorites.filter((k) => isPageId(parseNavKey(k).page) && allowedInMode(parseNavKey(k).page, prefs.mode));
+  const togglePin = (k: string) => setSidebar({ favorites: sb.favorites.includes(k) ? sb.favorites.filter((x) => x !== k) : [...sb.favorites, k] });
 
-  // ---------- Solo iconos ----------
-  if (mini) {
-    return (
-      <aside className={`flex w-16 shrink-0 flex-col items-center border-line bg-panel ${border}`}>
-        <button onClick={onAbout} className="pt-5 pb-4" title={`AdminOps ${appInfo?.version ?? ""}`}>
-          <img src={logo} alt="" className="size-8" draggable={false} />
-        </button>
-        {sb.showSearch && (
-          <button onClick={onSearch} className="mb-2 grid size-10 place-items-center rounded-lg text-mute hover:bg-panel-2 hover:text-ink" title="Buscar o ejecutar (Ctrl+K)">
-            <Search size={18} strokeWidth={1.6} />
-          </button>
-        )}
-        <nav aria-label="Navegación principal" className="flex flex-1 flex-col items-center gap-1 overflow-y-auto">
-          {sb.favorites.length > 0 && (
-            <button
-              onClick={() => onSelect(sb.favorites[0])}
-              className={`grid size-10 place-items-center rounded-lg ${sb.favorites.includes(active) ? "bg-panel-2 text-ink" : "text-mute hover:bg-panel-2 hover:text-ink"}`}
-              title={`Favoritos: ${sb.favorites.map(pageLabel).join(", ")}`}
-            >
-              <Star size={18} strokeWidth={1.6} />
-            </button>
-          )}
-          {areas.map((a) => {
-            const Icon = a.icon;
-            const on = current?.id === a.id;
-            return (
-              <button
-                key={a.id}
-                onClick={() => onArea(a)}
-                aria-current={on ? "page" : undefined}
-                title={a.label}
-                className={`relative grid size-10 place-items-center rounded-lg transition-colors ${on ? "bg-panel-2 text-ink" : "text-mute hover:bg-panel-2 hover:text-ink"}`}
-              >
-                {on && <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-neon" />}
-                <Icon size={19} strokeWidth={1.6} />
-              </button>
-            );
-          })}
-        </nav>
-        {sessionActive && sb.showSession && (
-          <button onClick={() => onSelect("session")} className="mb-2 grid size-10 place-items-center rounded-lg text-ok hover:bg-panel-2" title="Sesión de servicio en curso">
-            <span className="size-2 rounded-full bg-ok" />
-          </button>
-        )}
-        {update && (
-          <button onClick={() => appcareApi.openRelease(update.url).catch(() => {})} className="mb-2 grid size-10 place-items-center rounded-lg text-neon hover:bg-panel-2" title={`Versión ${update.latest} disponible`}>
-            <Rocket size={17} />
-          </button>
-        )}
-        <div className="flex flex-col items-center gap-1 border-t border-line py-3">
-          <button
-            onClick={() => setSidebar({ mode: "full" })}
-            className="grid size-9 place-items-center rounded-md text-mute hover:bg-panel-2 hover:text-ink"
-            title="Desacoplar: mostrar los nombres"
-          >
-            <PanelLeftOpen size={17} strokeWidth={1.6} className={sb.position === "right" ? "rotate-180" : ""} />
-          </button>
-          {onLock && (
-            <button onClick={onLock} className="grid size-9 place-items-center rounded-md text-mute hover:bg-panel-2 hover:text-ink" title="Bloquear (Ctrl+L)">
-              <LockIcon size={16} strokeWidth={1.6} />
-            </button>
-          )}
-          <button
-            onClick={() => onSelect("settings")}
-            className={`grid size-9 place-items-center rounded-md hover:bg-panel-2 ${active === "settings" ? "text-ink" : "text-mute hover:text-ink"}`}
-            title={`Ajustes (Ctrl+,) · ${isAdmin ? "Administrador" : "Usuario estándar"}`}
-          >
-            <SettingsIcon size={17} strokeWidth={1.6} />
-          </button>
-        </div>
-      </aside>
-    );
-  }
+  /** La línea está a la vista: la pantalla actual y, si tiene secciones, la sección actual. */
+  const isCurrent = (page: PageId, section: string | null) => {
+    if (page !== active) return false;
+    const list = sectionsOf(page);
+    if (!list.length) return section === null;
+    return section === (sections[page] ?? list[0].id);
+  };
 
-  // ---------- Completa ----------
-  const pageRow = (p: PageId, indent: boolean, key: string) => {
-    const sel = p === active;
-    const fav = sb.favorites.includes(p);
+  const line = (k: string, label: string, opts: { sub?: boolean; current: boolean; onClick: () => void; badge?: Badge; title?: string }) => {
+    const on = sb.favorites.includes(k);
     return (
-      <div key={key} className="group/page relative">
+      <div key={k} className="group/line relative">
         <button
-          onClick={() => onSelect(p)}
-          aria-current={sel ? "page" : undefined}
-          className={`relative flex w-full items-center rounded-md pr-7 text-left text-[13px] transition-colors ${SUBROW[sb.density]} ${indent ? (sb.showAreaIcons ? "pl-10" : "pl-5") : "pl-3"} ${
-            sel ? "bg-panel-2 font-medium text-ink" : "text-dim hover:bg-panel-2/60 hover:text-ink"
-          }`}
+          onClick={opts.onClick}
+          aria-current={opts.current ? "page" : undefined}
+          title={opts.title}
+          className={`relative flex w-full items-center gap-2 rounded-md pr-8 text-left transition-colors ${ROW[sb.density]} ${
+            opts.sub ? "pl-7 text-[12.5px]" : "pl-2.5 text-[13px] font-medium"
+          } ${opts.current ? "bg-neon/10 text-ink" : opts.sub ? "text-dim hover:bg-panel-2 hover:text-ink" : "text-ink hover:bg-panel-2"}`}
         >
-          {sel && indent && <span className={`absolute top-2 bottom-2 w-0.5 rounded-full bg-neon ${sb.showAreaIcons ? "left-[21px]" : "left-2"}`} />}
-          <span className="truncate">{pageLabel(p)}</span>
+          {opts.sub && <span className={`absolute top-0 bottom-0 left-3.5 ${opts.current ? "w-0.5 bg-neon" : "w-px bg-line-2"}`} />}
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {opts.badge && <BadgeTag b={opts.badge} />}
         </button>
         <button
-          onClick={() => toggleFavorite(p)}
-          className={`absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 ${fav ? "text-neon" : "text-mute opacity-0 group-hover/page:opacity-100 hover:text-ink"}`}
-          title={fav ? "Quitar de favoritos" : "Añadir a favoritos"}
-          aria-label={fav ? "Quitar de favoritos" : "Añadir a favoritos"}
+          onClick={() => togglePin(k)}
+          className={`absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded ${on ? "text-neon" : "text-mute opacity-0 group-hover/line:opacity-100 hover:bg-panel-2 hover:text-ink focus-visible:opacity-100"}`}
+          title={on ? "Quitar de fijados" : "Fijar arriba"}
+          aria-label={on ? `Quitar ${label} de fijados` : `Fijar ${label} arriba`}
         >
-          <Star size={12} fill={fav ? "currentColor" : "none"} />
+          <Pin size={12} fill={on ? "currentColor" : "none"} />
         </button>
       </div>
     );
   };
 
-  const smallHeader = (text: string) => <div className="px-3 pt-2 pb-1 text-[11px] font-medium text-mute">{text}</div>;
-  const recentPages = sb.recents > 0 ? recent.filter((p) => p !== "settings").slice(0, sb.recents) : [];
-
-  const widthPx = resize.width ?? sb.widthPx;
-  return (
-    <aside
-      style={widthPx ? { width: `${widthPx}px` } : undefined}
-      className={`relative flex ${widthPx ? "" : WIDTH[sb.width]} shrink-0 flex-col border-line bg-panel ${border}`}
-    >
-      {/* Borde que se arrastra para cambiar el ancho; doble clic vuelve al de Ajustes. */}
-      <div
-        onPointerDown={(e) => {
-          e.preventDefault();
-          resize.start(widthPx ?? WIDTH_PX[sb.width]);
-        }}
-        onDoubleClick={() => setSidebar({ widthPx: null })}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Ajustar el ancho de la barra lateral"
-        title="Arrastra para ajustar el ancho · doble clic para el ancho de siempre"
-        className={`absolute inset-y-0 z-20 w-1.5 cursor-col-resize transition-colors hover:bg-neon/40 ${resize.dragging ? "bg-neon/60" : ""} ${
-          sb.position === "right" ? "left-0" : "right-0"
-        }`}
-      />
-      <div className="group/head flex items-start">
-        <button onClick={onAbout} className="flex min-w-0 flex-1 items-center gap-2.5 py-1 pt-5 pb-4 pl-5 text-left" title="Acerca de AdminOps">
-          <img src={logo} alt="" className="size-8 shrink-0" draggable={false} />
-          <div className="min-w-0">
-            <div className="truncate text-[15px] font-semibold tracking-tight text-ink">AdminOps</div>
-            <div className="flex items-center gap-1.5 text-xs text-mute">
-              {appInfo ? `Versión ${appInfo.version}` : "…"}
-              {appInfo?.portable && (
-                <span className="rounded border border-line-2 px-1 text-[11px] text-dim" title="Modo portable: los datos se guardan junto a AdminOps.exe, no en este equipo">
-                  portable
-                </span>
-              )}
-            </div>
-          </div>
-        </button>
-        <button
-          onClick={() => setSidebar({ mode: "mini" })}
-          className="mt-5 mr-2.5 grid size-8 shrink-0 place-items-center rounded-md text-mute opacity-0 transition-opacity group-hover/head:opacity-100 hover:bg-panel-2 hover:text-ink focus-visible:opacity-100"
-          title="Acoplar la barra: solo iconos"
-        >
-          <PanelLeftClose size={16} strokeWidth={1.6} className={sb.position === "right" ? "rotate-180" : ""} />
-        </button>
-      </div>
-
-      {sb.showSearch && (
-        <div className="px-3.5 pb-3">
-          <button
-            onClick={onSearch}
-            className="flex h-9 w-full items-center gap-2 rounded-lg border border-line bg-void px-2.5 text-left text-[13px] text-mute transition-colors hover:border-line-2 hover:text-dim"
-            title="Buscar páginas, herramientas, ajustes y reparaciones"
-          >
-            <Search size={15} strokeWidth={1.6} />
-            <span className="flex-1">Buscar o ejecutar</span>
-            <kbd className="rounded border border-line-2 px-1.5 font-sans text-[11px]">Ctrl K</kbd>
-          </button>
-        </div>
-      )}
-
-      <nav aria-label="Navegación principal" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5">
-        {sb.favorites.length > 0 && (
-          <div className="mb-2">
-            {smallHeader("Favoritos")}
-            {sb.favorites.filter((p) => NAV.some((n) => n.id === p)).map((p) => pageRow(p, false, `fav-${p}`))}
-          </div>
-        )}
-        {recentPages.length > 0 && (
-          <div className="mb-2">
-            {smallHeader("Recientes")}
-            {recentPages.map((p) => pageRow(p, false, `rec-${p}`))}
-          </div>
-        )}
-        {(sb.favorites.length > 0 || recentPages.length > 0) && smallHeader("Secciones")}
-        {areas.map((a) => {
-          const on = current?.id === a.id;
-          const open = isOpen(a);
-          const single = a.pages.length === 1;
-          const Icon = a.icon;
-          return (
-            <div key={a.id}>
-              <div className={`group flex ${ROW[sb.density]} items-center rounded-lg transition-colors ${on && (single || !open) ? "bg-panel-2" : "hover:bg-panel-2/60"}`}>
-                <button
-                  onClick={() => {
-                    setClosedCurrent(null);
-                    onArea(a);
-                  }}
-                  aria-current={on && single ? "page" : undefined}
-                  className={`flex h-full min-w-0 flex-1 items-center gap-3 pl-3 text-left text-sm ${on ? "font-medium text-ink" : "text-dim group-hover:text-ink"}`}
-                >
-                  {sb.showAreaIcons && <Icon size={18} strokeWidth={1.6} className={on ? "text-ink" : "text-mute"} />}
-                  <span className="flex-1 truncate">{a.label}</span>
-                </button>
-                {!single && sb.expand !== "all" && (
-                  <button
-                    onClick={() => toggle(a)}
-                    aria-expanded={open}
-                    aria-label={open ? `Plegar ${a.label}` : `Desplegar ${a.label}`}
-                    className="grid h-full w-8 shrink-0 place-items-center rounded-r-lg text-mute hover:text-ink"
-                  >
-                    <ChevronRight size={14} className={`transition-transform ${open ? "rotate-90" : ""}`} />
-                  </button>
-                )}
-              </div>
-              {open && <div className="mt-0.5 mb-1 flex flex-col gap-px">{a.pages.map((p) => pageRow(p, true, p))}</div>}
-            </div>
-          );
+  /** Una pantalla y sus secciones. */
+  const pageLines = (p: PageId) => {
+    const list = sectionsOf(p);
+    return (
+      <div key={p} className="flex flex-col gap-px">
+        {line(navKey(p), pageLabel(p), {
+          current: isCurrent(p, null),
+          onClick: () => onNavigate(p),
+          badge: badgeOf(navKey(p)),
+          title: NAV.find((n) => n.id === p)?.help,
         })}
-      </nav>
+        {list.map((s) => line(navKey(p, s.id), s.label, { sub: true, current: isCurrent(p, s.id), onClick: () => onNavigate(p, s.id), badge: badgeOf(navKey(p, s.id)) }))}
+      </div>
+    );
+  };
 
-      {update && (
-        <button
-          onClick={() => appcareApi.openRelease(update.url).catch(() => {})}
-          className="mx-3.5 mb-2.5 flex flex-col gap-0.5 rounded-lg border border-neon/40 bg-neon/5 px-3 py-2.5 text-left transition-colors hover:border-neon"
-          title={update.notes || "Ver la versión nueva en GitHub"}
-        >
-          <span className="text-xs text-neon">Versión {update.latest} disponible</span>
-          <span className="text-[13px] text-ink">Ver novedades y descargar</span>
-        </button>
-      )}
+  const fixedButton = (label: string, Icon: LucideIcon, on: boolean, onClick: () => void, title?: string) => (
+    <button
+      onClick={onClick}
+      aria-current={on ? "page" : undefined}
+      title={title ?? label}
+      className={`relative flex w-[76px] flex-col items-center gap-1 rounded-lg px-1 pt-2 pb-1.5 text-[10.5px] leading-tight transition-colors ${
+        on ? "bg-neon/10 text-ink" : "text-mute hover:bg-panel-2 hover:text-ink"
+      }`}
+    >
+      {on && <span className="absolute top-2.5 bottom-2.5 -left-1 w-[3px] rounded-full bg-neon" />}
+      <Icon size={19} strokeWidth={1.6} />
+      <span className="max-w-full text-center break-words">{label}</span>
+    </button>
+  );
 
-      {sessionActive && sb.showSession && (
-        <button
-          onClick={() => onSelect("session")}
-          className="mx-3.5 mb-2.5 flex flex-col gap-0.5 rounded-lg border border-line px-3 py-2.5 text-left transition-colors hover:border-line-2"
-        >
-          <span className="flex items-center gap-1.5 text-xs text-mute">
-            <span className="size-1.5 rounded-full bg-ok" /> Sesión de servicio
-          </span>
-          <span className="text-[13px] text-ink">En curso · ver checklist</span>
-        </button>
-      )}
+  const rail = (
+    <nav aria-label="Áreas" className={`flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
+      {fixedButton("Todo", LayoutGrid, false, onTodo, "Todo AdminOps: cada función del programa, y el buscador (Ctrl+K o F1)")}
+      <div className="my-1 h-px w-10 bg-line" />
+      {areas.map((a) => {
+        const on = !mini ? shown?.id === a.id && (activeArea?.id === a.id || !activeArea) : activeArea?.id === a.id;
+        return (
+          <div key={a.id} className="relative">
+            {fixedButton(
+              a.label,
+              a.icon,
+              on,
+              () => {
+                setShownId(a.id);
+                onArea(a);
+              },
+            )}
+            {areaAlert(a) && <span className="pointer-events-none absolute top-2 right-5 size-2 rounded-full bg-warn" title="Hay algo que atender en esta área" />}
+          </div>
+        );
+      })}
+      <div className="flex-1" />
+      {allowedInMode("tools", prefs.mode) && fixedButton("Herramientas", Wrench, active === "tools", () => onNavigate("tools"), "Herramientas de Windows y atajos de teclado")}
+      {onLock && fixedButton("Bloquear", LockIcon, false, onLock, "Bloquear AdminOps (Ctrl+L)")}
+      {fixedButton("Ajustes", SettingsIcon, active === "settings", () => onNavigate("settings"), `Ajustes (Ctrl+,) · ${isAdmin ? "Administrador" : "Usuario estándar"}`)}
+      <button
+        onClick={() => setSidebar({ mode: mini ? "full" : "mini" })}
+        className="mt-1 grid size-8 place-items-center rounded-md text-mute hover:bg-panel-2 hover:text-ink"
+        title={mini ? "Mostrar las pantallas de cada área" : "Ocultar las pantallas: solo las áreas"}
+        aria-label={mini ? "Mostrar las pantallas de cada área" : "Ocultar las pantallas"}
+      >
+        {mini === (sb.position === "right") ? <PanelLeftOpen size={16} strokeWidth={1.6} /> : <PanelLeftClose size={16} strokeWidth={1.6} />}
+      </button>
+    </nav>
+  );
 
-      <div className="flex items-center gap-2.5 border-t border-line px-5 py-3.5">
-        {sb.showFooter ? (
-          <>
-            <span className={`size-2 shrink-0 rounded-full ${isAdmin ? "bg-ok" : "bg-warn"}`} />
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] text-ink">{isAdmin === null ? "Comprobando…" : isAdmin ? "Administrador" : "Usuario estándar"}</div>
-              {targetUser && (
-                <div className="truncate text-[11px] text-mute" title={`Los ajustes de usuario (HKCU) se aplican a ${targetUser.name} (${targetUser.sid})`}>
-                  {targetUser.name}
-                  {targetUser.redirected && " · sesión activa"}
-                </div>
-              )}
+  if (mini) return <aside className={`flex shrink-0 border-line ${sb.position === "right" ? "border-l" : "border-r"}`}>{rail}</aside>;
+
+  const recentPages = sb.recents > 0 ? recent.filter((p) => !OUTSIDE_AREAS.includes(p)).slice(0, sb.recents) : [];
+  const widthPx = resize.width ?? sb.widthPx ?? WIDTH_PX[sb.width];
+  const header = (text: string, right?: ReactNode) => (
+    <div className="flex items-baseline justify-between px-2.5 pt-1 pb-1.5 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">
+      <span>{text}</span>
+      {right}
+    </div>
+  );
+
+  return (
+    <aside className={`relative flex shrink-0 border-line ${sb.position === "right" ? "flex-row-reverse border-l" : "border-r"}`}>
+      {rail}
+      <div style={{ width: `${widthPx}px` }} className="relative flex flex-col bg-panel">
+        {/* Borde que se arrastra para cambiar el ancho; doble clic vuelve al de Ajustes. */}
+        <div
+          onPointerDown={(e) => {
+            e.preventDefault();
+            resize.start(widthPx);
+          }}
+          onDoubleClick={() => setSidebar({ widthPx: null })}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Ajustar el ancho de la barra lateral"
+          title="Arrastra para ajustar el ancho · doble clic para el ancho de siempre"
+          className={`absolute inset-y-0 z-20 w-1.5 cursor-col-resize transition-colors hover:bg-neon/40 ${resize.dragging ? "bg-neon/60" : ""} ${
+            sb.position === "right" ? "left-0" : "right-0"
+          }`}
+        />
+        <nav aria-label="Pantallas y secciones" className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 pt-3 pb-3">
+          {pinned.length > 0 && (
+            <div className="flex flex-col gap-px">
+              {header("Fijados")}
+              {pinned.map((k) => {
+                const { page, section } = parseNavKey(k);
+                return line(k, navLabel(k), {
+                  current: section ? isCurrent(page, section) : page === active && !sectionsOf(page).length,
+                  onClick: () => onNavigate(page, section),
+                  badge: badgeOf(k),
+                  title: section ? `${pageLabel(page)} › ${navLabel(k)}` : undefined,
+                });
+              })}
             </div>
-          </>
-        ) : (
-          <span className="flex-1" />
-        )}
-        {onLock && (
-          <button onClick={onLock} className="grid size-8 place-items-center rounded-md text-mute transition-colors hover:bg-panel-2 hover:text-ink" title="Bloquear AdminOps (Ctrl+L)" aria-label="Bloquear">
-            <LockIcon size={16} strokeWidth={1.6} />
+          )}
+          {recentPages.length > 0 && (
+            <div className="flex flex-col gap-px">
+              {header("Recientes")}
+              {recentPages.map((p) => line(navKey(p), pageLabel(p), { current: p === active, onClick: () => onNavigate(p) }))}
+            </div>
+          )}
+          {shown && (
+            <div className="flex flex-col gap-2">
+              {header(shown.label, <span>{shown.pages.length}</span>)}
+              {shown.pages.map(pageLines)}
+            </div>
+          )}
+        </nav>
+
+        {update && (
+          <button
+            onClick={() => goToPage("settings", "general")}
+            className="mx-2.5 mb-2 flex flex-col gap-0.5 rounded-lg border border-neon/40 bg-neon/5 px-3 py-2.5 text-left transition-colors hover:border-neon"
+            title={update.notes || "Ver la versión nueva en Ajustes → General"}
+          >
+            <span className="text-xs text-neon">Versión {update.latest} disponible</span>
+            <span className="text-[13px] text-ink">Ver novedades y descargar</span>
           </button>
         )}
-        <button
-          onClick={() => onSelect("settings")}
-          className={`grid size-8 place-items-center rounded-md transition-colors hover:bg-panel-2 ${active === "settings" ? "text-ink" : "text-mute hover:text-ink"}`}
-          title="Ajustes (Ctrl+,)"
-          aria-label="Ajustes"
-        >
-          <SettingsIcon size={17} strokeWidth={1.6} />
-        </button>
+        {sessionActive && sb.showSession && (
+          <button
+            onClick={() => onNavigate("session")}
+            className="mx-2.5 mb-2.5 flex flex-col gap-0.5 rounded-lg border border-line px-3 py-2.5 text-left transition-colors hover:border-line-2"
+          >
+            <span className="flex items-center gap-1.5 text-xs text-mute">
+              <span className="size-1.5 rounded-full bg-ok" /> Sesión de servicio
+            </span>
+            <span className="text-[13px] text-ink">En curso · ver checklist</span>
+          </button>
+        )}
       </div>
-      {sb.showFooter && (
-        <button onClick={onAbout} className="pb-3 text-center text-[11px] text-mute transition-colors hover:text-dim">
-          por David Bonilla
-        </button>
-      )}
     </aside>
   );
 }

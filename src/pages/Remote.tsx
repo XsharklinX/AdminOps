@@ -2,9 +2,10 @@ import { Copy, Download, ExternalLink, Headset, KeyRound, MonitorSmartphone, Pen
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, EmptyLine, EmptyState, inputClass, Modal, Loading } from "../components/ui";
+import { Button, Card, EmptyLine, EmptyState, inputClass, Modal, Loading, iconBtn } from "../components/ui";
 import { useLiveEffect } from "../lib/useLiveEffect";
-import { officeApi, remoteApi, usersApi, workApi, type Connection, type RdpOptions, type RdpServer, type Reach, type RemoteStatus, type RemoteTool } from "../lib/api";
+import { logQuietly, officeApi, remoteApi, usersApi, workApi, type Connection, type RdpOptions, type RdpServer, type Reach, type RemoteStatus, type RemoteTool } from "../lib/api";
+import { ago } from "../lib/format";
 
 const KIND: Record<string, string> = { rdp: "Escritorio remoto", anydesk: "AnyDesk", rustdesk: "RustDesk", teamviewer: "TeamViewer" };
 const DEFAULT_OPTIONS: RdpOptions = { fullscreen: true, multimon: false, clipboard: true, drives: false, printers: false, audio: true };
@@ -30,6 +31,9 @@ function Options({ value, onChange }: { value: RdpOptions; onChange: (o: RdpOpti
   );
 }
 
+/** Lo último comprobado de cada equipo (por nombre o IP), mientras AdminOps está abierta. */
+const reachCache = new Map<string, Reach>();
+
 function ReachResult({ r }: { r: Reach }) {
   return (
     <div className={`rounded-md px-3 py-2 text-xs ${r.rdpOpen ? "bg-ok/10 text-ink" : "bg-warn/10 text-ink"}`}>
@@ -43,14 +47,7 @@ function ReachResult({ r }: { r: Reach }) {
 }
 
 /** «hace 3 días», para saber de un vistazo cuáles se usan. */
-function usedAgo(ts: number): string {
-  if (!ts) return "sin usar todavía";
-  const days = Math.floor((Date.now() / 1000 - ts) / 86_400);
-  if (days <= 0) return "usada hoy";
-  if (days === 1) return "usada ayer";
-  if (days < 60) return `usada hace ${days} días`;
-  return `usada hace ${Math.floor(days / 30)} meses`;
-}
+const usedAgo = (ts: number) => (ts ? `usada ${ago(ts)}` : "sin usar todavía");
 
 export function Remote({ isAdmin }: { isAdmin: boolean }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);
@@ -64,8 +61,9 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
   const [showOptions, setShowOptions] = useState(false);
   const [reach, setReach] = useState<Reach | null>(null);
   const [testing, setTesting] = useState(false);
-  /** Si contesta cada equipo guardado (solo Escritorio remoto): `null` mientras se comprueba. */
-  const [reachOf, setReachOf] = useState<Record<string, Reach | null>>({});
+  /** Si contesta cada equipo guardado (solo Escritorio remoto): sin entrada si no se ha
+   *  comprobado, `null` mientras se comprueba y `false` si no se pudo comprobar. */
+  const [reachOf, setReachOf] = useState<Record<string, Reach | null | false>>({});
   const [query, setQuery] = useState("");
   const [mac, setMac] = useState("");
   const [installing, setInstalling] = useState<string | null>(null);
@@ -81,13 +79,14 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
       .catch(() => setConnections([]));
     officeApi.remoteStatus().then(setStatus).catch((e) => toast("error", String(e)));
     remoteApi.tools().then(setTools).catch(() => setTools([]));
-    remoteApi.server().then(setServer).catch(() => {});
+    remoteApi.server().then(setServer).catch(logQuietly("Remote"));
   }, [toast]);
 
   useEffect(load, [load]);
 
-  // Al abrir (y al cambiar la agenda) se mira si contesta cada equipo de
-  // Escritorio remoto, de dos en dos para no saturar la red.
+  // Si contesta cada equipo de Escritorio remoto se mira al pulsar «Comprobar»
+  // (no al abrir: con muchos equipos apagados eso llena la red de intentos), de dos
+  // en dos. Lo comprobado se recuerda mientras AdminOps está abierta.
   const targets = (connections ?? [])
     .filter((c) => c.kind === "rdp")
     .map((c) => `${c.id}\n${c.target}`)
@@ -96,18 +95,18 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
   useLiveEffect(
     (vigente) => {
       const queue = targets ? targets.split("\n\n").map((t) => t.split("\n") as [string, string]) : [];
+      if (round === 0) {
+        setReachOf(Object.fromEntries(queue.flatMap(([id, target]) => (reachCache.has(target) ? [[id, reachCache.get(target)!]] : []))));
+        return;
+      }
       setReachOf(Object.fromEntries(queue.map(([id]) => [id, null])));
       const worker = async () => {
         for (let next = queue.shift(); next && vigente(); next = queue.shift()) {
           const [id, target] = next;
           const r = await remoteApi.test(target).catch(() => undefined);
           if (!vigente()) return;
-          setReachOf((cur) => {
-            const copy = { ...cur };
-            if (r) copy[id] = r;
-            else delete copy[id];
-            return copy;
-          });
+          if (r) reachCache.set(target, r);
+          setReachOf((cur) => ({ ...cur, [id]: r ?? false }));
         }
       };
       void worker();
@@ -174,7 +173,6 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
 
   const wired = status?.adapters.filter((a) => a.wired) ?? [];
   const wolReady = wired.some((a) => a.magicPacket === "Enabled") && status && !status.fastStartup;
-  const btn = "rounded-md p-1.5 text-mute transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-30";
 
   return (
     <div className="@container mx-auto max-w-6xl space-y-4 p-6">
@@ -240,7 +238,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
                 />
               </div>
             )}
-            <button onClick={() => setRound((n) => n + 1)} className={btn} title="Volver a comprobar si contestan">
+            <button onClick={() => setRound((n) => n + 1)} className={iconBtn} title="Comprobar si contestan" aria-label="Comprobar si contestan">
               <RotateCw size={14} />
             </button>
             <Button onClick={() => setEditing(newConnection())}>
@@ -262,17 +260,19 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
             {shown.map((c) => {
               const r = reachOf[c.id];
               const checking = c.kind === "rdp" && r === null;
-              const dot = c.kind !== "rdp" || r === undefined ? "bg-line-2" : checking ? "animate-pulse bg-mute" : r?.rdpOpen ? "bg-ok" : "bg-bad";
+              const dot = c.kind !== "rdp" || !r ? (checking ? "animate-pulse bg-mute" : "bg-line-2") : r.rdpOpen ? "bg-ok" : "bg-bad";
               const state =
                 c.kind !== "rdp"
                   ? KIND[c.kind]
                   : checking
                     ? "Comprobando…"
                     : r === undefined
-                      ? "No se pudo comprobar"
-                      : r?.rdpOpen
-                        ? `Contesta${r.pingMs !== null ? ` · ${r.pingMs} ms` : ""}`
-                        : "No contesta";
+                      ? "Sin comprobar"
+                      : r === false
+                        ? "No se pudo comprobar"
+                        : r?.rdpOpen
+                          ? `Contesta${r.pingMs !== null ? ` · ${r.pingMs} ms` : ""}`
+                          : "No contesta";
               return (
                 <li key={c.id} className="group flex flex-col rounded-lg border border-line bg-panel-2/30 p-3 transition-colors hover:border-line-2">
                   <div className="flex items-start gap-2">
@@ -288,7 +288,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
                   </div>
                   <div className="mt-1.5 min-h-8 text-[11px] text-mute">
                     <div className="truncate">
-                      {c.kind === "rdp" && <span className={r?.rdpOpen ? "text-ok" : r && !r.rdpOpen ? "text-bad" : ""}>{state} · </span>}
+                      {c.kind === "rdp" && <span className={!r ? "" : r.rdpOpen ? "text-ok" : "text-bad"}>{state} · </span>}
                       {usedAgo(c.lastUsed)}
                       {c.client && ` · ${c.client}`}
                       {c.username && ` · ${c.username}`}
@@ -299,17 +299,17 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
                     <Button onClick={() => remoteApi.connect(c.id).then(load).catch(fail)}>Conectar</Button>
                     <span className="flex-1" />
                     {c.kind === "rdp" && (
-                      <button onClick={() => setPwFor(c)} className={btn} title={c.savedPassword ? "Cambiar u olvidar la contraseña" : "Guardar la contraseña en Windows"}>
+                      <button onClick={() => setPwFor(c)} className={iconBtn} title={c.savedPassword ? "Cambiar u olvidar la contraseña" : "Guardar la contraseña en Windows"}>
                         <KeyRound size={14} />
                       </button>
                     )}
-                    <button onClick={() => void copy(c.target, c.kind === "rdp" ? "Equipo copiado" : "ID copiado")} className={btn} title="Copiar">
+                    <button onClick={() => void copy(c.target, c.kind === "rdp" ? "Equipo copiado" : "ID copiado")} className={iconBtn} title="Copiar">
                       <Copy size={14} />
                     </button>
-                    <button onClick={() => setEditing(c)} className={btn} title="Editar">
+                    <button onClick={() => setEditing(c)} className={iconBtn} title="Editar">
                       <Pencil size={14} />
                     </button>
-                    <button onClick={() => void remove(c)} className={`${btn} hover:text-bad`} title="Borrar">
+                    <button onClick={() => void remove(c)} className={`${iconBtn} hover:text-bad`} title="Borrar">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -426,7 +426,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
         title="Este equipo"
         icon={<MonitorSmartphone size={14} />}
         right={
-          <button onClick={load} className={btn} title="Volver a comprobar">
+          <button onClick={load} className={iconBtn} title="Volver a comprobar">
             <RotateCw size={14} />
           </button>
         }
@@ -519,7 +519,7 @@ function RdpUsers({ server, onChange, isAdmin }: { server: RdpServer; onChange: 
     usersApi
       .list()
       .then((u) => setUsers(u.filter((x) => x.enabled && !x.builtin && !x.admin).map((x) => x.name)))
-      .catch(() => {});
+      .catch(logQuietly("Remote"));
   }, []);
   const short = (n: string) => n.replace(/^[^\\]+\\/, "");
   const available = users.filter((u) => !server.users.some((s) => short(s).toLowerCase() === u.toLowerCase()));
@@ -573,7 +573,7 @@ function ConnectionEditor({ value, onClose, onSaved }: { value: Connection; onCl
     workApi
       .clients()
       .then((l) => setClients(l.map((x) => x.name)))
-      .catch(() => {});
+      .catch(logQuietly("Remote"));
   }, []);
   const save = async () => {
     try {

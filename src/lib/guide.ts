@@ -68,14 +68,16 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "moving",
         title: "Moverse por la aplicación",
-        what: "A la izquierda están las áreas; cada área tiene páginas, y muchas páginas tienen pestañas arriba. El «?» junto al título explica qué hace cada pestaña.",
+        what: "A la izquierda, la columna de áreas (Inicio, Este equipo, Red, Programas, Administración, Soporte). Al lado, las pantallas del área elegida y, debajo de cada una, sus secciones: lo que hay dentro se ve sin abrir nada. Arriba, el equipo en una línea: nombre, dominio, permisos, Internet, disco y avisos; cada dato lleva a donde se mira o se arregla.",
         how: [
-          "Ctrl+K busca cualquier cosa: una página, una herramienta, un ajuste, un problema («no suena») o un contacto.",
-          "Alt+← y Alt+→ vuelven a la página anterior y a la siguiente.",
-          "La estrella marca una página como favorita para tenerla arriba.",
-          "Ctrl+, abre Ajustes. Ctrl+L bloquea AdminOps si hay PIN.",
+          "«Todo» (arriba en la columna de áreas, o Ctrl+K o F1) enseña el programa entero en una pantalla, por áreas. Escribiendo, busca cualquier cosa: una sección («dominio», «AD»), un problema («no imprime»), una herramienta, un ajuste o un contacto.",
+          "Encima del título se ve dónde estás: área › pantalla › sección. Cada parte se puede pulsar.",
+          "La chincheta, al pasar el ratón por una línea de la barra, la fija arriba (también una sección, como Dominio).",
+          "Al lado de algunas secciones sale su estado: los avisos del último diagnóstico, si el equipo está en el dominio, el espacio que queda.",
+          "Teams y Correo se abren desde sus iconos de la barra de arriba. Herramientas de Windows y Ajustes están abajo en la columna de áreas.",
+          "Alt+← y Alt+→ vuelven a la pantalla anterior y a la siguiente. Ctrl+, abre Ajustes. Ctrl+L bloquea AdminOps si hay PIN.",
         ],
-        notes: ["La barra lateral se puede reorganizar entera en Ajustes → Navegación."],
+        notes: ["La barra lateral se puede reorganizar entera en Ajustes → Navegación, y dejar solo la columna de áreas para ganar espacio."],
       },
       {
         id: "first-steps",
@@ -100,7 +102,12 @@ export const GUIDE: GuideChapter[] = [
         id: "journal",
         title: "El diario y «Deshacer»",
         what: "Cada cambio que AdminOps hace en el equipo se anota en el diario con el valor que había antes. Por eso un ajuste se puede deshacer días después y queda exactamente como estaba.",
-        how: ["Estado del equipo → Historial → Diario de cambios.", "Busca el cambio (hay buscador y filtros) y pulsa «Deshacer».", "El filtro «Se pueden deshacer» enseña solo lo que aún tiene vuelta atrás."],
+        how: [
+          "Estado del equipo → Historial → Diario de cambios.",
+          "Busca el cambio (hay buscador y filtros) y pulsa «Deshacer».",
+          "El filtro «Se pueden deshacer» enseña solo lo que aún tiene vuelta atrás.",
+          "«Exportar» guarda el diario en PDF o para Excel, como constancia de lo hecho. Con un filtro puesto, exporta solo lo filtrado.",
+        ],
         notes: ["Las acciones (una limpieza, una reparación, una instalación) se anotan pero no se deshacen: lo borrado no vuelve.", "El diario es de cada equipo. En el pendrive hay uno por cada equipo en el que has trabajado."],
         go: ["history"],
       },
@@ -181,7 +188,7 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "report",
         title: "Informe",
-        what: "El PDF que se entrega. Hay dos plantillas: para el cliente (clara, sin tecnicismos) y técnica (con todo el detalle). Lleva tu marca, el estado del equipo, lo resuelto, lo pendiente y, si quieres, presupuesto o recibo.",
+        what: "El PDF que se entrega. Hay dos plantillas de fábrica: para el cliente (clara, sin tecnicismos) y técnica (con todo el detalle). Y la tuya: en Ajustes → Informes y cobros eliges qué secciones lleva y en qué orden. Lleva tu marca, el estado del equipo, lo resuelto, lo pendiente y, si quieres, presupuesto o recibo.",
         how: ["Sin sesión: Sesión de servicio → pestaña Informe. «Entrega rápida» pasa al informe lo hecho hoy.", "«Enviar por correo» abre tu programa de correo con el PDF adjunto. No se envía nada sin que tú lo envíes."],
         notes: ["Los informes se guardan en una carpeta por cliente; se abre desde la ficha del cliente o desde Acerca de."],
         go: ["report"],
@@ -190,15 +197,27 @@ export const GUIDE: GuideChapter[] = [
   },
   {
     id: "machine",
-    title: "Equipo",
+    title: "Este equipo",
     intro: "Cómo está este equipo y qué se le puede hacer.",
     topics: [
       {
         id: "diagnostics",
         title: "Diagnóstico",
         what: "Un repaso del equipo en menos de un minuto: salud de los discos, pantallazos azules y apagados bruscos, programas que fallan, drivers con error, batería, antivirus, actualizaciones, activación y arranque. Cada hallazgo va ordenado por gravedad y trae el botón que lo resuelve o lo explica.",
-        how: ["«Analizar».", "Empieza por lo rojo. Cada hallazgo se despliega con el detalle.", "Los análisis se guardan: se puede comparar el de hoy con uno anterior."],
-        notes: ["Un diagnóstico es una ayuda, no un dictamen. Un disco «saludable» según sus propios datos puede fallar igualmente."],
+        how: [
+          "«Analizar» hace el análisis completo. «Rápido» da una primera mirada en segundos (sin actualizaciones, SMART, piezas, temperaturas ni seguridad) y no se guarda. «A fondo» vuelve a leer también el hardware y las actualizaciones.",
+          "Lo que encuentra va en tres niveles: «Urgente» (hay que hacerlo), «Conviene» (mejor arreglarlo) y «Sugerencias», plegadas aparte: mejoras posibles, no problemas.",
+          "«Ya lo sé», al pasar el ratón por un hallazgo: si ya lo conoces y no vas a arreglarlo ahora (un disco pendiente de cambio), apúntale el motivo. Pasa a «Aceptados» y deja de contar en este equipo, también en el Panel y en la barra de arriba. Se deshace con «Volver a avisar».",
+          "Mira «No se pudo comprobar», debajo de los hallazgos: dice qué quedó sin mirar y por qué (sin administrador, falta un driver para las temperaturas, discos que no dan SMART). Que no haya aviso de algo no significa que esté bien si no se pudo leer.",
+          "Los análisis se guardan: se puede comparar el de hoy con uno anterior.",
+        ],
+        notes: [
+          "Un diagnóstico es una ayuda, no un dictamen. Un disco «saludable» según sus propios datos puede fallar igualmente.",
+          "Los programas con actualización pendiente pueden tardar más de un minuto en buscarse la primera vez: se añaden solos al análisis cuando llegan.",
+          "El detalle de pantallazos azules, apagones y arranques está en «Arranques y cuelgues»; el de discos, en Discos; y cada punto de la nota, en Seguridad. Aquí va un resumen con su enlace.",
+          "Un hallazgo aceptado sigue saliendo en el informe del cliente: aceptarlo es una nota tuya, no un arreglo.",
+          "De los análisis de días anteriores se guarda el último de cada día.",
+        ],
         go: ["diagnostics"],
       },
       {
@@ -207,6 +226,32 @@ export const GUIDE: GuideChapter[] = [
         what: "Las piezas del equipo: placa, BIOS, procesador, memoria por ranura, gráfica, monitores y discos, con las temperaturas en vivo. Incluye la ficha del equipo (modelo, número de serie, licencia) para copiarla o pegarla en Excel.",
         notes: ["Las temperaturas necesitan administrador. Las lee LibreHardwareMonitor, un componente de código abierto que viene con AdminOps."],
         go: ["hardware"],
+      },
+      {
+        id: "performance",
+        title: "Rendimiento (7 días)",
+        what: "Procesador, memoria y disco del sistema minuto a minuto, de las últimas 6 horas, 24 horas o 7 días, y qué programa había detrás de cada pico. Para «va lento desde el martes»: se ve cuándo empezó y qué coincidía.",
+        how: ["Elige el tramo arriba a la derecha.", "Pasa el ratón por la gráfica: dice la hora, las cifras y el programa que más gastaba.", "«Qué había detrás de los picos» resume los programas que más aparecen cuando el procesador pasa del 60 %."],
+        notes: ["Se mide solo mientras AdminOps está abierta: los huecos de la gráfica son ratos con AdminOps cerrada. Se guarda una semana, en un archivo pequeño de este equipo."],
+        go: ["machine", "performance"],
+      },
+      {
+        id: "boots",
+        title: "Arranques y cuelgues",
+        what: "Lo que dice el registro de Windows de los últimos 60 días: cuántas veces arrancó, cuántas se apagó mal (corte de luz, botón, cuelgue), los pantallazos azules con su código explicado y qué mirar, y cuánto tarda en arrancar.",
+        notes: [
+          "Cuánto tarda cada arranque solo se puede leer como administrador; lo demás, sin él.",
+          "Como administrador, AdminOps lee los volcados de Windows y dice qué driver estaba probablemente detrás de cada pantallazo. Es una pista para empezar, no un veredicto.",
+          "El aviso de arranque lento del diagnóstico mira lo habitual de los últimos arranques, no solo el último.",
+        ],
+        go: ["machine", "boots"],
+      },
+      {
+        id: "peripherals",
+        title: "Probar periféricos",
+        what: "Pantalla de un color para ver píxeles muertos, teclado que marca cada tecla que responde, pitido por el altavoz izquierdo y el derecho, nivel del micrófono y la imagen de la cámara.",
+        notes: ["El micrófono y la cámara se ven en vivo y se apagan al salir de la pestaña; no se graba nada. Si Windows no deja usarlos, se dice dónde permitirlo (Configuración → Privacidad y seguridad)."],
+        go: ["machine", "peripherals"],
       },
       {
         id: "security",
@@ -233,8 +278,18 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "space",
         title: "Discos: espacio",
-        what: "Qué ocupa el disco, carpeta por carpeta, con los archivos más grandes y los grandes que nadie toca hace más de un año. Y lo que se puede liberar sin riesgo.",
-        how: ["Elige la unidad y «Analizar».", "Entra en las carpetas grandes para ver qué hay.", "Lo que se borra desde aquí va a la papelera."],
+        what: "Qué ocupa el disco, carpeta por carpeta y por tipo de archivo (vídeo, correo guardado, instaladores…), con los archivos más grandes y los grandes que nadie toca hace más de un año. Y lo que se puede liberar sin riesgo.",
+        how: [
+          "Elige la unidad y «Analizar» (o doble clic en la unidad).",
+          "En «Carpetas», el mapa enseña cada carpeta como un rectángulo de su tamaño. Un clic la señala y enseña su ficha: cuánto ocupa, qué parte es de la carpeta y del total, cuántos archivos y cuándo cambió por última vez. Doble clic entra.",
+          "La barra de colores dice de qué está llena la carpeta en la que estás. Pulsa un color para ver los archivos más grandes de ese tipo.",
+          "«Archivos» tiene cuatro listas: los más grandes, los que nadie toca hace un año, los de la carpeta en la que estás y los del tipo elegido. Se filtran por nombre o extensión.",
+          "Marca carpetas y archivos de cualquier lista: abajo sale lo marcado y cuánto suma. «A la papelera» lo manda todo de una vez, y las cifras se ponen al día sin volver a analizar.",
+        ],
+        notes: [
+          "Desde aquí no se pueden borrar Windows, un programa instalado entero ni un perfil de usuario: cada cosa se quita desde su sitio (Limpieza, Programas, Usuarios).",
+          "Lo que sea demasiado grande para la papelera, Windows lo borra del todo.",
+        ],
         go: ["space", "space"],
       },
       {
@@ -247,7 +302,7 @@ export const GUIDE: GuideChapter[] = [
       },
       {
         id: "tweaks",
-        title: "Ajustes de Windows",
+        title: "Optimizar Windows",
         what: "Limpieza, rendimiento, privacidad, servicios e inicio de Windows en un solo sitio, con buscador. Cada ajuste dice qué hace, qué riesgo tiene y cómo está ahora en el equipo.",
         how: ["Busca o recorre la categoría.", "Lee la explicación y el nivel de riesgo antes de aplicar.", "«Aplicar» lo cambia; «Deshacer» lo devuelve a como estaba."],
         notes: [
@@ -267,10 +322,10 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "tickets",
         title: "Tickets",
-        what: "La web de tickets o la intranet de tu empresa dentro de AdminOps, con la sesión recordada. Cada portal solo navega por sus propios sitios; un enlace a otro sitio se abre en tu navegador.",
+        what: "La web de tickets o la intranet de tu empresa dentro de AdminOps, con la sesión recordada. Funciona como un navegador: la dirección guardada es solo la página de inicio, y desde ella puedes ir a cualquier otra.",
         how: [
-          "«Añadir portal»: nombre y dirección.",
-          "Si al entrar algo se abre fuera, aparece una barra con «Permitir en este portal»: púlsala y vuelve a intentarlo.",
+          "«Añadir portal»: nombre y dirección. Puedes guardar varios y cambiar de uno a otro.",
+          "La barra de direcciones admite cualquier dirección; atrás, adelante, recargar e inicio funcionan como en un navegador.",
           "«Entrar solo» rellena el usuario y la contraseña guardados; en las páginas normales no envía el formulario, lo deja listo.",
         ],
         notes: ["Las páginas de un portal no tienen acceso a AdminOps ni al equipo: están aisladas.", "«Sesión privada» no guarda nada en el equipo y cierra la sesión al salir. Úsala en equipos ajenos."],
@@ -279,9 +334,17 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "mail-teams",
         title: "Correo y Teams",
-        what: "Outlook y Teams en su versión web, dentro de AdminOps: no hay que instalarlos ni configurarlos en el equipo del cliente. Sirven la cuenta del trabajo y la personal.",
+        what: "Outlook y Teams en su versión web, dentro de AdminOps: no hay que instalarlos ni configurarlos en el equipo del cliente. Sirven la cuenta del trabajo y la personal. Se abren desde sus iconos de la barra de arriba, estés donde estés.",
+        how: ["La primera vez se pregunta cómo abrirlos: dentro de AdminOps, en el navegador o en la aplicación de Windows (si está instalada).", "Se cambia en Ajustes → Portales y correo → «Cómo se abren Teams y el Correo»."],
         notes: ["Para hablar en una reunión, Windows pide permiso de micrófono y cámara la primera vez.", "Si tardan en abrir, es la web de Microsoft cargando: AdminOps lo dice en una barra y ofrece recargar."],
         go: ["mail"],
+      },
+      {
+        id: "inventory",
+        title: "Inventario",
+        what: "Todo el inventario en un sitio. «Mi inventario»: el parque de equipos con la ficha de cada uno y un veredicto (seguir, mejorar, renovar), exportable a Excel. «Inventario web»: la web de inventario de tu empresa dentro de AdminOps, con los datos de este equipo a mano para rellenar el formulario.",
+        notes: ["La web de inventario navega con libertad, como Tickets."],
+        go: ["inventory"],
       },
       {
         id: "people",
@@ -329,7 +392,7 @@ export const GUIDE: GuideChapter[] = [
   {
     id: "network",
     title: "Red",
-    intro: "Todo lo de la red, en una página con cuatro pestañas.",
+    intro: "Todo lo de la red, en una pantalla con cuatro secciones. Tiene su propia área: Red.",
     topics: [
       {
         id: "router",
@@ -354,9 +417,17 @@ export const GUIDE: GuideChapter[] = [
         go: ["router", "speed"],
       },
       {
+        id: "netwatch",
+        title: "Vigilante de la conexión",
+        what: "Para «se me corta Internet a ratos». Se deja en marcha y cada 5 segundos hace un ping al router y a Internet; apunta cada corte con su hora, cuánto duró y de quién era la culpa: del router (no contestaba ni él) o de Internet (el router sí, fuera no).",
+        how: ["«Poner en marcha» y deja AdminOps abierta el tiempo que haga falta (minimizada vale).", "La gráfica enseña la última hora y media, con los cortes en rojo.", "«Copiar resumen» deja un texto con todos los cortes listo para el proveedor de Internet."],
+        notes: ["Un ping perdido suelto no cuenta como corte: hacen falta dos comprobaciones fallidas seguidas.", "Los cortes se guardan aunque se cierre AdminOps; «Borrar» los quita."],
+        go: ["router", "watch"],
+      },
+      {
         id: "nettools",
         title: "Herramientas de red",
-        what: "Ping y traza de ruta en vivo, puertos abiertos por programa, cambio de DNS con un clic y editor del archivo hosts.",
+        what: "Ping y traza de ruta en vivo, puertos abiertos por programa, cambio de DNS con un clic, editor del archivo hosts y calculadora de red (rango, máscara, cuántos equipos caben y si dos IP están en la misma red).",
         notes: ["Un cambio de DNS se puede deshacer desde el diario."],
         go: ["router", "tools"],
       },
@@ -364,7 +435,7 @@ export const GUIDE: GuideChapter[] = [
   },
   {
     id: "apps",
-    title: "Aplicaciones",
+    title: "Programas",
     intro: "Los programas del equipo y cómo dejar uno nuevo listo.",
     topics: [
       {
@@ -377,7 +448,12 @@ export const GUIDE: GuideChapter[] = [
         id: "install",
         title: "Instalar en lote",
         what: "Tras formatear: marcas los programas de un catálogo comprobado, o una lista tuya guardada, y se instalan todos solos.",
-        how: ["Marca los programas o carga una lista.", "«Instalar». Se ve el progreso de cada uno y se puede cancelar."],
+        how: [
+          "«Empresa» enseña solo lo que se usa en una oficina; «Todo» añade juegos y programas de uso personal.",
+          "«Personalizar» deja ocultar los programas o las categorías que no usas. Se guarda y viaja con tus datos.",
+          "Marca los programas o carga una lista. Las categorías de arriba filtran.",
+          "«Instalar». Se ve el progreso de cada uno y se puede cancelar.",
+        ],
         notes: ["Necesita Internet y winget, que viene con Windows 11 y con las versiones recientes de Windows 10."],
         go: ["apps", "install"],
       },
@@ -404,21 +480,21 @@ export const GUIDE: GuideChapter[] = [
     topics: [
       {
         id: "users",
-        title: "Usuarios locales",
+        title: "Usuarios y cuentas: usuarios de este equipo",
         what: "Las cuentas de este equipo: crear, cambiar la contraseña, hacer administrador o estándar, desactivar, renombrar y eliminar. La ficha de cada cuenta avisa de lo que conviene revisar: contraseña caducada, administrador sin contraseña, cuentas integradas activas o cuentas que nadie usa.",
         notes: [
           "AdminOps no deja el equipo sin un administrador activo, ni permite borrar la cuenta que tiene la sesión abierta.",
           "Cambiar la contraseña de otro usuario le hace perder sus archivos cifrados con EFS y las contraseñas que Windows le tenía guardadas.",
           "Al renombrar una cuenta, su carpeta personal conserva el nombre antiguo. Es normal; no la renombres a mano.",
         ],
-        go: ["users"],
+        go: ["users", "users"],
       },
       {
         id: "accounts",
-        title: "Cuentas y dominio",
+        title: "Usuarios y cuentas: cuentas y dominio",
         what: "Con qué cuentas entra este equipo (Microsoft, profesionales, de Office) y las credenciales que Windows recuerda. Y el dominio de la empresa: estado, unir, sacar, reparar la relación de confianza y cambiar el nombre del equipo.",
         notes: ["Antes de sacar un equipo del dominio, comprueba que hay una cuenta local de administrador con contraseña conocida: si no, nadie podrá entrar.", "Borrar una credencial guardada arregla el típico «pide la contraseña una y otra vez»."],
-        go: ["accounts"],
+        go: ["users", "accounts"],
       },
       {
         id: "printers",
@@ -452,14 +528,14 @@ export const GUIDE: GuideChapter[] = [
       },
       {
         id: "stations",
-        title: "Puestos e inventario",
-        what: "Una lista de equipos de la oficina para comprobar cuáles responden, y el inventario del parque de cada cliente con un veredicto por equipo (seguir, mejorar, renovar), exportable a Excel.",
+        title: "Puestos",
+        what: "Tus listas de equipos de la oficina, para comprobar de una vez cuáles responden y cuáles necesitan atención (disco, reinicios, actualizaciones).",
         go: ["stations"],
       },
       {
         id: "tools",
-        title: "Herramientas y atajos",
-        what: "Las herramientas de Windows de siempre a un clic (servicios, conexiones de red, visor de eventos, registro, BIOS…), tus propios accesos directos, y los atajos de teclado de Windows y de los programas habituales.",
+        title: "Herramientas de Windows",
+        what: "Las herramientas de Windows de siempre a un clic (servicios, conexiones de red, visor de eventos, registro, BIOS…), tus propios accesos directos, y los atajos de teclado de Windows y de los programas habituales. Está abajo en la columna de áreas.",
         go: ["tools"],
       },
     ],
@@ -467,7 +543,7 @@ export const GUIDE: GuideChapter[] = [
   {
     id: "data",
     title: "Datos del equipo",
-    intro: "Los archivos del usuario: moverlos, protegerlos, borrarlos y recuperarlos.",
+    intro: "Los archivos del usuario: moverlos, protegerlos, borrarlos y recuperarlos. Está en el área Este equipo.",
     topics: [
       {
         id: "migrate",
@@ -575,7 +651,7 @@ export const GUIDE: GuideChapter[] = [
     intro: "Qué hacer cuando AdminOps no hace lo que esperabas.",
     topics: [
       {
-        id: "report",
+        id: "report-problem",
         title: "Reportar un problema",
         what: "Describes lo que pasó y AdminOps prepara un correo para el autor con un archivo de diagnóstico adjunto. El correo se abre en tu programa de correo: lo revisas y lo envías tú.",
         how: ["Esta ventana → «Reportar un problema».", "Cuenta qué hacías, qué esperabas y qué pasó. Si se repite siempre, dilo.", "«Preparar el correo»."],
@@ -665,5 +741,5 @@ export const FAQ: FaqEntry[] = [
   { q: "¿Una limpieza se puede deshacer?", a: "No. Lo que se limpia son archivos temporales y cachés que Windows y los programas vuelven a crear, pero lo borrado no se recupera." },
   { q: "¿Sirve en Windows Home?", a: "Sí. Algunas cosas dependen de la edición: recibir Escritorio remoto, BitLocker completo y unir el equipo a un dominio necesitan Windows Pro. AdminOps lo indica en cada pantalla." },
   { q: "¿Cómo paso mis datos a otro equipo?", a: "Ajustes → General → «Seguridad de tus datos» hace una copia cifrada. En el otro equipo, el mismo sitio, «Restaurar una copia»." },
-  { q: "¿Cómo actualizo AdminOps?", a: "Pasa el instalador de la versión nueva por encima: detecta la que hay y conserva tus datos. En el pendrive, igual: el instalador lo encuentra y lo actualiza en su misma carpeta." },
+  { q: "¿Cómo actualizo AdminOps?", a: "Ajustes → General → Actualizaciones → «Buscar ahora»; si hay una versión nueva publicada, «Descargar e instalar» la baja y abre su instalador, que conserva tus datos. También puedes pasar a mano el instalador de la versión nueva por encima." },
 ];

@@ -67,3 +67,10 @@ describe("términos de uso", () => {
     expect(blocks.find((b) => b.text.startsWith("Al instalar"))?.heading).toBe(false);
   });
 });
+
+describe("apartados de la guía", () => {
+  it("cada apartado tiene un id propio (Ctrl+K lleva a él por el id)", () => {
+    const ids = GUIDE.flatMap((c) => c.topics.map((t) => t.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

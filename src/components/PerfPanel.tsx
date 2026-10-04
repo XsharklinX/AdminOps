@@ -1,6 +1,6 @@
 import { Copy, Gauge, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { appApi, type StartupTiming } from "../lib/api";
+import { logQuietly, appApi, type StartupTiming } from "../lib/api";
 import { appStartMs, commandStats, onPerfChange, pageLoads, type PageLoad } from "../lib/perf";
 import { pageLabel, type PageId } from "./Sidebar";
 import { useToast } from "./feedback";
@@ -50,7 +50,7 @@ export function PerfPanel() {
   const [, setTick] = useState(0);
   const toast = useToast();
   useEffect(() => {
-    fetchTiming().then(setTiming).catch(() => {});
+    fetchTiming().then(setTiming).catch(logQuietly("PerfPanel"));
     return onPerfChange(() => setTick((n) => n + 1));
   }, []);
 

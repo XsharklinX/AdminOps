@@ -6,11 +6,10 @@ import { NetRepairCard } from "../components/NetRepairCard";
 import { WifiControl } from "../components/WifiControl";
 import { WifiProfiles } from "../components/WifiProfiles";
 import { Card } from "../components/ui";
-import { toolsApi, type NetworkReport, type SpeedResult } from "../lib/api";
+import { logQuietly, toolsApi, type NetworkReport, type SpeedResult } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { DataTable } from "../components/DataTable";
-
-const when = (ts: number) => new Date(ts * 1000).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
+import { dateTime as when } from "../lib/format";
 
 export function Network({ isAdmin }: { isAdmin: boolean }) {
   const [report, setReport] = useState<NetworkReport | null>(null);
@@ -32,7 +31,7 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
   useLiveEffect(
     (vigente) => {
       void diagnose();
-      toolsApi.speedHistory().then((h) => vigente() && setHistory(h)).catch(() => {});
+      toolsApi.speedHistory().then((h) => vigente() && setHistory(h)).catch(logQuietly("Network"));
     },
     [diagnose],
   );

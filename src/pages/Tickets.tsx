@@ -38,7 +38,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { SheetPanel } from "../components/MachineSheetCard";
-import { Button, inputClass, Loading, Modal } from "../components/ui";
+import { Button, inputClass, Loading, Modal, iconBtn } from "../components/ui";
 import { lockApi, portalsApi, type Portal, type PortalAction } from "../lib/api";
 import { clearPortalBlocked, clearPortalError, failPortal, lastPortalKey, stowPortal, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
 import { getPrefs, windowRect } from "../lib/prefs";
@@ -256,7 +256,6 @@ export function Tickets({
     if (a === "reload" || a === "home") clearPortalError(active);
     portalsApi.nav(active, a).catch((e) => toast("error", String(e)));
   };
-  const iconBtn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
   // El Correo y Teams ponen los pendientes en el título de la página («(3) …»).
   const unread = isMicrosoft(kind) ? unreadFromTitle(view.title) : null;
 
@@ -464,27 +463,26 @@ function BrowserBar({
   };
   const find = (backwards = false) => query.trim() && portalsApi.find(portal.id, query, backwards).catch(() => {});
   const running = view.downloads.filter((d) => d.state === "running").length;
-  const btn = "rounded-md p-1.5 text-dim transition-colors hover:bg-panel-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
 
   return (
     <div className="border-b border-line">
       <div className="flex items-center gap-1 px-3 py-1.5">
-        <button onClick={() => onNav("back")} disabled={!view.canBack} className={btn} title="Atrás">
+        <button onClick={() => onNav("back")} disabled={!view.canBack} className={iconBtn} title="Atrás">
           <ArrowLeft size={15} />
         </button>
-        <button onClick={() => onNav("forward")} disabled={!view.canForward} className={btn} title="Adelante">
+        <button onClick={() => onNav("forward")} disabled={!view.canForward} className={iconBtn} title="Adelante">
           <ArrowRight size={15} />
         </button>
         {view.loading ? (
-          <button onClick={() => onNav("stop")} className={btn} title="Detener">
+          <button onClick={() => onNav("stop")} className={iconBtn} title="Detener">
             <X size={15} />
           </button>
         ) : (
-          <button onClick={() => onNav("reload")} className={btn} title="Recargar (la página, sin cerrar la sesión)">
+          <button onClick={() => onNav("reload")} className={iconBtn} title="Recargar (la página, sin cerrar la sesión)">
             <RotateCw size={15} />
           </button>
         )}
-        <button onClick={() => onNav("home")} className={btn} title="Página inicial del portal">
+        <button onClick={() => onNav("home")} className={iconBtn} title="Página inicial del portal">
           <House size={15} />
         </button>
 
@@ -533,13 +531,13 @@ function BrowserBar({
             <Plus size={12} />
           </button>
         </div>
-        <button onClick={() => setFindOpen(!findOpen)} className={`${btn} ${findOpen ? "text-neon" : ""}`} title="Buscar en la página">
+        <button onClick={() => setFindOpen(!findOpen)} className={`${iconBtn} ${findOpen ? "text-neon" : ""}`} title="Buscar en la página">
           <Search size={15} />
         </button>
-        <button onClick={() => onNav("print")} className={btn} title="Imprimir o guardar como PDF">
+        <button onClick={() => onNav("print")} className={iconBtn} title="Imprimir o guardar como PDF">
           <Printer size={15} />
         </button>
-        <button onClick={() => setMenu(!menu)} className={`${btn} relative ${menu ? "text-neon" : ""}`} title="Descargas">
+        <button onClick={() => setMenu(!menu)} className={`${iconBtn} relative ${menu ? "text-neon" : ""}`} title="Descargas">
           <Download size={15} />
           {running > 0 && <span className="absolute -top-0.5 -right-0.5 size-2 animate-pulse rounded-full bg-neon" />}
           {running === 0 && view.downloads.length > 0 && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-ok" />}
@@ -559,13 +557,13 @@ function BrowserBar({
             placeholder="Buscar en la página (Intro: siguiente · Mayús+Intro: anterior)"
             className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-mute"
           />
-          <button onClick={() => find(true)} className={btn} title="Anterior">
+          <button onClick={() => find(true)} className={iconBtn} title="Anterior">
             <ChevronUp size={14} />
           </button>
-          <button onClick={() => find(false)} className={btn} title="Siguiente">
+          <button onClick={() => find(false)} className={iconBtn} title="Siguiente">
             <ChevronDown size={14} />
           </button>
-          <button onClick={() => setFindOpen(false)} className={btn} title="Cerrar">
+          <button onClick={() => setFindOpen(false)} className={iconBtn} title="Cerrar">
             <X size={14} />
           </button>
         </div>
@@ -789,7 +787,7 @@ function Empty({ kind, onAdd }: { kind: PortalKind; onAdd: (preset?: Portal) => 
       <h2 className="mb-2 text-lg font-semibold">{inventory ? "El inventario de tu empresa, sin salir de AdminOps" : "Tus tickets, sin salir de AdminOps"}</h2>
       <p className="mb-5 text-sm text-dim">
         {inventory
-          ? "Añade la web donde tu empresa lleva el inventario de equipos (por ejemplo https://inventario.pgr.gob.do) y se abrirá aquí mismo. Con «Datos del equipo» copias modelo, número de serie, IP… para rellenar el formulario."
+          ? "Añade la web donde tu empresa lleva el inventario de equipos (por ejemplo https://inventario.empresa.com) y se abrirá aquí mismo. Con «Datos del equipo» copias modelo, número de serie, IP… para rellenar el formulario."
           : "Añade la web donde gestionas los tickets o soportes (la intranet de tu empresa, GLPI, osTicket, Jira…) y se abrirá aquí mismo, con la sesión recordada."}
       </p>
       <Button onClick={() => onAdd()}>
@@ -888,7 +886,7 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
           </label>
           <label className="col-span-3 block">
             <span className="mb-1 block text-xs text-dim">Dirección</span>
-            <input value={p.url} onChange={(e) => setP({ ...p, url: e.target.value })} placeholder="https://intranet.pgr.gob.do" className={`${inputClass} font-mono text-xs`} />
+            <input value={p.url} onChange={(e) => setP({ ...p, url: e.target.value })} placeholder="https://intranet.empresa.com" className={`${inputClass} font-mono text-xs`} />
           </label>
         </div>
 
@@ -941,18 +939,23 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
             )}
         </div>
 
-        <label className="block">
-          <span className="mb-1 block text-xs text-dim">{ms ? "Página de inicio de sesión de tu empresa (opcional)" : "Otros dominios permitidos (opcional)"}</span>
-          <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={ms ? "sts.pgr.gob.do" : "login.empresa.com, archivos.empresa.com"} className={`${inputClass} font-mono text-xs`} />
-          <span className="mt-1 block text-[11px] text-mute">
-            {ms
-              ? "Solo si al iniciar sesión Microsoft te lleva a una página de tu empresa. Los dominios de Microsoft y el de tu dominio habitual ya se permiten."
-              : "Solo si el inicio de sesión o los archivos del portal están en otro dominio. Los subdominios del portal ya se permiten."}
-          </span>
-        </label>
+        {ms && (
+          <label className="block">
+            <span className="mb-1 block text-xs text-dim">Página de inicio de sesión de tu empresa (opcional)</span>
+            <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="sts.empresa.com" className={`${inputClass} font-mono text-xs`} />
+            <span className="mt-1 block text-[11px] text-mute">
+              Solo si al iniciar sesión Microsoft te lleva a una página de tu empresa. Los dominios de Microsoft y el de tu dominio habitual ya se permiten.
+            </span>
+          </label>
+        )}
         {!ms && (
           <p className="text-[11px] text-mute">
-            Webs de la empresa con la cuenta de Windows (dominio, como *.pgr.gob.do): tras guardar, cierra y vuelve a abrir AdminOps y entrará sola con tu usuario de Windows, sin
+            La dirección es solo la página de inicio: desde ahí puedes navegar a cualquier otra, como en un navegador, y escribir otra dirección en la barra.
+          </p>
+        )}
+        {!ms && (
+          <p className="text-[11px] text-mute">
+            Webs de la empresa con la cuenta de Windows (dominio, como *.empresa.local): tras guardar, cierra y vuelve a abrir AdminOps y entrará sola con tu usuario de Windows, sin
             pedir contraseña.
           </p>
         )}

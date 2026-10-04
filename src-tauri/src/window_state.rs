@@ -60,6 +60,17 @@ static READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new
 /// la primera pantalla, y eso **no** es un fallo.
 static BOOTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// Espera a que la interfaz esté pintada (o a que pase `max`). Para lo que se
+/// prepara en segundo plano al abrir: mientras WebView2 arranca, cada PowerShell
+/// que se lanza le quita disco y procesador, y en un arranque lento (desde un
+/// pendrive, o la primera vez tras instalar) eso lo alargaba todavía más.
+pub fn wait_until_ready(max: std::time::Duration) {
+    let start = std::time::Instant::now();
+    while !READY.load(std::sync::atomic::Ordering::SeqCst) && start.elapsed() < max {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+}
+
 /// Enseña la ventana (una sola vez). Se llama cuando la interfaz ya está
 /// pintada, o pasado el margen del vigilante si tarda más de la cuenta.
 pub fn reveal(app: &tauri::AppHandle) {
