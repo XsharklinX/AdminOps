@@ -1,10 +1,10 @@
 // Rendimiento de los últimos días: procesador, memoria y disco minuto a minuto,
 // y qué programa estaba detrás de cada pico. Para «va lento desde el martes».
-import { RotateCw } from "lucide-react";
+import { PictureInPicture2, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TimeChart } from "../components/TimeChart";
-import { Card, EmptyState, ErrorState, iconBtn, Loading, Tile } from "../components/ui";
-import { insightApi, type Sample } from "../lib/api";
+import { Card, EmptyState, ErrorState, iconBtn, Loading, smallBtn, Tile } from "../components/ui";
+import { insightApi, logQuietly, workApi, type Sample } from "../lib/api";
 import { dateTime } from "../lib/format";
 import { usePageActive } from "../lib/pageActive";
 
@@ -76,6 +76,13 @@ export function PerfHistory() {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => void workApi.miniMonitor().catch(logQuietly("PerfHistory"))}
+          className={smallBtn}
+          title="Una ventanita siempre encima con procesador, memoria, temperatura y red, para vigilar mientras pruebas otra cosa"
+        >
+          <PictureInPicture2 size={13} /> Mini monitor
+        </button>
         <button onClick={load} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">
           <RotateCw size={14} />
         </button>

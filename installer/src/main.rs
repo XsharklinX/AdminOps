@@ -8,6 +8,8 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod fingerprint;
+
 use serde::Serialize;
 #[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
@@ -26,11 +28,10 @@ const EXE_SHA256: &str = env!("APP_EXE_SHA256");
 /// terminar sin error; como las dos builds tienen la misma versión, eso pasaba
 /// por «actualizado» y se seguía usando la anterior.
 fn exe_is_current(dir: &Path) -> bool {
-    use sha2::Digest;
     if EXE_SHA256.is_empty() {
         return true;
     }
-    std::fs::read(dir.join("adminops.exe")).is_ok_and(|b| sha2::Sha256::digest(&b).iter().map(|x| format!("{x:02x}")).collect::<String>() == EXE_SHA256)
+    std::fs::read(dir.join("adminops.exe")).is_ok_and(|b| fingerprint::fingerprint(&b) == EXE_SHA256)
 }
 
 fn parse_version(v: &str) -> Vec<u32> {
@@ -474,6 +475,20 @@ mod tests {
         drop(held);
         assert!(lockers(&dir).is_empty());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// El ejecutable instalado y el de la carpeta de compilación solo se
+    /// diferencian en la marca del tipo de instalador: tienen que dar la misma huella.
+    #[test]
+    fn the_installed_exe_matches_the_built_one() {
+        let exe = |kind: &str, tail: &str| format!("cabecera__TAURI_BUNDLE_TYPE_VAR_{kind}resto__TAURI_BUNDLE_TYPE_VAR_{kind}{tail}").into_bytes();
+        let built = fingerprint::fingerprint(&exe("UNK", "fin"));
+        assert_eq!(built, fingerprint::fingerprint(&exe("NSS", "fin")));
+        // Cualquier otra diferencia sí cuenta: es otra build.
+        assert_ne!(built, fingerprint::fingerprint(&exe("NSS", "fim")));
+        // Sin marca (o cortado justo en ella) no se rompe.
+        assert_eq!(fingerprint::fingerprint(b"nada"), fingerprint::fingerprint(b"nada"));
+        assert_ne!(fingerprint::fingerprint(b"__TAURI_BUNDLE_TYPE_VAR_N"), fingerprint::fingerprint(b"otra cosa"));
     }
 
     #[test]

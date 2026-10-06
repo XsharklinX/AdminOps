@@ -25,6 +25,36 @@ fn visible_on(monitors: &[(i32, i32, u32, u32)], s: &Saved) -> bool {
     monitors.iter().any(|&(mx, my, mw, mh)| px >= mx && py >= my && px < mx + mw as i32 && py < my + mh as i32)
 }
 
+/// Ajustes → General: la X minimiza en vez de cerrar. En memoria, porque se
+/// consulta al cerrar la ventana y ahí no conviene leer un archivo.
+static CLOSE_MINIMIZES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Se ha pedido salir de verdad (botón «Salir»): la X ya no se intercepta.
+static QUITTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_close_minimizes(on: bool) {
+    CLOSE_MINIMIZES.store(on, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// ¿Hay que minimizar en vez de cerrar?
+pub fn minimizes_on_close() -> bool {
+    use std::sync::atomic::Ordering::SeqCst;
+    CLOSE_MINIMIZES.load(SeqCst) && !QUITTING.load(SeqCst)
+}
+
+/// Cierra AdminOps de verdad, aunque la X esté puesta para minimizar.
+#[tauri::command]
+pub fn quit_app(window: tauri::Window) {
+    save(&window);
+    quit(window.app_handle());
+}
+
+/// Salida de verdad, desde el botón «Salir» o desde el icono junto al reloj.
+pub fn quit(app: &tauri::AppHandle) {
+    QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
+    log::info!("Salida pedida («Salir»)");
+    app.exit(0);
+}
+
 /// ¿Se ha enseñado ya la ventana? (se enseña una sola vez, desde donde llegue antes).
 static SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 

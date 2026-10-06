@@ -14,6 +14,7 @@ mod keys;
 mod maintenance;
 mod metrics;
 mod migrate;
+mod minimon;
 mod network;
 mod cases;
 mod followups;
@@ -44,6 +45,7 @@ mod pspool;
 mod task;
 mod target_user;
 mod toolbox;
+mod tray;
 mod tweaks;
 mod users;
 mod window_state;
@@ -157,11 +159,22 @@ pub fn run() {
             // desaparece sola no deja ni rastro en el registro y no hay forma de
             // saber si la cerró el usuario, Windows, o se murió ella.
             match event {
-                tauri::WindowEvent::CloseRequested { .. } => {
-                    log::info!("Cierre pedido a los {} ms", boottime::since_start_ms());
+                tauri::WindowEvent::CloseRequested { api, .. } => {
                     window_state::save(window);
+                    // Ajustes → General: la X solo la quita de en medio.
+                    if window_state::minimizes_on_close() {
+                        api.prevent_close();
+                        // Con el icono junto al reloj se esconde ahí; sin él, a la barra de tareas.
+                        let _ = if tray::visible() { window.hide() } else { window.minimize() };
+                        log::info!("Cierre pedido: se minimiza (ajuste «Al cerrar, minimizar»)");
+                    } else {
+                        log::info!("Cierre pedido a los {} ms", boottime::since_start_ms());
+                    }
                 }
-                tauri::WindowEvent::Destroyed => log::info!("Ventana destruida a los {} ms", boottime::since_start_ms()),
+                tauri::WindowEvent::Destroyed => {
+                    log::info!("Ventana destruida a los {} ms", boottime::since_start_ms());
+                    minimon::close(window.app_handle());
+                }
                 _ => {}
             }
         })
@@ -189,6 +202,10 @@ pub fn run() {
             window_state::watch_first_paint(app.handle().clone());
             let settings = boottime::step("Ajustes", || workflow::settings(app.handle()));
             tweaks::set_restore_point_policy(&settings.restore_points);
+            window_state::set_close_minimizes(settings.close_minimizes);
+            if settings.tray_icon {
+                tray::set_visible(app.handle(), true);
+            }
             // Arranque con Windows: minimizada en la barra de tareas.
             if std::env::args().any(|a| a == "--minimized") {
                 if let Some(w) = app.get_webview_window("main") {
@@ -368,6 +385,7 @@ pub fn run() {
             space::space_folder,
             space::space_files,
             space::space_kind_files,
+            space::space_duplicates,
             space::reveal_in_explorer,
             software::list_software_updates,
             software::upgrade_software,
@@ -510,6 +528,8 @@ pub fn run() {
             window_state::set_ui_zoom,
             window_state::ui_ready,
             window_state::ui_booting,
+            window_state::quit_app,
+            minimon::open_mini_monitor,
             appcare::autostart_enabled,
             appcare::set_autostart,
             appcare::data_usage,

@@ -64,6 +64,10 @@ pub struct Settings {
     pub watch_windows: bool,
     /// De qué avisos llega además notificación de Windows: all | bad | none.
     pub notify_alerts: String,
+    /// La X de la ventana minimiza en vez de cerrar (se sale con el botón «Salir»).
+    pub close_minimizes: bool,
+    /// Icono junto al reloj, con lo habitual a un clic derecho.
+    pub tray_icon: bool,
     /// Tipos de visita con su checklist (mantenimiento, equipo nuevo…).
     pub visit_types: Vec<VisitType>,
     /// La plantilla de informe propia: qué secciones lleva y en qué orden.
@@ -207,6 +211,8 @@ impl Default for Settings {
             check_updates: true,
             watch_windows: true,
             notify_alerts: "all".into(),
+            close_minimizes: false,
+            tray_icon: false,
             visit_types: default_visit_types(),
             report_layout: ReportLayout::default(),
         }
@@ -257,6 +263,8 @@ pub fn save_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), St
         return Err("Opción de puntos de restauración no válida.".into());
     }
     crate::tweaks::set_restore_point_policy(&settings.restore_points);
+    crate::window_state::set_close_minimizes(settings.close_minimizes);
+    crate::tray::set_visible(&app, settings.tray_icon);
     crate::paths::write_json(&settings_path(&app), &settings)
 }
 

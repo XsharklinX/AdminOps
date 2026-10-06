@@ -181,6 +181,23 @@ export function General({
           </select>
         </Row>
         <Autostart />
+        <Row
+          title="Icono junto al reloj"
+          sub="Un icono de AdminOps al lado del reloj de Windows. Clic para abrirla; clic derecho para un análisis rápido, la nota de llamada, el mini monitor, los avisos o salir."
+        >
+          <input type="checkbox" checked={s.trayIcon} onChange={(e) => set({ trayIcon: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+        </Row>
+        <Row
+          title="Al cerrar la ventana, minimizar"
+          sub="La X deja AdminOps minimizada en vez de cerrarla, para no perder lo que tenías abierto: en la barra de tareas o, con el icono junto al reloj, escondida en él. Para cerrarla de verdad aparece el botón «Salir» en la barra de arriba."
+        >
+          <input
+            type="checkbox"
+            checked={s.closeMinimizes}
+            onChange={(e) => set({ closeMinimizes: e.target.checked })}
+            className="size-4 accent-[var(--color-neon)]"
+          />
+        </Row>
       </Card>
 
       <WhereStored portable={portable} />

@@ -1,5 +1,7 @@
-import { ChevronDown, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { Check, ChevronDown, Images, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { copyAsImage, NO_CAPTURE } from "../lib/copyImage";
+import { logQuietly } from "../lib/api/core";
 import { createPortal } from "react-dom";
 import { loadColor } from "../lib/format";
 
@@ -22,11 +24,27 @@ export function Card({
   fold?: { collapsed: boolean; note: string; onToggle: () => void };
 }) {
   const collapsed = !!fold?.collapsed;
+  const ref = useRef<HTMLElement>(null);
+  // Copiar la tarjeta como imagen: «idle», dibujando, hecho, o el motivo del fallo.
+  const [copy, setCopy] = useState<"idle" | "busy" | "done" | string>("idle");
+  const copyCard = () => {
+    if (!ref.current || copy === "busy") return;
+    setCopy("busy");
+    copyAsImage(ref.current).then(
+      () => setCopy("done"),
+      (e) => {
+        logQuietly("Card")(e);
+        setCopy(e instanceof Error ? e.message : "No se pudo copiar la imagen.");
+      },
+    );
+    window.setTimeout(() => setCopy("idle"), 4000);
+  };
   return (
     <section
+      ref={ref}
       id={id}
       data-setting={title}
-      className={`scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 ${
+      className={`group/card scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 ${
         collapsed ? "py-3" : ""
       } ${className}`}
     >
@@ -36,6 +54,20 @@ export function Card({
             {icon && <span className="text-mute">{icon}</span>}
             {title}
           </h2>
+          <span className="flex items-center gap-2">
+          {!collapsed && (
+            <button
+              {...NO_CAPTURE}
+              onClick={copyCard}
+              title={copy === "done" ? "Copiada: pégala en Teams o en el correo" : copy === "idle" || copy === "busy" ? "Copiar esta tarjeta como imagen" : copy}
+              aria-label={`Copiar la tarjeta «${title}» como imagen`}
+              className={`rounded p-1 transition-opacity focus:opacity-100 ${
+                copy === "idle" ? "text-mute opacity-0 group-hover/card:opacity-100 hover:text-ink" : copy === "done" ? "text-ok" : copy === "busy" ? "text-neon" : "text-bad"
+              }`}
+            >
+              {copy === "busy" ? <Loader2 size={13} className="animate-spin" /> : copy === "done" ? <Check size={13} /> : <Images size={13} />}
+            </button>
+          )}
           {fold ? (
             <button onClick={fold.onToggle} className="flex items-center gap-1.5 text-[11px] text-mute transition-colors hover:text-ink">
               {collapsed && <span className="text-ok">{fold.note}</span>}
@@ -45,6 +77,7 @@ export function Card({
           ) : (
             right
           )}
+          </span>
         </header>
       )}
       {!collapsed && children}

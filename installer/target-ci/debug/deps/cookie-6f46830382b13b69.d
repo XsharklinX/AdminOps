@@ -1,0 +1,12 @@
+F:\Programacion\AdminOps\installer\target-ci\debug\deps\cookie-6f46830382b13b69.d: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\builder.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\parse.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\jar.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\delta.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\same_site.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\expiration.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\prefix.rs
+
+F:\Programacion\AdminOps\installer\target-ci\debug\deps\libcookie-6f46830382b13b69.rmeta: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\builder.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\parse.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\jar.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\delta.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\same_site.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\expiration.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\prefix.rs
+
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\lib.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\builder.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\parse.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\jar.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\delta.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\same_site.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\expiration.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cookie-0.18.2\src\prefix.rs:

@@ -232,7 +232,7 @@ const SAFE: &[&str] = &[
     // software
     "list_software_updates", "ignored_updates", "cached_software_updates", "set_update_ignored",
     // space
-    "scan_space", "cancel_space_scan", "space_freeable", "space_folder", "space_files", "space_kind_files", "reveal_in_explorer",
+    "scan_space", "cancel_space_scan", "space_freeable", "space_folder", "space_files", "space_kind_files", "space_duplicates", "reveal_in_explorer",
     // stations
     "check_stations",
     // support
@@ -272,7 +272,7 @@ const SAFE: &[&str] = &[
     // vault
     "vault_support", "vault_list", "vault_recovery_key", "vault_save_recovery", "vault_pick_location", "pick_folder", "pick_encrypted_zip",
     // window_state
-    "set_ui_zoom", "ui_ready", "ui_booting",
+    "set_ui_zoom", "ui_ready", "ui_booting", "quit_app", "open_mini_monitor",
     // winupdate
     "update_history", "update_pause_state", "pending_updates",
     // winwatch

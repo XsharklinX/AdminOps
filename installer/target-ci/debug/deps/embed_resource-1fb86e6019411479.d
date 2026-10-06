@@ -1,0 +1,8 @@
+F:\Programacion\AdminOps\installer\target-ci\debug\deps\embed_resource-1fb86e6019411479.d: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\windows_msvc.rs
+
+F:\Programacion\AdminOps\installer\target-ci\debug\deps\libembed_resource-1fb86e6019411479.rlib: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\windows_msvc.rs
+
+F:\Programacion\AdminOps\installer\target-ci\debug\deps\libembed_resource-1fb86e6019411479.rmeta: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\windows_msvc.rs
+
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\lib.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\embed-resource-3.0.11\src\windows_msvc.rs:

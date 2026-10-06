@@ -1,6 +1,7 @@
 /** Preferencias de la interfaz: apariencia, página de inicio, refresco del Panel y
  * estructura de la barra lateral. Se guardan por equipo en el almacenamiento del
  * webview (en modo portable, junto a AdminOps.exe) y se aplican antes de pintar. */
+import type { PanelPrefs } from "./panelLayout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import type { PageId } from "../components/Sidebar";
@@ -100,10 +101,12 @@ export interface Prefs {
   portalZoom: number;
   /** Cómo se abren Teams y el Correo desde la barra de arriba. */
   comms: { teams: CommMode; mail: CommMode };
+  /** El Panel a medida: orden de las tarjetas y cuáles están ocultas (vacío: de fábrica). */
+  panel: PanelPrefs;
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" } };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [] } };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -141,6 +144,8 @@ export function getPrefs(): Prefs {
   p.sidebar.favorites = p.sidebar.favorites.filter((f): f is string => typeof f === "string");
   if (!p.pageLabels || typeof p.pageLabels !== "object") p.pageLabels = {};
   const modes = ["ask", "adminops", "browser", "app"];
+  const panel = (p.panel && typeof p.panel === "object" ? p.panel : {}) as Partial<PanelPrefs>;
+  p.panel = { order: Array.isArray(panel.order) ? panel.order : [], hidden: Array.isArray(panel.hidden) ? panel.hidden : [] };
   const c = (p.comms && typeof p.comms === "object" ? p.comms : {}) as Partial<Prefs["comms"]>;
   p.comms = { teams: modes.includes(c.teams as string) ? c.teams! : "ask", mail: modes.includes(c.mail as string) ? c.mail! : "ask" };
   // AdminOps abre siempre en el Panel salvo que el técnico haya elegido otra

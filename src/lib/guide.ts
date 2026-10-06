@@ -285,10 +285,13 @@ export const GUIDE: GuideChapter[] = [
           "La barra de colores dice de qué está llena la carpeta en la que estás. Pulsa un color para ver los archivos más grandes de ese tipo.",
           "«Archivos» tiene cuatro listas: los más grandes, los que nadie toca hace un año, los de la carpeta en la que estás y los del tipo elegido. Se filtran por nombre o extensión.",
           "Marca carpetas y archivos de cualquier lista: abajo sale lo marcado y cuánto suma. «A la papelera» lo manda todo de una vez, y las cifras se ponen al día sin volver a analizar.",
+          "«Archivos duplicados» busca el mismo archivo guardado varias veces. De cada grupo, «Marcar las copias» deja la primera y marca las demás; mira antes dónde está cada una.",
+          "«Liberar lo verde», en «Qué puedes liberar», vacía de una vez los sitios seguros.",
         ],
         notes: [
           "Desde aquí no se pueden borrar Windows, un programa instalado entero ni un perfil de usuario: cada cosa se quita desde su sitio (Limpieza, Programas, Usuarios).",
           "Lo que sea demasiado grande para la papelera, Windows lo borra del todo.",
+          "Los duplicados de más de 256 MB se comparan por muestras (principio, final y dieciséis trozos), no enteros: lo dice cada grupo.",
         ],
         go: ["space", "space"],
       },

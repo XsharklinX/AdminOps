@@ -4,6 +4,7 @@ import { getPrefs, setSidebar, usePrefs, type NavLayout } from "../lib/prefs";
 import { goToPage } from "../lib/navigate";
 import type { Badge } from "../lib/machineState";
 import { navKey, parseNavKey, sectionLabel, sectionsOf } from "../lib/sections";
+import { markSeen, useNewMarks } from "../lib/whatsNew";
 import { useCurrentSections } from "../lib/sectionState";
 import {
   Activity,
@@ -547,6 +548,13 @@ export function Sidebar({
   const pinned = sb.favorites.filter((k) => isPageId(parseNavKey(k).page) && allowedInMode(parseNavKey(k).page, prefs.mode));
   const togglePin = (k: string) => setSidebar({ favorites: sb.favorites.includes(k) ? sb.favorites.filter((x) => x !== k) : [...sb.favorites, k] });
 
+  // Marca «Nuevo» tras actualizar: se va al entrar en la pantalla o en la sección.
+  const fresh = useNewMarks();
+  const shownSection = sections[active] ?? sectionsOf(active)[0]?.id ?? null;
+  useEffect(() => {
+    markSeen(shownSection ? [navKey(active), navKey(active, shownSection)] : [navKey(active)]);
+  }, [active, shownSection]);
+
   /** La línea está a la vista: la pantalla actual y, si tiene secciones, la sección actual. */
   const isCurrent = (page: PageId, section: string | null) => {
     if (page !== active) return false;
@@ -569,7 +577,11 @@ export function Sidebar({
         >
           {opts.sub && <span className={`absolute top-0 bottom-0 left-3.5 ${opts.current ? "w-0.5 bg-neon" : "w-px bg-line-2"}`} />}
           <span className="min-w-0 flex-1 truncate">{label}</span>
-          {opts.badge && <BadgeTag b={opts.badge} />}
+          {opts.badge ? (
+            <BadgeTag b={opts.badge} />
+          ) : (
+            fresh.includes(k) && <BadgeTag b={{ text: "Nuevo", tone: "ok", title: "Ha cambiado en esta versión. La marca se va al entrar." }} />
+          )}
         </button>
         <button
           onClick={() => togglePin(k)}

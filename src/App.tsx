@@ -5,6 +5,7 @@ import type { PaletteAction } from "./components/CommandPalette";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
+import { QuitButton } from "./components/QuitButton";
 import { LockScreen } from "./components/LockScreen";
 import { NAV, Sidebar, allowedInMode, areaOf, isPageId, pageLabel, resolvePage, visibleAreas, type Area, type PageId } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
@@ -12,10 +13,10 @@ import { CommOpener } from "./components/CommOpener";
 import { useMachineState } from "./lib/machineState";
 import { sectionLabel, sectionsOf } from "./lib/sections";
 import { PageIdContext, requestSection, useCurrentSections } from "./lib/sectionState";
-import { logQuietly, api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { logQuietly, api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
-import { analyze } from "./lib/diagRun";
+import { analyze, analyzeQuick } from "./lib/diagRun";
 import { lastPortalKey, watchPortals } from "./lib/portalState";
 import { isModestMachine, machineSummary } from "./lib/machine";
 import { NAVIGATE_EVENT, ONBOARDING_EVENT } from "./lib/navigate";
@@ -88,6 +89,20 @@ const SPLIT_KEY = "adminops.split";
 /** Página donde vive el portal de cada tipo (para precargar solo el que toca). */
 const PORTAL_PAGE = { inventory: "inventory", mail: "mail", teams: "teams" } as const;
 /** Páginas que se mantienen vivas a la vez; la menos usada se descarta al pasar de aquí. */
+/** «Análisis rápido» pedido desde el icono junto al reloj. */
+const TRAY_QUICK_SCAN = "adminops-tray-quick-scan";
+
+/** Acciones de «Todo AdminOps» que se ejecutan al momento: clave, ajuste que las hace, título y otras formas de decirlo. */
+const DO_NOW: [string, string, string, string][] = [
+  ["print-queue", "repair.print-queue", "Vaciar la cola de impresión", "impresora atascada no imprime cola spooler trabajos"],
+  ["audio", "repair.audio", "Reiniciar el sonido", "audio no suena altavoz microfono servicio"],
+  ["explorer", "repair.explorer", "Reiniciar el Explorador", "barra de tareas colgada escritorio explorer"],
+  ["dns", "cleanup.dns-cache", "Vaciar la caché de DNS", "dns pagina no carga flushdns"],
+  ["temp", "cleanup.user-temp", "Limpiar los temporales del usuario", "temp basura liberar espacio"],
+  ["time", "repair.time-sync", "Sincronizar la hora", "reloj hora mal fecha"],
+  ["icons", "repair.icon-cache", "Reconstruir la caché de iconos", "iconos en blanco mal"],
+];
+
 const MAX_ALIVE = 12;
 /** Si la interfaz tardó más que esto en empezar, el arranque fue lento y no se precarga nada. */
 const SLOW_START_MS = 5000;
@@ -212,6 +227,11 @@ export default function App() {
   useEffect(() => {
     let notifiedAt = 0;
     const un = listen("alert-notified", () => (notifiedAt = Date.now()));
+    // Lo que se pide desde el icono junto al reloj y hace la interfaz.
+    const tray = listen<string>("tray-action", ({ payload }) => {
+      if (payload === "alerts") setAlertSignal((n) => n + 1);
+      if (payload === "quick-scan") window.dispatchEvent(new Event(TRAY_QUICK_SCAN));
+    });
     const onFocus = () => {
       if (notifiedAt && Date.now() - notifiedAt < 2 * 60_000) {
         notifiedAt = 0;
@@ -222,6 +242,7 @@ export default function App() {
     return () => {
       window.removeEventListener("focus", onFocus);
       void un.then((f) => f());
+      void tray.then((f) => f());
     };
   }, []);
 
@@ -458,6 +479,26 @@ export default function App() {
       { id: "help-news", title: "Novedades de cada versión", subtitle: "Lo que se ha añadido desde la primera", keywords: "cambios version changelog nuevo", run: () => openHelp("news") },
       { id: "help-report", title: "Reportar un problema", subtitle: "Prepara el correo para el autor con el diagnóstico adjunto", keywords: "fallo error bug soporte contacto", run: () => openHelp("report") },
       { id: "help-terms", title: "Términos de uso", keywords: "licencia responsabilidad garantia legal", run: () => openHelp("terms") },
+      // Cosas que se hacen al momento, sin salir de donde estás: el resultado sale abajo.
+      ...DO_NOW.map(([id, tweak, title, keywords]) => ({
+        id: `do:${id}`,
+        title,
+        subtitle: "Se hace al pulsar Intro",
+        keywords,
+        run: () => tweaksApi.run(tweak).then((r) => `${title}: ${r.message}`),
+      })),
+      { id: "do:restore-point", title: "Crear un punto de restauración", subtitle: "Se hace al pulsar Intro", keywords: "restaurar sistema punto copia antes de cambiar", run: () => tweaksApi.createRestorePoint().then(() => "Punto de restauración creado.") },
+      {
+        id: "do:quick-scan",
+        title: "Análisis rápido del equipo",
+        subtitle: "Se hace al pulsar Intro: una primera mirada en segundos",
+        keywords: "diagnostico rapido revisar mirar estado",
+        run: () =>
+          analyzeQuick().then((d) => {
+            const n = d.findings.filter((f) => f.severity !== "info").length;
+            return n ? `Análisis rápido: ${n} ${n === 1 ? "cosa que atender" : "cosas que atender"}. Está en Diagnóstico.` : "Análisis rápido: nada urgente.";
+          }),
+      },
       { id: "diag", title: "Ejecutar un diagnóstico", run: () => navigate("diagnostics") },
       { id: "report", title: "Generar informe PDF", run: () => navigate("report") },
       { id: "shortcut", title: "Añadir un acceso directo propio", run: () => navigate("tools") },
@@ -465,6 +506,7 @@ export default function App() {
       { id: "newuser", title: "Crear un usuario local", run: () => navigate("users") },
       { id: "setup", title: "Volver a abrir el asistente de inicio", run: () => setOnboarding(true) },
       { id: "case", title: "Nuevo caso", subtitle: "Lo que hagas queda apuntado y la resolución se redacta sola", keywords: "ticket incidencia caso abrir atender", run: () => openCase() },
+      { id: "minimon", title: "Mini monitor siempre encima", subtitle: "Una ventanita con procesador, memoria, temperatura y red", keywords: "monitor flotante widget vigilar temperatura cpu ram encima", run: () => workApi.miniMonitor() },
       { id: "note", title: "Nota de llamada", subtitle: "También con Ctrl+Alt+N, aunque AdminOps esté minimizado", keywords: "telefono llamada apuntar nota rapida", run: () => noteApi.open() },
       { id: "clip", title: "Recorte de pantalla", subtitle: "Tapa solo rutas, usuario y equipo; queda en el portapapeles para el ticket", keywords: "captura pantallazo imagen recortes ocr privacidad", run: () => noteApi.screenClip() },
       {
@@ -575,7 +617,8 @@ export default function App() {
             <NewCaseButton hidden={false} />
             <TasksIndicator />
             <AuditToggle />
-            <AlertCenter onNavigate={(p) => navigate(p)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
+            <QuitButton />
+            <AlertCenter onNavigate={(p, s) => goTo(p, s ?? null)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
           </>
         }
       />

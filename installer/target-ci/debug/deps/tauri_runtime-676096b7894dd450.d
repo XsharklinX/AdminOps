@@ -1,0 +1,10 @@
+F:\Programacion\AdminOps\installer\target-ci\debug\deps\tauri_runtime-676096b7894dd450.d: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\dpi.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\monitor.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\webview.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\webview_permissions.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\window.rs
+
+F:\Programacion\AdminOps\installer\target-ci\debug\deps\libtauri_runtime-676096b7894dd450.rmeta: C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\lib.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\dpi.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\monitor.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\webview.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\webview_permissions.rs C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\window.rs
+
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\lib.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\dpi.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\monitor.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\webview.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\webview_permissions.rs:
+C:\Users\otaku\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-runtime-2.12.0\src\window.rs:

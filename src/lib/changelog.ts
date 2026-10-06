@@ -18,6 +18,22 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.4",
+    title: "Más a mano: duplicados, panel a tu medida, icono junto al reloj y mini monitor",
+    added: [
+      "Discos → Espacio → «Archivos duplicados»: encuentra el mismo archivo guardado varias veces (de 1 MB en adelante), dice cuánto se recupera y deja marcar las copias para mandarlas a la papelera. No mira dentro de Windows ni lee lo que solo está en la nube.",
+      "Espacio → «Liberar lo verde»: vacía de una vez los sitios seguros de «Qué puedes liberar» (temporales y caché de Windows Update), sin tocar nada del usuario.",
+      "Panel a tu medida: «Personalizar el panel» deja ordenar las tarjetas, arrastrando o con las flechas, y ocultar las que no uses. Se recuerda por técnico.",
+      "Panel → «Qué frena el equipo ahora»: lo que más pesa en este momento, dicho en claro. Lo que es de Windows o del antivirus se explica; un programa del usuario se puede cerrar desde ahí.",
+      "Icono junto al reloj (Ajustes → General, apagado de fábrica): clic para abrir AdminOps; clic derecho para un análisis rápido, la nota de llamada, el mini monitor, los avisos o salir. Con «Al cerrar la ventana, minimizar», la X la esconde en el icono.",
+      "Mini monitor: una ventanita siempre encima con procesador, memoria, temperatura y red, para vigilar el equipo mientras pruebas otra cosa. Se abre desde Rendimiento, desde Ctrl+K o desde el icono junto al reloj.",
+      "La campana tiene una pestaña «Actividad»: lo que AdminOps terminó en esta sesión (análisis, copias, instalaciones), cuánto tardó y un enlace al resultado.",
+      "Ctrl+K hace más cosas al momento: vaciar la cola de impresión, reiniciar el sonido o el Explorador, vaciar la caché de DNS, limpiar temporales, sincronizar la hora, crear un punto de restauración o lanzar un análisis rápido.",
+      "Copiar una tarjeta como imagen: al pasar el ratón por una tarjeta sale un botón en su esquina; la deja en el portapapeles para pegarla en Teams o en un correo.",
+      "Marca «Nuevo» en la barra lateral: tras actualizar, señala las pantallas que cambiaron. Se va al entrar.",
+    ],
+  },
+  {
     version: "1.2.3",
     title: "Avisos que se pueden ordenar y callar, y un arranque más ligero",
     added: [
@@ -26,12 +42,14 @@ export const RELEASES: Release[] = [
       "«No avisar más de esto en este equipo»: un aviso que ya conoces (ese programa viejo que se cierra siempre) se silencia y no vuelve a salir ni en la campana ni como notificación. Se deshace en «Silenciados».",
       "Ajustes → General: elegir de qué avisos salta además la notificación de Windows: de todos, solo de los graves o de ninguno. A la campana siguen llegando todos.",
       "Si la vigilancia está desactivada, la campana lo dice y lleva a Ajustes.",
+      "Ajustes → General → «Al cerrar la ventana, minimizar» (apagado de fábrica): la X deja AdminOps en la barra de tareas en vez de cerrarla. Para cerrarla de verdad aparece el botón «Salir» en la barra de arriba. Junto a él sigue «Abrir AdminOps al iniciar Windows», minimizada, también apagado de fábrica.",
       "Discos → Espacio, de mirar a manejar: una barra de colores dice de qué está llena cada carpeta (vídeo, imágenes, correo guardado, instaladores…) y al pulsar un color salen los archivos más grandes de ese tipo.",
       "Espacio: un clic en una carpeta enseña su ficha (cuánto ocupa, qué parte del total, cuántos archivos, cuándo cambió por última vez) con sus acciones; doble clic entra. La lista se ordena por tamaño, antigüedad, número de archivos o nombre.",
       "Espacio: se ven los archivos de la carpeta en la que estás, con buscador por nombre o extensión. Antes una carpeta llena de archivos sueltos, como Descargas, salía casi vacía.",
       "Espacio: se pueden marcar carpetas enteras, además de archivos, y mandarlo todo a la papelera de una vez. Las cifras se actualizan solas, sin volver a analizar. Windows, los programas instalados y los perfiles de usuario quedan protegidos.",
     ],
     fixed: [
+      "El instalador (Setup) decía que no había podido actualizar cuando sí lo había hecho, y mandaba al instalador clásico. Comparaba el programa instalado con una copia que difería en tres letras internas, así que la comprobación no podía salir bien nunca.",
       "Arranque: lo que AdminOps prepara por detrás (la consola de PowerShell, la seguridad) espera ahora a que la ventana esté pintada, en vez de competir con ella. Se nota sobre todo desde un pendrive o en un equipo ocupado.",
       "«Este equipo y esta red» (las notas del Panel) ya no pregunta a PowerShell en cada arranque: una red ya vista se reconoce al instante. Tardaba unos 7 s desde un pendrive.",
       "El último análisis se guarda en memoria: el Panel y la barra de arriba lo pedían cada minuto y cada vez se leía del disco.",

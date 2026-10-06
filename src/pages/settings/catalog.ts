@@ -36,6 +36,8 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { section: "general", title: "Precargar los portales", keywords: "tickets inventario correo teams rapido" },
   { section: "general", title: "Diagnosticar al abrir AdminOps", keywords: "diagnostico automatico analisis" },
   { section: "general", title: "Vigilar errores de Windows", keywords: "avisos eventos campana pantallazos" },
+  { section: "general", title: "Icono junto al reloj", keywords: "bandeja tray area de notificacion icono reloj segundo plano" },
+  { section: "general", title: "Al cerrar la ventana, minimizar", keywords: "cerrar x minimizar barra de tareas salir segundo plano" },
   { section: "general", title: "Notificaciones de Windows de los avisos", keywords: "notificacion campana graves silenciar molestar" },
   { section: "general", title: "Avisar al terminar tareas largas", keywords: "notificacion tareas" },
   { section: "general", title: "Punto de restauración antes de cambiar el sistema", keywords: "restaurar seguridad deshacer" },

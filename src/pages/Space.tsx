@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   CornerDownRight,
+  CopyCheck,
   File,
   Folder,
   FolderOpen,
@@ -21,7 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, smallBtn } from "../components/ui";
-import { api, logQuietly, toolsApi, type Freeable, type SpaceEntry, type SpaceFolder, type SpaceView } from "../lib/api";
+import { api, appApi, logQuietly, toolsApi, tweaksApi, type Duplicates, type Freeable, type SpaceEntry, type SpaceFolder, type SpaceView } from "../lib/api";
 import { bytes, ago, friendlyPath } from "../lib/format";
 import { crumbsOf, type FolderSort, kindColor, kindLabel, kindShares, LOOSE, looseSize, matchesText, parentOf, percent, sortEntries } from "../lib/spaceView";
 import { squarify } from "../lib/treemap";
@@ -35,6 +36,13 @@ type FileTab = "here" | "big" | "old" | "kind";
 type Picked = Map<string, { name: string; size: number; dir: boolean }>;
 
 const NONE: SpaceEntry[] = [];
+
+/** Qué limpieza vacía cada sitio «verde» de «Qué puedes liberar». */
+const CLEANER: Record<string, string> = {
+  "windows-temp": "cleanup.windows-temp",
+  "update-cache": "cleanup.windows-update-cache",
+  "user-temp": "cleanup.user-temp",
+};
 
 const SORTS: [FolderSort, string][] = [
   ["size", "Lo que más ocupa"],
@@ -63,6 +71,10 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<Picked>(new Map());
   const [recycling, setRecycling] = useState(false);
+  const [freeing, setFreeing] = useState<string | null>(null);
+  // Duplicados: sin buscar (null), buscando, o el resultado.
+  const [dups, setDups] = useState<Duplicates | "busy" | null>(null);
+  const [dupStep, setDupStep] = useState("");
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
@@ -83,8 +95,10 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
     loadFreeable();
     loadDrives();
     const un = listen<{ files: number; bytes: number }>("space-progress", (e) => setProgress(e.payload));
+    const step = listen<{ task: string; message: string }>("task-progress", (e) => e.payload.task === "duplicates" && setDupStep(e.payload.message));
     return () => {
       void un.then((f) => f());
+      void step.then((f) => f());
     };
   }, [loadFreeable, loadDrives]);
 
@@ -115,6 +129,7 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
       setKind(null);
       setKindFiles(null);
       setQuery("");
+      setDups(null);
       setFileTab("big");
     } catch (e) {
       toast(String(e).includes("cancelado") ? "info" : "error", String(e));
@@ -199,6 +214,12 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
       setScan((s) => s && { ...s, size: Math.max(0, s.size - freed), largestFiles: s.largestFiles.filter((e) => !gone(e)), oldFiles: s.oldFiles.filter((e) => !gone(e)) });
       setHereFiles((f) => f && f.filter((e) => !gone(e)));
       setKindFiles((f) => f && f.filter((e) => !gone(e)));
+      // De los duplicados se va lo borrado; un grupo con una sola copia ya no es un duplicado.
+      setDups((d) => {
+        if (!d || d === "busy") return d;
+        const groups = d.groups.map((g) => ({ ...g, files: g.files.filter((e) => !gone(e)) })).filter((g) => g.files.length > 1);
+        return { ...d, groups, wasted: groups.reduce((n, g) => n + g.size * (g.files.length - 1), 0) };
+      });
       setPicked(new Map());
       setFocused(null);
     } catch (e) {
@@ -216,6 +237,63 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
       loadFreeable();
       loadDrives();
     }
+  };
+
+  const findDups = () => {
+    setDups("busy");
+    setDupStep("");
+    toolsApi.spaceDuplicates().then(setDups, (e) => {
+      setDups(null);
+      toast(String(e).includes("cancelada") ? "info" : "error", String(e));
+    });
+  };
+  // De cada grupo se queda la primera y se marcan las demás.
+  const pickCopies = (groups: Duplicates["groups"]) =>
+    setPicked((m) => {
+      const n = new Map(m);
+      for (const g of groups) {
+        n.delete(g.files[0].path);
+        for (const f of g.files.slice(1)) n.set(f.path, { name: f.name, size: f.size, dir: false });
+      }
+      return n;
+    });
+
+  // Lo verde que tiene una limpieza conocida: se puede vaciar de una vez.
+  const safe = (freeable ?? []).filter((f) => f.safe && CLEANER[f.key]);
+  const safeSize = safe.reduce((n, f) => n + f.size, 0);
+  const freeSafe = async () => {
+    const ok = await confirm({
+      title: `¿Liberar ${bytes(safeSize)}?`,
+      body: (
+        <div className="space-y-2">
+          <p>Se vacían solo los sitios en verde. No se toca nada del usuario: ni Descargas, ni la papelera, ni sus documentos.</p>
+          <ul className="list-inside list-disc text-[13px] text-dim">
+            {safe.map((f) => (
+              <li key={f.key}>
+                {f.name} · <span className="font-mono">{bytes(f.size)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[12px] text-mute">Lo que algún programa tenga abierto en este momento se queda: por eso puede liberarse algo menos.</p>
+        </div>
+      ),
+      confirmLabel: "Liberar",
+    });
+    if (!ok) return;
+    const failed: string[] = [];
+    for (const f of safe) {
+      setFreeing(f.name);
+      try {
+        await tweaksApi.run(CLEANER[f.key]);
+      } catch (e) {
+        failed.push(`${f.name}: ${e}`);
+      }
+    }
+    setFreeing(null);
+    if (failed.length) toast("error", `No se pudo vaciar todo. ${failed.join(" · ")}`);
+    else toast("ok", "Hecho. Abajo sale lo que queda.");
+    loadFreeable();
+    loadDrives();
   };
 
   const crumbs = scan && folder ? crumbsOf(scan.root, folder.path) : [];
@@ -586,6 +664,98 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
             )}
           </Card>
 
+          <Card
+            title={`Archivos duplicados${dups && dups !== "busy" && dups.groups.length ? ` · ${bytes(dups.wasted)} recuperables` : ""}`}
+            icon={<CopyCheck size={14} />}
+            className="col-span-12"
+            right={
+              dups === "busy" ? (
+                <button onClick={() => void appApi.cancelTask("duplicates")} className="flex items-center gap-1.5 text-[11px] text-bad hover:underline">
+                  <Square size={10} fill="currentColor" /> Detener
+                </button>
+              ) : (
+                dups && (
+                  <button onClick={findDups} className="text-[11px] text-mute hover:text-ink">
+                    Buscar otra vez
+                  </button>
+                )
+              )
+            }
+          >
+            {dups === null ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="min-w-60 flex-1 text-[13px] text-dim">
+                  El mismo archivo guardado varias veces: copias a mano, descargas repetidas, fotos pasadas dos veces. Busca en lo analizado, entre archivos de 1 MB o más. No mira
+                  dentro de Windows ni de la papelera, y no lee lo que solo está en la nube.
+                </p>
+                <Button kind="secondary" onClick={findDups}>
+                  <CopyCheck size={14} /> Buscar duplicados
+                </Button>
+              </div>
+            ) : dups === "busy" ? (
+              <p className="flex items-center gap-2 font-mono text-xs text-neon">
+                <Loader2 size={12} className="animate-spin" /> {dupStep || "Empezando…"}
+              </p>
+            ) : dups.groups.length === 0 ? (
+              <p className="text-sm text-mute">
+                No hay archivos repetidos de 1 MB o más ({dups.checked.toLocaleString("es")} mirados en {dups.seconds.toFixed(1)} s).
+              </p>
+            ) : (
+              <>
+                <div className="mb-2 flex flex-wrap items-center gap-3">
+                  <p className="min-w-60 flex-1 text-[11px] text-mute">
+                    {dups.groups.length} {dups.groups.length === 1 ? "grupo" : "grupos"} entre {dups.checked.toLocaleString("es")} archivos, en {dups.seconds.toFixed(1)} s
+                    {dups.truncated && " (se enseñan los que más espacio devuelven)"}
+                    {dups.cloudSkipped > 0 && ` · ${dups.cloudSkipped.toLocaleString("es")} que solo están en la nube no se han leído`}. Mira dónde está cada copia antes de
+                    borrar: a veces la «copia» es la que usa un programa.
+                  </p>
+                  <button onClick={() => pickCopies(dups.groups)} className={smallBtn}>
+                    <Check size={12} /> Marcar las copias de todos (se queda la primera)
+                  </button>
+                </div>
+                <ul className="max-pane-lg space-y-2 overflow-y-auto">
+                  {dups.groups.map((g) => {
+                    const marked = g.files.filter((f) => picked.has(f.path)).length;
+                    return (
+                      <li key={g.files[0].path} className="rounded-lg border border-line px-3 py-2">
+                        <div className="mb-1 flex flex-wrap items-baseline gap-x-2">
+                          <span className="min-w-0 flex-1 truncate text-sm text-ink">{g.files[0].name}</span>
+                          {g.sampled && (
+                            <span className="text-[11px] text-warn" title="Son demasiado grandes para leerlos enteros: se compararon el principio, el final y dieciséis muestras repartidas.">
+                              comparados por muestras
+                            </span>
+                          )}
+                          {marked === g.files.length && <span className="text-[11px] text-bad">no queda ninguna copia</span>}
+                          <span className="font-mono text-xs text-dim">
+                            {bytes(g.size)} × {g.files.length}
+                          </span>
+                          <button onClick={() => pickCopies([g])} className="text-[11px] text-neon hover:underline">
+                            Marcar las copias
+                          </button>
+                        </div>
+                        <ul>
+                          {g.files.map((f) => (
+                            <li key={f.path} className={`group flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-panel-2 ${picked.has(f.path) ? "bg-neon/5" : ""}`}>
+                              <input type="checkbox" checked={picked.has(f.path)} onChange={() => toggle(f, false)} aria-label={`Marcar ${f.name}`} className="shrink-0 accent-[var(--color-neon)]" />
+                              <span className="min-w-0 flex-1 truncate text-dim">
+                                {friendlyPath(parentOf(f.path))}
+                                {f.name !== g.files[0].name && <span className="text-mute"> · {f.name}</span>}
+                              </span>
+                              <span className="shrink-0 text-[11px] text-mute">{since(f.modified)}</span>
+                              <button onClick={() => reveal(f.path)} className="text-mute opacity-0 group-hover:opacity-100 hover:text-ink focus:opacity-100" title="Ver en el Explorador" aria-label="Ver en el Explorador">
+                                <FolderOpen size={12} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </Card>
+
           {picked.size > 0 && (
             <div className="sticky bottom-3 z-10 col-span-12 flex flex-wrap items-center gap-3 rounded-xl border border-line-2 bg-panel px-4 py-2.5 shadow-2xl">
               <Recycle size={14} className="text-mute" />
@@ -644,10 +814,18 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
             ))}
           </ul>
         )}
-        <p className="mt-3 flex items-start gap-1.5 text-[11px] text-mute">
-          <TriangleAlert size={12} className="mt-0.5 shrink-0 text-warn" />
-          Verde: se puede borrar sin pensarlo. Naranja: míralo antes, puede haber cosas del usuario.
-        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="flex min-w-0 flex-1 items-start gap-1.5 text-[11px] text-mute">
+            <TriangleAlert size={12} className="mt-0.5 shrink-0 text-warn" />
+            Verde: se puede borrar sin pensarlo. Naranja: míralo antes, puede haber cosas del usuario.
+          </p>
+          {safe.length > 0 && (
+            <Button onClick={freeSafe} disabled={freeing !== null}>
+              {freeing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              {freeing ? `Vaciando ${freeing}…` : `Liberar lo verde · ${bytes(safeSize)}`}
+            </Button>
+          )}
+        </div>
       </Card>
       {dialog}
     </div>

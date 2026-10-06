@@ -12,6 +12,8 @@ const TOP_FILES: usize = 100;
 /// Carpetas más pequeñas se suman al padre pero no se guardan como nodo.
 const MIN_NODE: u64 = 1024 * 1024;
 const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+/// Sin conexión, o «se descarga al abrirlo» / «al leer sus datos».
+const CLOUD_ONLY: u32 = 0x1000 | 0x0004_0000 | 0x0040_0000;
 
 static CANCEL: AtomicBool = AtomicBool::new(false);
 static LAST: Mutex<Option<Scan>> = Mutex::new(None);
@@ -119,6 +121,8 @@ struct RawEntry {
     name: String,
     is_dir: bool,
     is_reparse: bool,
+    /// Solo está en la nube (OneDrive y similares): leerlo lo descargaría.
+    is_cloud: bool,
     size: u64,
     /// Última modificación (segundos desde 1970). Viene en el mismo listado,
     /// así que saber la antigüedad de un archivo no cuesta nada.
@@ -170,6 +174,7 @@ fn list_dir(path: &Path) -> Option<Vec<RawEntry>> {
                 out.push(RawEntry {
                     is_dir: data.dwFileAttributes & DIRECTORY != 0,
                     is_reparse: data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0,
+                    is_cloud: data.dwFileAttributes & CLOUD_ONLY != 0,
                     size: ((data.nFileSizeHigh as u64) << 32) | data.nFileSizeLow as u64,
                     modified: to_epoch(data.ftLastWriteTime),
                     name,
@@ -524,6 +529,193 @@ pub fn space_kind_files(kind: String) -> Result<Vec<SpaceEntry>, String> {
     Ok(scan.tops.by_kind[i].iter().map(file_entry).collect())
 }
 
+// ---------- Duplicados ----------
+
+/// Solo se comparan archivos de este tamaño en adelante: por debajo hay miles
+/// de coincidencias que no devuelven espacio.
+const DUP_MIN: u64 = 1024 * 1024;
+/// Hasta aquí se lee el archivo entero; los más grandes se comparan por muestras.
+const DUP_FULL: u64 = 256 * 1024 * 1024;
+const DUP_BLOCK: usize = 1024 * 1024;
+/// Muestras repartidas por un archivo grande (además del principio y el final).
+const DUP_SAMPLES: u64 = 16;
+const DUP_GROUPS: usize = 200;
+
+/// Varios archivos con el mismo contenido.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DupGroup {
+    /// Lo que ocupa cada copia.
+    size: u64,
+    /// Comparados por muestras y no enteros (archivos de más de 256 MB).
+    sampled: bool,
+    files: Vec<SpaceEntry>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Duplicates {
+    groups: Vec<DupGroup>,
+    /// Lo que se recupera dejando una copia de cada grupo.
+    wasted: u64,
+    /// Archivos de 1 MB o más que se miraron.
+    checked: u64,
+    /// Archivos que solo están en la nube: no se leen para no descargarlos.
+    cloud_skipped: u64,
+    seconds: f64,
+    /// Había más grupos de los que se enseñan.
+    truncated: bool,
+}
+
+/// Todos los archivos de `DUP_MIN` en adelante bajo `dir`. No entra en enlaces
+/// ni en las carpetas de `skip` (Windows, la papelera), y cuenta aparte lo que
+/// solo está en la nube.
+fn big_files(dir: &Path, skip: &[String], cloud: &AtomicU64, stop: &dyn Fn() -> bool) -> Vec<TopFile> {
+    if stop() || skip.contains(&dir.display().to_string().trim_end_matches('\\').to_lowercase()) {
+        return Vec::new();
+    }
+    let Some(entries) = list_dir(dir) else { return Vec::new() };
+    let mut out = Vec::new();
+    for e in entries {
+        if e.is_reparse {
+            continue;
+        }
+        if e.is_dir {
+            out.extend(big_files(&dir.join(&e.name), skip, cloud, stop));
+        } else if e.size >= DUP_MIN {
+            if e.is_cloud {
+                cloud.fetch_add(1, Ordering::Relaxed);
+            } else {
+                out.push((e.size, dir.join(&e.name), e.modified));
+            }
+        }
+    }
+    out
+}
+
+/// Huella del contenido. `whole`: el archivo entero; si no, el principio, el
+/// final y unas muestras repartidas (para descartar rápido, y para los enormes).
+fn content_hash(path: &Path, size: u64, whole: bool) -> Option<[u8; 32]> {
+    use sha2::Digest;
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(path).ok()?;
+    let mut h = sha2::Sha256::new();
+    let mut buf = vec![0u8; DUP_BLOCK];
+    if whole {
+        loop {
+            let n = f.read(&mut buf).ok()?;
+            if n == 0 {
+                break;
+            }
+            h.update(&buf[..n]);
+        }
+    } else {
+        let block = DUP_BLOCK as u64;
+        let last = size.saturating_sub(block);
+        let mut offsets: Vec<u64> = (0..=DUP_SAMPLES).map(|i| last / DUP_SAMPLES * i).collect();
+        offsets.push(last);
+        offsets.dedup();
+        for at in offsets {
+            f.seek(SeekFrom::Start(at)).ok()?;
+            let mut read = 0;
+            while read < buf.len() {
+                let n = f.read(&mut buf[read..]).ok()?;
+                if n == 0 {
+                    break;
+                }
+                read += n;
+            }
+            h.update(&buf[..read]);
+        }
+    }
+    Some(h.finalize().into())
+}
+
+/// Agrupa por contenido los archivos que ya coinciden en tamaño.
+fn same_content(mut files: Vec<TopFile>, stop: &dyn Fn() -> bool, progress: &dyn Fn(usize, usize)) -> Vec<DupGroup> {
+    use std::collections::HashMap;
+    // 1) Mismo tamaño: lo único que no cuesta nada mirar.
+    let mut by_size: HashMap<u64, Vec<TopFile>> = HashMap::new();
+    for f in files.drain(..) {
+        by_size.entry(f.0).or_default().push(f);
+    }
+    let candidates: Vec<Vec<TopFile>> = by_size.into_values().filter(|v| v.len() > 1).collect();
+    let total: usize = candidates.iter().map(Vec::len).sum();
+    let mut done = 0;
+    let mut groups = Vec::new();
+    for same_size in candidates {
+        if stop() {
+            break;
+        }
+        let size = same_size[0].0;
+        // 2) Mismas muestras: descarta casi todo lo que solo coincide en tamaño.
+        let mut by_sample: HashMap<[u8; 32], Vec<TopFile>> = HashMap::new();
+        for f in same_size {
+            done += 1;
+            progress(done, total);
+            if let Some(h) = content_hash(&f.1, size, false) {
+                by_sample.entry(h).or_default().push(f);
+            }
+        }
+        for alike in by_sample.into_values().filter(|v| v.len() > 1) {
+            // 3) El archivo entero, salvo los enormes, que se quedan en las muestras.
+            let sampled = size > DUP_FULL;
+            let sets: Vec<Vec<TopFile>> = if sampled {
+                vec![alike]
+            } else {
+                let mut by_full: HashMap<[u8; 32], Vec<TopFile>> = HashMap::new();
+                for f in alike {
+                    if stop() {
+                        break;
+                    }
+                    if let Some(h) = content_hash(&f.1, size, true) {
+                        by_full.entry(h).or_default().push(f);
+                    }
+                }
+                by_full.into_values().filter(|v| v.len() > 1).collect()
+            };
+            for mut set in sets {
+                set.sort_by(|a, b| a.1.cmp(&b.1));
+                groups.push(DupGroup { size, sampled, files: set.iter().map(file_entry).collect() });
+            }
+        }
+    }
+    // Primero lo que más espacio devuelve.
+    groups.sort_by_key(|g| std::cmp::Reverse(g.size * (g.files.len() as u64 - 1)));
+    groups
+}
+
+/// Busca archivos repetidos dentro del último análisis. No toca Windows ni la
+/// papelera, ni lee lo que solo está en la nube. Tarea «duplicates» (se puede cancelar).
+#[tauri::command(async)]
+pub fn space_duplicates(app: tauri::AppHandle) -> Result<Duplicates, String> {
+    let root = LAST.lock().unwrap_or_else(|e| e.into_inner()).as_ref().map(|s| s.root.clone()).ok_or("Analiza primero una unidad o una carpeta.")?;
+    let task = crate::task::Task::new(&app, "duplicates").named("Buscar archivos duplicados");
+    let start = Instant::now();
+    let stop = || task.cancelled();
+    let protected = Protected::here();
+    let drive = root.components().next().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).unwrap_or_default();
+    let skip = vec![protected.windows.clone(), format!("{drive}\\$recycle.bin"), format!("{drive}\\system volume information")];
+    task.step("Buscando archivos del mismo tamaño…");
+    let cloud = AtomicU64::new(0);
+    let files = big_files(&root, &skip, &cloud, &stop);
+    let checked = files.len() as u64;
+    let mut groups = same_content(files, &stop, &|done, total| {
+        if done % 25 == 0 || done == total {
+            task.step(format!("Comparando el contenido: {done} de {total}"));
+        }
+    });
+    if task.cancelled() {
+        return Err("Búsqueda cancelada.".into());
+    }
+    let truncated = groups.len() > DUP_GROUPS;
+    groups.truncate(DUP_GROUPS);
+    let wasted = groups.iter().map(|g| g.size * (g.files.len() as u64 - 1)).sum();
+    let seconds = start.elapsed().as_secs_f64();
+    log::info!("Duplicados: {checked} archivos mirados, {} grupos, {wasted} bytes recuperables en {seconds:.1} s", groups.len());
+    Ok(Duplicates { groups, wasted, checked, cloud_skipped: cloud.load(Ordering::Relaxed), seconds, truncated })
+}
+
 /// ¿Está esta ruta dentro del último análisis? Lo que la interfaz envía solo
 /// puede ser algo que el propio análisis encontró: nunca una ruta cualquiera.
 fn in_last_scan(path: &str) -> Result<(), String> {
@@ -738,6 +930,43 @@ mod tests {
         // Algo de fuera del análisis no toca nada.
         forget(&mut scan, Path::new(r"Z:\otra\cosa"), (999, 9));
         assert_eq!(scan.tree.size, 500);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn finds_the_same_file_twice() {
+        let dir = std::env::temp_dir().join(format!("adminops-dups-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("copia")).unwrap();
+        std::fs::create_dir_all(dir.join("saltar")).unwrap();
+        let mb = |fill: u8| vec![fill; 2 * 1024 * 1024];
+        std::fs::write(dir.join("boda.mp4"), mb(1)).unwrap();
+        std::fs::write(dir.join("copia/boda (1).mp4"), mb(1)).unwrap();
+        // Mismo tamaño, otro contenido: no es un duplicado.
+        std::fs::write(dir.join("otro.mp4"), mb(2)).unwrap();
+        // Igual salvo el último byte: las muestras del final lo distinguen.
+        let mut almost = mb(1);
+        *almost.last_mut().unwrap() = 9;
+        std::fs::write(dir.join("casi.mp4"), almost).unwrap();
+        // Pequeños: ni se miran.
+        std::fs::write(dir.join("a.txt"), b"hola").unwrap();
+        std::fs::write(dir.join("b.txt"), b"hola").unwrap();
+        // En una carpeta que no se toca.
+        std::fs::write(dir.join("saltar/boda.mp4"), mb(1)).unwrap();
+
+        let skip = vec![dir.join("saltar").display().to_string().to_lowercase()];
+        let cloud = AtomicU64::new(0);
+        let files = big_files(&dir, &skip, &cloud, &|| false);
+        assert_eq!(files.len(), 4, "los de 1 MB o más, sin la carpeta saltada");
+        let groups = same_content(files, &|| false, &|_, _| {});
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].size, 2 * 1024 * 1024);
+        assert!(!groups[0].sampled);
+        let names: Vec<&str> = groups[0].files.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["boda.mp4", "boda (1).mp4"]);
+        // Cancelado: no devuelve nada a medias que parezca completo.
+        let files = big_files(&dir, &skip, &cloud, &|| true);
+        assert!(files.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

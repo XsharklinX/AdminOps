@@ -20,6 +20,8 @@ export interface Settings {
   checkUpdates: boolean;
   watchWindows: boolean;
   notifyAlerts: "all" | "bad" | "none";
+  closeMinimizes: boolean;
+  trayIcon: boolean;
   visitTypes: VisitType[];
   currency: string;
   taxName: string;
@@ -334,13 +336,24 @@ export interface Comparison {
   machines: MachineRank[];
 }
 
+/** Evento del navegador que se lanza al guardar los ajustes. */
+export const SETTINGS_SAVED = "adminops-settings-saved";
+
 export const workApi = {
   /** Cómo queda cada equipo del cliente frente a los demás (solo cifras técnicas). */
   compareMachines: (clientId: string) => invoke<Comparison[]>("compare_client_machines", { clientId }),
   /** Qué cambió en los equipos de un cliente desde la última visita. */
   visitChanges: (clientId: string) => invoke<MachineChanges[]>("visit_changes", { clientId }),
   settings: () => invoke<Settings>("get_settings"),
-  saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  saveSettings: (settings: Settings) =>
+    invoke<void>("save_settings", { settings }).then(() => {
+      // Quien dependa de un ajuste (el botón «Salir») se entera sin recargar.
+      window.dispatchEvent(new Event(SETTINGS_SAVED));
+    }),
+  /** Cierra AdminOps de verdad, aunque la X esté puesta para minimizar. */
+  quit: () => invoke<void>("quit_app"),
+  /** La ventanita siempre encima con procesador, memoria, temperatura y red. */
+  miniMonitor: () => invoke<void>("open_mini_monitor"),
   clients: () => invoke<Client[]>("list_clients"),
   saveClient: (client: Partial<Client> & { name: string }) =>
     invoke<Client>("save_client", {

@@ -118,6 +118,26 @@ export interface KindSize {
   size: number;
 }
 
+/** Varios archivos con el mismo contenido. */
+export interface DupGroup {
+  /** Lo que ocupa cada copia. */
+  size: number;
+  /** Comparados por muestras y no enteros (más de 256 MB). */
+  sampled: boolean;
+  files: SpaceEntry[];
+}
+
+export interface Duplicates {
+  groups: DupGroup[];
+  /** Lo que se recupera dejando una copia de cada grupo. */
+  wasted: number;
+  checked: number;
+  /** Archivos que solo están en la nube: no se leen para no descargarlos. */
+  cloudSkipped: number;
+  seconds: number;
+  truncated: boolean;
+}
+
 /** Una carpeta del análisis: sus subcarpetas y de qué está llena. */
 export interface SpaceFolder {
   path: string;
@@ -159,6 +179,8 @@ export const toolsApi = {
   spaceFolder: (path: string) => invoke<SpaceFolder>("space_folder", { path }),
   /** Los archivos sueltos de una carpeta, de mayor a menor. */
   spaceFiles: (path: string) => invoke<SpaceEntry[]>("space_files", { path }),
+  /** Archivos repetidos dentro del último análisis. Tarea «duplicates». */
+  spaceDuplicates: () => invoke<Duplicates>("space_duplicates"),
   /** Los archivos más grandes de un tipo en el último análisis. */
   spaceKindFiles: (kind: string) => invoke<SpaceEntry[]>("space_kind_files", { kind }),
   revealInExplorer: (path: string) => invoke<void>("reveal_in_explorer", { path }),

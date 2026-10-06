@@ -1,0 +1,2 @@
+cargo:rustc-link-search=native=F:\Programacion\AdminOps\installer\target-ci\debug\build\webview2-com-sys-3e94f767ecb40a03\out\x64
+cargo:rustc-link-lib=advapi32

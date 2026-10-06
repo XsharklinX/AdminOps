@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Ventanas propias de AdminOps: la principal y la nota de llamada. Los portales (webs remotas) no están aquí a propósito.",
+  "description": "Ventanas propias de AdminOps: la principal, la nota de llamada y el mini monitor. Los portales (webs remotas) no están aquí a propósito.",
   "windows": [
     "main",
-    "note"
+    "note",
+    "monitor"
   ],
   "permissions": [
     "core:default"

@@ -11,6 +11,9 @@ import { logQuietly, api, diagApi, toolboxApi, tweaksApi, type JournalEntry, typ
 import { getPrefs } from "../lib/prefs";
 import { bytes, duration, loadColor, rate, ago } from "../lib/format";
 import { FirstSteps } from "../components/FirstSteps";
+import { PanelGrid } from "../components/PanelGrid";
+import { Slowdown } from "../components/Slowdown";
+import type { PanelBlock } from "../lib/panelLayout";
 import { TodayCard } from "../components/TodayCard";
 import { DIAG_COUNT_CHANGED, DIAG_UPDATED } from "../lib/diagRun";
 
@@ -168,13 +171,150 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     { key: "sfc", label: "Reparar archivos de Windows", icon: LifeBuoy, run: () => onNavigate("repair", "repair.sfc") },
   ];
 
+  // Cada tarjeta del Panel por su nombre: el orden y cuáles se ven lo decide el técnico (PanelGrid).
+  const blocks: Record<PanelBlock, ReactNode> = {
+    // Lo pendiente del técnico: casos, seguimientos, visitas y avisos (no en modo usuario).
+    today: (
+      <>
+        <FirstSteps />
+        <TodayCard />
+      </>
+    ),
+    // Lo que se apuntó de este equipo o de esta red la última vez.
+    notes: <PlaceNotes compact />,
+    live: (
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Kpi
+          label="Procesador"
+          value={`${Math.round(m.cpuTotal)}`}
+          unit="%"
+          sub={
+            <>
+              {cpuTemp != null ? <span style={{ color: tempColor(cpuTemp) }}>{cpuTemp.toFixed(0)} °C</span> : "Temperatura: requiere administrador"}
+              {gpuTemp != null && <span style={{ color: tempColor(gpuTemp) }}> · GPU {gpuTemp.toFixed(0)} °C</span>}
+            </>
+          }
+        >
+          <Sparkline data={history.cpu} max={100} color={loadColor(m.cpuTotal)} height={26} />
+        </Kpi>
+        <Kpi label="Memoria" value={bytes(m.memoryUsed).replace(/ GB$/, "")} unit={`de ${bytes(m.memoryTotal)}`} sub={`${Math.round(ramPct)} % en uso · ${m.processCount} procesos`}>
+          <Sparkline data={history.ram} max={100} color={loadColor(ramPct)} height={26} />
+        </Kpi>
+        <Kpi
+          label={`Disco del sistema${system ? ` (${system.mount.replace(/\\$/, "")})` : ""}`}
+          value={system ? bytes(system.available).replace(/ GB$/, "") : "—"}
+          unit="GB libres"
+          sub={system ? `de ${bytes(system.total)}` : undefined}
+        >
+          <div className="py-2.5">
+            <Bar value={system ? ((system.total - system.available) / system.total) * 100 : 0} />
+          </div>
+        </Kpi>
+        <Kpi label="Red" value={rate(m.netRxPerSec)} sub={<>Subida {rate(m.netTxPerSec)} · encendido hace {duration(m.uptime)}</>}>
+          <Sparkline data={history.rx} max={Math.max(...history.rx, ...history.tx, 1)} color="var(--color-dim)" height={26} />
+        </Kpi>
+      </section>
+    ),
+    plan: (
+        <Section
+          title="Qué hacer ahora"
+          action={latest && <LinkButton onClick={() => onNavigate("diagnostics")}>Ver diagnóstico</LinkButton>}
+        >
+          {!loaded ? null : (
+            <>
+              {!latest && <p className="border-b border-line py-3 text-sm text-dim">Pulsa «Revisar el equipo» para completar esta lista con discos, drivers, seguridad y estabilidad.</p>}
+              <ActionPlan
+                findings={latest?.findings ?? []}
+                diagnosedAt={latest?.timestamp ?? null}
+                systemDisk={system ? { free: system.available, total: system.total, mount: system.mount } : null}
+                refresh={refresh}
+                onNavigate={navigate}
+              />
+            </>
+          )}
+        </Section>
+
+    ),
+    quick: (
+        <Section title="Acciones rápidas" action={<LinkButton onClick={() => onNavigate("tools")}>Herramientas</LinkButton>}>
+          <div className="flex flex-col py-1">
+            {quickActions.map((q) => (
+              <button
+                key={q.key}
+                onClick={q.run}
+                disabled={busy !== null}
+                className="-mx-2 flex h-9 items-center gap-3 rounded-lg px-2 text-left text-[13px] text-ink transition-colors hover:bg-panel-2 disabled:opacity-50"
+              >
+                {busy === q.key ? <Loader2 size={16} className="animate-spin text-neon" /> : <q.icon size={16} strokeWidth={1.6} className="text-mute" />}
+                {q.label}
+              </button>
+            ))}
+          </div>
+          <FavoriteTools onNavigate={onNavigate} />
+        </Section>
+    ),
+    slow: <Slowdown metrics={m} onProcesses={() => onNavigate("processes")} />,
+    machine: (
+        <Section title="Este equipo" action={<LinkButton onClick={() => onNavigate("hardware")}>Hardware</LinkButton>}>
+          <Row label="Modelo">{latest?.model ?? info?.hostName ?? "—"}</Row>
+          <Row label="Procesador">{info?.cpuBrand ?? "—"}</Row>
+          <Row label="Memoria">{bytes(m.memoryTotal)}</Row>
+          <Row label="Gráfica">{latest?.gpus.join(" + ") || "—"}</Row>
+          <Row label="Windows">
+            {latest?.windows ?? info?.osName ?? "—"}
+            {latest?.activated === false && <span className="text-warn"> · sin activar</span>}
+          </Row>
+        </Section>
+
+    ),
+    disks: (
+        <Section title="Discos" action={<LinkButton onClick={() => onNavigate("space")}>Espacio</LinkButton>}>
+          {latest && latest.disks.length > 0
+            ? latest.disks.map((d) => (
+                <div key={d.name} className="flex items-start gap-3 border-b border-line py-2">
+                  <span className={`mt-1.5 size-2 shrink-0 rounded-full ${DOT[d.status]}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px]">{d.name}</div>
+                    <div className={`truncate text-xs ${d.status === "ok" ? "text-mute" : d.status === "bad" ? "text-bad" : "text-warn"}`}>
+                      {d.kind} · {bytes(d.size)} · {d.detail}
+                    </div>
+                  </div>
+                </div>
+              ))
+            : volumes.map((d) => (
+                <div key={d.mount} className="flex flex-col gap-1.5 border-b border-line py-2.5">
+                  <div className="flex justify-between text-[13px]">
+                    <span>{d.mount}</span>
+                    <span className="text-dim tabular">{bytes(d.available)} libres</span>
+                  </div>
+                  <Bar value={((d.total - d.available) / d.total) * 100} />
+                </div>
+              ))}
+          {latest && <p className="pt-2 text-xs text-mute">Salud según el diagnóstico {ago(latest.timestamp)}.</p>}
+        </Section>
+
+    ),
+    recent: (
+        <Section title="Actividad reciente" action={<LinkButton onClick={() => onNavigate("history")}>Historial</LinkButton>}>
+          {journal.length === 0 ? (
+            <p className="py-4 text-sm text-mute">Todavía no se ha cambiado nada en este equipo.</p>
+          ) : (
+            journal.map((j) => (
+              <div key={j.id} className="flex items-start gap-3 border-b border-line py-2">
+                <span className={`mt-1.5 size-2 shrink-0 rounded-full ${j.ok ? "bg-ok" : "bg-bad"}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px]">{j.title}</div>
+                  <div className="text-xs text-mute">{ago(j.timestamp)}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </Section>
+    ),
+  };
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-5 px-8 py-6">
-      {/* Lo pendiente del técnico: casos, seguimientos, visitas y avisos (no en modo usuario). */}
-      <FirstSteps />
-      <TodayCard />
-      {/* Lo que se apuntó de este equipo o de esta red la última vez */}
-      <PlaceNotes compact />
       {/* Veredicto */}
       <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 px-6 py-5">
         <span className={`size-3 shrink-0 rounded-full ${verdict.dot}`} />
@@ -212,145 +352,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         </div>
       </Card>
 
-      {/* En vivo */}
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi
-          label="Procesador"
-          value={`${Math.round(m.cpuTotal)}`}
-          unit="%"
-          sub={
-            <>
-              {cpuTemp != null ? <span style={{ color: tempColor(cpuTemp) }}>{cpuTemp.toFixed(0)} °C</span> : "Temperatura: requiere administrador"}
-              {gpuTemp != null && <span style={{ color: tempColor(gpuTemp) }}> · GPU {gpuTemp.toFixed(0)} °C</span>}
-            </>
-          }
-        >
-          <Sparkline data={history.cpu} max={100} color={loadColor(m.cpuTotal)} height={26} />
-        </Kpi>
-        <Kpi label="Memoria" value={bytes(m.memoryUsed).replace(/ GB$/, "")} unit={`de ${bytes(m.memoryTotal)}`} sub={`${Math.round(ramPct)} % en uso · ${m.processCount} procesos`}>
-          <Sparkline data={history.ram} max={100} color={loadColor(ramPct)} height={26} />
-        </Kpi>
-        <Kpi
-          label={`Disco del sistema${system ? ` (${system.mount.replace(/\\$/, "")})` : ""}`}
-          value={system ? bytes(system.available).replace(/ GB$/, "") : "—"}
-          unit="GB libres"
-          sub={system ? `de ${bytes(system.total)}` : undefined}
-        >
-          <div className="py-2.5">
-            <Bar value={system ? ((system.total - system.available) / system.total) * 100 : 0} />
-          </div>
-        </Kpi>
-        <Kpi label="Red" value={rate(m.netRxPerSec)} sub={<>Subida {rate(m.netTxPerSec)} · encendido hace {duration(m.uptime)}</>}>
-          <Sparkline data={history.rx} max={Math.max(...history.rx, ...history.tx, 1)} color="var(--color-dim)" height={26} />
-        </Kpi>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Section
-          className="lg:col-span-2"
-          title="Qué hacer ahora"
-          action={latest && <LinkButton onClick={() => onNavigate("diagnostics")}>Ver diagnóstico</LinkButton>}
-        >
-          {!loaded ? null : (
-            <>
-              {!latest && <p className="border-b border-line py-3 text-sm text-dim">Pulsa «Revisar el equipo» para completar esta lista con discos, drivers, seguridad y estabilidad.</p>}
-              <ActionPlan
-                findings={latest?.findings ?? []}
-                diagnosedAt={latest?.timestamp ?? null}
-                systemDisk={system ? { free: system.available, total: system.total, mount: system.mount } : null}
-                refresh={refresh}
-                onNavigate={navigate}
-              />
-            </>
-          )}
-        </Section>
-
-        <Section title="Acciones rápidas" action={<LinkButton onClick={() => onNavigate("tools")}>Herramientas</LinkButton>}>
-          <div className="flex flex-col py-1">
-            {quickActions.map((q) => (
-              <button
-                key={q.key}
-                onClick={q.run}
-                disabled={busy !== null}
-                className="-mx-2 flex h-9 items-center gap-3 rounded-lg px-2 text-left text-[13px] text-ink transition-colors hover:bg-panel-2 disabled:opacity-50"
-              >
-                {busy === q.key ? <Loader2 size={16} className="animate-spin text-neon" /> : <q.icon size={16} strokeWidth={1.6} className="text-mute" />}
-                {q.label}
-              </button>
-            ))}
-          </div>
-          <FavoriteTools onNavigate={onNavigate} />
-        </Section>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Section title="Este equipo" action={<LinkButton onClick={() => onNavigate("hardware")}>Hardware</LinkButton>}>
-          <Row label="Modelo">{latest?.model ?? info?.hostName ?? "—"}</Row>
-          <Row label="Procesador">{info?.cpuBrand ?? "—"}</Row>
-          <Row label="Memoria">{bytes(m.memoryTotal)}</Row>
-          <Row label="Gráfica">{latest?.gpus.join(" + ") || "—"}</Row>
-          <Row label="Windows">
-            {latest?.windows ?? info?.osName ?? "—"}
-            {latest?.activated === false && <span className="text-warn"> · sin activar</span>}
-          </Row>
-        </Section>
-
-        <Section title="Discos" action={<LinkButton onClick={() => onNavigate("space")}>Espacio</LinkButton>}>
-          {latest && latest.disks.length > 0
-            ? latest.disks.map((d) => (
-                <div key={d.name} className="flex items-start gap-3 border-b border-line py-2">
-                  <span className={`mt-1.5 size-2 shrink-0 rounded-full ${DOT[d.status]}`} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px]">{d.name}</div>
-                    <div className={`truncate text-xs ${d.status === "ok" ? "text-mute" : d.status === "bad" ? "text-bad" : "text-warn"}`}>
-                      {d.kind} · {bytes(d.size)} · {d.detail}
-                    </div>
-                  </div>
-                </div>
-              ))
-            : volumes.map((d) => (
-                <div key={d.mount} className="flex flex-col gap-1.5 border-b border-line py-2.5">
-                  <div className="flex justify-between text-[13px]">
-                    <span>{d.mount}</span>
-                    <span className="text-dim tabular">{bytes(d.available)} libres</span>
-                  </div>
-                  <Bar value={((d.total - d.available) / d.total) * 100} />
-                </div>
-              ))}
-          {latest && <p className="pt-2 text-xs text-mute">Salud según el diagnóstico {ago(latest.timestamp)}.</p>}
-        </Section>
-
-        <Section title="Actividad reciente" action={<LinkButton onClick={() => onNavigate("history")}>Historial</LinkButton>}>
-          {journal.length === 0 ? (
-            <p className="py-4 text-sm text-mute">Todavía no se ha cambiado nada en este equipo.</p>
-          ) : (
-            journal.map((j) => (
-              <div key={j.id} className="flex items-start gap-3 border-b border-line py-2">
-                <span className={`mt-1.5 size-2 shrink-0 rounded-full ${j.ok ? "bg-ok" : "bg-bad"}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px]">{j.title}</div>
-                  <div className="text-xs text-mute">{ago(j.timestamp)}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </Section>
-      </div>
-
-      <Section title="Procesos con más carga" action={<LinkButton onClick={() => onNavigate("processes")}>Ver todos</LinkButton>}>
-        <div className="grid gap-x-10 lg:grid-cols-2">
-          {m.topProcesses.slice(0, 8).map((p) => (
-            <div key={p.pid} className="flex items-center gap-3 border-b border-line py-2 text-[13px]">
-              <span className="min-w-0 flex-1 truncate">{p.name}</span>
-              <span className="w-14 text-right text-dim tabular" style={p.cpu >= 50 ? { color: loadColor(p.cpu) } : undefined}>
-                {p.cpu.toFixed(1)} %
-              </span>
-              <span className="w-16 text-right text-dim tabular">{bytes(p.memory)}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
-
+      <PanelGrid blocks={blocks} />
     </div>
   );
 }

@@ -7,6 +7,31 @@ Ctrl+K → «paquete de soporte»).
 Hazlo dos veces: **sin administrador** (lo que requiere permisos debe explicarlo, no fallar) y **como
 administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un segundo equipo.
 
+## Las once de la 1.2.4
+- [ ] **Duplicados**: copiar un archivo de más de 1 MB a dos carpetas, analizar la unidad → Espacio → «Buscar duplicados»: sale el grupo con las dos rutas (sin el nombre del usuario) y lo recuperable. «Marcar las copias» deja la primera sin marcar. «A la papelera» → el grupo desaparece. «Detener» a media búsqueda la corta.
+- [ ] Duplicados: un archivo de OneDrive que solo está en la nube no se descarga durante la búsqueda (sale contado como «solo en la nube»).
+- [ ] **Liberar lo verde**: el botón suma solo lo verde; tras aceptar, «Qué puedes liberar» se vuelve a medir y baja. Descargas y Papelera no cambian. Sin administrador, dice qué no pudo vaciar.
+- [ ] **Panel a tu medida**: «Personalizar el panel» → arrastrar una tarjeta sobre otra, mover con las flechas, ocultar con el ojo → «Listo». Cerrar y abrir AdminOps: se mantiene. «Como de fábrica» lo deja como estaba. Una tarjeta sin contenido (sin notas, sin pendientes) no deja hueco.
+- [ ] **Qué frena el equipo**: con el equipo tranquilo dice que nada lo frena. Abrir algo pesado: sale con su porcentaje y «Cerrar» (pide confirmación y lo cierra). El antivirus o System salen explicados y sin botón.
+- [ ] **Icono junto al reloj**: Ajustes → General → marcarlo: aparece sin reiniciar. Clic: trae la ventana. Clic derecho: cada entrada hace lo suyo («Avisos» abre la campana; «Análisis rápido» avisa al empezar y al terminar). Desmarcarlo: desaparece.
+- [ ] Icono + «Al cerrar la ventana, minimizar»: la X esconde la ventana (no queda en la barra de tareas) y el icono la devuelve. «Salir de AdminOps» del menú la cierra del todo. Al desmarcar el icono en Ajustes, la X vuelve a minimizar a la barra de tareas.
+- [ ] **Mini monitor**: Rendimiento → «Mini monitor»: ventanita encima de todo, también de un programa a pantalla completa en ventana. Los números se mueven. Abrirlo dos veces no crea dos. Al cerrar AdminOps se cierra con ella.
+- [ ] **Actividad**: lanzar un análisis y mirar otra pantalla → al terminar, punto verde en la campana → pestaña «Actividad» con lo que tardó y «Ver resultado». Una tarea cancelada sale como cancelada. «Vaciar» la limpia.
+- [ ] **Ctrl+K**: «cola» → «Vaciar la cola de impresión» → Intro: se hace y sale el resultado abajo, sin cambiar de pantalla. Igual con «sonido», «dns», «análisis rápido». En modo auditoría se niega y lo dice.
+- [ ] **Copiar tarjeta**: pasar el ratón por una tarjeta con título → botón en su esquina → pegar en Paint o en Teams: sale la tarjeta, sin el propio botón, con el fondo de la app. Probar en tema claro y oscuro.
+- [ ] **«Nuevo»**: actualizando desde una versión anterior, Panel y Rendimiento llevan «Nuevo» en la barra lateral y se les va al entrar. En una instalación desde cero no sale ninguna.
+- [ ] Deshacer en el momento (ya existía): desactivar un programa de inicio → el mensaje lleva «Deshacer» durante 10 s.
+
+## Setup y cerrar minimizando (1.2.3)
+- [ ] Con una versión anterior instalada y AdminOps abierta: `AdminOps-<versión>-Setup.exe` → Actualizar → termina en «Listo» sin reiniciar el equipo ni pasar por el instalador clásico. Al abrir, Ajustes → Acerca de dice la versión nueva.
+- [ ] Lo mismo con AdminOps cerrada, y una instalación desde cero en un equipo sin AdminOps.
+- [ ] Ajustes → General: «Al cerrar la ventana, minimizar» y «Abrir AdminOps al iniciar Windows» vienen desmarcadas.
+- [ ] Marcar «Al cerrar la ventana, minimizar»: aparece el botón «Salir» en la barra de arriba sin reiniciar. La X y Alt+F4 minimizan a la barra de tareas; al volver, todo sigue como estaba.
+- [ ] «Salir» → confirmar → AdminOps se cierra del todo (no queda `adminops.exe` en el Administrador de tareas).
+- [ ] Desmarcarla: el botón «Salir» desaparece y la X vuelve a cerrar.
+- [ ] Con la opción marcada, actualizar desde Ajustes → Acerca de: AdminOps se cierra sola cuando arranca el instalador (no se queda minimizada).
+- [ ] «Abrir AdminOps al iniciar Windows» marcada → cerrar sesión y volver a entrar: a los 20 s aparece minimizada, sin pedir permiso de administrador.
+
 ## Discos → Espacio (1.2.3)
 - [ ] Las unidades salen con su barra de ocupación (naranja desde el 75 %, roja desde el 90 %). Doble clic en una la analiza; Intro en el cuadro de ruta también.
 - [ ] Tras analizar C: la barra de colores de arriba reparte el total por tipos y la leyenda suma lo mismo que la carpeta. Al entrar en una carpeta, la barra cambia a lo de esa carpeta.

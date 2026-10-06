@@ -107,7 +107,38 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
-### v1.2.3 — Avisos y arranque (hecho, sin build)
+### v1.2.4 — Once ideas elegidas por el autor (hecho, sin build)
+
+Elegidas sobre un catálogo con maquetas (artifact «AdminOps, ideas para la 1.2.4»).
+
+- **Duplicados** (`space.rs`): `space_duplicates` recorre la raíz del último análisis (archivos de
+  1 MB o más), agrupa por tamaño, descarta con una huella de muestras y confirma leyendo el archivo
+  entero; por encima de 256 MB se queda en las muestras y el grupo lo dice (`sampled`). No entra en
+  Windows, la papelera ni `System Volume Information`, y no lee lo que solo está en la nube
+  (`RawEntry.is_cloud`). Tarea «duplicates», cancelable. **Sin tratar**: dos enlaces duros al mismo
+  archivo saldrían como duplicados sin que borrar uno libere nada (fuera de Windows es raro).
+- **Liberar lo verde** (`Space.tsx`): ejecuta `cleanup.windows-temp`, `cleanup.windows-update-cache`
+  y `cleanup.user-temp` según lo que haya medido `space_freeable`.
+- **Panel a tu medida**: `lib/panelLayout.ts` (bloques, `arrange`, `shift`, `dropOn`),
+  `components/PanelGrid.tsx`, preferencia `panel {order, hidden}`. El veredicto de arriba es fijo.
+- **Qué frena el equipo** (`lib/slowdown.ts`, `components/Slowdown.tsx`): sustituye a «Procesos con
+  más carga». Lista de procesos de Windows que se explican y no se ofrece cerrar.
+- **Icono junto al reloj** (`tray.rs`, característica `tray-icon` de Tauri): ajuste `tray_icon`,
+  apagado de fábrica. Con `close_minimizes`, la X esconde la ventana en vez de minimizarla.
+  Las acciones que hace la interfaz llegan por el evento `tray-action`.
+- **Mini monitor** (`minimon.rs`, `components/MiniMonitor.tsx`): ventana «monitor», siempre encima
+  y fuera de la barra de tareas; se cierra con la principal.
+- **Actividad** (`lib/activity.ts`): tareas terminadas de la sesión, en la campana.
+- **Ctrl+K**: `DO_NOW` en `App.tsx` (acciones que ejecutan un ajuste al momento).
+- **Copiar tarjeta** (`lib/copyImage.ts`, botón en `Card`): dependencia nueva `html-to-image`.
+  **Sin probar en la app**: que WebView2 deje escribir una imagen en el portapapeles desde aquí.
+- **«Nuevo»** (`lib/whatsNew.ts`): `NEW_IN` se rellena al publicar; una prueba comprueba que cada
+  clave existe y que su versión está en las novedades.
+- **Deshacer en el momento**: ya existía (`undoable-change` → aviso con «Deshacer» 10 s).
+- **Quedan en «quizá»** (no hacer sin que el autor lo pida): qué ha crecido desde el último
+  análisis de espacio, rutinas de varios pasos, arrastrar una carpeta a la ventana.
+
+### v1.2.3 — Avisos y arranque (compilada)
 
 **Avisos (campana)**
 - `AlertCenter.tsx` rehecho sobre `lib/alerts.ts` (con pruebas): por días, filtro por nivel y «solo
@@ -132,6 +163,20 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   Es lo que más pesa en el arranque desde USB, y está así a propósito: no deja sesiones en el
   equipo del cliente.
 
+**Setup: la comprobación final no podía salir bien**
+- `installer/build.rs` calculaba la huella de `target/release/adminops.exe`, pero Tauri marca el
+  ejecutable que empaqueta (`__TAURI_BUNDLE_TYPE_VAR_NSS`) y deja el de `target` como estaba
+  (`…_UNK`): tres bytes distintos, y `exe_is_current` fallaba siempre aunque la instalación hubiera
+  ido bien (código 2, «usa el instalador clásico»). `installer/src/fingerprint.rs` calcula la huella
+  sin esa marca; lo usan `build.rs` y el programa. Comprobado con los dos ejecutables de la 1.2.3.
+  **Sin confirmar en un equipo**: que no hubiera además un bloqueo real de archivos.
+
+**Cerrar minimizando**
+- Ajuste `close_minimizes` (apagado de fábrica). `window_state`: `minimizes_on_close`, comando
+  `quit_app`; en `CloseRequested` se llama a `prevent_close` y se minimiza. `QuitButton.tsx` solo
+  aparece con el ajuste activo. La salida por actualización (`app.exit`) no pasa por ahí.
+- El arranque con Windows ya existía (tarea programada con `--minimized`, apagado de fábrica).
+
 **Discos → Espacio, de mirar a manejar**
 - `space.rs`: cada carpeta del análisis guarda lo que ocupa cada tipo de archivo (`KINDS`, por
   extensión) y su cambio más reciente; se apartan además los más grandes de cada tipo (`Tops`).
@@ -145,7 +190,7 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
 - `pages/Space.tsx` rehecha sobre `lib/spaceView.ts` (con pruebas): barra de tipos por carpeta,
   ficha de la carpeta señalada, lista ordenable, archivos de la carpeta actual, buscador, y una
   sola selección para carpetas y archivos con su barra fija abajo.
-- **Ideas que quedan**: archivos duplicados; comparar con el análisis anterior («qué ha crecido»).
+- Los duplicados se hicieron en la 1.2.4; «qué ha crecido» quedó en «quizá».
 
 ### v1.2.2 — Todo a la vista: navegación nueva (compilada)
 
