@@ -7,7 +7,7 @@
 import { ClipboardCheck, Copy, Crop, Loader2, Pencil, Send, TicketPlus, Trash2, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
-import { logQuietly, casesApi, noteApi, portalsApi, type Case, type ClipRedacted } from "../lib/api";
+import { logQuietly, casesApi, noteApi, portalsApi, type Case, type CaseTones, type ClipRedacted } from "../lib/api";
 import { CASE_CHANGED_EVENT, caseChanged, elapsed, OPEN_CASE_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { lastPortalKey } from "../lib/portalState";
@@ -249,6 +249,8 @@ function CaseEditor({ mode, prefill, onClose, onSaved }: { mode: "new" | "edit";
 /** Cerrar el caso: la resolución redactada, editable, lista para el ticket. */
 function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () => void }) {
   const [text, setText] = useState<string | null>(null);
+  const [tones, setTones] = useState<CaseTones | null>(null);
+  const [tone, setTone] = useState<keyof CaseTones>("technical");
   const [busy, setBusy] = useState<"close" | "paste" | "discard" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -259,6 +261,10 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
       .draft()
       .then((t) => vigente() && setText(t))
       .catch((e) => vigente() && setError(String(e)));
+    void casesApi
+      .tones()
+      .then((t) => vigente() && setTones(t))
+      .catch(() => undefined);
   }, []);
 
   const copy = () =>
@@ -357,6 +363,31 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
         </p>
       ) : (
         <>
+          {tones && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="Tono de la resolución">
+              <span className="text-[11px] text-mute">Contarlo de forma:</span>
+              {(
+                [
+                  ["brief", "Breve (ticket)"],
+                  ["friendly", "Para la persona"],
+                  ["technical", "Técnica"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={tone === id}
+                  onClick={() => {
+                    setTone(id);
+                    setText(tones[id]);
+                  }}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs ${tone === id ? "border-neon/50 bg-neon/10 text-neon" : "border-line text-dim hover:text-ink"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <textarea value={text ?? ""} onChange={(e) => setText(e.target.value)} rows={13} className={`${inputClass} font-mono text-[12.5px] leading-relaxed`} aria-label="Resolución del caso" />
           <p className="mt-2 text-[11px] text-mute">
             Sale del diario: cada línea es algo que se hizo de verdad en AdminOps. Puedes retocarla antes de pegarla. Para «Pegar en Tickets», deja antes seleccionado en el portal el

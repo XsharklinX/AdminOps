@@ -410,7 +410,7 @@ export function Clients() {
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">
                             <span className="text-xs text-mute">última visita {date(m.lastSeen)}</span>
-                            <MachineActions machine={m} />
+                            <MachineActions machine={m} client={form} />
                           </div>
                         </li>
                       ))}

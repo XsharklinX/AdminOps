@@ -175,3 +175,14 @@
   background-color: var(--color-warn);
   color: #111315;
 }
+
+/* Modo privacidad (lib/privacy.ts): el texto sensible se difumina sin tocar el DOM. */
+::highlight(adminops-private) {
+  color: transparent;
+  text-shadow: 0 0 7px var(--color-ink);
+  background-color: transparent;
+}
+[data-privacy] [data-priv-hit],
+[data-privacy] [data-sensitive] {
+  filter: blur(6px);
+}

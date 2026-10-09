@@ -78,6 +78,9 @@ pub struct Disk {
     pub score: crate::smartx::HealthScore,
     #[serde(skip_deserializing)]
     pub verdict: Verdict,
+    /// Textos listos para copiar: para el cliente y para el ticket.
+    #[serde(skip_deserializing)]
+    pub texts: crate::diskreport::DiskTexts,
     /// Cifras de los últimos días (una por día) para ver si va a peor.
     #[serde(skip_deserializing)]
     pub trend: Vec<Point>,
@@ -201,6 +204,37 @@ fn score_of(d: &Disk) -> crate::smartx::HealthScore {
         wear_trend: &wear_trend,
         tb_written: d.nvme.as_ref().map(|n| n.tb_written),
     })
+}
+
+/// Lo que el informe necesita de un disco.
+fn view_of(d: &Disk) -> crate::diskreport::DiskView {
+    crate::diskreport::DiskView {
+        name: d.model.clone(),
+        bus: d.bus.clone(),
+        media: d.media.clone(),
+        size: d.size,
+        system: d.system,
+        level: d.verdict.level.clone(),
+        title: d.verdict.title.clone(),
+        text: d.verdict.text.clone(),
+        advice: d.verdict.advice.clone(),
+        score: d.score.total,
+        label: d.score.label.clone(),
+        life_text: d.score.life_text.clone(),
+        hours: d.hours,
+        temperature: d.temperature,
+        wear: d.wear,
+        reallocated: d.reallocated,
+        pending: d.pending,
+        uncorrectable: d.uncorrectable,
+        crc: d.crc_errors,
+        volumes: d.volumes.iter().map(|v| (v.letter.clone(), v.size, v.free)).collect(),
+    }
+}
+
+/// El estado de los discos la última vez que se miraron (para el informe).
+pub fn last_saved(app: &tauri::AppHandle) -> crate::diskreport::Saved {
+    crate::paths::read_json(&crate::paths::machine_data_dir(app).join("discos-resumen.json"))
 }
 
 fn history_path(app: &tauri::AppHandle) -> std::path::PathBuf {
@@ -398,7 +432,11 @@ fn status_and_record(app: &tauri::AppHandle) -> Result<(Vec<Disk>, News), String
     for d in &mut disks {
         apply_trend(d);
         d.score = score_of(d);
+        d.texts = crate::diskreport::texts(&view_of(d));
     }
+    // La foto que usa el informe del cliente (no vuelve a leer los discos).
+    let saved = crate::diskreport::Saved { at: now_secs(), disks: disks.iter().map(view_of).collect() };
+    let _ = crate::paths::write_json(&crate::paths::machine_data_dir(app).join("discos-resumen.json"), &saved);
     Ok((disks, news))
 }
 

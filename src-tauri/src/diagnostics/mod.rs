@@ -3,7 +3,7 @@
 
 pub mod collect;
 pub mod minidump;
-mod pdf;
+pub(crate) mod pdf;
 pub mod report;
 
 use crate::tweaks::TweakState;

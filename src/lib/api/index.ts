@@ -10,6 +10,7 @@ export * from "./hardware";
 export * from "./install";
 export * from "./disks";
 export * from "./diskdeep";
+export * from "./extras";
 export * from "./people";
 export * from "./maintenance";
 export * from "./lan";

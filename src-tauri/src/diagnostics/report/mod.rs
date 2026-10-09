@@ -67,6 +67,8 @@ struct Ctx<'a> {
     input: &'a ReportInput,
     settings: &'a Settings,
     speed: Option<&'a SpeedResult>,
+    /// El estado de los discos de la última vez que se miraron.
+    disks: &'a crate::diskreport::Saved,
     number: &'a str,
     since: u64,
 }
@@ -227,6 +229,7 @@ fn build(c: &Ctx) -> String {
                     }
                 }
             }
+            "disks" => h.push_str(&crate::diskreport::html(c.disks, c.technical())),
             "comparison" => {
                 if let Some(base) = c.base {
                     comparison(&mut h, c, base);
@@ -332,6 +335,7 @@ fn report_html(app: &tauri::AppHandle, state: &TweakState, input: &ReportInput, 
     let technician = input.technician.clone().filter(|t| !t.trim().is_empty()).unwrap_or_else(|| settings.technician.clone());
     // Último test de velocidad del periodo del informe.
     let speed = crate::network::speedtest::history(app).into_iter().find(|r| r.timestamp >= since);
+    let disks = crate::disks::last_saved(app);
     let html = build(&Ctx {
         cur: &cur,
         base: base.as_ref(),
@@ -340,6 +344,7 @@ fn report_html(app: &tauri::AppHandle, state: &TweakState, input: &ReportInput, 
         input,
         settings: &settings,
         speed: speed.as_ref(),
+        disks: &disks,
         number,
         since,
     });
@@ -688,7 +693,7 @@ mod tests {
         let cur = Diagnostics { host: "PC-01".into(), ..Default::default() };
         let render = |template, settings: &Settings| {
             let input = sample_input(template);
-            build(&Ctx { cur: &cur, base: None, journal: &[], technician: "Ana", input: &input, settings, speed: None, number: "2026-0001", since: 0 })
+            build(&Ctx { cur: &cur, base: None, journal: &[], technician: "Ana", input: &input, settings, speed: None, disks: &Default::default(), number: "2026-0001", since: 0 })
         };
         let at = |html: &str, what: &str| html.find(what);
 
@@ -811,7 +816,7 @@ mod tests {
         };
         for (name, template, kind) in [("cliente", Template::Client, DocKind::Receipt), ("tecnico", Template::Technical, DocKind::Quote)] {
             let inp = input(template, kind);
-            let html = build(&Ctx { cur: &cur, base: Some(&base), journal: &journal, technician: "David Bonilla", input: &inp, settings: &settings, speed: None, number: "2026-0042", since: 0 });
+            let html = build(&Ctx { cur: &cur, base: Some(&base), journal: &journal, technician: "David Bonilla", input: &inp, settings: &settings, speed: None, disks: &Default::default(), number: "2026-0042", since: 0 });
             std::fs::write(out.join(format!("{name}.html")), &html).unwrap();
             super::super::pdf::html_to_pdf(&html, &out.join(format!("{name}.pdf"))).unwrap();
         }

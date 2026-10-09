@@ -290,6 +290,10 @@ const SAFE: &[&str] = &[
     "diskwatch_get", "diskwatch_set", "smart_full", "smart_selftest_status", "disk_scan", "disk_scan_live", "disk_scan_last",
     "partition_layout", "partition_backup", "partition_backups", "partition_find_lost",
     "carve_scan", "carve_found", "carve_preview", "disk_clone_live", "disk_clone_last",
+    // el caso en tres tonos (solo redacta texto)
+    "case_tones",
+    // etiquetas con QR (crean un PDF en la carpeta de informes)
+    "label_qr", "label_sheet",
     // workflow
     "get_settings", "save_settings", "list_clients", "visit_changes", "compare_client_machines", "save_client", "delete_client", "get_session",
     "start_session", "update_session", "cancel_session", "finish_session", "set_next_maintenance", "export_config", "import_config",

@@ -160,6 +160,12 @@ export function tomorrowMorning(days = 1): number {
 
 // ---------- El caso de ahora ----------
 
+export interface CaseTones {
+  brief: string;
+  friendly: string;
+  technical: string;
+}
+
 export interface Case {
   id: string;
   ticket: string;
@@ -185,6 +191,8 @@ export const casesApi = {
   update: (c: Partial<Case>) => invoke<Case>("case_update", { case: emptyCase(c) }),
   actions: () => invoke<CaseAction[]>("case_actions"),
   draft: () => invoke<string>("case_draft"),
+  /** La resolución en tres tonos: breve, para la persona y técnica. */
+  tones: () => invoke<CaseTones>("case_tones"),
   close: (resolution: string) => invoke<Case>("case_close", { resolution }),
   discard: () => invoke<void>("case_discard"),
   forPerson: (sam: string, person: string) => invoke<Case[]>("cases_for_person", { sam, person }),

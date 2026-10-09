@@ -62,6 +62,8 @@ export interface DiskReport {
   /** Últimos 90 días (una foto por día). */
   trend: DiskPoint[];
   mediaErrors: number;
+  /** Textos listos para copiar. */
+  texts: { client: string; ticket: string };
   nvme: NvmeHealth | null;
   /** Nota de 0 a 100 con su desglose y la vida que le queda. */
   score: HealthScore;

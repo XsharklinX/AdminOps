@@ -1,5 +1,6 @@
 import { MonitorSmartphone, Power } from "lucide-react";
-import { officeApi, type Machine, type MachineInventory } from "../lib/api";
+import { officeApi, type Client, type Machine, type MachineInventory } from "../lib/api";
+import { LabelButton } from "./MachineLabel";
 import { useToast } from "./feedback";
 import { iconBtn } from "./ui";
 
@@ -20,7 +21,7 @@ export function VerdictChip({ inv }: { inv: MachineInventory | null }) {
 }
 
 /** Encender por red y conectarse por Escritorio remoto a un equipo del inventario. */
-export function MachineActions({ machine }: { machine: Machine }) {
+export function MachineActions({ machine, client }: { machine: Machine; client?: Client }) {
   const toast = useToast();
   const inv = machine.inventory;
   return (
@@ -39,6 +40,7 @@ export function MachineActions({ machine }: { machine: Machine }) {
           <Power size={14} />
         </button>
       )}
+      <LabelButton machine={machine} client={client} />
       <button onClick={() => officeApi.rdp(inv?.ip || machine.host).catch((e) => toast("error", String(e)))} className={iconBtn} title="Conectar por Escritorio remoto">
         <MonitorSmartphone size={14} />
       </button>

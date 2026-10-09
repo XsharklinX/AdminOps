@@ -25,6 +25,7 @@ import { NAVIGATE_EVENT, ONBOARDING_EVENT } from "./lib/navigate";
 import { appStarted, appStartMs, codeLoaded, onPerfChange, pageLoads, pageOpened, pagePainted } from "./lib/perf";
 import { Dashboard } from "./pages/Dashboard";
 import { AuditBanner, AuditToggle } from "./components/AuditMode";
+import { PrivacyBanner, PrivacyToggle } from "./components/PrivacyMode";
 import { PageHelp } from "./components/PageHelp";
 import { TasksIndicator } from "./components/TasksIndicator";
 import { CaseBar, NewCaseButton } from "./components/CaseBar";
@@ -651,6 +652,7 @@ export default function App() {
           <>
             <NewCaseButton hidden={false} />
             <TasksIndicator />
+            <PrivacyToggle />
             <AuditToggle />
             <QuitButton />
             <AlertCenter onNavigate={(p, s) => goTo(p, s ?? null)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
@@ -671,6 +673,7 @@ export default function App() {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           <AuditBanner />
+          <PrivacyBanner />
           <CaseBar onOpenChange={setCaseDialog} />
           {prefs.pageTabs && openTabs.length > 1 && <OpenTabs tabs={openTabs} current={page} onPick={(p) => navigate(p)} onClose={closeTab} />}
           <header className="flex items-end justify-between border-b border-line px-8 pt-4 pb-4">

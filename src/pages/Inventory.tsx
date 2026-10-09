@@ -193,7 +193,7 @@ export function Inventory() {
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className="text-[11px] text-mute">visto el {date(r.machine.lastSeen)}</span>
                   <span className="flex items-center gap-1">
-                    <MachineActions machine={r.machine} />
+                    <MachineActions machine={r.machine} client={r.client} />
                     <button onClick={() => remove(r)} className="rounded-md p-1.5 text-mute opacity-0 group-hover:opacity-100 hover:bg-panel-2 hover:text-bad" title="Quitar del inventario">
                       <Trash2 size={14} />
                     </button>

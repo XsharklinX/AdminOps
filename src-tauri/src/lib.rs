@@ -24,6 +24,10 @@ mod company;
 mod webview_orphans;
 mod disks;
 mod disktools;
+mod casetones;
+mod diskreport;
+mod labels;
+mod labelsio;
 mod diskscan;
 mod diskscanio;
 mod diskwatch;
@@ -384,6 +388,9 @@ pub fn run() {
             cloneio::disk_clone,
             cloneio::disk_clone_live,
             cloneio::disk_clone_last,
+            cases::case_tones,
+            labelsio::label_qr,
+            labelsio::label_sheet,
             disktools::disk_speed_test,
             disktools::disk_capacity_test,
             disktools::disk_eject,

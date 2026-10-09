@@ -284,7 +284,7 @@ pub enum Template {
 
 /// Secciones del informe que se pueden quitar o cambiar de sitio, en su orden
 /// de fábrica. La cabecera va siempre arriba y las firmas y condiciones, abajo.
-pub const REPORT_SECTIONS: [&str; 10] = ["summary", "problem", "work", "findings", "comparison", "recommendations", "billing", "machine", "speed", "notes"];
+pub const REPORT_SECTIONS: [&str; 11] = ["summary", "problem", "work", "findings", "disks", "comparison", "recommendations", "billing", "machine", "speed", "notes"];
 
 /// La plantilla propia del técnico.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

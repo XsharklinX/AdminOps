@@ -41,6 +41,15 @@ pub struct Case {
     pub resolution: String,
 }
 
+/// La misma resolución contada de tres maneras.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ToneSet {
+    pub brief: String,
+    pub friendly: String,
+    pub technical: String,
+}
+
 /// Una acción apuntada durante el caso (para la barra del caso).
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -145,6 +154,36 @@ pub fn compose(case: &Case, entries: &[Entry], at: u64) -> String {
     out.join("\n")
 }
 
+/// Los hechos del caso para contarlos en otro tono.
+fn facts(case: &Case, entries: &[Entry], at: u64, findings: Vec<(String, Option<String>)>) -> crate::casetones::Facts {
+    let mut done: Vec<(String, usize)> = Vec::new();
+    let mut failed = Vec::new();
+    for e in entries.iter().filter(|e| counts(e)) {
+        if e.ok {
+            match done.last_mut() {
+                Some((t, n)) if *t == e.title => *n += 1,
+                _ => done.push((e.title.clone(), 1)),
+            }
+        } else {
+            let why = e.message.as_deref().map(|m| m.lines().next().unwrap_or("").chars().take(90).collect::<String>()).filter(|m| !m.is_empty());
+            failed.push(match why {
+                Some(m) => format!("{} ({m})", e.title),
+                None => e.title.clone(),
+            });
+        }
+    }
+    crate::casetones::Facts {
+        ticket: case.ticket.clone(),
+        person: case.person.clone(),
+        machine: case.machine.clone(),
+        notes: case.notes.clone(),
+        minutes: at.saturating_sub(case.started).div_ceil(60).max(1),
+        done,
+        failed,
+        findings,
+    }
+}
+
 fn open_case(list: &[Case]) -> Option<&Case> {
     list.iter().find(|c| c.ended == 0)
 }
@@ -207,6 +246,20 @@ pub fn case_actions(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Vec
 pub fn case_draft(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Result<String, String> {
     let c = open_case(&load(&app)).cloned().ok_or("No hay ningún caso abierto.")?;
     Ok(compose(&c, &tweaks.journal_since(c.started), now()))
+}
+
+/// La resolución del caso abierto en tres tonos: breve, para la persona y técnica.
+/// Lo "encontrado" sale del último análisis del equipo (solo lo importante).
+#[tauri::command]
+pub fn case_tones(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Result<ToneSet, String> {
+    use crate::diagnostics::Severity;
+    let c = open_case(&load(&app)).cloned().ok_or("No hay ningún caso abierto.")?;
+    let entries = tweaks.journal_since(c.started);
+    let findings: Vec<(String, Option<String>)> = crate::diagnostics::latest_snapshot(&app)
+        .map(|d| d.findings.into_iter().filter(|f| matches!(f.severity, Severity::Bad | Severity::Warn)).take(4).map(|f| (f.title, f.detail)).collect())
+        .unwrap_or_default();
+    let t = crate::casetones::tones(&facts(&c, &entries, now(), findings));
+    Ok(ToneSet { brief: t.brief, friendly: t.friendly, technical: compose(&c, &entries, now()) })
 }
 
 /// Cierra el caso abierto guardando la resolución tal y como quedó.

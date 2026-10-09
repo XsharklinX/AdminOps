@@ -4,7 +4,7 @@
 // conexión o el índice de archivos), porque de eso depende qué hacer. Lo que
 // pierde datos va antes que lo que se arregla: con un disco que falla, lo
 // primero es copiar lo que aún se lee, y eso está aquí mismo.
-import { Activity, CheckCircle2, CircleAlert, FolderInput, FolderOutput, HardDrive, Loader2, RefreshCw, ScanSearch, Usb, Wrench, XCircle } from "lucide-react";
+import { Activity, CheckCircle2, ClipboardCopy, CircleAlert, FolderInput, FolderOutput, HardDrive, Loader2, RefreshCw, ScanSearch, Usb, Wrench, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { BitLockerChip, DiskTrend, RemovableActions, SpeedTest } from "../components/DiskExtras";
@@ -12,7 +12,7 @@ import { DiskDeep, DiskWatchCard, ScoreCard } from "../components/DiskDeep";
 import { CloneCard } from "../components/DiskRescue";
 import { usePrefs } from "../lib/prefs";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Loading } from "../components/ui";
+import { Button, Card, Loading, smallBtn } from "../components/ui";
 import { disksApi, type DiskCheck, type DiskReport, type DiskVolume, type RescueResult } from "../lib/api";
 import { withoutUserPaths } from "../lib/errors";
 import { bytes } from "../lib/format";
@@ -106,6 +106,8 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
 
 function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; onChanged: () => void }) {
   const technician = usePrefs().mode !== "user";
+  const toast = useToast();
+  const copyText = (text: string, ok: string) => void navigator.clipboard.writeText(text).then(() => toast("ok", ok), () => toast("error", "No se pudo copiar."));
   const t = TONE[d.verdict.level];
   const external = d.bus.toUpperCase() === "USB";
   const Icon = external ? Usb : HardDrive;
@@ -148,7 +150,15 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
         </div>
       )}
       {d.verdict.level === "ok" && <p className="-mt-1 px-4 pb-2 text-xs text-dim">{d.verdict.text}</p>}
-      {facts.length > 0 && <p className="px-4 pb-3 text-[11px] text-mute">{facts.join(" · ")}</p>}
+      {facts.length > 0 && <p className="px-4 pb-2 text-[11px] text-mute">{facts.join(" · ")}</p>}
+      <div className="flex flex-wrap gap-2 px-4 pb-3">
+        <button type="button" className={smallBtn} onClick={() => copyText(d.texts.ticket, "Texto para el ticket copiado.")} title="Una línea con el estado, las cifras y lo recomendado">
+          <ClipboardCopy size={12} /> Copiar para el ticket
+        </button>
+        <button type="button" className={smallBtn} onClick={() => copyText(d.texts.client, "Texto para el cliente copiado.")} title="Qué le pasa al disco y qué hacer, sin siglas">
+          <ClipboardCopy size={12} /> Copiar para el cliente
+        </button>
+      </div>
       <ScoreCard score={d.score} technician={technician} />
       <DiskTrend d={d} />
       <SpeedTest d={d} />
