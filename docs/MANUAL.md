@@ -41,6 +41,15 @@ de BitLocker o LAPS de su equipo.
 piezas y temperaturas, seguridad e historial. Equipo → *Discos*: el espacio y la **salud** de cada
 disco (si falla, qué hacer; rescatar archivos de uno que no copia; pendrives falsos).
 
+**Un disco falla, o ha desaparecido una partición.** Equipo → *Discos* → *Salud y reparación*: la nota
+del disco, su tabla SMART completa explicada (pestaña *Salud SMART*), las autopruebas del propio disco
+y la curva de velocidad (*Pruebas y velocidad*), el mapa de superficie (*Mapa de superficie*) y, abajo,
+*Clonar o hacer una imagen*: con un disco enfermo, **cópialo primero** y trabaja después sobre la copia.
+*Particiones y arranque* enseña la tabla, busca particiones perdidas y repara el arranque de Windows
+(siempre guarda antes una copia de la tabla). Para archivos borrados: Datos del equipo → *Recuperar
+archivos* (la búsqueda *a fondo por firma* sirve cuando Windows ya no encuentra nada). El
+*Vigilante de discos* avisa solo cuando una cifra cambia.
+
 **Una visita de mantenimiento.** Inicio → *Sesión de servicio*: diagnóstico al llegar, checklist,
 trabajo, diagnóstico al irse, presupuesto o recibo y firma. Al final, el **informe PDF** con el
 antes y después, el estado por áreas y lo pendiente por prioridad.
@@ -54,6 +63,7 @@ urgente: caso abierto, seguimientos, visitas y avisos de Windows.
 | Atajo | Qué hace |
 |---|---|
 | Ctrl+K o F1 | «Todo AdminOps»: el programa entero por áreas, y buscar cualquier cosa (secciones, acciones, contactos, síntomas, equipos) |
+| Ctrl+Alt+P | Modo privacidad: difumina correos, IP y claves al compartir pantalla |
 | Ctrl+Alt+N | Nota de llamada (aunque AdminOps esté minimizado) |
 | Ctrl+L | Bloquear AdminOps |
 | / | Buscar en la página (Contactos, listas) |

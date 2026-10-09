@@ -240,15 +240,8 @@ pub fn partition_restore(app: tauri::AppHandle, number: u32, model: String, foun
 
 // ---------- Arranque ----------
 
-/// Repara el arranque de Windows (BCD) de la instalación que hay en `letter`: bcdboot,
-/// con la partición EFI si el disco es GPT o con el arranque clásico si es MBR.
-#[tauri::command(async)]
-pub fn boot_repair(app: tauri::AppHandle, letter: String, tweaks: State<'_, TweakState>) -> Result<String, String> {
-    need_admin()?;
-    let l = letter.trim().trim_end_matches([':', '\\']).chars().next().filter(|c| c.is_ascii_alphabetic()).ok_or("Unidad no válida.")?.to_ascii_uppercase();
-    let task = crate::task::Task::new(&app, "boot-repair").named("Reparar el arranque de Windows");
-    task.step("Buscando la partición de arranque…");
-    let script = format!(
+fn boot_script(l: char) -> String {
+    format!(
         r#"
 $ErrorActionPreference = 'Stop'
 $L = '{l}'
@@ -269,9 +262,29 @@ if ($style -eq 'GPT') {{
 if ($LASTEXITCODE -ne 0) {{ throw "bcdboot falló: $out" }}
 "El arranque de Windows de $L`: se ha reparado ($style)."
 "#
-    );
+    )
+}
+
+/// Repara el arranque de Windows (BCD) de la instalación que hay en `letter`: bcdboot,
+/// con la partición EFI si el disco es GPT o con el arranque clásico si es MBR.
+#[tauri::command(async)]
+pub fn boot_repair(app: tauri::AppHandle, letter: String, tweaks: State<'_, TweakState>) -> Result<String, String> {
+    need_admin()?;
+    let l = letter.trim().trim_end_matches([':', '\\']).chars().next().filter(|c| c.is_ascii_alphabetic()).ok_or("Unidad no válida.")?.to_ascii_uppercase();
+    let task = crate::task::Task::new(&app, "boot-repair").named("Reparar el arranque de Windows");
+    task.step("Buscando la partición de arranque…");
+    let script = boot_script(l);
     let result = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(180)), task: None }).map(|s| s.trim().to_string());
     let journal = result.as_ref().map(|_| ()).map_err(Clone::clone);
     tweaks.record(Op::Run, &format!("Reparar el arranque de Windows de {l}:"), &journal);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn boot_script_parses() {
+        let e = crate::ps::parse_errors(&super::boot_script('C'));
+        assert!(e.is_empty(), "{e}");
+    }
 }

@@ -32,8 +32,9 @@ fn ata_smart(d: &RawDisk, feature: u8, lba_low: u8, read: bool) -> Result<Vec<u8
     let mut input = [0u8; 36];
     input[0..4].copy_from_slice(&(if read { 512u32 } else { 0 }).to_le_bytes());
     input[4] = feature; // bFeaturesReg
-    input[5] = if read { 1 } else { 0 }; // bSectorCountReg
-    input[6] = lba_low; // bSectorNumberReg
+    input[5] = 1; // bSectorCountReg
+    // Como en el ejemplo de Microsoft (DFP): para leer y para encender SMART el registro vale 1; para las autopruebas, el subcomando.
+    input[6] = if lba_low == 0 { 1 } else { lba_low }; // bSectorNumberReg (LBA bajo)
     input[7] = 0x4F; // bCylLowReg (firma de SMART)
     input[8] = 0xC2; // bCylHighReg (firma de SMART)
     input[9] = 0xA0; // bDriveHeadReg
@@ -41,7 +42,8 @@ fn ata_smart(d: &RawDisk, feature: u8, lba_low: u8, read: bool) -> Result<Vec<u8
     input[12] = d.number() as u8;
     // SENDCMDOUTPARAMS: 4 de tamaño + 12 de estado del controlador + datos.
     let mut out = vec![0u8; 16 + 512 + 4];
-    let (code, out_len) = if read { (SMART_RCV_DRIVE_DATA, 16 + 512) } else { (SMART_SEND_DRIVE_COMMAND, 16) };
+    // La cabecera de la respuesta son 16 bytes; el controlador pide además unos pocos de margen.
+    let (code, out_len) = if read { (SMART_RCV_DRIVE_DATA, 16 + 512 + 4) } else { (SMART_SEND_DRIVE_COMMAND, 20) };
     d.ioctl(code, &input, &mut out[..out_len])?;
     if read {
         Ok(out[16..16 + 512].to_vec())

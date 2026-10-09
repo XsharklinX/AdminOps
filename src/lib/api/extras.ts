@@ -86,3 +86,49 @@ export const backupsApi = {
   /** Tarea «backup-run». Copia lo nuevo o cambiado, sin borrar nada. */
   run: (id: string) => invoke<string>("backups_run", { id }),
 };
+
+// ---------- Reglas de alerta ----------
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** disk_free · cpu · ram · service_running · backup_age · toner · disk_score */
+  metric: string;
+  target: string;
+  /** lt · gt */
+  op: "lt" | "gt";
+  value: number;
+  forMinutes: number;
+  level: "warn" | "bad";
+}
+
+export const alertRulesApi = {
+  get: () => invoke<AlertRule[]>("alert_rules_get"),
+  templates: () => invoke<{ name: string; rules: AlertRule[] }[]>("alert_rules_templates"),
+  save: (rules: AlertRule[]) => invoke<AlertRule[]>("alert_rules_save", { rules }),
+  /** El valor de ahora de lo que mira la regla. */
+  reading: (rule: AlertRule) => invoke<number | null>("alert_rules_reading", { rule }),
+};
+
+// ---------- Repuestos compatibles ----------
+
+export interface PartsItem {
+  /** memory · storage · unknown */
+  area: string;
+  /** ok · warn · info */
+  level: "ok" | "warn" | "info";
+  title: string;
+  text: string;
+}
+
+export interface PartsAdvice {
+  model: string;
+  items: PartsItem[];
+  shopping: string[];
+  manualQuery: string;
+}
+
+export const partsApi = {
+  advice: () => invoke<PartsAdvice>("parts_advice"),
+};

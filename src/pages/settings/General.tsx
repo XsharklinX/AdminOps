@@ -1,4 +1,5 @@
 // Ajustes: Inicio y ventana, Avisos, Datos y copias, y piezas de Seguridad y Portales y red.
+import { AlertRules } from "./AlertRules";
 import { CheckCircle2, Download, HardDrive, Sparkles, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NAV } from "../../components/Sidebar";
@@ -115,6 +116,7 @@ export function AlertSettings({ s, set }: SettingsProps) {
           </select>
         </Row>
       </Card>
+      <AlertRules />
       <Card title="Tareas de AdminOps">
         <Row title="Avisar al terminar tareas largas" sub="Notificación de Windows cuando una tarea de más de 20 s acaba con AdminOps en segundo plano.">
           <Toggle checked={s.notifyTasks} onChange={(v) => set({ notifyTasks: v })} />

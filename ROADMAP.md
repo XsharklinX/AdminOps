@@ -107,6 +107,56 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
+### v1.2.7 — Discos a fondo y banco de ideas (hecho, sin build, sin probar en hardware real)
+
+Elegidas por el autor sobre el artifact «Ideas para AdminOps» (19 ideas, todas). **Verificado**: tipos
+(`tsc`), `eslint`, `vitest`, `cargo clippy --all-targets -D warnings` contra el objetivo de Windows y
+las pruebas de la lógica pura de cada módulo nuevo (SMART, nota, mapa de superficie, vigilante,
+particiones, firmas, clonado, informe de disco, etiquetas, tonos del caso, valoración del equipo,
+copias, reglas, repuestos). **Sin verificar**: todo lo que habla con un disco físico o con Windows
+(`rawdisk.rs`, `smartio.rs`, `partitionsio.rs`, `cloneio.rs`, `carveio.rs`, `diskscanio.rs`) y los
+scripts de PowerShell nuevos; solo se ha comprobado que compilan. Probar con un disco de usar y tirar
+antes de fiarse de ello, sobre todo **restaurar particiones**, **clonar a otro disco** y **reparar el
+arranque**.
+
+- **Discos a fondo** (sustituye a CrystalDiskInfo, TestDisk, PhotoRec y ddrescue):
+  - `smartx.rs` (lógica) y `smartio.rs` (órdenes): tabla SMART completa con umbrales por
+    `SMART_RCV_DRIVE_DATA` (SATA con AHCI; con caja USB o RAID se cae a WMI, sin umbrales y sin
+    autopruebas), registro de salud del NVMe por `IOCTL_STORAGE_QUERY_PROPERTY`, autopruebas corta y
+    extendida (`SMART EXECUTE OFF-LINE IMMEDIATE`), nota 0-100 desglosada y vida restante (por las
+    fotos diarias; si no, por las horas, suponiendo 8 h al día). Cada fila lleva su explicación.
+  - `rawdisk.rs`: `BlockSource` (disco físico, archivo de imagen o memoria) y `BlockSink`. Todos los
+    algoritmos trabajan sobre ellos, por eso se prueban sin disco.
+  - `diskscan.rs`/`diskscanio.rs`: mapa de superficie y curva de velocidad en solo lectura, rápido
+    (4 MB por zona) o completo, con pausa y reanudación (`superficie-N.json`) y comparación con la
+    última vez. **No** dice qué archivos caen en una zona mala, solo en qué unidades.
+  - `diskwatch.rs`: vigilante cada 30 min (ajustable) que avisa de cambios, no de estados: sectores
+    pendientes que suben, fallo anunciado, calor sostenido, poco espacio y un disco fijo que
+    desaparece. Campana, «Hoy» y diario.
+  - `partitions.rs`/`partitionsio.rs`: lectura MBR/GPT (sumas de control, copia del final, solapes,
+    unidades lógicas), búsqueda de NTFS/FAT32/exFAT perdidos y restauración. Escribe **solo** tras
+    guardar una copia de los sectores de la tabla (`copias-tabla/`), nunca en el disco de Windows,
+    pide escribir «RESTAURAR», lo comprueba después y si no cuadra la devuelve a como estaba. Sin
+    listado del contenido de la partición encontrada (el NTFS se valida por su arranque, su MFT y la
+    copia del final). Reparar el arranque usa `bcdboot`.
+  - `carve.rs`/`carveio.rs`: recuperación por firmas (JPEG, PNG, GIF, BMP, WebP, PDF, ZIP/Office,
+    7z, MP4/MOV/HEIC, SQLite, OLE antiguo). Cada archivo se mide por su estructura: completo o
+    parcial. Un archivo fragmentado no se reconstruye. Nunca copia al disco que se está recuperando.
+  - `clone.rs`/`cloneio.rs`: imagen o clonado en tres pasadas (rápida, zonas saltadas, sector a
+    sector con reintentos), mapa, reanudación y registro de lo perdido. A otro disco lo pone fuera de
+    línea y pide escribir «BORRAR DISCO N».
+  - `diskreport.rs`: sección «Estado de los discos» del informe y textos para el ticket y el cliente.
+- **Generales**: etiquetas QR (`labels.rs`), modo privacidad (`lib/privacy.ts`, Ctrl+Alt+P, con la
+  API de resaltados de CSS: no toca el DOM de React), cerrar caso en tres tonos (`casetones.rs`),
+  «¿Está bien mi equipo?» (`lib/userHome.ts`), ¿reparar o cambiar? (`lifespan.rs`), copias de seguridad
+  (`backupcheck.rs`/`backupio.rs`, con sección en el informe y comprobación diaria), saltos del uso
+  junto a lo que pasó (`lib/perfCorrelate.ts`), reglas de alerta (`alertrules.rs`/`alertrulesio.rs`) y
+  repuestos compatibles (`partsadvice.rs`; Windows no dice cuántos M.2 o SATA quedan libres, y lo dice).
+- **Modo auditoría**: los comandos nuevos que cambian algo van en `BLOCKED`; el resto, en `SAFE`.
+- **Sin tratar**: el informe de disco no sale en las plantillas propias ya guardadas (hay que añadir
+  la sección en Ajustes → Informes); las etiquetas no abren la ficha en AdminOps al escanearlas (el QR
+  lleva texto, no un enlace).
+
 ### v1.2.6 — Ajustes ordenado, vista previa del informe y batería (hecho, sin build)
 
 - **Ajustes**: `SECTIONS` lleva `group`; `General.tsx` exporta `StartWindow`, `AlertSettings`,

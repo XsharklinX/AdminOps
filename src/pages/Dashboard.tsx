@@ -8,7 +8,9 @@ import { Bar, Button, Card, Sparkline, Loading } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
 import { logQuietly, api, diagApi, toolboxApi, tweaksApi, type JournalEntry, type SystemInfo } from "../lib/api";
-import { getPrefs } from "../lib/prefs";
+import { getPrefs, usePrefs } from "../lib/prefs";
+import { UserHome } from "../components/UserHome";
+import { summarize as summarizeForText, summaryText, type UserInput } from "../lib/userHome";
 import { bytes, duration, loadColor, rate, ago } from "../lib/format";
 import { FirstSteps } from "../components/FirstSteps";
 import { PanelGrid } from "../components/PanelGrid";
@@ -71,6 +73,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   const [reviewing, setReviewing] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const toast = useToast();
+  const userMode = usePrefs().mode === "user";
   const navigate = useCallback((p: PageId, f?: string | null) => onNavigate(p, f), [onNavigate]);
 
   const loadLatest = useCallback(
@@ -313,8 +316,31 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     ),
   };
 
+  const userInput: UserInput = {
+    ramPct,
+    cpuPct: m.cpuTotal,
+    securityScore: latest?.securityScore ?? null,
+    securityIssues: findings.filter((f) => f.severity !== "info" && /segur|antivirus|firewall|cortafuegos|defender|bitlocker|actualiz/i.test(`${f.area} ${f.title}`)).map((f) => f.title),
+    freePct: system && system.total > 0 ? (system.available / system.total) * 100 : null,
+    disks: (latest?.disks ?? []).filter((k) => k.status !== "ok").map((k): [string, "ok" | "warn" | "bad"] => [k.name, k.status]),
+    startupCount: null,
+    analyzed: !!latest,
+  };
+  const userFix = () =>
+    quick("fix", "Arreglar", async () => {
+      const r = await tweaksApi.run("cleanup.user-temp");
+      void loadLatest();
+      return r.message;
+    });
+  const tellTechnician = () =>
+    void navigator.clipboard.writeText(summaryText(summarizeForText(userInput), info?.hostName ?? "mi equipo")).then(
+      () => toast("ok", "Resumen copiado: pégalo en un mensaje o un correo a tu técnico."),
+      () => toast("error", "No se pudo copiar."),
+    );
+
   return (
     <div className="mx-auto flex max-w-(--page-max) flex-col gap-5 px-8 py-6">
+      {userMode && <UserHome input={userInput} busy={busy === "fix" ? "fix" : reviewing ? "review" : null} onFix={userFix} onTellTechnician={tellTechnician} onReview={() => void review()} />}
       {/* Veredicto */}
       <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 px-6 py-5">
         <span className={`size-3 shrink-0 rounded-full ${verdict.dot}`} />

@@ -1,4 +1,5 @@
 import { LifeCard } from "../components/LifeCard";
+import { PartsCard } from "../components/PartsCard";
 import {
   Check,
   ChevronDown,
@@ -126,6 +127,9 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
       <MachineSheetCard autoLoad={focus === "sheet"} />
       <div className="col-span-12">
         <LifeCard />
+      </div>
+      <div className="col-span-12">
+        <PartsCard />
       </div>
       {/* Resumen */}
       <Card
