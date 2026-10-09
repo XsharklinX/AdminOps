@@ -40,6 +40,7 @@ const BLOCKED: &[&str] = &[
     "boot_repair",
     "carve_recover",
     "disk_clone",
+    "backups_run",
     // Programas y Windows
     "remove_apps",
     "reinstall_app",
@@ -291,7 +292,7 @@ const SAFE: &[&str] = &[
     "partition_layout", "partition_backup", "partition_backups", "partition_find_lost",
     "carve_scan", "carve_found", "carve_preview", "disk_clone_live", "disk_clone_last",
     // el caso en tres tonos (solo redacta texto)
-    "case_tones",
+    "case_tones", "life_report", "backups_get", "backups_status", "backups_defaults", "backups_save", "backups_check",
     // etiquetas con QR (crean un PDF en la carpeta de informes)
     "label_qr", "label_sheet",
     // workflow

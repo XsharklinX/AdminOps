@@ -12,6 +12,7 @@ export const REPORT_SECTIONS: { id: string; label: string; hint: string }[] = [
   { id: "work", label: "Trabajo realizado", hint: "Lo hecho con AdminOps y la lista de comprobación." },
   { id: "findings", label: "Problemas detectados", hint: "Lo resuelto en la visita y lo que queda pendiente." },
   { id: "disks", label: "Estado de los discos", hint: "Semáforo de cada disco, qué significa y qué hacer, con el detalle técnico en la plantilla técnica." },
+  { id: "backups", label: "Copias de seguridad", hint: "Si las copias del cliente están al día, en otro disco y se pueden restaurar." },
   { id: "comparison", label: "Antes y después", hint: "La comparación con el diagnóstico inicial, si lo hay." },
   { id: "recommendations", label: "Recomendaciones", hint: "Lo que aconsejas hacer." },
   { id: "billing", label: "Presupuesto o recibo, y garantías", hint: "El cobro, las garantías y el próximo mantenimiento." },

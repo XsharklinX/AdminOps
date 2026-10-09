@@ -3,6 +3,7 @@
 // Windows…).
 import {
   BookCopy,
+  DatabaseBackup,
   ClipboardList,
   Cog,
   Download,
@@ -65,6 +66,7 @@ import { Session } from "./Session";
 import { People } from "./People";
 import { Clients } from "./Clients";
 import { Disks } from "./Disks";
+import { Backups } from "./Backups";
 import { PartitionsTab } from "../components/DiskPartitions";
 import { Space } from "./Space";
 import { Shortcuts } from "./Shortcuts";
@@ -546,13 +548,19 @@ export function ServiceSession({
   );
 }
 
-type DataTab = "migrate" | "vault" | "wipe" | "recover" | "family";
+type DataTab = "migrate" | "backups" | "vault" | "wipe" | "recover" | "family";
 const DATA: PageTab<DataTab>[] = [
   {
     id: "migrate",
     label: "Copia de datos",
     icon: <Undo2 size={14} />,
     help: "Copia los datos de un usuario (escritorio, documentos, navegadores, Wi-Fi) y los restaura en otro equipo.",
+  },
+  {
+    id: "backups",
+    label: "Copias de seguridad",
+    icon: <DatabaseBackup size={14} />,
+    help: "Comprueba que las copias de seguridad sirven: que son recientes, están en otro disco, cubren lo importante y un archivo de prueba se puede leer.",
   },
   {
     id: "vault",
@@ -597,6 +605,8 @@ export function DataTools({
       render={(t) =>
         t === "migrate" ? (
           <Migrate />
+        ) : t === "backups" ? (
+          <Backups />
         ) : t === "vault" ? (
           <Vault />
         ) : t === "wipe" ? (

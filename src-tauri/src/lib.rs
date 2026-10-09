@@ -27,10 +27,14 @@ mod disktools;
 mod casetones;
 mod diskreport;
 mod labels;
+mod lifeio;
+mod lifespan;
 mod labelsio;
 mod diskscan;
 mod diskscanio;
 mod diskwatch;
+mod backupcheck;
+mod backupio;
 mod carve;
 mod carveio;
 mod clone;
@@ -243,6 +247,7 @@ pub fn run() {
             // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
             agenda::start(app.handle().clone());
             disks::start_watch(app.handle().clone());
+            backupio::start(app.handle().clone());
             // Historial de rendimiento de 7 días: una muestra por minuto mientras AdminOps está abierta.
             perfhistory::start(app.handle().clone());
             appbackup::start(app.handle().clone());
@@ -389,6 +394,13 @@ pub fn run() {
             cloneio::disk_clone_live,
             cloneio::disk_clone_last,
             cases::case_tones,
+            backupio::backups_get,
+            backupio::backups_status,
+            backupio::backups_defaults,
+            backupio::backups_save,
+            backupio::backups_check,
+            backupio::backups_run,
+            lifeio::life_report,
             labelsio::label_qr,
             labelsio::label_sheet,
             disktools::disk_speed_test,

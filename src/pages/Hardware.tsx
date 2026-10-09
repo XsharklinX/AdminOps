@@ -1,3 +1,4 @@
+import { LifeCard } from "../components/LifeCard";
 import {
   Check,
   ChevronDown,
@@ -123,6 +124,9 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
   return (
     <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <MachineSheetCard autoLoad={focus === "sheet"} />
+      <div className="col-span-12">
+        <LifeCard />
+      </div>
       {/* Resumen */}
       <Card
         title={`${inv.manufacturer} ${inv.model}`.trim() || "Equipo"}

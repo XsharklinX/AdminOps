@@ -4,7 +4,8 @@ import { PictureInPicture2, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TimeChart } from "../components/TimeChart";
 import { Card, EmptyState, ErrorState, iconBtn, Loading, smallBtn, Tile } from "../components/ui";
-import { insightApi, logQuietly, workApi, type Sample } from "../lib/api";
+import { insightApi, logQuietly, timelineApi, workApi, type Sample, type TimelineEvent } from "../lib/api";
+import { blame, describeStep, findStepUps, relevant } from "../lib/perfCorrelate";
 import { dateTime } from "../lib/format";
 import { usePageActive } from "../lib/pageActive";
 
@@ -20,6 +21,7 @@ const PEAK = 60;
 export function PerfHistory() {
   const [all, setAll] = useState<Sample[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [range, setRange] = useState<(typeof RANGES)[number]["id"]>("24h");
   const active = usePageActive();
 
@@ -40,6 +42,14 @@ export function PerfHistory() {
     return () => window.clearInterval(t);
   }, [active, load]);
 
+  // Lo que pasó en el equipo (instalaciones, cambios, actualizaciones) para ponerlo sobre la gráfica.
+  useEffect(() => {
+    timelineApi
+      .list(7)
+      .then(setEvents)
+      .catch(logQuietly("PerfHistory"));
+  }, []);
+
   const view = useMemo(() => {
     if (!all) return null;
     const secs = RANGES.find((r) => r.id === range)!.secs;
@@ -50,8 +60,11 @@ export function PerfHistory() {
     const culprits = new Map<string, number>();
     for (const s of v) if (s.cpu >= PEAK && s.top) culprits.set(s.top, (culprits.get(s.top) ?? 0) + 1);
     const peaks = [...v].filter((s) => s.cpu >= PEAK).sort((a, b) => b.cpu - a.cpu).slice(0, 5);
+    const marks = events.filter((e) => relevant(e) && e.time >= from);
     return {
       v,
+      marks,
+      changes: blame(findStepUps(v), events),
       minutes: v.length,
       cpu: avg("cpu"),
       ram: avg("ram"),
@@ -59,7 +72,7 @@ export function PerfHistory() {
       culprits: [...culprits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
       peaks,
     };
-  }, [all, range]);
+  }, [all, range, events]);
 
   if (!all) return failed ? <ErrorState page message={failed} onRetry={load} /> : <Loading page />;
 
@@ -111,8 +124,25 @@ export function PerfHistory() {
                   { label: "Memoria", color: "var(--color-warn)", values: view.v.map((s) => s.ram) },
                   { label: "Disco del sistema ocupado", color: "var(--color-mute)", values: view.v.map((s) => s.disk) },
                 ]}
+                events={view.marks.map((e) => ({ t: e.time, label: `${e.title}${e.detail ? ` · ${e.detail}` : ""}`, tone: e.level }))}
                 describe={(i) => (view.v[i].top ? `más uso: ${view.v[i].top}` : null)}
               />
+              {view.marks.length > 0 && <p className="mt-1 text-[11px] text-mute">Las líneas de puntos son sucesos del equipo (programas instalados, ajustes aplicados, actualizaciones): pasa el ratón por encima para ver cuál.</p>}
+            </Card>
+            <Card title="Qué coincide con los cambios">
+              {view.changes.length === 0 ? (
+                <p className="text-sm text-mute">No hay ningún salto claro del uso en este tramo: el equipo ha ido más o menos igual todo el rato.</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {view.changes.map((b) => (
+                    <li key={`${b.step.metric}-${b.step.at}`} className="flex gap-3">
+                      <span className="w-40 shrink-0 text-dim">{dateTime(b.step.at)}</span>
+                      <span className="min-w-0 flex-1 text-ink">{describeStep(b)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-[11px] text-mute">Coincidir no es lo mismo que causar: es el primer sitio donde mirar, no una sentencia.</p>
             </Card>
             <div className="grid gap-4 lg:grid-cols-2">
               <Card title="Qué había detrás de los picos">

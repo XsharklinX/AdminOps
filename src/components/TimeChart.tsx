@@ -40,6 +40,7 @@ export function TimeChart({
   unit = "%",
   gapSeconds = 180,
   marks = [],
+  events = [],
   describe,
 }: {
   /** Segundos desde 1970, uno por punto. */
@@ -53,6 +54,8 @@ export function TimeChart({
   gapSeconds?: number;
   /** Tramos a resaltar (cortes): [desde, hasta] en segundos. */
   marks?: [number, number][];
+  /** Sucesos a señalar con una línea vertical (instalaciones, cambios…). */
+  events?: { t: number; label: string; tone?: "ok" | "info" | "warn" | "bad" }[];
   /** Texto extra del punto bajo el ratón. */
   describe?: (i: number) => string | null;
 }) {
@@ -106,6 +109,15 @@ export function TimeChart({
         {marks.map(([a, b], i) => (
           <rect key={i} x={x(Math.max(a, from))} y={PAD.t} width={Math.max(2, x(Math.min(b, to)) - x(Math.max(a, from)))} height={H - PAD.t - PAD.b} fill="var(--color-bad)" opacity={0.14} />
         ))}
+        {events
+          .filter((e) => e.t >= from && e.t <= to)
+          .map((e, i) => (
+            <g key={`${e.t}-${i}`}>
+              <title>{e.label}</title>
+              <line x1={x(e.t)} x2={x(e.t)} y1={PAD.t} y2={H - PAD.b} stroke={e.tone === "bad" ? "var(--color-bad)" : e.tone === "warn" ? "var(--color-warn)" : "var(--color-neon)"} strokeWidth={1} strokeDasharray="3 3" opacity={0.75} vectorEffect="non-scaling-stroke" />
+              <circle cx={x(e.t)} cy={PAD.t + 3} r={3} fill={e.tone === "bad" ? "var(--color-bad)" : e.tone === "warn" ? "var(--color-warn)" : "var(--color-neon)"} />
+            </g>
+          ))}
         {yTicks.map((v) => (
           <g key={v}>
             <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="var(--color-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />

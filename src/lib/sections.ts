@@ -41,6 +41,7 @@ export const SECTIONS: Partial<Record<PageId, Section[]>> = {
   ],
   data: [
     { id: "migrate", label: "Copia de datos", keywords: "migrar pasar a otro pc perfil marcadores" },
+    { id: "backups", label: "Copias de seguridad", keywords: "backup copia seguridad comprobar restaurar reciente otro disco outlook documentos" },
     { id: "vault", label: "Caja fuerte", keywords: "cifrar contraseñas secreto" },
     { id: "wipe", label: "Borrado seguro", keywords: "borrar sin recuperar destruir" },
     { id: "recover", label: "Recuperar archivos", keywords: "borrados papelera recuperar" },
