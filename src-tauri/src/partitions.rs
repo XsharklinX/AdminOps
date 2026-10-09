@@ -223,7 +223,7 @@ pub fn parse_gpt_header(b: &[u8]) -> Option<GptHeader> {
 }
 
 fn utf16_name(b: &[u8]) -> String {
-    let units: Vec<u16> = b.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).take_while(|u| *u != 0).collect();
+    let units: Vec<u16> = b.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).take_while(|u| *u != 0).collect();
     String::from_utf16_lossy(&units)
 }
 
@@ -569,7 +569,7 @@ fn put64(b: &mut [u8], o: usize, v: u64) {
 pub fn unique_guid(seed: u64) -> [u8; 16] {
     let mut g = [0u8; 16];
     let mut z = seed ^ 0x9E37_79B9_7F4A_7C15;
-    for chunk in g.chunks_exact_mut(8) {
+    for chunk in g.as_chunks_mut::<8>().0.iter_mut() {
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
         z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
         z ^= z >> 31;

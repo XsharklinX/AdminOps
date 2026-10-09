@@ -44,7 +44,9 @@ pub struct AtaEntry {
 pub fn parse_ata_table(data: &[u8]) -> Vec<AtaEntry> {
     data.get(2..)
         .unwrap_or_default()
-        .chunks_exact(12)
+        .as_chunks::<12>()
+        .0
+        .iter()
         .take(30)
         .filter(|e| e[0] != 0)
         .map(|e| {
@@ -57,7 +59,7 @@ pub fn parse_ata_table(data: &[u8]) -> Vec<AtaEntry> {
 
 /// Umbrales: 2 bytes de versión y 30 entradas de 12 (id, umbral, 10 reservados).
 pub fn parse_thresholds(data: &[u8]) -> Vec<(u8, u8)> {
-    data.get(2..).unwrap_or_default().chunks_exact(12).take(30).filter(|e| e[0] != 0).map(|e| (e[0], e[1])).collect()
+    data.get(2..).unwrap_or_default().as_chunks::<12>().0.iter().take(30).filter(|e| e[0] != 0).map(|e| (e[0], e[1])).collect()
 }
 
 /// (nombre, qué es)

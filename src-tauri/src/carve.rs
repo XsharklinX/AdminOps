@@ -402,8 +402,8 @@ fn ole<S: BlockSource>(c: &mut Cur<S>, off: u64, max: u64) -> Measured {
     for i in 0..n_fat as usize {
         let sect = u32::from_le_bytes([h[0x4C + i * 4], h[0x4D + i * 4], h[0x4E + i * 4], h[0x4F + i * 4]]) as u64;
         let fat = c.bytes(off + (sect + 1) * ssize, ssize as usize)?;
-        for (j, e) in fat.chunks_exact(4).enumerate() {
-            if u32::from_le_bytes([e[0], e[1], e[2], e[3]]) != 0xFFFF_FFFF {
+        for (j, e) in fat.as_chunks::<4>().0.iter().enumerate() {
+            if u32::from_le_bytes(*e) != 0xFFFF_FFFF {
                 last = last.max(i as u64 * (ssize / 4) + j as u64);
             }
         }
