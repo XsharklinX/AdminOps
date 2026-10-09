@@ -65,6 +65,7 @@ import { Session } from "./Session";
 import { People } from "./People";
 import { Clients } from "./Clients";
 import { Disks } from "./Disks";
+import { PartitionsTab } from "../components/DiskPartitions";
 import { Space } from "./Space";
 import { Shortcuts } from "./Shortcuts";
 import { Startup } from "./Startup";
@@ -583,9 +584,11 @@ const DATA: PageTab<DataTab>[] = [
 export function DataTools({
   focus,
   onNavigate,
+  isAdmin,
 }: {
   focus?: string | null;
   onNavigate: (p: PageId) => void;
+  isAdmin: boolean;
 }) {
   return (
     <Tabbed
@@ -599,7 +602,7 @@ export function DataTools({
         ) : t === "wipe" ? (
           <Wipe onNavigate={onNavigate} />
         ) : t === "recover" ? (
-          <Recover />
+          <Recover isAdmin={isAdmin} />
         ) : (
           <Family />
         )
@@ -655,7 +658,7 @@ export function AccountsAndDomain({
   );
 }
 
-type DiskTab = "space" | "health";
+type DiskTab = "space" | "health" | "partitions";
 const DISK_TABS: PageTab<DiskTab>[] = [
   {
     id: "space",
@@ -669,6 +672,12 @@ const DISK_TABS: PageTab<DiskTab>[] = [
     icon: <Stethoscope size={14} />,
     help: "Qué le pasa a cada disco (superficie, conexión o sistema de archivos), repararlo cuando se puede y rescatar los archivos de un disco que falla.",
   },
+  {
+    id: "partitions",
+    label: "Particiones y arranque",
+    icon: <Layers size={14} />,
+    help: "La tabla de particiones de cada disco, si está rota, buscar particiones perdidas y devolverlas, y reparar el arranque de Windows.",
+  },
 ];
 
 /** Discos: el espacio y su salud (con reparación y rescate de archivos). */
@@ -681,7 +690,7 @@ export function DiskTools({
   focus?: string | null;
   onNavigate?: (p: PageId, focus?: string | null) => void;
 }) {
-  return <Tabbed tabs={DISK_TABS} focus={focus} render={(t) => (t === "space" ? <Space onNavigate={onNavigate} /> : <Disks isAdmin={isAdmin} />)} />;
+  return <Tabbed tabs={DISK_TABS} focus={focus} render={(t) => (t === "space" ? <Space onNavigate={onNavigate} /> : t === "health" ? <Disks isAdmin={isAdmin} /> : <PartitionsTab isAdmin={isAdmin} />)} />;
 }
 
 type WhoTab = "people" | "clients";

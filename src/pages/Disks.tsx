@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { BitLockerChip, DiskTrend, RemovableActions, SpeedTest } from "../components/DiskExtras";
 import { DiskDeep, DiskWatchCard, ScoreCard } from "../components/DiskDeep";
+import { CloneCard } from "../components/DiskRescue";
 import { usePrefs } from "../lib/prefs";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Loading } from "../components/ui";
@@ -67,6 +68,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       <Rescue isAdmin={isAdmin} />
+      {technician && <CloneCard isAdmin={isAdmin} />}
       {technician && <DiskWatchCard />}
 
       <Card title="¿Qué significa cada cosa?" icon={<Activity size={14} />}>

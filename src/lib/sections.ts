@@ -36,7 +36,8 @@ export const SECTIONS: Partial<Record<PageId, Section[]>> = {
   ],
   space: [
     { id: "space", label: "Espacio", keywords: "liberar lleno ocupa carpetas grandes" },
-    { id: "health", label: "Salud y reparación", keywords: "smart chkdsk sectores dañado rescatar pendrive" },
+    { id: "health", label: "Salud y reparación", keywords: "smart chkdsk sectores dañado rescatar pendrive clonar imagen superficie autoprueba vigilante crystaldiskinfo" },
+    { id: "partitions", label: "Particiones y arranque", keywords: "particion perdida tabla gpt mbr testdisk sin formato arranque bcd bootmgr disco sin asignar" },
   ],
   data: [
     { id: "migrate", label: "Copia de datos", keywords: "migrar pasar a otro pc perfil marcadores" },

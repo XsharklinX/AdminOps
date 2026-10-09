@@ -194,7 +194,7 @@ const CELL_CLASS: Record<string, string> = {
   "?": "bg-line",
 };
 
-function SurfaceMap({ cells }: { cells: string }) {
+export function SurfaceMap({ cells }: { cells: string }) {
   return (
     <div>
       <div className="grid gap-px" style={{ gridTemplateColumns: "repeat(50, minmax(0, 1fr))" }} role="img" aria-label="Mapa de la superficie del disco">

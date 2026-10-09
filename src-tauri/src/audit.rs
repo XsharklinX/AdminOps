@@ -34,6 +34,12 @@ const BLOCKED: &[&str] = &[
     "disk_capacity_test",
     "disk_format",
     "disk_eject",
+    "smart_selftest",
+    "partition_table_restore",
+    "partition_restore",
+    "boot_repair",
+    "carve_recover",
+    "disk_clone",
     // Programas y Windows
     "remove_apps",
     "reinstall_app",
@@ -280,6 +286,10 @@ const SAFE: &[&str] = &[
     "dismiss_windows_alert", "mute_windows_alert", "unmute_windows_alert", "muted_windows_alerts",
     // wipe
     "wipe_pick", "open_ms_settings",
+    // discos a fondo: solo leen (o guardan copias y ajustes propios de AdminOps)
+    "diskwatch_get", "diskwatch_set", "smart_full", "smart_selftest_status", "disk_scan", "disk_scan_live", "disk_scan_last",
+    "partition_layout", "partition_backup", "partition_backups", "partition_find_lost",
+    "carve_scan", "carve_found", "carve_preview", "disk_clone_live", "disk_clone_last",
     // workflow
     "get_settings", "save_settings", "list_clients", "visit_changes", "compare_client_machines", "save_client", "delete_client", "get_session",
     "start_session", "update_session", "cancel_session", "finish_session", "set_next_maintenance", "export_config", "import_config",

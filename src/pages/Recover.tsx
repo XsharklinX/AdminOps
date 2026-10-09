@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, inputClass, Loading } from "../components/ui";
+import { CarveCard } from "../components/DiskRescue";
 import { recoverApi, type RecoverDrive } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 
@@ -16,7 +17,7 @@ const KINDS: [string, string][] = [
 
 const driveLabel = (d: RecoverDrive) => `${d.letter}: ${d.label ? `· ${d.label} ` : ""}· ${bytes(d.size, 0)} · ${d.fs}${d.kind === "Removable" ? " · extraíble" : ""}`;
 
-export function Recover() {
+export function Recover({ isAdmin }: { isAdmin: boolean }) {
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [drives, setDrives] = useState<RecoverDrive[]>([]);
   const [source, setSource] = useState("");
@@ -185,6 +186,9 @@ export function Recover() {
           </div>
         )}
       </Card>
+      <div className="col-span-12">
+        <CarveCard isAdmin={isAdmin} />
+      </div>
     </div>
   );
 }

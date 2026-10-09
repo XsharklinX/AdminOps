@@ -38,14 +38,12 @@ impl Aligned {
 }
 
 /// Un archivo (imagen de disco o dispositivo en Linux, para las pruebas).
-#[allow(dead_code)] // lo usan el clonado y la recuperación de archivos sobre imágenes
 pub struct FileSource {
     file: std::fs::File,
     len: u64,
     sector: u32,
 }
 
-#[allow(dead_code)]
 impl FileSource {
     pub fn open(path: &std::path::Path, sector: u32) -> std::io::Result<Self> {
         let file = std::fs::File::open(path)?;
@@ -137,7 +135,6 @@ mod win {
         /// Lectura de datos, sin pasar por la caché.
         Read,
         /// Lectura y escritura (solo particiones).
-        #[allow(dead_code)]
         Write,
     }
 
@@ -204,7 +201,6 @@ mod win {
             }
         }
 
-        #[allow(dead_code)]
         /// Escribe `buf` (múltiplo del sector y alineado) en `offset`.
         pub fn write_at(&self, offset: u64, buf: &[u8]) -> Result<(), u32> {
             // SAFETY: el identificador es válido y el búfer vive durante la llamada.
@@ -296,3 +292,16 @@ pub mod stub {
 
 #[cfg(not(windows))]
 pub use stub::{Mode, RawDisk};
+
+/// Para elegir en tiempo de ejecución entre un disco físico y una imagen.
+impl BlockSource for Box<dyn BlockSource + Send> {
+    fn len(&self) -> u64 {
+        (**self).len()
+    }
+    fn sector(&self) -> u32 {
+        (**self).sector()
+    }
+    fn read_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<usize, u32> {
+        (**self).read_at(offset, buf)
+    }
+}

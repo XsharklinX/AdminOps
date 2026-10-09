@@ -610,7 +610,7 @@ export default function App() {
     if (p === "machine") return <MachineState isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "apps") return <Apps isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "tools") return <WindowsToolbox isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "data") return <DataTools focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} />;
+    if (p === "data") return <DataTools focus={p === page ? focus : null} onNavigate={(x: PageId) => navigate(x)} isAdmin={!!isAdmin} />;
     if (p === "space") return <DiskTools isAdmin={!!isAdmin} focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "session") return <ServiceSession onSessionChange={setSessionActive} focus={p === page ? focus : null} />;
     if (p === "agenda") return <Agenda onNavigate={navigate} focus={p === page ? focus : null} />;

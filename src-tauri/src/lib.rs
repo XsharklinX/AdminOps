@@ -27,6 +27,12 @@ mod disktools;
 mod diskscan;
 mod diskscanio;
 mod diskwatch;
+mod carve;
+mod carveio;
+mod clone;
+mod cloneio;
+mod partitions;
+mod partitionsio;
 mod rawdisk;
 mod smartio;
 mod smartx;
@@ -364,6 +370,20 @@ pub fn run() {
             diskscanio::disk_scan,
             diskscanio::disk_scan_live,
             diskscanio::disk_scan_last,
+            partitionsio::partition_layout,
+            partitionsio::partition_backup,
+            partitionsio::partition_backups,
+            partitionsio::partition_table_restore,
+            partitionsio::partition_find_lost,
+            partitionsio::partition_restore,
+            partitionsio::boot_repair,
+            carveio::carve_scan,
+            carveio::carve_found,
+            carveio::carve_preview,
+            carveio::carve_recover,
+            cloneio::disk_clone,
+            cloneio::disk_clone_live,
+            cloneio::disk_clone_last,
             disktools::disk_speed_test,
             disktools::disk_capacity_test,
             disktools::disk_eject,
