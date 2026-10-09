@@ -107,7 +107,7 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
-### v1.2.7 — Discos a fondo y banco de ideas (hecho, sin build, sin probar en hardware real)
+### v1.2.7 — Discos a fondo y banco de ideas (hecho, build local pendiente, sin probar en hardware real)
 
 Elegidas por el autor sobre el artifact «Ideas para AdminOps» (19 ideas, todas). **Verificado**: tipos
 (`tsc`), `eslint`, `vitest`, `cargo clippy --all-targets -D warnings` contra el objetivo de Windows y

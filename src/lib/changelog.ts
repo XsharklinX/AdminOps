@@ -18,6 +18,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.7",
+    title: "Discos a fondo, copias comprobadas y un banco de mejoras",
+    added: [
+      "Discos a fondo, para no depender de CrystalDiskInfo ni de TestDisk. Cada disco lleva una nota de 0 a 100 con su desglose y los años que le quedan; la tabla SMART completa con valor, peor valor, umbral y dato bruto, cada fila explicada; las autopruebas del propio disco; la curva de velocidad de lectura; y un mapa de superficie en solo lectura que se puede parar y seguir otro día.",
+      "Vigilante de discos en segundo plano: avisa solo cuando una cifra cambia de verdad (sectores pendientes que suben, fallo anunciado, calor sostenido, poco espacio, un disco que desaparece), en la campana, en «Hoy» y en el diario.",
+      "Discos → Particiones y arranque: la tabla MBR o GPT de cada disco y lo que tiene roto, búsqueda de particiones perdidas (NTFS, FAT32, exFAT) y restauración con copia previa de la tabla, y reparación del arranque de Windows.",
+      "Clonar o hacer una imagen de un disco que falla, en tres pasadas (primero lo que se lee bien, después lo dudoso, al final sector a sector), con mapa y reanudación. Y en Recuperar archivos, búsqueda por firma para discos formateados o tarjetas, con miniaturas.",
+      "Informe de disco para el cliente (semáforo, qué significa y qué hacer) y textos listos para pegar en el ticket. Datos del equipo → Copias de seguridad: comprueba que la copia es reciente, está en otro disco, cubre lo importante y se puede restaurar.",
+      "Cerrar un caso: la resolución en tres tonos (breve, para la persona o técnica). Modo privacidad (Ctrl+Alt+P) que difumina correos, IP y claves al compartir pantalla. Etiqueta con QR por equipo.",
+      "Hardware: «¿Reparar o cambiar este equipo?» (la pieza que lo frena y lo que cuesta alargarle la vida frente a uno nuevo) y repuestos compatibles. Rendimiento: los saltos del uso junto a lo que pasó justo antes. Ajustes → Alertas: reglas propias.",
+      "En modo usuario, la primera pantalla responde si el equipo está bien, con tres tarjetas (velocidad, seguridad y espacio) y un botón para arreglar lo que se pueda.",
+    ],
+  },
+  {
     version: "1.2.6",
     title: "Ajustes ordenados, vista previa del informe y la batería en el tiempo",
     added: [

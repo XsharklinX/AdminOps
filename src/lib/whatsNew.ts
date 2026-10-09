@@ -10,7 +10,11 @@ export const NEW_IN: Record<string, string> = {
   dashboard: "1.2.4",
   "machine:performance": "1.2.4",
   settings: "1.2.6",
-  "machine:hardware": "1.2.6",
+  "machine:hardware": "1.2.7",
+  "space:health": "1.2.7",
+  "space:partitions": "1.2.7",
+  "data:backups": "1.2.7",
+  "data:recover": "1.2.7",
   "session:report": "1.2.6",
 };
 

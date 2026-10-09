@@ -13,13 +13,13 @@ describe("marca «Nuevo»", () => {
   });
 
   it("solo señala lo posterior a la versión con la que se empezó, y lo no visto", () => {
-    const recent = ["1.2.6", "1.2.5", "1.2.4"];
+    const recent = ["1.2.7", "1.2.6", "1.2.5"];
     const all = Object.keys(NEW_IN);
     expect(pendingMarks("0", [], recent).sort()).toEqual(all.filter((k) => recent.includes(NEW_IN[k])).sort());
     // Instalación nueva: nada es «nuevo».
-    expect(pendingMarks("1.2.6", [], recent)).toEqual([]);
-    // Venía de la 1.2.4: solo lo de después.
-    expect(pendingMarks("1.2.4", [], recent)).toEqual(all.filter((k) => newerThan(NEW_IN[k], "1.2.4") && recent.includes(NEW_IN[k])));
+    expect(pendingMarks("1.2.7", [], recent)).toEqual([]);
+    // Venía de la 1.2.5: solo lo de después.
+    expect(pendingMarks("1.2.5", [], recent)).toEqual(all.filter((k) => newerThan(NEW_IN[k], "1.2.5") && recent.includes(NEW_IN[k])));
     expect(pendingMarks("0", ["dashboard"], recent)).not.toContain("dashboard");
     // Lo de versiones que ya no son recientes deja de señalarse.
     expect(pendingMarks("0", [], ["9.9.9"])).toEqual([]);
