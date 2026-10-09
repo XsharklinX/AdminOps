@@ -79,7 +79,7 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
   const current = SYMPTOMS.find((s) => s.id === symptom);
 
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="¿Qué le pasa al equipo?" icon={<Wrench size={14} />} className="col-span-12">
         <p className="mb-3 text-xs text-dim">Elige el síntoma: AdminOps revisa en orden las causas típicas y te ofrece la reparación de cada una.</p>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">

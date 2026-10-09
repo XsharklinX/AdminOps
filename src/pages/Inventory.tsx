@@ -112,7 +112,7 @@ export function Inventory() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <Card title="Inventario de equipos" icon={<Boxes size={14} />}>
         <p className="mb-3 text-sm text-dim">
           Cada equipo que pasa por una sesión de servicio (o que añades aquí) queda en la ficha de su cliente con su hardware y una recomendación:

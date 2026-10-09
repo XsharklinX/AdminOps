@@ -21,7 +21,7 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ size?: number 
 export function NetTools({ isAdmin }: { isAdmin: boolean }) {
   const [tab, setTab] = useState<Tab>("probe");
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className="mx-auto max-w-(--page-max) p-6">
       <div className="mb-4 flex gap-1 rounded-lg border border-line bg-panel p-1">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button

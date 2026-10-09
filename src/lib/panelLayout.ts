@@ -1,17 +1,30 @@
 // El Panel a medida: qué tarjetas hay, en qué orden y cuáles están ocultas.
 // La elección se guarda en las preferencias (por técnico).
 
+/** El Panel es una rejilla de seis columnas: así caben tercios y mitades. */
+export const PANEL_COLUMNS = 6;
+
+/** Los anchos que se pueden elegir, en columnas de la rejilla. */
+export const WIDTHS = [
+  { span: 2, label: "⅓", title: "Un tercio" },
+  { span: 3, label: "½", title: "La mitad" },
+  { span: 4, label: "⅔", title: "Dos tercios" },
+  { span: 6, label: "Todo", title: "Todo el ancho" },
+] as const;
+
+export type Span = (typeof WIDTHS)[number]["span"];
+
 export const PANEL_BLOCKS = {
-  today: { label: "Pendiente de hoy", span: 3 },
-  notes: { label: "Notas de este equipo y esta red", span: 3 },
-  live: { label: "En vivo: procesador, memoria, disco y red", span: 3 },
-  plan: { label: "Qué hacer ahora", span: 2 },
-  quick: { label: "Acciones rápidas", span: 1 },
-  slow: { label: "Qué frena el equipo ahora", span: 3 },
-  machine: { label: "Este equipo", span: 1 },
-  disks: { label: "Discos", span: 1 },
-  recent: { label: "Actividad reciente", span: 1 },
-} as const;
+  today: { label: "Pendiente de hoy", span: 6 },
+  notes: { label: "Notas de este equipo y esta red", span: 6 },
+  live: { label: "En vivo: procesador, memoria, disco y red", span: 6 },
+  plan: { label: "Qué hacer ahora", span: 4 },
+  quick: { label: "Acciones rápidas", span: 2 },
+  slow: { label: "Qué frena el equipo ahora", span: 6 },
+  machine: { label: "Este equipo", span: 2 },
+  disks: { label: "Discos", span: 2 },
+  recent: { label: "Actividad reciente", span: 2 },
+} as const satisfies Record<string, { label: string; span: Span }>;
 
 export type PanelBlock = keyof typeof PANEL_BLOCKS;
 export const DEFAULT_ORDER = Object.keys(PANEL_BLOCKS) as PanelBlock[];
@@ -19,6 +32,14 @@ export const DEFAULT_ORDER = Object.keys(PANEL_BLOCKS) as PanelBlock[];
 export interface PanelPrefs {
   order: string[];
   hidden: string[];
+  /** Ancho elegido por tarjeta (columnas de seis); lo que no está, el de fábrica. */
+  widths: Record<string, number>;
+}
+
+/** El ancho de una tarjeta: el elegido si es uno de los válidos, si no el de fábrica. */
+export function spanOf(id: PanelBlock, widths: Record<string, number>): Span {
+  const chosen = widths[id];
+  return WIDTHS.some((w) => w.span === chosen) ? (chosen as Span) : PANEL_BLOCKS[id].span;
 }
 
 /**

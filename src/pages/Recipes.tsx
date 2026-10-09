@@ -95,7 +95,7 @@ export function Recipes({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-dim">
           Una plantilla reúne todo lo que haces en un equipo nuevo (quitar bloatware, instalar programas, crear el usuario, unir al dominio…) para hacerlo de una

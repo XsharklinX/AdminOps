@@ -91,7 +91,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
   const step = (done: boolean, n: number) => (done ? <CheckCircle2 size={16} className="shrink-0 text-ok" /> : <span className="grid size-4 shrink-0 place-items-center rounded-full border border-line-2 text-[10px] text-mute">{n}</span>);
 
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       {/* Esta sesión y el equipo */}
       <Card
         title="Esta sesión"

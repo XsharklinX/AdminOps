@@ -299,12 +299,7 @@ export function Reports({ s, set }: SettingsProps) {
                   />
                 </td>
                 <td className="py-1 text-center">
-                  <input
-                    type="checkbox"
-                    checked={c.part}
-                    onChange={(e) => setItem(i, { part: e.target.checked })}
-                    className="size-4 accent-[var(--color-neon)]"
-                  />
+                  <input type="checkbox" checked={c.part} onChange={(e) => setItem(i, { part: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
                 </td>
                 <td className="py-1 pr-2">
                   <input

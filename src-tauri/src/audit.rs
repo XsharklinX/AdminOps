@@ -157,7 +157,7 @@ const SAFE: &[&str] = &[
     // diagnostics
     "run_diagnostics", "list_snapshots", "latest_findings", "open_system_tool",
     // diagnostics::report
-    "generate_report", "open_report", "reveal_report", "email_report", "email_report_manual",
+    "generate_report", "preview_report", "open_report", "reveal_report", "email_report", "email_report_manual",
     // domain
     "domain_status", "domain_check",
     // drivers
@@ -169,7 +169,7 @@ const SAFE: &[&str] = &[
     // hardware
     "hardware_inventory", "memory_test_result",
     // hardware::sensors
-    "read_sensors", "open_third_party_notices",
+    "read_sensors", "battery_history", "open_third_party_notices",
     // hardware::smart
     "smart_status", "disks_status", "disk_check", "disk_pick_folder", "bitlocker_local_key", "disk_speed_test", "autobackup_info", "autobackup_set", "autobackup_run_now", "storage_info", "storage_make_portable", "storage_set_browser_on_usb", "company_export", "company_import_preview", "company_import_apply",
     // keys

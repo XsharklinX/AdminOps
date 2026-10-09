@@ -40,7 +40,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
   useLiveEffect((vigente) => load(vigente), []);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <p className="min-w-0 flex-1 text-xs text-dim">
           Qué le pasa a cada disco y qué hacer. Si Windows te dice «Reparar disco» o hay archivos que no se copian, empieza por el veredicto: no es lo mismo un

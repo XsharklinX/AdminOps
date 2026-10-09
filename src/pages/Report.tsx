@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { BillingEditor, SendReportModal, TemplatePicker } from "../components/service";
 import { Button, Card, inputClass, Loading } from "../components/ui";
-import { logQuietly, diagApi, EMPTY_BILLING, tweaksApi, workApi, type Billing, type Client, type Settings, type SnapshotInfo, type Template } from "../lib/api";
+import { ReportPreview } from "../components/ReportPreview";
+import { logQuietly, diagApi, EMPTY_BILLING, tweaksApi, workApi, type Billing, type Client, type Settings, type ReportOptions, type SnapshotInfo, type Template } from "../lib/api";
 import { dateTime as when } from "../lib/format";
 
 const TECH_KEY = "adminops.technician";
@@ -78,6 +79,20 @@ export function Report() {
     await generate(merged);
   };
 
+  // Lo que va al informe: lo mismo para la vista previa y para el PDF.
+  const options = (notesOverride?: string): ReportOptions => ({
+    baseline,
+    technician: technician.trim(),
+    clientId: picked?.id ?? null,
+    client: picked ? picked.name : client.trim(),
+    notes: notesOverride ?? notes,
+    template,
+    billing,
+    problem,
+    recommendations,
+    archive: !!picked && archive,
+  });
+
   const generate = async (notesOverride?: string) => {
     try {
       localStorage.setItem(TECH_KEY, technician);
@@ -89,18 +104,7 @@ export function Report() {
       // El informe usa un análisis recién hecho como "después".
       await diagApi.run();
       setBusy("Generando informe…");
-      const path = await diagApi.generateReport({
-        baseline,
-        technician: technician.trim(),
-        clientId: picked?.id ?? null,
-        client: picked ? picked.name : client.trim(),
-        notes: notesOverride ?? notes,
-        template,
-        billing,
-        problem,
-        recommendations,
-        archive: !!picked && archive,
-      });
+      const path = await diagApi.generateReport(options(notesOverride));
       setLastPath(path);
       const pdf = path.toLowerCase().endsWith(".pdf");
       toast(pdf ? "ok" : "info", pdf ? "Informe PDF generado." : "No se pudo crear el PDF (falta Microsoft Edge): se guardó como HTML.");
@@ -120,7 +124,8 @@ export function Report() {
   );
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) items-start gap-4 p-6 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,44%)]">
+      <div className="grid min-w-0 grid-cols-12 gap-4">
       <div className="col-span-12 flex flex-wrap items-center gap-3 rounded-xl border border-neon/30 bg-neon/5 px-4 py-3">
         <Zap size={16} className="shrink-0 text-neon" />
         <p className="min-w-0 flex-1 text-sm text-dim">
@@ -224,6 +229,8 @@ export function Report() {
         </Button>
       </div>
       {sending && lastPath && <SendReportModal path={lastPath} client={picked ?? (client.trim() ? { name: client.trim() } : null)} onClose={() => setSending(false)} />}
+      </div>
+      <ReportPreview options={options()} />
     </div>
   );
 }

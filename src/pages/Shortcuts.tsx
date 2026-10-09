@@ -147,7 +147,7 @@ export function Shortcuts() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className="mx-auto max-w-(--page-max) p-6">
       <div className="mb-4 flex items-center gap-3">
         <div className="relative flex-1">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />

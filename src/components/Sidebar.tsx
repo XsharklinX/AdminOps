@@ -26,7 +26,6 @@ import {
   Heart,
   Home,
   Layers,
-  LayoutGrid,
   Lock,
   Lock as LockIcon,
   MessagesSquare,
@@ -507,7 +506,6 @@ export function Sidebar({
   isAdmin,
   badges,
   sessionActive,
-  onTodo,
   onLock,
   update,
   recent = [],
@@ -519,7 +517,6 @@ export function Sidebar({
   badges: Record<string, Badge>;
   sessionActive: boolean;
   /** Abre «Todo AdminOps» (el mapa y el buscador). */
-  onTodo: () => void;
   onLock?: () => void;
   update?: UpdateInfo | null;
   recent?: PageId[];
@@ -628,8 +625,6 @@ export function Sidebar({
 
   const rail = (
     <nav aria-label="Áreas" className={`flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
-      {fixedButton("Todo", LayoutGrid, false, onTodo, "Todo AdminOps: cada función del programa, y el buscador (Ctrl+K o F1)")}
-      <div className="my-1 h-px w-10 bg-line" />
       {areas.map((a) => {
         const on = !mini ? shown?.id === a.id && (activeArea?.id === a.id || !activeArea) : activeArea?.id === a.id;
         return (
@@ -723,9 +718,9 @@ export function Sidebar({
 
         {update && (
           <button
-            onClick={() => goToPage("settings", "general")}
+            onClick={() => goToPage("settings", "about")}
             className="mx-2.5 mb-2 flex flex-col gap-0.5 rounded-lg border border-neon/40 bg-neon/5 px-3 py-2.5 text-left transition-colors hover:border-neon"
-            title={update.notes || "Ver la versión nueva en Ajustes → General"}
+            title={update.notes || "Ver la versión nueva en Ajustes → Acerca de"}
           >
             <span className="text-xs text-neon">Versión {update.latest} disponible</span>
             <span className="text-[13px] text-ink">Ver novedades y descargar</span>

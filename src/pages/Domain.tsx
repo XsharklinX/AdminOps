@@ -71,7 +71,7 @@ export function Domain({ isAdmin }: { isAdmin: boolean }) {
   const skewBad = s.timeOffset !== null && Math.abs(s.timeOffset) > 300;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       {!isAdmin && <NeedsAdmin>Sin administrador solo puedes ver el estado. Unir, salir, reparar o renombrar requiere administrador.</NeedsAdmin>}
       {needsRestart && (
         <div className="flex items-center gap-3 rounded-lg border border-neon/40 bg-neon/5 px-4 py-3">

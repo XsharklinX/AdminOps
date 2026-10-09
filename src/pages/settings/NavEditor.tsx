@@ -2,7 +2,7 @@ import { Eye, EyeOff, GripVertical, Plus, RotateCcw, Star, Trash2 } from "lucide
 import { useState } from "react";
 import { useConfirm } from "../../components/feedback";
 import { AREA_ICONS, effectiveAreas, NAV, navLabel, type PageId } from "../../components/Sidebar";
-import { Button, Card } from "../../components/ui";
+import { Button, Card, Toggle } from "../../components/ui";
 import { DEFAULT_SIDEBAR, setPrefs, setSidebar, usePrefs, type NavArea, type SidebarPrefs } from "../../lib/prefs";
 
 const defaultLabel = (p: PageId) => NAV.find((n) => n.id === p)?.label ?? p;
@@ -39,7 +39,7 @@ function Opt({ title, sub, children }: { title: string; sub?: string; children: 
 function Check({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <label className="flex items-center gap-2 py-0.5 text-[13px] text-dim">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="size-4 accent-[var(--color-neon)]" />
+      <Toggle checked={checked} onChange={(v) => onChange(v)} />
       {label}
     </label>
   );

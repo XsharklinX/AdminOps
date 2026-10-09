@@ -312,7 +312,7 @@ function DoneStep({ mode }: { mode: AppMode }) {
               <span className="text-neon">·</span> Dar acceso a tu técnico desde <span className="text-ink">Acceso remoto</span>.
             </li>
           </ul>
-          <p className="text-xs text-mute">Si eres el técnico y quieres AdminOps completo, cámbialo en Ajustes → General.</p>
+          <p className="text-xs text-mute">Si eres el técnico y quieres AdminOps completo, cámbialo en Ajustes → Inicio y ventana.</p>
         </>
       )}
     </div>

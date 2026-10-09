@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arrange, DEFAULT_ORDER, dropOn, shift } from "./panelLayout";
+import { arrange, DEFAULT_ORDER, dropOn, PANEL_BLOCKS, shift, spanOf } from "./panelLayout";
 import { slowdown } from "./slowdown";
 import { resultPage, took, withFinished } from "./activity";
 
@@ -19,6 +19,13 @@ describe("Panel a medida", () => {
     expect(order).toHaveLength(DEFAULT_ORDER.length);
     // «slow» va de fábrica detrás de «quick».
     expect(order.indexOf("slow")).toBe(order.indexOf("quick") + 1);
+  });
+
+  it("cada tarjeta tiene su ancho, y uno raro vuelve al de fábrica", () => {
+    expect(spanOf("plan", {})).toBe(PANEL_BLOCKS.plan.span);
+    expect(spanOf("plan", { plan: 3 })).toBe(3);
+    expect(spanOf("plan", { plan: 5 })).toBe(PANEL_BLOCKS.plan.span);
+    expect(spanOf("quick", { plan: 6 })).toBe(PANEL_BLOCKS.quick.span);
   });
 
   it("mueve y suelta tarjetas", () => {

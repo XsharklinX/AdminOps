@@ -1,9 +1,9 @@
-// Ajustes → General: el técnico, la empresa, dónde se guardan los datos y el arranque.
+// Ajustes: Inicio y ventana, Avisos, Datos y copias, y piezas de Seguridad y Portales y red.
 import { CheckCircle2, Download, HardDrive, Sparkles, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NAV } from "../../components/Sidebar";
 import { useToast } from "../../components/feedback";
-import { Button, Card, inputClass } from "../../components/ui";
+import { Button, Card, inputClass, Toggle } from "../../components/ui";
 import { openOnboarding } from "../../lib/navigate";
 import { appcareApi, configApi, logQuietly, type Settings, storageApi, type StorageInfo } from "../../lib/api";
 import { exportPrefs, importPrefs, setPrefs, usePrefs } from "../../lib/prefs";
@@ -15,16 +15,118 @@ import { ModeCard } from "./About";
 import { DataCare } from "./DataCare";
 import { Row, selectClass, type SettingsProps } from "./shared";
 
-export function General({
-  s,
-  set,
-  portable,
-  onImported,
-}: SettingsProps & { portable: boolean; onImported: () => void }) {
+/** Ajustes → Inicio y ventana: para quién es, qué pasa al abrir y cómo se comporta la ventana. */
+export function StartWindow({ s, set }: SettingsProps) {
   const prefs = usePrefs();
   const toast = useToast();
   const pages = NAV.filter((n) => n.id !== "settings");
+  return (
+    <div className="space-y-4">
+      <ModeCard />
+      <Card title="Al abrir AdminOps">
+        <Row title="Página al abrir AdminOps" sub="La que se muestra al arrancar. De fábrica, el Panel.">
+          <select
+            value={prefs.startPage}
+            onChange={(e) => setPrefs({ startPage: e.target.value as typeof prefs.startPage, startPageChosen: true })}
+            className={selectClass}
+          >
+            <option value="last">La última que usé</option>
+            {pages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <Row title="Diagnosticar al abrir AdminOps" sub="Analiza el equipo en segundo plano nada más abrir: al entrar en Diagnóstico ya está hecho o a medias.">
+          <Toggle checked={prefs.diagnoseOnOpen} onChange={(v) => setPrefs({ diagnoseOnOpen: v })} />
+        </Row>
+        <Autostart />
+        <Row
+          title="Volver a ver la bienvenida"
+          sub="El asistente de la primera vez: elegir el modo (técnico o usuario), la página de inicio y lo básico de AdminOps. No borra nada de lo que ya tengas configurado."
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button kind="ghost" size="sm" onClick={openOnboarding}>
+              <Sparkles size={13} /> Ver la bienvenida
+            </Button>
+            <Button
+              kind="ghost"
+              size="sm"
+              onClick={() => {
+                showFirstStepsAgain();
+                toast("ok", "Primeros pasos vuelve a salir en el Panel.");
+              }}
+            >
+              Ver «Primeros pasos»
+            </Button>
+          </div>
+        </Row>
+      </Card>
+      <Card title="La ventana">
+        <Row
+          title="Al cerrar la ventana, minimizar"
+          sub="La X deja AdminOps minimizada en vez de cerrarla, para no perder lo que tenías abierto: en la barra de tareas o, con el icono junto al reloj, escondida en él. Para cerrarla de verdad aparece el botón «Salir» en la barra de arriba."
+        >
+          <Toggle checked={s.closeMinimizes} onChange={(v) => set({ closeMinimizes: v })} />
+        </Row>
+        <Row
+          title="Icono junto al reloj"
+          sub="Un icono de AdminOps al lado del reloj de Windows. Clic para abrirla; clic derecho para un análisis rápido, la nota de llamada, el mini monitor, los avisos o salir. Windows 11 lo deja al principio en los iconos ocultos (la flecha «^» junto al reloj): arrástralo de ahí a la barra para tenerlo siempre a la vista."
+        >
+          <Toggle checked={s.trayIcon} onChange={(v) => set({ trayIcon: v })} />
+        </Row>
+        <Row title="Actualización del Panel" sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo.">
+          <select value={prefs.refreshMs} onChange={(e) => setPrefs({ refreshMs: Number(e.target.value) })} className={selectClass}>
+            <option value={1000}>Cada segundo</option>
+            <option value={2000}>Cada 2 segundos</option>
+            <option value={5000}>Cada 5 segundos</option>
+          </select>
+        </Row>
+      </Card>
+    </div>
+  );
+}
 
+/** Ajustes → Avisos: qué vigila AdminOps y cuándo avisa con una notificación de Windows. */
+export function AlertSettings({ s, set }: SettingsProps) {
+  return (
+    <div className="space-y-4">
+      <Card title="Errores de Windows">
+        <Row
+          title="Vigilar errores de Windows"
+          sub="Mientras AdminOps está abierta, revisa el Visor de eventos y avisa (campana de arriba y notificación) de pantallazos, discos con fallos, programas que se cierran, falta de memoria o espacio…"
+        >
+          <Toggle checked={s.watchWindows} onChange={(v) => set({ watchWindows: v })} />
+        </Row>
+        <Row
+          title="Notificaciones de Windows de los avisos"
+          sub="Con AdminOps en segundo plano. A la campana llegan siempre todos; aquí se elige de cuáles salta además la notificación."
+        >
+          <select
+            value={s.notifyAlerts}
+            onChange={(e) => set({ notifyAlerts: e.target.value as typeof s.notifyAlerts })}
+            disabled={!s.watchWindows}
+            className={selectClass}
+          >
+            <option value="all">Todos</option>
+            <option value="bad">Solo los graves</option>
+            <option value="none">Ninguno</option>
+          </select>
+        </Row>
+      </Card>
+      <Card title="Tareas de AdminOps">
+        <Row title="Avisar al terminar tareas largas" sub="Notificación de Windows cuando una tarea de más de 20 s acaba con AdminOps en segundo plano.">
+          <Toggle checked={s.notifyTasks} onChange={(v) => set({ notifyTasks: v })} />
+        </Row>
+      </Card>
+    </div>
+  );
+}
+
+/** Ajustes → Datos y copias: dónde están tus datos, sus copias y su limpieza. */
+export function DataSettings({ s, set, portable, onImported }: SettingsProps & { portable: boolean; onImported: () => void }) {
+  const toast = useToast();
   const doExport = async () => {
     try {
       const p = await configApi.export(exportPrefs());
@@ -45,191 +147,16 @@ export function General({
       toast("error", String(e));
     }
   };
-
   return (
     <div className="space-y-4">
-      <ModeCard />
-      <Card title="Inicio y actualización">
-        <Row
-          title="Página al abrir AdminOps"
-          sub="La que se muestra al arrancar. De fábrica, el Panel."
-        >
-          <select
-            value={prefs.startPage}
-            onChange={(e) =>
-              setPrefs({ startPage: e.target.value as typeof prefs.startPage, startPageChosen: true })
-            }
-            className={selectClass}
-          >
-            <option value="last">La última que usé</option>
-            {pages.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </Row>
-        <Row
-          title="Volver a ver la bienvenida"
-          sub="El asistente de la primera vez: elegir el modo (técnico o usuario), la página de inicio y lo básico de AdminOps. No borra nada de lo que ya tengas configurado."
-        >
-          <Button kind="ghost" onClick={openOnboarding}>
-            <Sparkles size={14} /> Ver la bienvenida
-          </Button>
-          <Button
-            kind="ghost"
-            onClick={() => {
-              showFirstStepsAgain();
-              toast("ok", "Primeros pasos vuelve a salir en el Panel.");
-            }}
-          >
-            Ver «Primeros pasos»
-          </Button>
-        </Row>
-        <Row
-          title="Actualización del Panel"
-          sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo."
-        >
-          <select
-            value={prefs.refreshMs}
-            onChange={(e) => setPrefs({ refreshMs: Number(e.target.value) })}
-            className={selectClass}
-          >
-            <option value={1000}>Cada segundo</option>
-            <option value={2000}>Cada 2 segundos</option>
-            <option value={5000}>Cada 5 segundos</option>
-          </select>
-        </Row>
-        <Row
-          title="Precargar los portales"
-          sub="Carga en segundo plano el último portal usado de Tickets, Inventario web, Correo y Teams, para que al entrar ya esté listo. Los de sesión privada no se precargan."
-        >
-          <input
-            type="checkbox"
-            checked={prefs.preloadPortals}
-            onChange={(e) => setPrefs({ preloadPortals: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
-        </Row>
-        <Row
-          title="Diagnosticar al abrir AdminOps"
-          sub="Analiza el equipo en segundo plano nada más abrir: al entrar en Diagnóstico ya está hecho o a medias."
-        >
-          <input
-            type="checkbox"
-            checked={prefs.diagnoseOnOpen}
-            onChange={(e) => setPrefs({ diagnoseOnOpen: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
-        </Row>
-        <Row
-          title="Vigilar errores de Windows"
-          sub="Mientras AdminOps está abierta, revisa el Visor de eventos cada minuto y avisa (campana de arriba y notificación) de pantallazos, discos con fallos, programas que se cierran, falta de memoria o espacio…"
-        >
-          <input
-            type="checkbox"
-            checked={s.watchWindows}
-            onChange={(e) => set({ watchWindows: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
-        </Row>
-        <Row
-          title="Notificaciones de Windows de los avisos"
-          sub="Con AdminOps en segundo plano. A la campana llegan siempre todos; aquí se elige de cuáles salta además la notificación."
-        >
-          <select
-            value={s.notifyAlerts}
-            onChange={(e) => set({ notifyAlerts: e.target.value as typeof s.notifyAlerts })}
-            disabled={!s.watchWindows}
-            className={selectClass}
-          >
-            <option value="all">Todos</option>
-            <option value="bad">Solo los graves</option>
-            <option value="none">Ninguno</option>
-          </select>
-        </Row>
-        <Row
-          title="Avisar al terminar tareas largas"
-          sub="Notificación de Windows cuando una tarea de más de 20 s acaba con AdminOps en segundo plano."
-        >
-          <input
-            type="checkbox"
-            checked={s.notifyTasks}
-            onChange={(e) => set({ notifyTasks: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
-        </Row>
-      </Card>
-
-      <Card title="Cambios en el sistema">
-        <Row
-          title="Punto de restauración antes de cambiar el sistema"
-          sub="Permite volver atrás con Restaurar sistema si algo sale mal. Crear uno tarda 1–2 minutos (como mucho uno cada 30 min)."
-        >
-          <select
-            value={s.restorePoints}
-            onChange={(e) =>
-              set({
-                restorePoints: e.target.value as Settings["restorePoints"],
-              })
-            }
-            className={selectClass}
-          >
-            <option value="risky">Solo antes de cambios con riesgo</option>
-            <option value="always">Antes de cualquier cambio</option>
-            <option value="never">Nunca (no recomendado)</option>
-          </select>
-        </Row>
-        <Autostart />
-        <Row
-          title="Icono junto al reloj"
-          sub="Un icono de AdminOps al lado del reloj de Windows. Clic para abrirla; clic derecho para un análisis rápido, la nota de llamada, el mini monitor, los avisos o salir."
-        >
-          <input type="checkbox" checked={s.trayIcon} onChange={(e) => set({ trayIcon: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
-        </Row>
-        <Row
-          title="Al cerrar la ventana, minimizar"
-          sub="La X deja AdminOps minimizada en vez de cerrarla, para no perder lo que tenías abierto: en la barra de tareas o, con el icono junto al reloj, escondida en él. Para cerrarla de verdad aparece el botón «Salir» en la barra de arriba."
-        >
-          <input
-            type="checkbox"
-            checked={s.closeMinimizes}
-            onChange={(e) => set({ closeMinimizes: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
-        </Row>
-      </Card>
-
       <WhereStored portable={portable} />
-
-      <DataSafety />
-
       <AutoBackup />
-
-      <CompanyConfig />
-
-      <DataCare s={s} set={set} />
-
-      <Card title="Red y dominio">
-        <label className="block">
-          <span className="mb-1 block text-xs text-dim">
-            Dominio habitual (se propone al unir equipos)
-          </span>
-          <input
-            value={s.defaultDomain}
-            onChange={(e) => set({ defaultDomain: e.target.value })}
-            placeholder="p. ej. empresa.local"
-            className={inputClass}
-          />
-        </label>
-      </Card>
-
+      <DataSafety />
+      <DataCare s={s} set={set} part="data" />
       <Card title="Copia de la configuración">
         <p className="mb-3 text-sm text-dim">
-          Guarda en un archivo tus ajustes (marca, precios, checklist, firma),
-          los portales de Tickets y las preferencias de la interfaz, para
-          llevarlos a otro equipo o recuperarlos. No incluye contraseñas ni
-          clientes.
+          Guarda en un archivo tus ajustes (marca, precios, checklist, firma), los portales de Tickets y las preferencias de la interfaz, para llevarlos a otro
+          equipo o recuperarlos. No incluye contraseñas ni clientes.
         </p>
         <div className="flex gap-2">
           <Button kind="ghost" onClick={doExport}>
@@ -240,7 +167,37 @@ export function General({
           </Button>
         </div>
       </Card>
+      <CompanyConfig />
     </div>
+  );
+}
+
+/** Ajustes → Seguridad (junto al bloqueo): la red de seguridad antes de cambiar Windows. */
+export function SystemChanges({ s, set }: SettingsProps) {
+  return (
+    <Card title="Cambios en el sistema">
+      <Row
+        title="Punto de restauración antes de cambiar el sistema"
+        sub="Permite volver atrás con Restaurar sistema si algo sale mal. Crear uno tarda 1–2 minutos (como mucho uno cada 30 min)."
+      >
+        <select value={s.restorePoints} onChange={(e) => set({ restorePoints: e.target.value as Settings["restorePoints"] })} className={selectClass}>
+          <option value="risky">Solo antes de cambios con riesgo</option>
+          <option value="always">Antes de cualquier cambio</option>
+          <option value="never">Nunca (no recomendado)</option>
+        </select>
+      </Row>
+    </Card>
+  );
+}
+
+/** Ajustes → Portales y red: el dominio que se propone al unir equipos. */
+export function DomainCard({ s, set }: SettingsProps) {
+  return (
+    <Card title="Red y dominio">
+      <Row title="Dominio habitual" sub="Se propone al unir equipos a un dominio, para no escribirlo cada vez.">
+        <input value={s.defaultDomain} onChange={(e) => set({ defaultDomain: e.target.value })} placeholder="p. ej. empresa.local" className={`${inputClass} w-56`} />
+      </Row>
+    </Card>
   );
 }
 
@@ -405,13 +362,7 @@ function Autostart() {
       title="Abrir AdminOps al iniciar Windows"
       sub="Minimizada en la barra de tareas, sin pedir permiso de administrador cada vez. En modo portable, si mueves la carpeta, vuelve a activarlo."
     >
-      <input
-        type="checkbox"
-        checked={!!on}
-        disabled={on === null}
-        onChange={(e) => toggle(e.target.checked)}
-        className="size-4 accent-[var(--color-neon)]"
-      />
+      <Toggle checked={!!on} disabled={on === null} onChange={(v) => toggle(v)} />
     </Row>
   );
 }

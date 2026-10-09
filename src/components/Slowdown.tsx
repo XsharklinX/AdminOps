@@ -53,7 +53,7 @@ export function Slowdown({ metrics, onProcesses }: { metrics: LiveMetrics; onPro
         <span className="text-[15px] font-medium text-ink">{s.headline}</span>
       </div>
       {s.hogs.length > 0 && (
-        <div className="grid gap-x-10 lg:grid-cols-2">
+        <div className="grid gap-x-10 @2xl:grid-cols-2">
           {s.hogs.map((h) => (
             <div key={h.pid} className="flex items-start gap-3 border-b border-line py-2 text-[13px]">
               <div className="min-w-0 flex-1">

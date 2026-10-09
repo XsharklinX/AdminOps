@@ -1,6 +1,7 @@
 //! Hardware: inventario completo, sensores (LibreHardwareMonitor), SMART y
 //! resultado de la prueba de memoria.
 
+pub mod battery;
 pub mod sensors;
 pub mod smart;
 

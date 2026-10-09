@@ -6,6 +6,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { QuitButton } from "./components/QuitButton";
+import { OpenTabs } from "./components/OpenTabs";
+import { PageFind } from "./components/PageFind";
 import { LockScreen } from "./components/LockScreen";
 import { NAV, Sidebar, allowedInMode, areaOf, isPageId, pageLabel, resolvePage, visibleAreas, type Area, type PageId } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
@@ -356,7 +358,28 @@ export default function App() {
   aliveRef.current = alive;
   useEffect(() => {
     setAlive((a) => (a[0] === page ? a : [page, ...a.filter((x) => x !== page)].slice(0, MAX_ALIVE)));
+    setOpened((t) => (t.includes(page) ? t : [...t, page]));
   }, [page]);
+  // Pestañas: las pantallas vivas, en el orden en que se abrieron.
+  const [opened, setOpened] = useState<PageId[]>([page]);
+  const openTabs = opened.filter((p) => alive.includes(p));
+  const tabsRef = useRef<PageId[]>([]);
+  tabsRef.current = openTabs;
+  const closeTab = useCallback(
+    (p: PageId) => {
+      const list = tabsRef.current;
+      if (list.length < 2) return;
+      // Si es la que se mira, se pasa a la de al lado (la de la derecha, o la de la izquierda si era la última).
+      if (p === pageRef.current) {
+        const i = list.indexOf(p);
+        navigate(list[i + 1] ?? list[i - 1]);
+      }
+      setOpened((t) => t.filter((x) => x !== p));
+      setAlive((a) => a.filter((x) => x !== p));
+    },
+    [navigate],
+  );
+  const [findOpen, setFindOpen] = useState(false);
   // La pantalla dividida está puesta si se está en un portal y hay página para el lado.
   const splitOn = split !== null && SPLIT_LEFT.includes(page) && allowedInMode(split, prefs.mode);
   // La página de la derecha tiene que estar montada, aunque no sea la actual.
@@ -438,11 +461,23 @@ export default function App() {
       } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
         goHistory(e.key === "ArrowLeft" ? "back" : "forward");
+      } else if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === "f") {
+        // Buscar en la pantalla actual (Ctrl+K es para toda la app).
+        e.preventDefault();
+        setFindOpen(true);
+      } else if (e.ctrlKey && e.key === "Tab" && getPrefs().pageTabs) {
+        e.preventDefault();
+        const list = tabsRef.current;
+        const i = list.indexOf(pageRef.current);
+        if (list.length > 1) navigate(list[(i + (e.shiftKey ? -1 : 1) + list.length) % list.length]);
+      } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "w" && getPrefs().pageTabs) {
+        e.preventDefault();
+        closeTab(pageRef.current);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate, goHistory]);
+  }, [navigate, goHistory, closeTab]);
 
   useEffect(() => {
     api.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
@@ -630,7 +665,6 @@ export default function App() {
           isAdmin={isAdmin}
           badges={machine.badges}
           sessionActive={sessionActive}
-          onTodo={() => setPaletteOpen(true)}
           onLock={lock?.enabled ? () => setLocked(true) : undefined}
           update={update}
           recent={recent}
@@ -638,6 +672,7 @@ export default function App() {
         <main className="flex min-w-0 flex-1 flex-col">
           <AuditBanner />
           <CaseBar onOpenChange={setCaseDialog} />
+          {prefs.pageTabs && openTabs.length > 1 && <OpenTabs tabs={openTabs} current={page} onPick={(p) => navigate(p)} onClose={closeTab} />}
           <header className="flex items-end justify-between border-b border-line px-8 pt-4 pb-4">
             <div className="min-w-0">
               {/* Dónde estás: área › pantalla › sección. Cada parte lleva a su sitio. */}
@@ -697,13 +732,14 @@ export default function App() {
             </div>
           </header>
           <div className="relative min-h-0 flex-1">
+            {findOpen && <PageFind page={page} onClose={() => setFindOpen(false)} />}
             {alive.map((p) => {
               const left = splitOn && p === page;
               const right = splitOn && p === split;
               const visible = p === page || right;
               const pos = left ? "inset-y-0 left-0 w-[56%] border-r border-line" : right ? "inset-y-0 right-0 w-[44%]" : "inset-0";
               return (
-              <div key={`${p}-${reloads[p] ?? 0}`} hidden={!visible} className={`absolute overflow-y-auto ${pos}`}>
+              <div key={`${p}-${reloads[p] ?? 0}`} data-page={p} hidden={!visible} className={`absolute overflow-y-auto ${pos}`}>
                 <PageIdContext.Provider value={p}>
                 <PageActiveContext.Provider value={visible}>
                   <ErrorBoundary onHome={() => navigate("dashboard")}>

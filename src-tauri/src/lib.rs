@@ -165,7 +165,12 @@ pub fn run() {
                     if window_state::minimizes_on_close() {
                         api.prevent_close();
                         // Con el icono junto al reloj se esconde ahí; sin él, a la barra de tareas.
-                        let _ = if tray::visible() { window.hide() } else { window.minimize() };
+                        if tray::visible() {
+                            let _ = window.hide();
+                            tray::tell_where(window.app_handle());
+                        } else {
+                            let _ = window.minimize();
+                        }
                         log::info!("Cierre pedido: se minimiza (ajuste «Al cerrar, minimizar»)");
                     } else {
                         log::info!("Cierre pedido a los {} ms", boottime::since_start_ms());
@@ -272,6 +277,7 @@ pub fn run() {
             diagnostics::latest_findings,
             diagnostics::open_system_tool,
             diagnostics::report::generate_report,
+            diagnostics::report::preview_report,
             diagnostics::report::open_report,
             diagnostics::report::reveal_report,
             diagnostics::report::email_report,
@@ -358,6 +364,7 @@ pub fn run() {
             company::company_import_preview,
             company::company_import_apply,
             hardware::sensors::read_sensors,
+            hardware::battery::battery_history,
             hardware::sensors::install_pawnio,
             hardware::sensors::open_third_party_notices,
             workflow::get_settings,

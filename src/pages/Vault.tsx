@@ -131,7 +131,7 @@ export function Vault() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Caja fuerte" icon={<Lock size={14} />} className="col-span-12">
         <div className="flex flex-wrap items-start gap-4">
           <p className="min-w-0 flex-1 text-sm text-dim">

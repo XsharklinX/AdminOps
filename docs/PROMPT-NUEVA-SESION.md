@@ -16,8 +16,8 @@ pendrive** (datos junto al programa, separados por equipo). Interfaz 100 % en es
 
 - Repositorio: `F:\Programacion\AdminOps` · GitHub `XsharklinX/AdminOps`, rama `main`
   (commits directos a `main`, mensaje con la versión, p. ej. «1.1.10: …»; etiqueta `vX.Y.Z`).
-- Versión en el código: **1.2.4** (sin compilar, sin commit). Última build hecha: **1.2.3** en
-  `release\v1.2.3\`. Hubo una build intermedia etiquetada 2.0.0 por un salto de numeración: la
+- Versión en el código: **1.2.6** (sin compilar, sin commit). Última build hecha: **1.2.5** en
+  `release\v1.2.5\`. Hubo una build intermedia etiquetada 2.0.0 por un salto de numeración: la
   serie sigue en 1.2.x. Última versión guardada en Git: commit «1.1.10» (y etiqueta `v1.1.9`).
 - Correo de soporte del autor (va en la app y en los términos): `Contactoyerlindavid@gmail.com`.
 

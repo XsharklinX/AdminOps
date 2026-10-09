@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Images, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { copyAsImage, NO_CAPTURE } from "../lib/copyImage";
 import { logQuietly } from "../lib/api/core";
 import { createPortal } from "react-dom";
@@ -288,6 +288,29 @@ export const smallBtn =
 export const softBtn =
   "inline-flex items-center justify-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/20 disabled:pointer-events-none disabled:opacity-40";
 
+/** El nombre del ajuste de la fila (para los lectores de pantalla del interruptor). */
+export const ToggleLabelCtx = createContext<string | undefined>(undefined);
+
+/** Interruptor: para lo que se enciende o se apaga. Para elegir entre varias cosas, un desplegable. */
+export function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
+  const fromRow = useContext(ToggleLabelCtx);
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label ?? fromRow}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-neon/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
+        checked ? "bg-neon" : "bg-line-2"
+      }`}
+    >
+      <span className={`absolute size-4 rounded-full shadow transition-[left] ${checked ? "left-[18px] bg-white" : "left-0.5 bg-dim"}`} />
+    </button>
+  );
+}
+
 /** Botón de solo icono, con su nombre para el ratón y para los lectores de pantalla. */
 export function IconButton({
   label,
@@ -364,7 +387,7 @@ export function Loading({ text = "Cargando…", page = false }: { text?: string;
 function PageSkeleton({ text }: { text: string }) {
   const bar = "rounded bg-panel-2 motion-safe:animate-pulse";
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6" role="status" aria-live="polite">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6" role="status" aria-live="polite">
       <span className="sr-only">{text}</span>
       <p className="flex items-center gap-2 text-xs text-mute" aria-hidden>
         <Loader2 size={12} className="animate-spin" /> {text}

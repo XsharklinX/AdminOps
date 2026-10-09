@@ -39,7 +39,7 @@ export function Network({ isAdmin }: { isAdmin: boolean }) {
   const mainAdapter = report?.adapters.find((a) => a.gateway.length > 0 && a.kind !== "Virtual/VPN") ?? null;
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       {/* Speedtest */}
       <Card title="Test de velocidad" icon={<Gauge size={14} />} className="col-span-12">
         <SpeedTest adapter={mainAdapter} onResult={(r) => setHistory((h) => [r, ...h])} />

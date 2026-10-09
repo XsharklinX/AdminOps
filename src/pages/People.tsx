@@ -119,7 +119,7 @@ export function People({ focus }: { focus: string | null }) {
   // ticket (pantalla dividida).
   return (
     <div className="@container">
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <div className="col-span-12 @3xl:col-span-4">
         <form
           className="relative"

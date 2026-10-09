@@ -20,6 +20,7 @@ import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
 import { MachineSheetCard } from "../components/MachineSheetCard";
+import { BatteryCard } from "../components/BatteryCard";
 import { Card } from "../components/ui";
 import { tempColor, useSensors } from "../hooks/useSensors";
 import { hwApi, type Inventory, type MemoryTest, type SmartDisk } from "../lib/api";
@@ -120,7 +121,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
   const bySlot = (i: number) => inv.modules[i];
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <MachineSheetCard autoLoad={focus === "sheet"} />
       {/* Resumen */}
       <Card
@@ -270,6 +271,9 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
           </Row>
         ))}
       </Card>
+
+      {/* Batería: solo en portátiles */}
+      <BatteryCard className={`col-span-12 ${ring("battery")}`} />
 
       {/* Memoria */}
       <Card id="focus-memory" title="Memoria RAM" icon={<MemoryStick size={14} />} className={`col-span-12 ${ring("memory")}`}>

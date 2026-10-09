@@ -58,7 +58,7 @@ export function Boots({ isAdmin }: { isAdmin: boolean }) {
   if (!log || !sum) return failed ? <ErrorState page message={failed} onRetry={load} /> : <Loading page text="Leyendo el registro de Windows…" />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <p className="min-w-60 flex-1 text-sm text-dim">Lo que dice el registro de Windows de los últimos 60 días: cuándo arrancó, cuándo se apagó mal y los pantallazos azules, con qué suele haber detrás.</p>
         <button onClick={load} disabled={busy} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">

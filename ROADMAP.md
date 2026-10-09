@@ -107,7 +107,54 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
-### v1.2.4 — Once ideas elegidas por el autor (hecho, sin build)
+### v1.2.6 — Ajustes ordenado, vista previa del informe y batería (hecho, sin build)
+
+- **Ajustes**: `SECTIONS` lleva `group`; `General.tsx` exporta `StartWindow`, `AlertSettings`,
+  `DataSettings`, `SystemChanges` (en Seguridad) y `DomainCard` (en Portales y red). `DataCare`
+  tiene `part` («data» en Datos y copias, «updates» en Acerca de); `PerfPanel` va en Acerca de.
+  `LEGACY_SECTIONS` lleva «general» y «performance» (pestaña guardada, enlaces) a su sitio nuevo.
+  Fuera la fila repetida «Precargar los portales» (sigue en Portales).
+- **Vista previa del informe**: `report_html` sale de `create_report`; `preview_report` arma la
+  misma entrada (`report_input`) y devuelve el HTML con el número «BORRADOR», sin `next_number`.
+  `ReportPreview.tsx` lo pinta en un `iframe` con `sandbox` vacío. CSP: `font-src 'self' data:`
+  (la fuente del informe va incrustada).
+- **Batería** (`hardware/battery.rs`, `BatteryCard.tsx`, `lib/batteryChart.ts`): historial
+  semanal de `powercfg /batteryreport /xml`, limpiado (`clean`) y con recta del último año
+  (`trend`) para la pérdida al mes y los meses hasta el 50 %. **Sin probar en un portátil real**:
+  la estructura del XML del historial se lee igual que la del resto del informe, pero no se ha
+  visto con datos de verdad.
+- Pasado a esta versión desde la 1.2.5 (hecho después de su build): el ancho de cada tarjeta del Panel.
+
+### v1.2.5 — Ajustes, pestañas y Ctrl+F (compilada)
+
+Elegidas sobre el catálogo «AdminOps, ideas para la 1.2.5».
+
+- **Resumen** (`pages/settings/Summary.tsx`): sección nueva y la primera al entrar. Solo lee; la
+  versión nueva se consulta al pulsar.
+- **Interruptores y filas compactas**: `Toggle` en `components/ui.tsx` (con `ToggleLabelCtx`, que
+  `Row` rellena con su título para los lectores de pantalla). `Row` esconde `sub` tras «?» y la
+  enseña sola si el buscador lleva a esa fila. Las casillas de tabla (catálogo de Informes) siguen
+  siendo casillas.
+- **Vista previa** (`pages/settings/AppPreview.tsx`): se pinta con los mismos tokens de color.
+- **Deshacer en Ajustes** (`SettingsPage.tsx`): guarda el estado de antes del último cambio, sea de
+  `Settings` (backend) o de `Prefs` (`setPrefs` emite ahora `adminops-prefs` con `detail.before`).
+  Cambios seguidos del mismo campo en menos de 3 s cuentan como uno.
+- **Ancho de cada tarjeta del Panel**: rejilla de seis columnas, `PanelPrefs.widths` y `spanOf`
+  (un ancho no válido vuelve al de fábrica). Cada tarjeta es un `@container`, y sus columnas
+  internas (`@3xl:`, `@2xl:`) siguen a su ancho, no al de la ventana. El alto no se elige: lo da
+  el contenido.
+- **Pestañas** (`components/OpenTabs.tsx`): las pantallas vivas de App en el orden de apertura;
+  cerrar una la desmonta. Preferencia `pageTabs` (encendida de fábrica).
+- **Ctrl+F** (`lib/pageFind.ts`, `components/PageFind.tsx`): CSS Custom Highlight API sobre el
+  contenedor `[data-page]` de la pantalla actual; vuelve a buscar cada 2 s mientras está abierta.
+- **No elegidas** (no volver a proponer tal cual): secciones nuevas de Ajustes, ver lo cambiado y
+  restablecer, etiquetas de cuándo surte efecto, dos pantallas lado a lado (ya existe la pantalla
+  dividida de los portales), modo compacto, tablas con columnas y CSV, hoja de atajos, acciones
+  fijadas arriba.
+- Pasados a esta versión desde la 1.2.4 (hechos después de su build): arrastrar arreglado, fuera el
+  botón «Todo», pantallas a todo el ancho, aviso del icono junto al reloj.
+
+### v1.2.4 — Once ideas elegidas por el autor (compilada)
 
 Elegidas sobre un catálogo con maquetas (artifact «AdminOps, ideas para la 1.2.4»).
 
@@ -135,6 +182,13 @@ Elegidas sobre un catálogo con maquetas (artifact «AdminOps, ideas para la 1.2
 - **«Nuevo»** (`lib/whatsNew.ts`): `NEW_IN` se rellena al publicar; una prueba comprueba que cada
   clave existe y que su versión está en las novedades.
 - **Deshacer en el momento**: ya existía (`undoable-change` → aviso con «Deshacer» 10 s).
+- **Arrastrar estaba roto en toda la app**: Tauri captura por defecto el arrastre de archivos del
+  sistema y WebView2 deja entonces de dar el de la página. `dragDropEnabled: false` en la ventana
+  principal y `disable_drag_drop_handler()` en la nota y el monitor. Si algún día se quiere soltar
+  archivos desde el Explorador, habrá que hacerlo con el evento de Tauri y no con el de la página.
+- **Ancho**: las pantallas usan `max-w-(--page-max)`; `applyAppearance` lo pone a `none` o `72rem`
+  según la preferencia `pageWidth` (de fábrica, toda la ventana).
+- Fuera el botón «Todo» de la columna de áreas (repetía el buscador).
 - **Quedan en «quizá»** (no hacer sin que el autor lo pida): qué ha crecido desde el último
   análisis de espacio, rutinas de varios pasos, arrastrar una carpeta a la ventana.
 

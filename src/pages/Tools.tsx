@@ -271,7 +271,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
   const shownGroups = GROUPS.filter((g) => group === "all" || g.id === group);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-8 py-6">
+    <div className="mx-auto max-w-(--page-max) space-y-6 px-8 py-6">
       <MachineCard />
 
       <div className="flex flex-col gap-3">

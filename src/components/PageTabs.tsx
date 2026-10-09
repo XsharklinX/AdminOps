@@ -13,7 +13,7 @@ export interface PageTab<T extends string> {
 /** Pestañas dentro de una página que agrupa varias vistas (Actualizaciones, Mi red…). */
 export function PageTabs<T extends string>({ tabs, value, onChange }: { tabs: PageTab<T>[]; value: T; onChange: (t: T) => void }) {
   return (
-    <div className="no-scrollbar mx-auto flex w-full max-w-6xl shrink-0 gap-1 overflow-x-auto border-b border-line px-6 pt-4">
+    <div className="no-scrollbar mx-auto flex w-full max-w-(--page-max) shrink-0 gap-1 overflow-x-auto border-b border-line px-6 pt-4">
       {tabs.map((t) => (
         <button
           key={t.id}

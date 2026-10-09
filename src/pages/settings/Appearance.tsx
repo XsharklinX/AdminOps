@@ -1,6 +1,6 @@
 // Ajustes → Apariencia.
 import { useState } from "react";
-import { Card } from "../../components/ui";
+import { Card, Toggle } from "../../components/ui";
 import { type Accent, ACCENTS, applyAppearance, setPrefs, usePrefs, ZOOMS } from "../../lib/prefs";
 import { getTheme, setTheme, type Theme } from "../../lib/theme";
 import { Row } from "./shared";
@@ -104,15 +104,32 @@ export function Appearance() {
           </div>
         </Row>
         <Row
+          title="Ancho de las pantallas"
+          sub="«Toda la ventana» aprovecha un monitor grande para ver más a la vez. «Centrado» deja el ancho de antes, más cómodo para leer en pantallas muy anchas."
+        >
+          <div className="inline-flex rounded-lg border border-line bg-void p-0.5">
+            {(
+              [
+                ["full", "Toda la ventana"],
+                ["limited", "Centrado"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => setPrefs({ pageWidth: value })}
+                aria-pressed={prefs.pageWidth === value}
+                className={`rounded-md px-3 py-1.5 text-[13px] ${prefs.pageWidth === value ? "bg-panel-2 font-medium text-ink" : "text-dim hover:text-ink"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row
           title="Reducir animaciones"
           sub="Quita transiciones y giros (más cómodo si marean o en equipos lentos)."
         >
-          <input
-            type="checkbox"
-            checked={prefs.reduceMotion}
-            onChange={(e) => setPrefs({ reduceMotion: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
+          <Toggle checked={prefs.reduceMotion} onChange={(v) => setPrefs({ reduceMotion: v })} />
         </Row>
       </Card>
     </div>

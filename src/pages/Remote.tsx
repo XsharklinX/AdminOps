@@ -175,7 +175,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
   const wolReady = wired.some((a) => a.magicPacket === "Enabled") && status && !status.fastStartup;
 
   return (
-    <div className="@container mx-auto max-w-6xl space-y-4 p-6">
+    <div className="@container mx-auto max-w-(--page-max) space-y-4 p-6">
       {/* Conexión rápida: un nombre y a conectar; lo demás, a un clic. */}
       <section className="rounded-xl border border-line bg-panel p-4">
         <form

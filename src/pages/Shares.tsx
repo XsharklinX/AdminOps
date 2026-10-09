@@ -180,7 +180,7 @@ export function Shares({ isAdmin }: { isAdmin: boolean }) {
   const selected = dialogOpen && status ? status.shares.find((s) => s.name === dialogOpen.share) : undefined;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       {blocked && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn/5 px-4 py-3">
           <TriangleAlert size={16} className="shrink-0 text-warn" />

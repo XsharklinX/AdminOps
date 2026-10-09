@@ -134,7 +134,7 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
   };
 
   return (
-    <div className="mx-auto grid max-w-5xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Timeline onNavigate={onNavigate} />
       <Card
         title="Puntos de restauración"

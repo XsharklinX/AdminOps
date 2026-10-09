@@ -9,6 +9,9 @@ export const NEW_IN: Record<string, string> = {
   "space:space": "1.2.3",
   dashboard: "1.2.4",
   "machine:performance": "1.2.4",
+  settings: "1.2.6",
+  "machine:hardware": "1.2.6",
+  "session:report": "1.2.6",
 };
 
 /** Solo se señala lo de las últimas versiones: lo de hace un año ya no es novedad. */

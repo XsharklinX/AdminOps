@@ -27,7 +27,7 @@ function useMigrateProgress(active: boolean) {
 export function Migrate() {
   const [mode, setMode] = useState<"backup" | "restore">("backup");
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className="mx-auto max-w-(--page-max) p-6">
       <div className="mb-4 grid grid-cols-2 gap-3">
         {(
           [

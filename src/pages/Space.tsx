@@ -317,7 +317,7 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
     });
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Qué analizar" icon={<HardDrive size={14} />} className="col-span-12">
         <div className="flex flex-wrap items-stretch gap-2">
           {drives.map((d) => {

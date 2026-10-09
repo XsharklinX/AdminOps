@@ -2,7 +2,7 @@
 // secciones lleva el PDF y en qué orden; la cabecera va siempre arriba y las
 // firmas y condiciones, abajo.
 import { ArrowDown, ArrowUp, LayoutList } from "lucide-react";
-import { Card, inputClass } from "../../components/ui";
+import { Card, inputClass, Toggle } from "../../components/ui";
 import type { ReportLayout, Settings } from "../../lib/api";
 
 /** Las secciones que se pueden quitar o mover, en su orden de fábrica (el mismo que en workflow.rs). */
@@ -53,7 +53,7 @@ export function ReportLayoutEditor({ s, set }: { s: Settings; set: (patch: Parti
           <input value={layout.name} onChange={(e) => update({ name: e.target.value.slice(0, 40) })} placeholder="Mi plantilla" className={`${inputClass} w-64 max-w-full`} />
         </label>
         <label className="flex items-center gap-2 pb-2 text-sm text-dim">
-          <input type="checkbox" checked={layout.technical} onChange={(e) => update({ technical: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
+          <Toggle checked={layout.technical} onChange={(v) => update({ technical: v })} />
           Con el detalle técnico (hardware, discos, drivers, estabilidad)
         </label>
       </div>

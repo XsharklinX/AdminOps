@@ -299,7 +299,7 @@ export function Peripherals() {
   // El micrófono y la cámara se apagan al salir de la pestaña.
   const active = usePageActive();
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 p-6 lg:grid-cols-2">
+    <div className="mx-auto grid max-w-(--page-max) gap-4 p-6 lg:grid-cols-2">
       <ScreenTest />
       <SpeakerTest />
       <div className="lg:col-span-2">

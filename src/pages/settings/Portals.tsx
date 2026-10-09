@@ -1,7 +1,7 @@
 import { Globe, Mail, MessagesSquare, Ticket, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
-import { Button, Card, inputClass } from "../../components/ui";
+import { Button, Card, inputClass, Toggle } from "../../components/ui";
 import { portalsApi, type Portal, type Settings } from "../../lib/api";
 import { setPrefs, usePrefs, type CommMode } from "../../lib/prefs";
 import { COMM_MODES } from "../../lib/comms";
@@ -55,12 +55,7 @@ export function PortalSettings({
           title="Precargar el último portal"
           sub="Carga en segundo plano el último portal usado de Tickets, Inventario web, Correo y Teams unos segundos después de abrir AdminOps, para que al entrar ya esté listo. Los de sesión privada nunca se precargan."
         >
-          <input
-            type="checkbox"
-            checked={prefs.preloadPortals}
-            onChange={(e) => setPrefs({ preloadPortals: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
+          <Toggle checked={prefs.preloadPortals} onChange={(v) => setPrefs({ preloadPortals: v })} />
         </Row>
         <Row
           title="Zoom de los portales"

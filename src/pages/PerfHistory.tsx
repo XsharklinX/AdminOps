@@ -64,7 +64,7 @@ export function PerfHistory() {
   if (!all) return failed ? <ErrorState page message={failed} onRetry={load} /> : <Loading page />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <p className="min-w-60 flex-1 text-sm text-dim">
           Cómo ha ido el equipo, minuto a minuto. Se mide <b className="font-medium text-ink">mientras AdminOps está abierta</b>: los huecos de la gráfica son ratos con AdminOps cerrada.

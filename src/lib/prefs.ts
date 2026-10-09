@@ -101,12 +101,16 @@ export interface Prefs {
   portalZoom: number;
   /** Cómo se abren Teams y el Correo desde la barra de arriba. */
   comms: { teams: CommMode; mail: CommMode };
+  /** Pestañas con las pantallas abiertas, debajo de la barra de arriba. */
+  pageTabs: boolean;
+  /** Ancho de las pantallas: toda la ventana, o el de antes (unos 1150 px, centrado). */
+  pageWidth: "full" | "limited";
   /** El Panel a medida: orden de las tarjetas y cuáles están ocultas (vacío: de fábrica). */
   panel: PanelPrefs;
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [] } };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -137,6 +141,7 @@ export function getPrefs(): Prefs {
   }
   if (!ACCENTS[p.accent]) p.accent = "blue";
   if (!ZOOMS.some((z) => z.value === p.zoom)) p.zoom = 1;
+  if (p.pageWidth !== "limited") p.pageWidth = "full";
   if (![1000, 2000, 5000].includes(p.refreshMs)) p.refreshMs = 2000;
   if (!p.shortcuts || typeof p.shortcuts !== "object") p.shortcuts = {};
   p.sidebar = { ...DEFAULT_SIDEBAR, ...(p.sidebar && typeof p.sidebar === "object" ? p.sidebar : {}) };
@@ -145,7 +150,11 @@ export function getPrefs(): Prefs {
   if (!p.pageLabels || typeof p.pageLabels !== "object") p.pageLabels = {};
   const modes = ["ask", "adminops", "browser", "app"];
   const panel = (p.panel && typeof p.panel === "object" ? p.panel : {}) as Partial<PanelPrefs>;
-  p.panel = { order: Array.isArray(panel.order) ? panel.order : [], hidden: Array.isArray(panel.hidden) ? panel.hidden : [] };
+  p.panel = {
+    order: Array.isArray(panel.order) ? panel.order : [],
+    hidden: Array.isArray(panel.hidden) ? panel.hidden : [],
+    widths: panel.widths && typeof panel.widths === "object" ? panel.widths : {},
+  };
   const c = (p.comms && typeof p.comms === "object" ? p.comms : {}) as Partial<Prefs["comms"]>;
   p.comms = { teams: modes.includes(c.teams as string) ? c.teams! : "ask", mail: modes.includes(c.mail as string) ? c.mail! : "ask" };
   // AdminOps abre siempre en el Panel salvo que el técnico haya elegido otra
@@ -170,18 +179,26 @@ export function applyAppearance(p: Prefs = getPrefs()) {
     root.style.setProperty("--color-on-neon", light ? "#ffffff" : "#0c1422");
   }
   root.classList.toggle("reduce-motion", p.reduceMotion);
+  // Las pantallas leen este tope (max-w-(--page-max)): sin él usan toda la ventana.
+  root.style.setProperty("--page-max", p.pageWidth === "limited" ? "72rem" : "none");
   invoke("set_ui_zoom", { scale: p.zoom }).catch(() => {});
 }
 
+/** Lo que lleva el aviso «adminops-prefs»: cómo estaban antes (para «Deshacer» en Ajustes). */
+export interface PrefsChange {
+  before: Prefs;
+}
+
 export function setPrefs(patch: Partial<Prefs>) {
-  cache = { ...getPrefs(), ...patch };
+  const before = getPrefs();
+  cache = { ...before, ...patch };
   try {
     localStorage.setItem(KEY, JSON.stringify(cache));
   } catch {
     /* sin almacenamiento: dura esta sesión */
   }
   applyAppearance(cache);
-  window.dispatchEvent(new Event("adminops-prefs"));
+  window.dispatchEvent(new CustomEvent<PrefsChange>("adminops-prefs", { detail: { before } }));
 }
 
 export function usePrefs(): Prefs {

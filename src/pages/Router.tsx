@@ -266,7 +266,7 @@ export function Router({ covered = false }: { covered?: boolean }) {
   const wifiAuth = AUTH[info.wifiAuth] ?? info.wifiAuth;
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Esta red" className="col-span-12 lg:col-span-7">
         <Row label="Red">{info.ssid ?? (info.network || "—")}</Row>
         <Row label="Conexión">

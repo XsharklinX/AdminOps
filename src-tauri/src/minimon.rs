@@ -22,6 +22,8 @@ pub fn open(app: &tauri::AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .skip_taskbar(true)
         .theme(Some(tauri::Theme::Dark))
+        // Como la principal: el arrastrar de la página, no el de archivos del sistema.
+        .disable_drag_drop_handler()
         // La interfaz sabe así que es el monitor y no la aplicación entera.
         .initialization_script("window.__ADMINOPS_MONITOR__ = true;");
     // Las mismas opciones de navegador que la ventana principal (ver quicknote::open).

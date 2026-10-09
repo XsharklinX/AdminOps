@@ -121,7 +121,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
   const toggle = (f: Filter) => setFilter((cur) => (cur === f ? "all" : f));
 
   return (
-    <div className="@container mx-auto max-w-6xl space-y-4 p-6">
+    <div className="@container mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-4">
         <Tile label={people.length === 1 ? "Usuario" : "Usuarios"} value={people.length} />
         <Tile label="Administradores activos" value={users.filter((u) => u.admin && u.enabled).length} active={filter === "admins"} onClick={() => toggle("admins")} />

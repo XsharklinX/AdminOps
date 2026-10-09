@@ -93,7 +93,7 @@ export function Wipe({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Borrar archivos y carpetas" icon={<Eraser size={14} />} className="col-span-12 lg:col-span-7">
         <p className="mb-3 text-sm text-dim">Sobrescribe el contenido antes de borrarlo: ni la papelera ni los programas de recuperación podrán devolverlo.</p>
         <div className="flex gap-2">

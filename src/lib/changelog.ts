@@ -18,6 +18,35 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.6",
+    title: "Ajustes ordenados, vista previa del informe y la batería en el tiempo",
+    added: [
+      "Ajustes, reordenado: «General» desaparece y lo suyo se reparte por lo que se quiere hacer: «Inicio y ventana», «Avisos» y «Datos y copias». Las secciones van en cuatro grupos (Uso, Datos, Trabajo, AdminOps). Los puntos de restauración pasan a Seguridad, el dominio habitual a «Portales y red», y las actualizaciones y el rendimiento de AdminOps a «Acerca de».",
+      "Vista previa del informe: al prepararlo (Sesión → Informe) se ve a la derecha tal como saldrá, y se pone al día mientras escribes. No crea el PDF ni gasta un número de informe.",
+      "La batería a lo largo del tiempo (Hardware, solo en portátiles): la capacidad de cada semana frente a la de fábrica, cuánto pierde al mes y cuándo quedará a la mitad a este ritmo. Con los datos que el propio Windows apunta.",
+      "Panel: cada tarjeta con su ancho. En «Personalizar el panel», ⅓, ½, ⅔ o «Todo» al lado de cada una; lo de dentro se reorganiza según el ancho (En vivo, a la mitad, pone sus cifras de dos en dos).",
+    ],
+    fixed: ["«Precargar los portales» salía dos veces en Ajustes (en General y en Portales): queda solo en «Portales y red»."],
+  },
+  {
+    version: "1.2.5",
+    title: "Ajustes más claros, pestañas y buscar en la pantalla",
+    added: [
+      "Ajustes empieza en un «Resumen»: el bloqueo, la copia de tus datos, la versión (y si hay una nueva, cuando lo pides), dónde se guardan tus datos, los avisos, el aspecto y tu marca en los informes. Cada cosa lleva a donde se cambia.",
+      "Ajustes, más limpio: interruptores para lo que se enciende y se apaga, y una línea por ajuste. La explicación sale al pulsar el «?» de al lado (y sola al llegar desde el buscador).",
+      "Ajustes → Apariencia enseña una miniatura de AdminOps con el tema, el color, el tamaño, la densidad y el ancho que elijas.",
+      "Ajustes dice «Guardado» tras cada cambio y deja deshacerlo durante unos segundos.",
+      "Pestañas con las pantallas abiertas, debajo de la barra de arriba: un clic para volver a una, Ctrl+Tab y Ctrl+Mayús+Tab para pasar entre ellas, Ctrl+W o la rueda del ratón para cerrarla. Se quitan en Ajustes → Navegación.",
+      "Ctrl+F busca en la pantalla en la que estás (procesos, servicios, programas, contactos…): marca cada coincidencia, sin distinguir tildes, y salta de una a otra con Intro. Ctrl+K sigue buscando en toda la app.",
+      "Las pantallas usan toda la ventana: en un monitor grande cabe mucho más a la vez. Quien prefiera el ancho de antes, centrado, lo elige en Ajustes → Apariencia → «Ancho de las pantallas».",
+    ],
+    fixed: [
+      "No se podía arrastrar nada en toda la aplicación (las tarjetas del Panel, la barra lateral en Ajustes → Navegación, la agenda): la ventana se quedaba con el arrastre para recibir archivos de Windows y la página no se enteraba.",
+      "Icono junto al reloj: la primera vez que la X esconde la ventana, un aviso dice dónde ha ido. Windows 11 lo deja al principio en los iconos ocultos (la flecha «^»).",
+    ],
+    removed: ["El botón «Todo» de la columna de áreas: el buscador de arriba (y Ctrl+K) abre lo mismo."],
+  },
+  {
     version: "1.2.4",
     title: "Más a mano: duplicados, panel a tu medida, icono junto al reloj y mini monitor",
     added: [

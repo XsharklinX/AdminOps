@@ -38,10 +38,10 @@ export function FirstSteps() {
       autoBackupApi.info().catch(() => null),
     ]);
     setSteps([
-      { id: "company", title: "Tus datos y los de la empresa", why: "Salen en los informes y presupuestos.", done: !!s?.company.trim() && !!s?.technician.trim(), go: () => goToPage("settings", "general") },
+      { id: "company", title: "Tus datos y los de la empresa", why: "Salen en los informes y presupuestos.", done: !!s?.company.trim() && !!s?.technician.trim(), go: () => goToPage("settings", "reports") },
       { id: "portals", title: "Tickets, Correo y Teams", why: "Los portales de la empresa dentro de AdminOps.", done: portals.length > 0, go: () => goToPage("settings", "portals") },
       { id: "lock", title: "Bloqueo con PIN", why: "Protege la app y, en el pendrive, tus contraseñas guardadas.", done: !!lock?.enabled, go: () => goToPage("settings", "security") },
-      { id: "backup", title: "Copia automática", why: "Si pierdes el pendrive o el equipo, no pierdes nada.", done: !!backup?.enabled, go: () => goToPage("settings", "general") },
+      { id: "backup", title: "Copia automática", why: "Si pierdes el pendrive o el equipo, no pierdes nada.", done: !!backup?.enabled, go: () => goToPage("settings", "data") },
     ]);
   }, []);
   const imp = useCompanyImport(() => void load());
@@ -80,7 +80,7 @@ export function FirstSteps() {
         <button onClick={() => void imp.start()} className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-xs text-neon hover:bg-neon/10" title="Si te pasaron el archivo de configuración de la empresa">
           <Upload size={12} /> Importar la configuración de la empresa
         </button>
-        <button onClick={hide} className="rounded-md p-1 text-mute hover:text-ink" title="Ocultar (vuelve desde Ajustes → General)">
+        <button onClick={hide} className="rounded-md p-1 text-mute hover:text-ink" title="Ocultar (vuelve desde Ajustes → Inicio y ventana)">
           <X size={14} />
         </button>
       </header>

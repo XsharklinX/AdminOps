@@ -1,17 +1,21 @@
-import { CheckCircle2, Loader2, Search, X } from "lucide-react";
+import { CheckCircle2, Loader2, Search, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type PageId } from "../components/Sidebar";
-import { ErrorState, Loading } from "../components/ui";
+import { Card, ErrorState, Loading, Toggle } from "../components/ui";
 import { PerfPanel } from "../components/PerfPanel";
 import { type AppInfo, type Settings, workApi } from "../lib/api";
 import { PortalSettings } from "./settings/Portals";
-import { findSettings, SECTIONS, type SettingsSection } from "./settings/catalog";
+import { findSettings, LEGACY_SECTIONS, SECTIONS, type SettingsSection } from "./settings/catalog";
 import { LockSettings } from "./settings/LockSettings";
 import { NavEditor } from "./settings/NavEditor";
 import { ShortcutEditor } from "./settings/ShortcutEditor";
 import { About } from "./settings/About";
 import { Appearance } from "./settings/Appearance";
-import { General } from "./settings/General";
+import { AppPreview } from "./settings/AppPreview";
+import { Summary } from "./settings/Summary";
+import { setPrefs, usePrefs, type Prefs, type PrefsChange } from "../lib/prefs";
+import { AlertSettings, DataSettings, DomainCard, StartWindow, SystemChanges } from "./settings/General";
+import { DataCare } from "./settings/DataCare";
 import { Reports } from "./settings/Reports";
 import { HighlightCtx, Row } from "./settings/shared";
 
@@ -20,13 +24,34 @@ const TAB_KEY = "adminops.settingsTab";
 
 function readTab(): Tab {
   try {
-    const t = localStorage.getItem(TAB_KEY);
+    const saved = localStorage.getItem(TAB_KEY);
+    const t = (saved && LEGACY_SECTIONS[saved]) ?? saved;
     if (SECTIONS.some((x) => x.id === t)) return t as Tab;
   } catch {
     /* sin almacenamiento */
   }
-  return "general";
+  return "summary";
 }
+
+/** Pestañas de pantallas abiertas (Ajustes → Navegación). */
+function NavTabsCard() {
+  const prefs = usePrefs();
+  return (
+    <Card title="Pantallas abiertas">
+      <Row
+        title="Pestañas de las pantallas abiertas"
+        sub="Debajo de la barra de arriba, una pestaña por cada pantalla que tienes abierta. Ctrl+Tab pasa a la siguiente, Ctrl+Mayús+Tab a la anterior y Ctrl+W cierra la actual."
+      >
+        <Toggle checked={prefs.pageTabs} onChange={(v) => setPrefs({ pageTabs: v })} />
+      </Row>
+    </Card>
+  );
+}
+
+/** Cuánto se ofrece «Deshacer» tras un cambio. */
+const UNDO_MS = 8000;
+/** Cambios seguidos del mismo ajuste (escribir un texto) cuentan como uno. */
+const SAME_CHANGE_MS = 3000;
 
 export function SettingsPage({
   appInfo,
@@ -42,6 +67,9 @@ export function SettingsPage({
   // Guardado automático: lo cambiado espera un momento (por si se sigue escribiendo) y se guarda.
   const pending = useRef<Settings | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // El último cambio, para deshacerlo: cómo estaba antes (ajustes guardados o preferencias de este equipo).
+  const [undo, setUndo] = useState<{ settings?: Settings; prefs?: Prefs; keys: string; at: number } | null>(null);
+  const restoring = useRef(false);
   const [saveError, setSaveError] = useState("");
   const flush = useCallback(async () => {
     const next = pending.current;
@@ -68,6 +96,21 @@ export function SettingsPage({
     const t = window.setTimeout(() => setSaveState("idle"), 2000);
     return () => window.clearTimeout(t);
   }, [saveState]);
+  // Las preferencias (apariencia, navegación…) se guardan al momento: también se pueden deshacer.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const before = (e as CustomEvent<PrefsChange>).detail?.before;
+      if (!before || restoring.current) return;
+      setUndo((u) => (u?.prefs && Date.now() - u.at < SAME_CHANGE_MS ? { ...u, at: Date.now() } : { prefs: before, keys: "prefs", at: Date.now() }));
+    };
+    window.addEventListener("adminops-prefs", on);
+    return () => window.removeEventListener("adminops-prefs", on);
+  }, []);
+  useEffect(() => {
+    if (!undo) return;
+    const t = window.setTimeout(() => setUndo(null), UNDO_MS - (Date.now() - undo.at));
+    return () => window.clearTimeout(t);
+  }, [undo]);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState<string | null>(null);
 
@@ -109,7 +152,9 @@ export function SettingsPage({
 
   // Desde Primeros pasos o un enlace: abrir esa sección.
   useEffect(() => {
-    if (focus && SECTIONS.some((x) => x.id === focus)) setTab(focus as Tab);
+    // Los enlaces de antes («general», «performance») llevan a donde está eso ahora.
+    const target = focus ? (LEGACY_SECTIONS[focus] ?? focus) : null;
+    if (target && SECTIONS.some((x) => x.id === target)) setTab(target as Tab);
   }, [focus]);
 
   const pickTab = (t: Tab) => {
@@ -127,6 +172,22 @@ export function SettingsPage({
     const next = { ...s, ...patch };
     pending.current = next;
     setS(next);
+    const keys = Object.keys(patch).sort().join(",");
+    // Reintentar (sin cambios) no es un cambio; escribir letra a letra en el mismo campo, uno solo.
+    if (keys && !restoring.current) {
+      setUndo((u) => (u?.settings && u.keys === keys && Date.now() - u.at < SAME_CHANGE_MS ? { ...u, at: Date.now() } : { settings: s, keys, at: Date.now() }));
+    }
+  };
+  const undoLast = () => {
+    if (!undo) return;
+    restoring.current = true;
+    if (undo.settings) {
+      pending.current = undo.settings;
+      setS(undo.settings);
+    }
+    if (undo.prefs) setPrefs(undo.prefs);
+    restoring.current = false;
+    setUndo(null);
   };
 
   const current = SECTIONS.find((x) => x.id === tab) ?? SECTIONS[0];
@@ -140,7 +201,7 @@ export function SettingsPage({
   };
 
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className="mx-auto max-w-(--page-max) p-6">
       <div className="mb-5">
         <div className="relative">
           <Search
@@ -199,11 +260,15 @@ export function SettingsPage({
           className="col-span-12 lg:col-span-3 lg:self-start"
         >
           <ul className="no-scrollbar flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {SECTIONS.map((x) => {
+            {SECTIONS.map((x, i) => {
               const Icon = x.icon;
               const on = tab === x.id;
+              const firstOfGroup = i === 0 || SECTIONS[i - 1].group !== x.group;
               return (
                 <li key={x.id} className="shrink-0 lg:shrink">
+                  {firstOfGroup && (
+                    <div className={`hidden px-3 pb-1 text-[10.5px] font-medium tracking-wider text-mute uppercase lg:block ${i ? "pt-4" : ""}`}>{x.group}</div>
+                  )}
                   <button
                     onClick={() => pickTab(x.id)}
                     aria-current={on ? "page" : undefined}
@@ -231,38 +296,50 @@ export function SettingsPage({
               <p className="text-xs text-mute">{current.hint}</p>
             </header>
 
-            {tab === "general" && (
-              <General
-                s={s}
-                set={set}
-                portable={!!appInfo?.portable}
-                onImported={loadSettings}
-              />
+            {tab === "start" && <StartWindow s={s} set={set} />}
+            {tab === "alerts" && <AlertSettings s={s} set={set} />}
+            {tab === "data" && <DataSettings s={s} set={set} portable={!!appInfo?.portable} onImported={loadSettings} />}
+            {tab === "summary" && <Summary s={s} appInfo={appInfo} onGo={(section, title) => goTo({ section, title: title ?? "" })} />}
+            {tab === "appearance" && (
+              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <Appearance />
+                <div className="xl:sticky xl:top-4">
+                  <AppPreview />
+                </div>
+              </div>
             )}
-            {tab === "appearance" && <Appearance />}
             {tab === "navigation" && (
               <div className="space-y-4">
+                <NavTabsCard />
                 <ShortcutEditor />
                 <NavEditor />
               </div>
             )}
-            {tab === "security" && <LockSettings />}
+            {tab === "security" && (
+              <div className="space-y-4">
+                <LockSettings />
+                <SystemChanges s={s} set={set} />
+              </div>
+            )}
             {tab === "portals" && (
-              <PortalSettings
-                s={s}
-                set={set}
-                onNavigate={onNavigate}
-                Row={Row}
-              />
+              <div className="space-y-4">
+                <PortalSettings s={s} set={set} onNavigate={onNavigate} Row={Row} />
+                <DomainCard s={s} set={set} />
+              </div>
             )}
             {tab === "reports" && <Reports s={s} set={set} />}
-            {tab === "performance" && <PerfPanel />}
-            {tab === "about" && <About appInfo={appInfo} />}
+            {tab === "about" && (
+              <div className="space-y-4">
+                <About appInfo={appInfo} />
+                <DataCare s={s} set={set} part="updates" />
+                <PerfPanel />
+              </div>
+            )}
           </div>
         </HighlightCtx.Provider>
       </div>
 
-      {saveState !== "idle" && (
+      {(saveState !== "idle" || undo) && (
         <div className="pointer-events-none sticky bottom-3 z-30 mt-4 flex justify-end" role="status">
           <span
             className={`pointer-events-auto flex items-center gap-1.5 rounded-full border bg-panel px-3 py-1.5 text-xs shadow-lg ${
@@ -274,10 +351,15 @@ export function SettingsPage({
                 <Loader2 size={12} className="animate-spin" /> Guardando…
               </>
             )}
-            {saveState === "saved" && (
+            {(saveState === "saved" || (saveState === "idle" && undo)) && (
               <>
                 <CheckCircle2 size={12} className="text-ok" /> Guardado
               </>
+            )}
+            {undo && saveState !== "error" && saveState !== "saving" && (
+              <button onClick={undoLast} className="ml-1 flex items-center gap-1 rounded-full border border-line-2 px-2 py-0.5 text-dim transition-colors hover:border-neon/40 hover:text-neon">
+                <Undo2 size={11} /> Deshacer
+              </button>
             )}
             {saveState === "error" && (
               <>

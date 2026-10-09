@@ -1,13 +1,14 @@
 // Ajustes → Datos de AdminOps: tamaño, limpieza, copias y paquete de soporte.
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
-import { Button, Card } from "../../components/ui";
+import { Button, Card, Toggle } from "../../components/ui";
 import { appcareApi, type DataUsage, logQuietly, type UpdateInfo } from "../../lib/api";
 import { bytes } from "../../lib/format";
 import { TaskStatus } from "../../components/TaskStatus";
 import { Row, selectClass, type SettingsProps } from "./shared";
 
-export function DataCare({ s, set }: SettingsProps) {
+/** `part`: solo los datos (Datos y copias) o solo las actualizaciones (Acerca de). */
+export function DataCare({ s, set, part }: SettingsProps & { part: "data" | "updates" }) {
   const [usage, setUsage] = useState<DataUsage | null>(null);
   const [months, setMonths] = useState(6);
   const [parts, setParts] = useState({
@@ -91,18 +92,14 @@ export function DataCare({ s, set }: SettingsProps) {
 
   const check = (key: keyof typeof parts, label: string) => (
     <label className="flex items-center gap-2 text-sm text-dim">
-      <input
-        type="checkbox"
-        checked={parts[key]}
-        onChange={(e) => setParts({ ...parts, [key]: e.target.checked })}
-        className="size-4 accent-[var(--color-neon)]"
-      />
+      <Toggle checked={parts[key]} onChange={(v) => setParts({ ...parts, [key]: v })} />
       {label}
     </label>
   );
 
   return (
     <>
+      {part === "data" && (
       <Card title="Datos de AdminOps">
         {usage && (
           <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
@@ -181,18 +178,15 @@ export function DataCare({ s, set }: SettingsProps) {
           </Row>
         </div>
       </Card>
+      )}
 
+      {part === "updates" && (
       <Card title="Actualizaciones">
         <Row
           title="Avisar de versiones nuevas"
           sub="Al abrir, consulta en GitHub si hay una versión nueva de AdminOps y lo indica en la barra lateral. No descarga ni instala nada solo: eso lo decides tú con el botón de abajo."
         >
-          <input
-            type="checkbox"
-            checked={s.checkUpdates}
-            onChange={(e) => set({ checkUpdates: e.target.checked })}
-            className="size-4 accent-[var(--color-neon)]"
-          />
+          <Toggle checked={s.checkUpdates} onChange={(v) => set({ checkUpdates: v })} />
         </Row>
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <Button kind="ghost" onClick={checkNow} disabled={installing}>
@@ -212,6 +206,7 @@ export function DataCare({ s, set }: SettingsProps) {
         </div>
         <TaskStatus task="update" active={installing} fallback="Descargando la versión nueva…" className="mt-2" />
       </Card>
+      )}
     </>
   );
 }

@@ -183,7 +183,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     // Lo que se apuntó de este equipo o de esta red la última vez.
     notes: <PlaceNotes compact />,
     live: (
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
         <Kpi
           label="Procesador"
           value={`${Math.round(m.cpuTotal)}`}
@@ -314,7 +314,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-5 px-8 py-6">
+    <div className="mx-auto flex max-w-(--page-max) flex-col gap-5 px-8 py-6">
       {/* Veredicto */}
       <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 px-6 py-5">
         <span className={`size-3 shrink-0 rounded-full ${verdict.dot}`} />

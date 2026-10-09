@@ -74,7 +74,7 @@ export function Recover() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Antes de empezar" icon={<Lightbulb size={14} />} className="col-span-12 lg:col-span-5">
         <ul className="space-y-2 text-sm text-dim">
           <li>

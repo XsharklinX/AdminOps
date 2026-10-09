@@ -25,7 +25,7 @@ const PRESETS: [string, boolean[][]][] = [
 
 export function Family() {
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <DnsFilter />
       <BlockedSites />
       <Schedule />

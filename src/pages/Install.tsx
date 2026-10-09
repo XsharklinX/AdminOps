@@ -219,7 +219,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   const pill = (on: boolean) => `rounded-full border px-2.5 py-0.5 text-xs transition-colors ${on ? "border-neon/60 bg-neon/10 text-ink" : "border-line text-mute hover:text-ink"}`;
 
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className="mx-auto max-w-(--page-max) p-6">
       {/* Listas */}
       <section className="mb-5">
         <h2 className="mb-2 text-[11px] font-semibold text-dim">Listas</h2>
@@ -430,7 +430,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
 
       {selected.length > 0 && (
         <div className="sticky bottom-0 z-30 -mx-6 -mb-6 mt-6 border-t border-line bg-panel px-6 py-3">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <div className="mx-auto flex max-w-(--page-max) items-center justify-between gap-4">
             {running ? (
               <TaskStatus task="install-apps" active={running} fallback="Instalando…" />
             ) : (

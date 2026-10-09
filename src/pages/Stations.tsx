@@ -161,7 +161,7 @@ export function Stations() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Listas de equipos" icon={<Monitor size={14} />} className="col-span-12 lg:col-span-3 lg:self-start">
         <button
           onClick={() => {

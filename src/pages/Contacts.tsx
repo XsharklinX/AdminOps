@@ -322,7 +322,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
 
   return (
     <>
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       {/* De un vistazo: cuántos hay y qué falta. Cada cifra filtra. */}
       {live.length > 0 && (
         <div className="col-span-12 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">

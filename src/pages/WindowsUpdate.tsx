@@ -88,7 +88,7 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
   const shown = (history ?? []).filter((h) => !onlyFailed || h.result === "failed" || h.result === "partial");
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-12 gap-4 p-6">
+    <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Estado" className="col-span-12 lg:col-span-5">
         {paused ? (
           <p className="flex items-center gap-2 text-sm text-warn">

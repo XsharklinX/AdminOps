@@ -83,7 +83,7 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <Card
         title="Nota de seguridad"
         icon={<ShieldCheck size={14} />}

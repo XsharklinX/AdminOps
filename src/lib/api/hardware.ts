@@ -73,7 +73,28 @@ export interface MemoryTest {
   message: string;
 }
 
+/** Una semana del historial de la batería que apunta Windows. */
+export interface BatteryPoint {
+  day: string;
+  full: number;
+  design: number;
+}
+
+export interface BatteryHistory {
+  name: string;
+  design: number;
+  full: number;
+  cycles: number | null;
+  points: BatteryPoint[];
+  /** Puntos de capacidad que pierde al mes (último año). */
+  lossPerMonth: number | null;
+  /** Meses hasta quedar a la mitad, a este ritmo. */
+  monthsToHalf: number | null;
+}
+
 export const hwApi = {
+  /** null: el equipo no tiene batería. */
+  batteryHistory: () => invoke<BatteryHistory | null>("battery_history"),
   inventory: () => invoke<Inventory>("hardware_inventory"),
   sensors: () => invoke<Sensors>("read_sensors"),
   smart: () => invoke<SmartDisk[]>("smart_status"),

@@ -251,11 +251,11 @@ export function AlertCenter({
               <button
                 onClick={() => {
                   show(false);
-                  onNavigate("settings");
+                  onNavigate("settings", "alerts");
                 }}
                 className="text-neon hover:underline"
               >
-                Activarla en Ajustes → General
+                Activarla en Ajustes → Avisos
               </button>
             </p>
           )}

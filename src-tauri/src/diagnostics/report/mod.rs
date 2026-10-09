@@ -321,9 +321,8 @@ fn inside_reports(app: &tauri::AppHandle, path: &str) -> Result<PathBuf, String>
     Ok(PathBuf::from(s.strip_prefix(r"\\?\").unwrap_or(&s)))
 }
 
-/// Genera el informe PDF (o HTML si falta Edge), lo abre y devuelve su ruta y número.
-pub fn create_report(app: &tauri::AppHandle, state: &TweakState, input: ReportInput) -> Result<Created, String> {
-    input.billing.validate()?;
+/// El HTML del informe (el que luego pasa a PDF) con el número dado.
+fn report_html(app: &tauri::AppHandle, state: &TweakState, input: &ReportInput, number: &str) -> Result<(String, Diagnostics), String> {
     let cur = latest_snapshot(app).ok_or("Ejecuta un diagnóstico antes de generar el informe.")?;
     let base = input.baseline.filter(|b| *b != cur.timestamp).and_then(|b| load_snapshot(app, b));
     let today = || Local::now().date_naive().and_hms_opt(0, 0, 0).and_then(|d| d.and_local_timezone(Local).single()).map_or(0, |d| d.timestamp() as u64);
@@ -333,18 +332,25 @@ pub fn create_report(app: &tauri::AppHandle, state: &TweakState, input: ReportIn
     let technician = input.technician.clone().filter(|t| !t.trim().is_empty()).unwrap_or_else(|| settings.technician.clone());
     // Último test de velocidad del periodo del informe.
     let speed = crate::network::speedtest::history(app).into_iter().find(|r| r.timestamp >= since);
-    let number = crate::workflow::next_number(app);
     let html = build(&Ctx {
         cur: &cur,
         base: base.as_ref(),
         journal: &journal,
         technician: technician.trim(),
-        input: &input,
+        input,
         settings: &settings,
         speed: speed.as_ref(),
-        number: &number,
+        number,
         since,
     });
+    Ok((html, cur))
+}
+
+/// Genera el informe PDF (o HTML si falta Edge), lo abre y devuelve su ruta y número.
+pub fn create_report(app: &tauri::AppHandle, state: &TweakState, input: ReportInput) -> Result<Created, String> {
+    input.billing.validate()?;
+    let number = crate::workflow::next_number(app);
+    let (html, cur) = report_html(app, state, &input, &number)?;
 
     let dir = reports_dir(app);
     std::fs::create_dir_all(&dir).map_err(|e| format!("No se pudo crear {}: {e}", dir.display()))?;
@@ -468,6 +474,40 @@ pub struct ReportOptions {
     pub recommendations: String,
     /// Guardar la visita en la ficha del cliente.
     pub archive: bool,
+}
+
+/// Lo que se elige en la pantalla del informe, convertido en lo que necesita el informe.
+fn report_input(app: &tauri::AppHandle, options: &ReportOptions) -> ReportInput {
+    use crate::workflow::{find_client, maintenance_date, warranties};
+    let settings = crate::workflow::settings(app);
+    let found = options.client_id.as_deref().and_then(|id| find_client(app, id));
+    let archive = options.archive && found.is_some();
+    let now = Local::now().timestamp() as u64;
+    ReportInput {
+        baseline: options.baseline,
+        client: found.unwrap_or(Client { name: options.client.trim().into(), ..Default::default() }),
+        technician: Some(options.technician.clone()),
+        notes: options.notes.clone(),
+        checklist: vec![],
+        since: None,
+        template: options.template,
+        billing: options.billing.clone(),
+        problem: options.problem.clone(),
+        recommendations: options.recommendations.clone(),
+        signature: None,
+        signer: String::new(),
+        warranties: if archive { warranties(&options.billing, settings.labor_warranty_days, now) } else { vec![] },
+        next_maintenance: if archive { maintenance_date(settings.maintenance_months, now) } else { None },
+    }
+}
+
+/// La vista previa del informe mientras se prepara: el mismo HTML que irá al
+/// PDF, sin crear el archivo, sin gastar número y sin guardar nada en el cliente.
+/// Usa el último análisis (el PDF analiza de nuevo justo antes de crearse).
+#[tauri::command(async)]
+pub fn preview_report(app: tauri::AppHandle, state: State<'_, TweakState>, options: ReportOptions) -> Result<String, String> {
+    let input = report_input(&app, &options);
+    report_html(&app, &state, &input, "BORRADOR").map(|(html, _)| html)
 }
 
 #[tauri::command(async)]

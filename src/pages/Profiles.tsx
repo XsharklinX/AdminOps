@@ -190,7 +190,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
   if (!profiles) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Detectando estado de los perfiles…" />;
 
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className="mx-auto max-w-(--page-max) p-6">
       {!isAdmin && <NeedsAdmin className="mb-4">Los perfiles modifican el registro y los servicios: requieren administrador.</NeedsAdmin>}
 
       {result && (

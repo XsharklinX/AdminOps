@@ -382,7 +382,7 @@ export function WindowsTweaks({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-4">
+      <div className="mx-auto w-full max-w-(--page-max) shrink-0 px-6 pt-4">
         <label className="flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 focus-within:border-neon/50">
           <Search size={14} className="text-mute" />
           <input

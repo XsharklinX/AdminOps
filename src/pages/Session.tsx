@@ -291,7 +291,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
   const small = "w-24 rounded-md border border-line bg-void/60 px-2 py-1.5 text-sm text-ink outline-none focus:border-neon/50";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-4 rounded-xl border border-line bg-panel px-5 py-3">
         <span className="size-2.5 animate-pulse rounded-full bg-ok" />
         <div className="min-w-0 flex-1">

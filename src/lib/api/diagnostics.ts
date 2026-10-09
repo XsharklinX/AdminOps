@@ -181,6 +181,8 @@ export const diagApi = {
       disks: { name: string; kind: string; size: number; status: "ok" | "warn" | "bad"; detail: string }[];
     } | null>("latest_findings"),
   generateReport: (options: ReportOptions) => invoke<string>("generate_report", { options }),
+  /** El HTML del informe tal como saldrá, sin crear el PDF ni gastar número. */
+  previewReport: (options: ReportOptions) => invoke<string>("preview_report", { options }),
   emailReport: (path: string, to: string, subject: string, body: string) => invoke<void>("email_report", { path, to, subject, body }),
   emailReportManual: (path: string, to: string, subject: string, body: string) =>
     invoke<void>("email_report_manual", { path, to, subject, body }),

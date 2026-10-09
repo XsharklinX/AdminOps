@@ -7,6 +7,26 @@ Ctrl+K → «paquete de soporte»).
 Hazlo dos veces: **sin administrador** (lo que requiere permisos debe explicarlo, no fallar) y **como
 administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un segundo equipo.
 
+## Ajustes reordenado, vista previa del informe y batería (1.2.6)
+- [ ] Ajustes: la columna de la izquierda va en cuatro grupos (Uso, Datos, Trabajo, AdminOps). Ya no hay «General» ni «Rendimiento». Cada ajuste de antes está en su sitio nuevo: buscar «icono», «restauración», «dominio», «copia», «versión» y «arranque» en el buscador de Ajustes lleva a la sección correcta.
+- [ ] Los enlaces que llevaban a Ajustes → General llevan a su sitio: Primeros pasos (copia → Datos y copias; empresa → Informes y cobros), el aviso de versión nueva de la barra lateral (→ Acerca de), la campana con la vigilancia apagada (→ Avisos) y los temas de la guía.
+- [ ] Si la última sección abierta de Ajustes era «General» (de una versión anterior), al entrar se abre «Inicio y ventana», sin errores.
+- [ ] Sesión → Informe: a la derecha (en pantallas anchas; debajo en las estrechas) sale el informe con «BORRADOR» como número. Escribir en el resumen o cambiar la plantilla lo actualiza al poco. Con la misma letra que el PDF. No aparece ningún PDF nuevo en la carpeta de informes y el siguiente informe de verdad lleva el número que tocaba.
+- [ ] Sin ningún análisis hecho, la vista previa dice que hace falta uno.
+- [ ] En un portátil: Hardware → «Batería» con capacidad de hoy, lo que pierde al mes, cuándo quedará a la mitad, ciclos, y la gráfica con los meses. En un equipo de sobremesa la tarjeta no aparece.
+- [ ] En un portátil recién instalado (sin historial): la tarjeta dice que aún no hay historial, sin gráfica rota.
+
+## Ajustes, pestañas y Ctrl+F (1.2.5)
+- [ ] Ajustes abre en «Resumen». Las siete tarjetas dicen la verdad de este equipo (bloqueo, copia, versión, datos, avisos, aspecto, informes). Cada enlace lleva a su sección y resalta el ajuste o la tarjeta. «Buscar versión nueva» solo sale a Internet al pulsarlo.
+- [ ] Las casillas de Ajustes son ahora interruptores, también con el teclado (Tab y Espacio). Cada fila ocupa una línea; el «?» enseña y esconde la explicación. Al llegar desde el buscador de Ajustes, la explicación sale sola.
+- [ ] La casilla «pieza» del catálogo de Informes sigue siendo una casilla.
+- [ ] Apariencia: al cambiar tema, color, tamaño, densidad de la barra lateral y ancho, la miniatura de la derecha cambia al momento. En una ventana estrecha queda debajo.
+- [ ] Cambiar un ajuste → abajo «Guardado · Deshacer» unos 8 s. «Deshacer» lo devuelve a como estaba (probar con un interruptor, con un desplegable, con el color de acento y escribiendo el nombre de la empresa: un solo «Deshacer» quita lo escrito).
+- [ ] Pestañas: abrir tres pantallas → salen tres pestañas en el orden en que se abrieron. Clic cambia; la X o la rueda cierra; cerrar la actual lleva a la de al lado. Ctrl+Tab, Ctrl+Mayús+Tab y Ctrl+W. Con una sola pantalla no hay pestañas. Ajustes → Navegación → apagarlas: desaparecen y Ctrl+W ya no cierra nada.
+- [ ] Ctrl+F en Procesos, Programas, Servicios y Contactos: marca las coincidencias («spool» encuentra «Spooler»; «impresion» encuentra «impresión»), dice «2 de 14», Intro y Mayús+Intro saltan y la vista se mueve. Esc cierra y quita las marcas. No abre la búsqueda propia del navegador.
+- [ ] Panel → «Personalizar el panel»: cada tarjeta lleva ⅓ ½ ⅔ «Todo». Poner «Qué hacer ahora» y «Acciones rápidas» a la mitad: quedan una al lado de la otra. «En vivo» a la mitad: sus cuatro cifras pasan a dos por fila. Se recuerda al cerrar y abrir. «Como de fábrica» lo devuelve. En una ventana estrecha todas van a lo ancho.
+- [ ] Ctrl+F en una pantalla que se actualiza sola (Procesos): las marcas siguen a las filas en unos segundos.
+
 ## Las once de la 1.2.4
 - [ ] **Duplicados**: copiar un archivo de más de 1 MB a dos carpetas, analizar la unidad → Espacio → «Buscar duplicados»: sale el grupo con las dos rutas (sin el nombre del usuario) y lo recuperable. «Marcar las copias» deja la primera sin marcar. «A la papelera» → el grupo desaparece. «Detener» a media búsqueda la corta.
 - [ ] Duplicados: un archivo de OneDrive que solo está en la nube no se descarga durante la búsqueda (sale contado como «solo en la nube»).
@@ -20,6 +40,10 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] **Ctrl+K**: «cola» → «Vaciar la cola de impresión» → Intro: se hace y sale el resultado abajo, sin cambiar de pantalla. Igual con «sonido», «dns», «análisis rápido». En modo auditoría se niega y lo dice.
 - [ ] **Copiar tarjeta**: pasar el ratón por una tarjeta con título → botón en su esquina → pegar en Paint o en Teams: sale la tarjeta, sin el propio botón, con el fondo de la app. Probar en tema claro y oscuro.
 - [ ] **«Nuevo»**: actualizando desde una versión anterior, Panel y Rendimiento llevan «Nuevo» en la barra lateral y se les va al entrar. En una instalación desde cero no sale ninguna.
+- [ ] **Arrastrar** vuelve a funcionar: tarjetas en «Personalizar el panel», áreas y pantallas en Ajustes → Navegación, citas en la Agenda.
+- [ ] **Ancho**: con la ventana maximizada en un monitor grande, las pantallas llenan todo el ancho. Ajustes → Apariencia → «Ancho de las pantallas» → «Centrado» vuelve al ancho de antes al momento. Mirar Panel, Diagnóstico, Espacio y Ajustes en los dos.
+- [ ] La columna de áreas ya no tiene «Todo»; el buscador de arriba abre «Todo AdminOps».
+- [ ] Icono junto al reloj: con «Al cerrar, minimizar», la primera X de la sesión muestra «AdminOps sigue abierta». En el registro aparece «Icono junto al reloj: puesto».
 - [ ] Deshacer en el momento (ya existía): desactivar un programa de inicio → el mensaje lleva «Deshacer» durante 10 s.
 
 ## Setup y cerrar minimizando (1.2.3)

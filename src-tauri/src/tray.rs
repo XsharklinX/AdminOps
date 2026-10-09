@@ -10,6 +10,8 @@ use tauri::{Emitter, Manager};
 const ID: &str = "adminops";
 /// ¿Está el icono a la vista? Lo consulta el cierre de la ventana.
 static VISIBLE: AtomicBool = AtomicBool::new(false);
+/// Ya se avisó en esta sesión de dónde está AdminOps al esconderla.
+static TOLD: AtomicBool = AtomicBool::new(false);
 
 pub fn visible() -> bool {
     VISIBLE.load(Ordering::SeqCst)
@@ -69,10 +71,28 @@ fn build(app: &tauri::AppHandle) -> tauri::Result<()> {
                 show_main(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
+    match app.default_window_icon() {
+        Some(icon) => tray = tray.icon(icon.clone()),
+        // Sin imagen, Windows pone un hueco transparente: está, pero no se ve.
+        None => log::warn!("Icono junto al reloj: no hay imagen del programa; saldrá en blanco"),
     }
     tray.build(app).map(|_| ())
+}
+
+/// La primera vez que la X esconde la ventana, se dice dónde ha ido: Windows 11
+/// mete los iconos nuevos en los ocultos (la flecha «^») y, sin aviso, parecía
+/// que AdminOps se había cerrado.
+pub fn tell_where(app: &tauri::AppHandle) {
+    if TOLD.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    use tauri_plugin_notification::NotificationExt;
+    let _ = app
+        .notification()
+        .builder()
+        .title("AdminOps sigue abierta")
+        .body("Está junto al reloj. Si no ves el icono, pulsa la flecha «^» de al lado y arrástralo a la barra para tenerlo siempre a la vista.")
+        .show();
 }
 
 /// Enseña o quita el icono. Se crea la primera vez que se pide.
@@ -89,6 +109,7 @@ pub fn set_visible(app: &tauri::AppHandle, on: bool) {
         None => false,
     };
     VISIBLE.store(shown, Ordering::SeqCst);
+    log::info!("Icono junto al reloj: {}", if shown { "puesto" } else { "quitado" });
     // Sin icono no hay de dónde volver a sacar una ventana escondida.
     if !shown {
         if let Some(w) = app.get_webview_window("main") {
