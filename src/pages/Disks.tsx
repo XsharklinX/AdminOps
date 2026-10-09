@@ -8,6 +8,8 @@ import { Activity, CheckCircle2, CircleAlert, FolderInput, FolderOutput, HardDri
 import { useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { BitLockerChip, DiskTrend, RemovableActions, SpeedTest } from "../components/DiskExtras";
+import { DiskDeep, DiskWatchCard, ScoreCard } from "../components/DiskDeep";
+import { usePrefs } from "../lib/prefs";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Loading } from "../components/ui";
 import { disksApi, type DiskCheck, type DiskReport, type DiskVolume, type RescueResult } from "../lib/api";
@@ -28,6 +30,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
   const [disks, setDisks] = useState<DiskReport[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const technician = usePrefs().mode !== "user";
 
   const load = (vigente: () => boolean = () => true) => {
     setLoading(true);
@@ -64,6 +67,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       <Rescue isAdmin={isAdmin} />
+      {technician && <DiskWatchCard />}
 
       <Card title="¿Qué significa cada cosa?" icon={<Activity size={14} />}>
         <dl className="grid gap-3 text-xs text-dim md:grid-cols-2">
@@ -99,6 +103,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
 }
 
 function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; onChanged: () => void }) {
+  const technician = usePrefs().mode !== "user";
   const t = TONE[d.verdict.level];
   const external = d.bus.toUpperCase() === "USB";
   const Icon = external ? Usb : HardDrive;
@@ -142,8 +147,10 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
       )}
       {d.verdict.level === "ok" && <p className="-mt-1 px-4 pb-2 text-xs text-dim">{d.verdict.text}</p>}
       {facts.length > 0 && <p className="px-4 pb-3 text-[11px] text-mute">{facts.join(" · ")}</p>}
+      <ScoreCard score={d.score} technician={technician} />
       <DiskTrend d={d} />
       <SpeedTest d={d} />
+      {technician && <DiskDeep d={d} isAdmin={isAdmin} />}
 
       {d.volumes.length > 0 && (
         <ul className="divide-y divide-line/60 border-t border-line/60">

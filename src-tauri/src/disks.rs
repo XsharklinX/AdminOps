@@ -68,6 +68,14 @@ pub struct Disk {
     pub pending: Option<u64>,
     pub uncorrectable: Option<u64>,
     pub crc_errors: Option<u64>,
+    /// Errores de medio e integridad de un NVMe.
+    pub media_errors: u64,
+    /// Registro de salud de un NVMe (con administrador).
+    #[serde(skip_deserializing)]
+    pub nvme: Option<crate::smartx::NvmeHealth>,
+    /// Nota de 0 a 100 con su desglose y la vida que le queda.
+    #[serde(skip_deserializing)]
+    pub score: crate::smartx::HealthScore,
     #[serde(skip_deserializing)]
     pub verdict: Verdict,
     /// Cifras de los últimos días (una por día) para ver si va a peor.
@@ -172,6 +180,29 @@ fn apply_trend(d: &mut Disk) {
     );
 }
 
+/// La nota de salud de un disco con lo que se sabe de él.
+fn score_of(d: &Disk) -> crate::smartx::HealthScore {
+    let wear_trend: Vec<(u32, i64)> = d.trend.iter().filter(|p| p.wear >= 0).map(|p| (p.day, p.wear)).collect();
+    crate::smartx::score(&crate::smartx::ScoreInput {
+        media: &d.media,
+        bus: &d.bus,
+        reallocated: d.reallocated.unwrap_or(0),
+        pending: d.pending.unwrap_or(0),
+        uncorrectable: d.uncorrectable.unwrap_or(0),
+        crc: d.crc_errors.unwrap_or(0),
+        read_errors: d.read_errors.max(0) as u64,
+        write_errors: d.write_errors.max(0) as u64,
+        media_errors: d.media_errors,
+        predict_failure: d.predict_failure,
+        wear: d.wear,
+        temperature: d.temperature,
+        hours: d.hours,
+        unhealthy: d.health.eq_ignore_ascii_case("Unhealthy"),
+        wear_trend: &wear_trend,
+        tb_written: d.nvme.as_ref().map(|n| n.tb_written),
+    })
+}
+
 fn history_path(app: &tauri::AppHandle) -> std::path::PathBuf {
     crate::paths::machine_data_dir(app).join("discos-historial.json")
 }
@@ -197,7 +228,7 @@ pub fn verdict(d: &Disk) -> Verdict {
     let external = d.bus.eq_ignore_ascii_case("USB");
     let pending = d.pending.unwrap_or(0);
     let uncorrectable = d.uncorrectable.unwrap_or(0);
-    if d.predict_failure || pending > 0 || uncorrectable > 0 || d.health.eq_ignore_ascii_case("Unhealthy") || d.read_errors > 0 {
+    if d.predict_failure || pending > 0 || uncorrectable > 0 || d.media_errors > 0 || d.health.eq_ignore_ascii_case("Unhealthy") || d.read_errors > 0 {
         let mut detalle = Vec::new();
         if pending > 0 {
             detalle.push(format!("{pending} sectores que no se pueden leer"));
@@ -207,6 +238,9 @@ pub fn verdict(d: &Disk) -> Verdict {
         }
         if d.read_errors > 0 {
             detalle.push(format!("{} errores de lectura sin corregir", d.read_errors));
+        }
+        if d.media_errors > 0 {
+            detalle.push(format!("{} errores de integridad de datos", d.media_errors));
         }
         if d.predict_failure {
             detalle.push("el propio disco avisa de que va a fallar".into());
@@ -363,40 +397,113 @@ fn status_and_record(app: &tauri::AppHandle) -> Result<(Vec<Disk>, News), String
     let _ = crate::paths::write_json(&path, &history);
     for d in &mut disks {
         apply_trend(d);
+        d.score = score_of(d);
     }
     Ok((disks, news))
 }
 
-/// Una vez al día, con AdminOps abierto: si un disco va a peor, avisa.
+fn watch_cfg_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::machine_data_dir(app).join("vigilante-discos.json")
+}
+
+fn watch_state_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::machine_data_dir(app).join("vigilante-discos-estado.json")
+}
+
+fn watch_config(app: &tauri::AppHandle) -> crate::diskwatch::Config {
+    let c: crate::diskwatch::Config = crate::paths::read_json(&watch_cfg_path(app));
+    c.sane()
+}
+
+/// Ajustes del vigilante de discos (Discos → Vigilante).
+#[tauri::command]
+pub fn diskwatch_get(app: tauri::AppHandle) -> crate::diskwatch::Config {
+    watch_config(&app)
+}
+
+#[tauri::command]
+pub fn diskwatch_set(app: tauri::AppHandle, config: crate::diskwatch::Config) -> Result<crate::diskwatch::Config, String> {
+    let c = config.sane();
+    crate::paths::write_json(&watch_cfg_path(&app), &c)?;
+    Ok(c)
+}
+
+fn watch_disks(disks: &[Disk]) -> Vec<crate::diskwatch::WatchDisk> {
+    disks
+        .iter()
+        .map(|d| crate::diskwatch::WatchDisk {
+            key: history_key(d),
+            model: d.model.clone(),
+            bus: d.bus.clone(),
+            media: d.media.clone(),
+            pending: d.pending.unwrap_or(0),
+            uncorrectable: d.uncorrectable.unwrap_or(0),
+            predict_failure: d.predict_failure,
+            temperature: d.temperature,
+            volumes: d.volumes.iter().map(|v| (v.letter.clone(), v.size, v.free)).collect(),
+        })
+        .collect()
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
+}
+
+/// Con AdminOps abierto, aunque esté minimizado: mira los discos cada cierto tiempo
+/// (Discos → Vigilante) y avisa de lo que cambia. Una vez al día, además, de los que van a peor.
 pub fn start_watch(app: tauri::AppHandle) {
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(10 * 60));
-        let mut last = 0u32;
+        std::thread::sleep(Duration::from_secs(3 * 60));
+        let mut last_day = 0u32;
         loop {
-            if today() != last {
-                last = today();
-                if let Ok((_, news)) = status_and_record(&app) {
-                    let alerts = news
-                        .into_iter()
-                        .map(|(model, changes)| crate::winwatch::Alert {
-                            key: format!("disk-trend:{model}:{}", changes.join(",")),
-                            level: "warn".into(),
-                            title: format!("El disco {model} va a peor"),
-                            detail: changes.join(" · "),
-                            explanation: "Las cifras de desgaste del disco han subido desde ayer. Es la señal típica de un disco que empieza a fallar.".into(),
-                            advice: "Haz una copia de lo importante y míralo en Discos → Salud y reparación.".into(),
+            let cfg = watch_config(&app);
+            if cfg.enabled {
+                if let Ok((disks, news)) = status_and_record(&app) {
+                    let mut alerts = Vec::new();
+                    if today() != last_day {
+                        last_day = today();
+                        for (model, changes) in news {
+                            alerts.push(crate::winwatch::Alert {
+                                key: format!("disk-trend:{model}:{}", changes.join(",")),
+                                level: "warn".into(),
+                                title: format!("El disco {model} va a peor"),
+                                detail: changes.join(" · "),
+                                explanation: "Las cifras de desgaste del disco han subido desde ayer. Es la señal típica de un disco que empieza a fallar.".into(),
+                                advice: "Haz una copia de lo importante y míralo en Discos → Salud y reparación.".into(),
+                                page: Some("space".into()),
+                                count: 1,
+                                time: now_secs(),
+                                ..Default::default()
+                            });
+                        }
+                    }
+                    let path = watch_state_path(&app);
+                    let prev: crate::diskwatch::State = crate::paths::read_json(&path);
+                    let (findings, next) = crate::diskwatch::evaluate(&prev, &watch_disks(&disks), &cfg);
+                    let _ = crate::paths::write_json(&path, &next);
+                    for f in findings {
+                        use tauri::Manager;
+                        let ok: Result<(), String> = Ok(());
+                        app.state::<TweakState>().record(Op::Run, &format!("Aviso del vigilante de discos: {} ({})", f.title, f.detail), &ok);
+                        alerts.push(crate::winwatch::Alert {
+                            key: f.key,
+                            level: f.level,
+                            title: f.title,
+                            detail: f.detail,
+                            explanation: f.explanation,
+                            advice: f.advice,
                             page: Some("space".into()),
                             count: 1,
-                            time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()),
+                            time: now_secs(),
                             ..Default::default()
-                        })
-                        .collect::<Vec<_>>();
+                        });
+                    }
                     if !alerts.is_empty() {
                         crate::winwatch::push_alerts(&app, alerts);
                     }
                 }
             }
-            std::thread::sleep(Duration::from_secs(3600));
+            std::thread::sleep(Duration::from_secs(cfg.interval_min as u64 * 60));
         }
     });
 }
@@ -418,6 +525,24 @@ fn read_status() -> Result<Vec<Disk>, String> {
             }
             if d.hours < 0 {
                 d.hours = s.power_on_hours.map_or(-1, |h| h as i64);
+            }
+        }
+        if d.bus.eq_ignore_ascii_case("NVMe") && crate::elevation::is_elevated() {
+            if let Some(n) = crate::smartio::nvme_health(d.number as u32) {
+                d.media_errors = n.media_errors;
+                if n.critical_warning != 0 {
+                    d.predict_failure = true;
+                }
+                if d.temperature < 0 && n.temperature >= 0 {
+                    d.temperature = n.temperature as i64;
+                }
+                if d.hours < 0 {
+                    d.hours = n.power_on_hours as i64;
+                }
+                if d.wear < 0 {
+                    d.wear = n.percent_used.min(100) as i64;
+                }
+                d.nvme = Some(n);
             }
         }
         for vol in &mut d.volumes {

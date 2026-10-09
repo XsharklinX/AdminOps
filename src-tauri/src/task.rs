@@ -53,6 +53,7 @@ fn default_name(key: &str) -> &'static str {
         "app-backup" => "Copia cifrada de AdminOps",
         "encrypt" | "decrypt" | "vault" => "Caja fuerte",
         "disk-rescue" => "Rescate de archivos",
+        "disk-scan" => "Mapa de superficie",
         "drivers-restore" => "Restaurar drivers",
         "inventory" => "Inventario",
         "lan-scan" | "lan-identify" => "Búsqueda en la red",

@@ -61,8 +61,130 @@ export interface DiskReport {
   verdict: DiskVerdict;
   /** Últimos 90 días (una foto por día). */
   trend: DiskPoint[];
+  mediaErrors: number;
+  nvme: NvmeHealth | null;
+  /** Nota de 0 a 100 con su desglose y la vida que le queda. */
+  score: HealthScore;
   /** Lo que ha subido en el último mes. */
   rising: string[];
+}
+
+/** Una fila de la tabla de salud (atributo SMART o dato de un NVMe). */
+export interface SmartRow {
+  id: string;
+  name: string;
+  explain: string;
+  current: number | null;
+  worst: number | null;
+  threshold: number | null;
+  raw: string;
+  status: "ok" | "warn" | "bad";
+  action: string;
+}
+
+export interface NvmeHealth {
+  criticalWarning: number;
+  temperature: number;
+  availableSpare: number;
+  spareThreshold: number;
+  percentUsed: number;
+  tbRead: number;
+  tbWritten: number;
+  powerCycles: number;
+  powerOnHours: number;
+  unsafeShutdowns: number;
+  mediaErrors: number;
+  errorLogEntries: number;
+}
+
+export interface SelfTest {
+  state: "idle" | "running" | "passed" | "failed" | "aborted";
+  percent: number;
+  text: string;
+  shortMinutes: number;
+  extendedMinutes: number;
+}
+
+export interface SmartFull {
+  number: number;
+  model: string;
+  /** ata · nvme · wmi (sin umbrales) · none */
+  kind: string;
+  rows: SmartRow[];
+  nvme: NvmeHealth | null;
+  selfTest: SelfTest | null;
+  note: string;
+  canSelfTest: boolean;
+}
+
+export interface ScorePart {
+  name: string;
+  score: number;
+  text: string;
+}
+
+export interface HealthScore {
+  total: number;
+  label: string;
+  sentence: string;
+  parts: ScorePart[];
+  lifeYears: number | null;
+  lifeText: string;
+  tbWritten: number | null;
+}
+
+export interface ScanSummary {
+  finished: number;
+  slow: number;
+  verySlow: number;
+  bad: number;
+}
+
+export interface ScanResult {
+  number: number;
+  model: string;
+  size: number;
+  mode: "quick" | "full";
+  /** Una letra por zona: . bien · s lento · v muy lento · x error · ? sin mirar. */
+  cells: string;
+  done: number;
+  total: number;
+  cellBytes: number;
+  curve: number[];
+  avgMbps: number;
+  minMbps: number;
+  maxMbps: number;
+  slow: number;
+  verySlow: number;
+  bad: number;
+  started: number;
+  /** 0: sin terminar (se puede seguir). */
+  finished: number;
+  volumesHit: string[];
+  previous: ScanSummary | null;
+  level: "ok" | "warn" | "bad";
+  text: string;
+}
+
+export interface ScanLive {
+  cells: string;
+  done: number;
+  total: number;
+  percent: number;
+  mbps: number;
+  etaSecs: number;
+  slow: number;
+  verySlow: number;
+  bad: number;
+}
+
+export interface WatchConfig {
+  enabled: boolean;
+  intervalMin: number;
+  freePct: number;
+  tempHdd: number;
+  tempSsd: number;
+  muted: string[];
 }
 
 export interface DiskSpeed {
@@ -113,6 +235,17 @@ export const disksApi = {
   speed: (letter: string, media: string, bus: string) => invoke<DiskSpeed>("disk_speed_test", { letter, media, bus }),
   /** Tarea «disk-capacity:LETRA». Llena el espacio libre y lo comprueba. */
   capacity: (letter: string) => invoke<DiskCapacity>("disk_capacity_test", { letter }),
+  /** Tabla SMART completa (SATA) o registro de salud (NVMe). */
+  smartFull: (number: number, bus: string, model: string) => invoke<SmartFull>("smart_full", { number, bus, model }),
+  /** "short" · "extended" · "abort" */
+  selfTest: (number: number, action: "short" | "extended" | "abort") => invoke<SelfTest>("smart_selftest", { number, action }),
+  selfTestStatus: (number: number) => invoke<SelfTest>("smart_selftest_status", { number }),
+  /** Tarea «disk-scan:N». Solo lectura. */
+  scan: (number: number, model: string, hdd: boolean, mode: "quick" | "full", resume: boolean) => invoke<ScanResult>("disk_scan", { number, model, hdd, mode, resume }),
+  scanLive: (number: number) => invoke<ScanLive | null>("disk_scan_live", { number }),
+  scanLast: (number: number, model: string, size: number) => invoke<ScanResult | null>("disk_scan_last", { number, model, size }),
+  watchGet: () => invoke<WatchConfig>("diskwatch_get"),
+  watchSet: (config: WatchConfig) => invoke<WatchConfig>("diskwatch_set", { config }),
   eject: (letter: string) => invoke<void>("disk_eject", { letter }),
   format: (letter: string, fs: string, label: string) => invoke<void>("disk_format", { letter, fs, label }),
 };

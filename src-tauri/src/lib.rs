@@ -24,6 +24,12 @@ mod company;
 mod webview_orphans;
 mod disks;
 mod disktools;
+mod diskscan;
+mod diskscanio;
+mod diskwatch;
+mod rawdisk;
+mod smartio;
+mod smartx;
 mod toast;
 mod evtwatch;
 mod ocr;
@@ -350,6 +356,14 @@ pub fn run() {
             disks::disk_rescue,
             disks::disk_pick_folder,
             disks::bitlocker_local_key,
+            disks::diskwatch_get,
+            disks::diskwatch_set,
+            smartio::smart_full,
+            smartio::smart_selftest,
+            smartio::smart_selftest_status,
+            diskscanio::disk_scan,
+            diskscanio::disk_scan_live,
+            diskscanio::disk_scan_last,
             disktools::disk_speed_test,
             disktools::disk_capacity_test,
             disktools::disk_eject,
