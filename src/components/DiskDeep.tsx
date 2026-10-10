@@ -2,11 +2,13 @@
 // escaneo de superficie. La tabla SMART completa y explicada, la nota de salud
 // con la vida que queda, las autopruebas del disco, la curva de velocidad y el
 // mapa de superficie. Todo en solo lectura.
+import { Term } from "./Term";
+import { termIn } from "../lib/glossary";
 import { Activity, Bell, ChevronDown, ChevronRight, Gauge, Loader2, Play, ScanSearch, Square, TestTube } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
-import { Button, Card, Toggle } from "./ui";
+import { Button, Card, Loading, Toggle } from "./ui";
 import { appApi, disksApi, type DiskReport, type HealthScore, type ScanLive, type ScanResult, type SelfTest, type SmartFull, type SmartRow, type WatchConfig } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -74,6 +76,7 @@ export function ScoreCard({ score, technician }: { score: HealthScore; technicia
 }
 
 // ---------- Tabla SMART ----------
+// Los nombres que están en el glosario llevan su explicación al pasar el ratón.
 
 function SmartTab({ d }: { d: DiskReport }) {
   const [data, setData] = useState<SmartFull | null>(null);
@@ -94,9 +97,9 @@ function SmartTab({ d }: { d: DiskReport }) {
   if (error) return <p className="px-4 py-3 text-xs text-bad">{error}</p>;
   if (!data)
     return (
-      <p className="flex items-center gap-2 px-4 py-3 text-xs text-mute">
-        <Loader2 size={12} className="animate-spin" /> Leyendo la tabla del disco…
-      </p>
+      <div className="px-4">
+        <Loading text="Leyendo la tabla del disco…" />
+      </div>
     );
   const rows = onlyIssues ? data.rows.filter((r) => r.status !== "ok") : data.rows;
   const issues = data.rows.filter((r) => r.status !== "ok").length;
@@ -158,7 +161,7 @@ function SmartLine({ r, levels, open, onToggle }: { r: SmartRow; levels: boolean
           <Chev size={12} />
         </td>
         <td className="px-2 py-1.5 font-mono text-mute">{r.id.startsWith("nvme") ? "" : r.id}</td>
-        <td className="px-2 py-1.5 text-ink">{r.name}</td>
+        <td className="px-2 py-1.5 text-ink">{termIn(r.name) ? <Term k={termIn(r.name)!.term}>{r.name}</Term> : r.name}</td>
         {levels && (
           <>
             <td className="tabular px-2 py-1.5 text-right font-mono text-dim">{r.current ?? "—"}</td>

@@ -1,0 +1,98 @@
+// Pruebas de la app en marcha: abre la interfaz de verdad en un navegador (con
+// el sistema simulado), recorre todas las pantallas y comprueba que ninguna se
+// queda en blanco, enseña «Algo falló» o deja errores en la consola. Guarda una
+// captura de cada una en tests/ui/out/.
+//
+//   node tests/ui/smoke.mjs            (necesita Playwright con Chromium)
+//
+// Es lo que evita fallos como los de la 1.1.6 (portales colgados, ajustes sin
+// poder pulsar) que pasaban todas las pruebas de lógica.
+import { createServer } from "vite";
+import { readFileSync, readdirSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const out = join(root, "tests", "ui", "out");
+mkdirSync(out, { recursive: true });
+
+// Qué espera cada orden (lista, texto, sí/no…), leído de src/lib/api.
+function defaults() {
+  const map = {};
+  const dir = join(root, "src", "lib", "api");
+  for (const f of readdirSync(dir)) {
+    const src = readFileSync(join(dir, f), "utf8");
+    for (const m of src.matchAll(/invoke<([^>]+(?:<[^>]*>)?[^>]*)>\("([a-z_]+)"/g)) {
+      const t = m[1].trim();
+      map[m[2]] = /\[\]$/.test(t) ? "array" : t === "string" ? "string" : t === "boolean" ? "bool" : t === "number" ? "number" : "null";
+    }
+  }
+  return map;
+}
+
+// Todas las pantallas, de la barra lateral.
+function pages() {
+  const src = readFileSync(join(root, "src", "components", "Sidebar.tsx"), "utf8");
+  const block = src.slice(src.indexOf("export type PageId"), src.indexOf(";", src.indexOf("export type PageId")));
+  return [...block.matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+}
+
+let playwright;
+try {
+  playwright = await import("playwright");
+} catch {
+  playwright = await import("/opt/node22/lib/node_modules/playwright/index.mjs");
+}
+
+const server = await createServer({ root, configFile: join(root, "vite.config.ts"), server: { port: 1430, strictPort: false }, logLevel: "error" });
+await server.listen();
+const url = `http://localhost:${server.config.server.port}/tests/ui/index.html`;
+const launch = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
+const browser = await playwright.chromium.launch(launch);
+const page = await browser.newPage({ viewport: { width: 1366, height: 820 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(`[excepción] ${e.message}`));
+page.on("console", (m) => m.type() === "error" && errors.push(`[consola] ${m.text().split("\n")[0].slice(0, 300)}`));
+await page.addInitScript((d) => {
+  window.__E2E_DEFAULTS__ = d;
+  // También corre en los marcos sin almacenamiento (vistas previas de informes).
+  try {
+    localStorage.setItem("adminops-seen-version", "1.2.8");
+  } catch {
+    /* marco aislado */
+  }
+}, defaults());
+
+await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
+await page.waitForSelector("main", { timeout: 120000 });
+
+const failures = [];
+// El Panel también cuenta: es la primera pantalla.
+if (errors.length) failures.push({ page: "dashboard (al abrir)", shown: "dashboard", empty: false, crashed: false, errors: errors.slice(0, 3) });
+for (const p of pages()) {
+  if (["tickets", "mail", "teams"].includes(p)) continue; // vistas web nativas
+  const before = errors.length;
+  await page.evaluate((id) => window.dispatchEvent(new CustomEvent("adminops:navigate", { detail: { page: id, focus: null } })), p);
+  await page.waitForTimeout(700);
+  const state = await page.evaluate(() => {
+    const visible = [...document.querySelectorAll("[data-page]")].find((el) => !el.hidden);
+    const text = visible?.innerText ?? "";
+    return { id: visible?.getAttribute("data-page") ?? "", empty: text.trim().length < 20, crashed: /Algo falló|Something went wrong/.test(text) };
+  });
+  await page.screenshot({ path: join(out, `${p}.png`) });
+  // Avisos rojos con un fallo de JavaScript (no los errores normales de Windows).
+  const toasts = await page.evaluate(() => [...document.querySelectorAll('[data-toast="error"]')].map((t) => t.textContent ?? ""));
+  for (const t of toasts) if (/TypeError|ReferenceError|undefined|null \(reading/.test(t)) errors.push(`[aviso] ${t.slice(0, 200)}`);
+  await page.evaluate(() => document.querySelectorAll('[data-toast] button[aria-label="Cerrar aviso"]').forEach((b) => b.click()));
+  const newErrors = errors.slice(before);
+  if (state.empty || state.crashed || newErrors.length) failures.push({ page: p, shown: state.id, empty: state.empty, crashed: state.crashed, errors: newErrors.slice(0, 3) });
+}
+
+const unknown = await page.evaluate(() => [...window.__E2E_UNKNOWN__]);
+await browser.close();
+await server.close();
+
+console.log(`Pantallas revisadas: ${pages().length - 3}. Con problemas: ${failures.length}.`);
+for (const f of failures) console.log(`✗ ${f.page} (se ve «${f.shown}»)${f.empty ? " · vacía" : ""}${f.crashed ? " · «Algo falló»" : ""}\n   ${f.errors.join("\n   ")}`);
+if (unknown.length) console.log(`Órdenes sin tipo conocido (respondidas con null): ${unknown.join(", ")}`);
+process.exit(failures.length ? 1 : 0);

@@ -1,3 +1,4 @@
+import { useDraft } from "../lib/draft";
 import { ExternalLink, FileText, FolderOpen, Loader2, Mail, Receipt, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
@@ -27,9 +28,10 @@ export function Report() {
   const [client, setClient] = useState("");
   const [archive, setArchive] = useState(true);
   const [template, setTemplate] = useState<Template>("client");
-  const [problem, setProblem] = useState("");
-  const [notes, setNotes] = useState("");
-  const [recommendations, setRecommendations] = useState("");
+  // Borradores: lo escrito vuelve si se cierra AdminOps antes de generar el informe.
+  const [problem, setProblem, clearProblem] = useDraft("report.problem");
+  const [notes, setNotes, clearNotes] = useDraft("report.notes");
+  const [recommendations, setRecommendations, clearRecommendations] = useDraft("report.recommendations");
   const [billing, setBilling] = useState<Billing>(EMPTY_BILLING);
   const [busy, setBusy] = useState<string | null>(null);
   const [lastPath, setLastPath] = useState<string | null>(null);
@@ -106,6 +108,10 @@ export function Report() {
       setBusy("Generando informe…");
       const path = await diagApi.generateReport(options(notesOverride));
       setLastPath(path);
+      // Ya está en el informe: el borrador guardado no hace falta (el texto sigue en pantalla).
+      clearProblem();
+      clearNotes();
+      clearRecommendations();
       const pdf = path.toLowerCase().endsWith(".pdf");
       toast(pdf ? "ok" : "info", pdf ? "Informe PDF generado." : "No se pudo crear el PDF (falta Microsoft Edge): se guardó como HTML.");
       void loadSnapshots();

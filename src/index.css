@@ -186,3 +186,180 @@
 [data-privacy] [data-sensitive] {
   filter: blur(6px);
 }
+
+/* ---------- Movimiento (1.2.8) ----------
+   Todo es corto y se apaga con «Reducir animaciones» o con la preferencia de
+   Windows: el ojo ve qué cambió, sin esperar a ninguna animación. */
+
+/* Al cambiar de pantalla, el contenido entra con un fundido corto. Las páginas
+   se mantienen vivas y ocultas: la animación vuelve a empezar al enseñarlas. */
+@keyframes pagein {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+[data-page]:not([hidden]) > * {
+  animation: pagein 140ms ease-out;
+}
+/* Los portales colocan una vista web nativa encima según dónde está su hueco:
+   sin desplazamiento, para que no la midan a medio camino. */
+[data-page="tickets"]:not([hidden]) > *,
+[data-page="mail"]:not([hidden]) > *,
+[data-page="teams"]:not([hidden]) > *,
+[data-page="inventory"]:not([hidden]) > *,
+[data-page="router"]:not([hidden]) > * {
+  animation: none;
+}
+
+/* Esqueletos: la forma de lo que va a llegar, con un brillo que pasa. */
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+.skeleton {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--color-panel-2) 30%, color-mix(in srgb, var(--color-line-2) 70%, var(--color-panel-2)) 50%, var(--color-panel-2) 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Una cifra que acaba de cambiar destella un instante. */
+@keyframes valueflash {
+  from {
+    background-color: color-mix(in srgb, var(--color-neon) 28%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.value-flash {
+  border-radius: 4px;
+  animation: valueflash 900ms ease-out;
+}
+
+/* Los anillos se dibujan la primera vez que se ven. */
+@keyframes ringdraw {
+  from {
+    stroke-dashoffset: var(--ring-c);
+  }
+}
+.ring-draw {
+  animation: ringdraw 650ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Botones: se hunden un poco al pulsarlos. */
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+button {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+}
+
+/* Barrita de los avisos con «Deshacer»: se vacía mientras queda tiempo. */
+@keyframes countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.toast-countdown {
+  transform-origin: left;
+  animation: countdown linear forwards;
+}
+.toast-paused .toast-countdown {
+  animation-play-state: paused;
+}
+
+/* Todo en orden: el gran ✓ entra, se queda un momento y se va. */
+@keyframes celebrate {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  25% {
+    transform: scale(1);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes checkdraw {
+  from {
+    stroke-dashoffset: 60;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.celebrate {
+  animation: celebrate 2200ms ease-out forwards;
+}
+.celebrate path {
+  stroke-dasharray: 60;
+  animation: checkdraw 500ms 180ms ease-out backwards;
+}
+
+/* Barrita fina de arranque y de cargas de fondo, arriba del todo. */
+@keyframes bootbar {
+  0% {
+    transform: translateX(-100%) scaleX(0.4);
+  }
+  100% {
+    transform: translateX(250%) scaleX(0.4);
+  }
+}
+
+/* Recorrido guiado: el resto se oscurece y lo nuevo queda iluminado. */
+.tour-spot {
+  box-shadow:
+    0 0 0 9999px rgb(0 0 0 / 0.6),
+    0 0 0 2px var(--color-neon);
+  transition:
+    top 220ms ease,
+    left 220ms ease,
+    width 220ms ease,
+    height 220ms ease;
+}
+
+/* Cambio de tema: un fundido en lugar de un parpadeo (View Transitions de WebView2). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+}
+
+/* Foco con teclado: un anillo claro, siempre visible, también dentro de las tablas. */
+tr[tabindex]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-neon) 70%, transparent);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.reduce-motion button:active {
+  transform: none;
+}

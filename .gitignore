@@ -35,3 +35,4 @@ src-tauri/target-ci/
 # Instalador personalizado
 installer/target/
 installer/gen/
+tests/ui/out/

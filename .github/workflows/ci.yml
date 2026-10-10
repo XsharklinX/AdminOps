@@ -34,6 +34,22 @@ jobs:
       - name: Tests del frontend
         run: npm test
 
+      # La app en marcha: abre la interfaz con el sistema simulado, recorre todas
+      # las pantallas y falla si alguna se queda en blanco, enseña «Algo falló» o
+      # deja errores. Las capturas quedan como artefacto.
+      - name: Pruebas de la interfaz en marcha
+        run: |
+          npx playwright install chromium
+          npm run test:ui
+
+      - name: Capturas de la interfaz
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-interfaz-${{ github.sha }}
+          path: tests/ui/out/
+          if-no-files-found: ignore
+
       # Reglas de hooks de React: avisan de los efectos con dependencias
       # incompletas, que TypeScript no ve. Los avisos no rompen la CI; los errores si.
       - name: Reglas de codigo

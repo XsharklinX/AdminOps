@@ -1,6 +1,7 @@
 // Rescate a fondo: recuperar archivos por su firma (discos formateados, tarjetas,
 // sistemas de archivos dañados, imágenes) y clonar o hacer una imagen de un disco
 // que falla. Lo que se hacía con PhotoRec y con ddrescue.
+import { useDropped } from "../lib/dropped";
 import { Camera, ChevronDown, ChevronRight, CopyCheck, FileSearch, FolderOutput, Loader2, Play, Square } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./feedback";
@@ -61,6 +62,11 @@ export function CarveCard({ isAdmin, fixed }: { isAdmin: boolean; fixed?: CarveS
   const [kind, setKind] = useState<"disk" | "image">("disk");
   const [number, setNumber] = useState<number | null>(null);
   const [image, setImage] = useState("");
+  // Una imagen soltada sobre la ventana llega aquí ya elegida.
+  useDropped("image", (path) => {
+    setKind("image");
+    setImage(path);
+  });
   const [groups, setGroups] = useState<string[]>(["photos", "documents"]);
   const [items, setItems] = useState<CarveItem[] | null>(null);
   const [show, setShow] = useState<string>("all");
@@ -428,6 +434,9 @@ export function CloneCard({ isAdmin }: { isAdmin: boolean }) {
           title={`Clonar al disco ${dst}`}
           body={`Se BORRARÁ todo lo que hay en el disco ${dst} (${disks.find((d) => d.number === dst)?.model ?? ""}) para dejar una copia exacta del disco ${src}. Comprueba que es el disco de destino correcto: no se puede deshacer.`}
           word={`BORRAR DISCO ${dst}`}
+          touches={[`Todo el disco ${dst}: se sobrescribe entero`]}
+          keeps={[`El disco ${src} (el de origen): solo se lee`]}
+          checks={[`El disco ${dst} no tiene nada que haga falta conservar.`, "He comprobado modelo y tamaño de los dos discos.", "El disco de destino es igual o más grande que el de origen."]}
           confirmLabel="Borrar y clonar"
           onClose={() => setTyped(false)}
           onConfirm={() => {

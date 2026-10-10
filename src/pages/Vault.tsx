@@ -1,3 +1,4 @@
+import { useDropped } from "../lib/dropped";
 import { Copy, Eye, EyeOff, FolderLock, FolderOpen, HardDrive, KeyRound, Lock, LockOpen, Plus, Save, Trash2, Unlock } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
@@ -425,6 +426,7 @@ function EncryptedFolder() {
   const [pw2, setPw2] = useState("");
   const [removeOriginal, setRemoveOriginal] = useState(false);
   const [zip, setZip] = useState<string | null>(null);
+  useDropped("vault", setZip);
   const [zipPw, setZipPw] = useState("");
   const [busy, setBusy] = useState<"encrypt" | "decrypt" | null>(null);
   const toast = useToast();

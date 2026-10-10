@@ -88,6 +88,7 @@ export function TopBar({
       {prefs.sidebar.showSearch && (
         <button
           onClick={onSearch}
+          data-tour="search"
           className="flex h-8 w-56 shrink-0 items-center gap-2 rounded-lg border border-line-2 bg-void px-2.5 text-left text-[13px] text-mute transition-colors hover:border-neon/50 hover:text-dim"
           title="Todo AdminOps: cada función del programa, y el buscador"
         >

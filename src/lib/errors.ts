@@ -42,3 +42,45 @@ export function humanError(command: string, error: unknown): string {
 export function withoutUserPaths(text: string): string {
   return text.replace(/(?:file:\/\/\/)?[a-z]:[\\/](?:users|usuarios)[\\/][^\\/'"\s]+/gi, "Carpeta personal");
 }
+
+/** Un error explicado: qué pasó, por qué suele pasar y qué probar. */
+export interface Explained {
+  what: string;
+  why: string;
+  tries: string[];
+  /** Algo que AdminOps puede hacer por ti: reiniciar como administrador, reintentar… */
+  fix?: "admin" | "retry" | "network" | "space";
+}
+
+type Explain = [RegExp, Omit<Explained, "what">];
+
+const EXPLAIN: Explain[] = [
+  [/administrador|acceso denegado|access is denied|0x80070005/i, { why: "Windows protege esa parte del sistema y solo deja tocarla con permisos de administrador.", tries: ["Reinicia AdminOps como administrador.", "Si ya lo es, puede que un antivirus esté bloqueando la carpeta."], fix: "admin" }],
+  [/en uso por otro programa|being used by another process/i, { why: "Otro programa tiene ese archivo abierto y Windows no deja cambiarlo mientras tanto.", tries: ["Cierra el programa que lo usa (Procesos lo muestra).", "Si no sabes cuál es, reinicia el equipo y vuelve a intentarlo."], fix: "retry" }],
+  [/espacio suficiente|not enough space|disk full/i, { why: "El disco está lleno o casi lleno.", tries: ["Libera espacio en Espacio en disco.", "Vacía la papelera y los temporales."], fix: "space" }],
+  [/no se encuentra el archivo|cannot find the (file|path)/i, { why: "El archivo o la carpeta ya no está donde se esperaba: se movió, se borró o la unidad no está conectada.", tries: ["Comprueba que la unidad (USB, red) sigue conectada.", "Vuelve a elegir el archivo."] }],
+  [/conectar|internet|error sending request|dns error/i, { why: "No hay conexión con el servidor: sin Internet, un proxy o un cortafuegos que lo bloquea.", tries: ["Comprueba que hay Internet.", "Prueba Red → Reparar la red.", "Si estás tras un proxy de empresa, pregunta si deja salir a ese servidor."], fix: "network" }],
+  [/tardó demasiado|timed out/i, { why: "El otro lado no contestó a tiempo: equipo ocupado, red lenta o servicio colgado.", tries: ["Vuelve a intentarlo en un momento.", "Si se repite, reinicia el equipo o el servicio."], fix: "retry" }],
+  [/equipo remoto no responde|rpc server/i, { why: "El equipo de destino no contesta: está apagado, sin red o con el cortafuegos cerrado.", tries: ["Comprueba que está encendido y en la red (ping en Red → Herramientas).", "Revisa que el cortafuegos permite la administración remota."] }],
+  [/ruta de acceso de la red|network path was not found|no se encuentra ese equipo/i, { why: "No se encuentra ese equipo o esa carpeta compartida en la red.", tries: ["Revisa el nombre o prueba con la IP.", "Comprueba que la carpeta sigue compartida."] }],
+  [/no está lista|device is not ready/i, { why: "La unidad no responde: un USB desconectado o un lector sin disco.", tries: ["Vuelve a conectar la unidad.", "Prueba otro puerto USB."], fix: "retry" }],
+  [/error interno de adminops/i, { why: "Algo falló dentro de AdminOps, no en tu equipo. Ya está anotado en el registro técnico.", tries: ["Vuelve a intentarlo.", "Si se repite, crea un paquete de soporte (Ctrl+K → «paquete de soporte»)."], fix: "retry" }],
+];
+
+/** Explica un error ya traducido (o en bruto) para la tarjeta de error. */
+export function explainError(message: string): Explained {
+  const what = withoutUserPaths(message.trim()) || "Algo no salió bien.";
+  for (const [re, e] of EXPLAIN) if (re.test(message)) return { what, ...e };
+  return { what, why: "Windows devolvió un error que AdminOps no reconoce.", tries: ["Vuelve a intentarlo.", "Si se repite, copia los detalles y busca el código en Ctrl+K."], fix: "retry" };
+}
+
+/**
+ * Texto técnico para pegar en un ticket o un correo: sin rutas personales,
+ * correos ni nombres de equipo de la red (\\\\SERVIDOR).
+ */
+export function supportDetails(message: string, where = ""): string {
+  const clean = withoutUserPaths(message)
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "[correo]")
+    .replace(/\\\\[^\\\s]+/g, "\\\\[equipo]");
+  return [`AdminOps · ${new Date().toLocaleString("es-ES")}`, where && `Dónde: ${where}`, `Error: ${clean}`].filter(Boolean).join("\n");
+}

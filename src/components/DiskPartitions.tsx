@@ -1,42 +1,98 @@
 // Particiones y arranque: ver la tabla de cada disco, detectar lo que está roto,
 // encontrar particiones perdidas y devolverlas. Lo que se hacía con TestDisk.
 // Mirar es solo lectura; escribir guarda antes una copia de la tabla y pide confirmación.
+import { Checks, Wizard } from "./Wizard";
 import { History, Loader2, RefreshCw, Save, Search, Wrench } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
 import { NeedsAdmin } from "./AdminBanner";
-import { Button, Card, inputClass, Loading, Modal } from "./ui";
+import { Button, Card, inputClass, Loading } from "./ui";
 import { disksApi, partitionsApi, type DiskReport, type FoundPartition, type PartitionLayout, type TableBackup } from "../lib/api";
 import { bytes } from "../lib/format";
 
 const PILL = { ok: "border-ok/40 bg-ok/10 text-ok", warn: "border-warn/40 bg-warn/10 text-warn", bad: "border-bad/40 bg-bad/10 text-bad" } as const;
 
 /** Pide escribir una palabra antes de hacer algo que cambia el disco. */
-export function TypedConfirm({ title, body, word, confirmLabel, onClose, onConfirm }: { title: string; body: string; word: string; confirmLabel: string; onClose: () => void; onConfirm: () => void }) {
+/**
+ * Confirmación de una operación con riesgo, como asistente de tres pasos: qué se
+ * va a hacer (lo que se toca y lo que no), comprobaciones de seguridad y la
+ * palabra escrita para confirmar.
+ */
+export function TypedConfirm({
+  title,
+  body,
+  word,
+  confirmLabel,
+  onClose,
+  onConfirm,
+  touches = [],
+  keeps = [],
+  checks = ["Tengo copia de lo importante o sé que no hace falta.", "He comprobado que es el disco correcto (modelo y tamaño)."],
+}: {
+  title: string;
+  body: string;
+  word: string;
+  confirmLabel: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  /** Lo que se va a cambiar. */
+  touches?: string[];
+  /** Lo que no se toca. */
+  keeps?: string[];
+  /** Lo que hay que marcar antes de seguir. */
+  checks?: string[];
+}) {
   const [typed, setTyped] = useState("");
+  const [ticks, setTicks] = useState<boolean[]>([]);
   const ready = typed.trim().toUpperCase() === word.toUpperCase();
+  const list = (items: string[], cls: string) => (
+    <ul className={`mt-1 list-disc space-y-0.5 pl-5 text-xs ${cls}`}>
+      {items.map((t) => (
+        <li key={t}>{t}</li>
+      ))}
+    </ul>
+  );
   return (
-    <Modal
+    <Wizard
       title={title}
+      finishLabel={confirmLabel}
       onClose={onClose}
-      footer={
-        <>
-          <Button kind="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button kind="danger" disabled={!ready} onClick={onConfirm}>
-            {confirmLabel}
-          </Button>
-        </>
-      }
-    >
-      <p className="mb-3 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs leading-relaxed text-bad">{body}</p>
-      <label className="block text-xs text-dim">
-        Para continuar, escribe <b className="font-mono text-ink">{word}</b>
-        <input value={typed} onChange={(e) => setTyped(e.target.value)} className={`mt-1 ${inputClass}`} autoFocus />
-      </label>
-    </Modal>
+      onFinish={onConfirm}
+      steps={[
+        {
+          title: "Qué se va a hacer",
+          body: (
+            <div className="space-y-3">
+              <p className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs leading-relaxed text-bad">{body}</p>
+              {touches.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-ink">Se cambia</p>
+                  {list(touches, "text-warn")}
+                </div>
+              )}
+              {keeps.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-ink">No se toca</p>
+                  {list(keeps, "text-ok")}
+                </div>
+              )}
+            </div>
+          ),
+        },
+        { title: "Comprobación", body: <Checks items={checks} value={ticks} onChange={setTicks} />, ready: checks.every((_, k) => ticks[k]) },
+        {
+          title: "Confirmar",
+          ready,
+          body: (
+            <label className="block text-xs text-dim">
+              Para continuar, escribe <b className="font-mono text-ink">{word}</b>
+              <input value={typed} onChange={(e) => setTyped(e.target.value)} className={`mt-1 ${inputClass}`} autoFocus />
+            </label>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -272,6 +328,8 @@ export function PartitionsTab({ isAdmin }: { isAdmin: boolean }) {
           title="Restaurar la partición"
           body={`Se dará de alta una partición ${typed.f.fs} de ${bytes(typed.f.size, 0)} en el disco ${disk.number} (${disk.model}). Se guarda antes una copia de la tabla y se comprueba el resultado; si algo no cuadra, la tabla vuelve a como estaba.`}
           word="RESTAURAR"
+          touches={["La tabla de particiones del disco"]}
+          keeps={["Los datos de dentro de las particiones", "Una copia de la tabla actual, por si hay que volver"]}
           confirmLabel="Restaurar la partición"
           onClose={() => setTyped(null)}
           onConfirm={() => {
@@ -286,6 +344,8 @@ export function PartitionsTab({ isAdmin }: { isAdmin: boolean }) {
           title="Volver a una copia de la tabla"
           body={`Se escribirá la tabla de particiones del disco ${disk.number} guardada el ${date(typed.b.created)}. Los cambios hechos en las particiones desde entonces se pierden.`}
           word="RESTAURAR"
+          touches={["La tabla de particiones del disco"]}
+          keeps={["Los datos de dentro de las particiones", "Una copia de la tabla actual, por si hay que volver"]}
           confirmLabel="Volver a esta copia"
           onClose={() => setTyped(null)}
           onConfirm={() => {

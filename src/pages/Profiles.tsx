@@ -1,3 +1,5 @@
+import { useDropped } from "../lib/dropped";
+import { ChangePreview } from "../components/ChangePreview";
 import {
   Briefcase,
   Copy,
@@ -60,6 +62,10 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
   const [editing, setEditing] = useState<ProfileDef | null | undefined>(undefined);
   const [importing, setImporting] = useState(false);
   const [importText, setImportText] = useState("");
+  useDropped("profile", (text) => {
+    setImportText(text);
+    setImporting(true);
+  });
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
@@ -130,15 +136,8 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
         confirmLabel: "Aplicar perfil",
         body: (
           <>
-            <p className="mb-2">Se aplicarán {pending.length} cambios. Antes se creará un punto de restauración.</p>
-            <ul className="max-h-48 overflow-y-auto rounded-md border border-line bg-void/50 px-3 py-2 text-xs">
-              {pending.map((i) => (
-                <li key={i.id} className="flex justify-between gap-2 py-0.5">
-                  <span className="text-ink">{i.name}</span>
-                  {i.risk !== "low" && <span className={i.risk === "high" ? "text-bad" : "text-warn"}>riesgo {i.risk === "high" ? "alto" : "medio"}</span>}
-                </li>
-              ))}
-            </ul>
+            <p className="mb-2">Se aplicarán {pending.length} ajustes. Antes se creará un punto de restauración. Esto es lo que cambiará en este equipo:</p>
+            <ChangePreview ids={pending.map((i) => i.id)} />
             <p className="mt-2">Podrás deshacerlo entero con "Deshacer perfil" o ajuste por ajuste desde el Historial.</p>
           </>
         ),

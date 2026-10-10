@@ -12,8 +12,10 @@ import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { EmptyLine } from "./ui";
 import { GUIDE } from "../lib/guide";
-import { openHelpTopic } from "../lib/help";
+import { openHelp, openHelpTopic } from "../lib/help";
+import { GLOSSARY as TERMS } from "../lib/glossary";
 import { openComm } from "../lib/comms";
+import { didYouMean, fuzzyHas, tokens } from "../lib/palette";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -54,17 +56,37 @@ export interface PaletteAction {
   run: () => void | Promise<unknown>;
 }
 
-/** La búsqueda de siempre: todas las palabras, y el título que empieza igual, antes. */
-function searchEntries(entries: Entry[], q: string): Entry[] {
-  const words = q.split(/\s+/);
-  return entries
-    .map((e) => {
-      const title = norm(e.title);
-      if (!words.every((w) => e.search.includes(w))) return null;
-      const score = (title.startsWith(q) ? 4 : title.includes(q) ? 2 : 0) + (e.kind === "page" || e.kind === "section" ? 1 : 0);
-      return { e, score };
-    })
-    .filter((x): x is { e: Entry; score: number } => x !== null)
+/** Palabras de relleno: «la impresora no imprime» busca «impresora imprime». */
+const STOP = new Set(["el", "la", "los", "las", "de", "del", "se", "me", "mi", "que", "y", "en", "un", "una", "no", "al", "lo", "por", "con", "para", "es", "esta", "esto"]);
+
+/**
+ * La búsqueda de siempre (todas las palabras; el título que empieza igual,
+ * antes) y, si encuentra poco, otra que perdona erratas y palabras de relleno.
+ */
+export function searchEntries(entries: Entry[], q: string): Entry[] {
+  const words = q.split(/\s+/).filter(Boolean);
+  const meaningful = words.filter((w) => !STOP.has(w));
+  const strict = (e: Entry) => words.every((w) => e.search.includes(w));
+  const loose = (e: Entry) => {
+    if (!meaningful.length) return false;
+    let toks: string[] | null = null;
+    return meaningful.every((w) => e.search.includes(w) || fuzzyHas((toks ??= tokens(e.search)), w));
+  };
+  const scored = (match: (e: Entry) => boolean, bonus: number) =>
+    entries
+      .map((e) => {
+        if (!match(e)) return null;
+        const title = norm(e.title);
+        const score = bonus + (title.startsWith(q) ? 4 : title.includes(q) ? 2 : 0) + (e.kind === "page" || e.kind === "section" ? 1 : 0);
+        return { e, score };
+      })
+      .filter((x): x is { e: Entry; score: number } => x !== null);
+  let found = scored(strict, 10);
+  if (found.length < 5) {
+    const seen = new Set(found.map((x) => x.e.key));
+    found = [...found, ...scored(loose, 0).filter((x) => !seen.has(x.e.key))];
+  }
+  return found
     .sort((a, b) => b.score - a.score || a.e.title.localeCompare(b.e.title))
     .slice(0, 40)
     .map((x) => x.e);
@@ -110,6 +132,7 @@ export function CommandPalette({
   onSection,
   badges = {},
   actions,
+  initialQuery = "",
 }: {
   open: boolean;
   onClose: () => void;
@@ -118,6 +141,8 @@ export function CommandPalette({
   onSection: (page: PageId, section?: string | null) => void;
   badges?: Record<string, Badge>;
   actions: PaletteAction[];
+  /** Texto con el que se abre (clic derecho → «Buscar en Ctrl+K»). */
+  initialQuery?: string;
 }) {
   const prefs = usePrefs();
   const areas = visibleAreas("dashboard");
@@ -136,7 +161,7 @@ export function CommandPalette({
   useLiveEffect(
     (vigente) => {
       if (!open) return;
-      setQuery("");
+      setQuery(initialQuery);
       setIndex(0);
       window.setTimeout(() => input.current?.focus(), 0);
       if (!toolsCache) toolboxApi.list().then((t) => vigente() && setTools((toolsCache = t))).catch(logQuietly("CommandPalette"));
@@ -150,6 +175,7 @@ export function CommandPalette({
         .catch(() => vigente() && setSolutions(BUILTIN_SOLUTIONS));
       libraryApi.list("templates").then((t) => vigente() && setTemplates(t)).catch(logQuietly("CommandPalette"));
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- el texto inicial solo cuenta al abrir
     [open],
   );
 
@@ -223,6 +249,9 @@ export function CommandPalette({
     for (const ch of GUIDE)
       for (const t of ch.topics)
         out.push({ key: `help:${t.id}`, kind: "help", title: t.title, subtitle: ch.title, search: norm(`${t.title} ${ch.title} ${t.what}`), run: () => openHelpTopic(ch.id, t.id) });
+    // «qué es tpm», «bcd»: el término explicado, con qué hacer.
+    for (const g of TERMS)
+      out.push({ key: `term:${g.term}`, kind: "help", title: `¿Qué es ${g.term}?`, subtitle: `${g.what} ${g.todo}`, search: norm(`que es ${g.term} ${(g.aliases ?? []).join(" ")} ${g.what}`), run: () => openHelp("glossary") });
     for (const c of tools?.custom ?? []) {
       out.push({
         key: `tool:${c.id}`,
@@ -251,6 +280,14 @@ export function CommandPalette({
     if (!smart) return found;
     return (smart.sure ? [...smart.entries, ...found] : [...found, ...smart.entries]).slice(0, 40);
   }, [entries, query, smart]);
+
+  // Palabras que conoce Ctrl+K, para «¿Quisiste decir…?» cuando no encuentra nada.
+  const vocabulary = useMemo(() => {
+    const v = new Set<string>();
+    for (const e of entries) for (const w of tokens(norm(e.title))) if (w.length > 3) v.add(w);
+    return v;
+  }, [entries]);
+  const suggestion = useMemo(() => (query.trim() && results.length === 0 ? didYouMean(norm(query.trim()), vocabulary) : null), [query, results.length, vocabulary]);
 
   useEffect(() => setIndex(0), [query]);
   useEffect(() => {
@@ -407,7 +444,18 @@ export function CommandPalette({
                 {i === index && <span className="shrink-0 font-mono text-[10.5px] text-neon">Intro ↵</span>}
               </button>
             ))}
-            {results.length === 0 && <EmptyLine>Nada coincide con «{query}». Prueba con otra palabra: «impresora», «contraseña», «espacio».</EmptyLine>}
+            {results.length === 0 && (
+              <EmptyLine>
+                Nada coincide con «{query}».{" "}
+                {suggestion ? (
+                  <button onClick={() => setQuery(suggestion)} className="text-neon underline-offset-2 hover:underline">
+                    ¿Quisiste decir «{suggestion}»?
+                  </button>
+                ) : (
+                  "Prueba con otra palabra: «impresora», «contraseña», «espacio», o pega un código de error."
+                )}
+              </EmptyLine>
+            )}
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">

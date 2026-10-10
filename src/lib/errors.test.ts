@@ -31,3 +31,20 @@ describe("errores comprensibles", () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining("save_contact"));
   });
 });
+
+import { explainError, supportDetails } from "./errors";
+
+describe("errores que ayudan", () => {
+  it("explica el porqué y propone qué hacer", () => {
+    const e = explainError("Windows denegó el acceso. Prueba a abrir AdminOps como administrador.");
+    expect(e.fix).toBe("admin");
+    expect(e.tries.length).toBeGreaterThan(0);
+    expect(explainError("Algo raro 0x1234").why).toMatch(/no reconoce/);
+  });
+  it("los detalles para soporte no llevan datos personales", () => {
+    const t = supportDetails("Fallo en C:\\Users\\ana\\x con ana@empresa.com en \\\\SRV01\\datos");
+    expect(t).not.toMatch(/ana/);
+    expect(t).not.toMatch(/SRV01/);
+    expect(t).toMatch(/\[correo\]/);
+  });
+});

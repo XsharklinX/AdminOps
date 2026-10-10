@@ -75,6 +75,20 @@ export interface TweakView {
   changes: string[];
 }
 
+export interface PreviewLine {
+  what: string;
+  before: string;
+  after: string;
+  undoable: boolean;
+}
+
+export interface TweakPreview {
+  id: string;
+  name: string;
+  reboot: boolean;
+  lines: PreviewLine[];
+}
+
 export interface OpResult {
   status: TweakStatus;
   message: string;
@@ -114,6 +128,8 @@ export const tweaksApi = {
   exportJournalPdf: (ids: number[]) => invoke<string | null>("export_journal_pdf", { ids }),
   index: () => invoke<{ id: string; name: string; description: string; category: string }[]>("tweak_index"),
   revertEntry: (entryId: number) => invoke<OpResult>("revert_entry", { entryId }),
+  /** Antes → después de cada cosa que tocarán esos ajustes (solo lee). */
+  preview: (ids: string[]) => invoke<TweakPreview[]>("tweak_preview", { ids }),
   createRestorePoint: () => invoke<void>("create_restore_point"),
   listRestorePoints: () => invoke<RestorePoint[]>("list_restore_points"),
   openSystemRestore: () => invoke<void>("open_system_restore"),

@@ -34,6 +34,39 @@ import { SPLIT_LEFT, SPLIT_RIGHT } from "./lib/split";
 import { SYMPTOMS } from "./lib/symptoms";
 import { Loading } from "./components/ui";
 import { openHelp, useHelp } from "./lib/help";
+import { CelebrateLayer } from "./components/Celebrate";
+import { ContextMenu } from "./components/ContextMenu";
+import { DropLayer } from "./components/DropLayer";
+import { UndoLast } from "./components/UndoLast";
+import { BootBar } from "./components/BootBar";
+import { QuickRead } from "./components/QuickRead";
+import { ResumeRibbon, rememberPlace } from "./components/ResumeRibbon";
+import { trackBoot } from "./lib/boot";
+import { setPrefetcher } from "./lib/prefetch";
+import { PALETTE_EVENT } from "./lib/palette";
+import { startTour, tourFor } from "./lib/tour";
+import { Tour } from "./components/Tour";
+import { DemoBanner } from "./components/DemoMode";
+
+/** Código de cada pantalla, para empezar a cargarlo al pasar el ratón por la barra lateral. */
+const PAGE_CODE: Partial<Record<PageId, () => Promise<unknown>>> = {
+  processes: () => import("./pages/Processes"),
+  tickets: () => import("./pages/Tickets"),
+  mail: () => import("./pages/Tickets"),
+  teams: () => import("./pages/Tickets"),
+  remote: () => import("./pages/Remote"),
+  settings: () => import("./pages/SettingsPage"),
+  troubleshoot: () => import("./pages/Troubleshoot"),
+  contacts: () => import("./pages/Contacts"),
+  knowledge: () => import("./pages/Knowledge"),
+  agenda: () => import("./pages/Agenda"),
+  repair: () => import("./pages/TweaksPage"),
+};
+setPrefetcher((p) => {
+  const page = resolvePage(p)[0];
+  if (page === "dashboard") return;
+  void (PAGE_CODE[page] ?? (() => import("./pages/Merged")))().catch(() => {});
+});
 
 // Solo el Panel se carga al abrir la app; el resto de páginas, al visitarlas.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cada página tiene sus propias props
@@ -308,6 +341,16 @@ export default function App() {
     setRecent((r) => [page, ...r.filter((x) => x !== page)].slice(0, 10));
   }, [page]);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Texto con el que se abre Ctrl+K (desde el clic derecho o un error).
+  const [paletteQuery, setPaletteQuery] = useState("");
+  useEffect(() => {
+    const f = (e: Event) => {
+      setPaletteQuery((e as CustomEvent<string>).detail ?? "");
+      setPaletteOpen(true);
+    };
+    window.addEventListener(PALETTE_EVENT, f);
+    return () => window.removeEventListener(PALETTE_EVENT, f);
+  }, []);
   const [onboarding, setOnboarding] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [targetUser, setTargetUser] = useState<TargetUser | null>(null);
@@ -448,6 +491,7 @@ export default function App() {
       }
       if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") || (e.key === "F1" && !e.ctrlKey && !e.altKey && !e.shiftKey)) {
         e.preventDefault();
+        setPaletteQuery("");
         setPaletteOpen((o) => !o);
       } else if (e.ctrlKey && e.key.toLowerCase() === "l" && lockRef.current) {
         e.preventDefault();
@@ -481,10 +525,9 @@ export default function App() {
   }, [navigate, goHistory, closeTab]);
 
   useEffect(() => {
-    api.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
-    systemApi.targetUser().then(setTargetUser).catch(logQuietly("App"));
-    appApi
-      .info()
+    trackBoot("permisos", api.isAdmin()).then(setIsAdmin).catch(() => setIsAdmin(false));
+    trackBoot("usuario del equipo", systemApi.targetUser()).then(setTargetUser).catch(logQuietly("App"));
+    trackBoot("datos de AdminOps", appApi.info())
       .then((info) => {
         setAppInfo(info);
         // Solo para capturas y mediciones (scripts/bench.ps1 -Page): "tickets,dashboard"
@@ -493,18 +536,21 @@ export default function App() {
         seq.forEach((p, i) => window.setTimeout(() => setPage(resolvePage(p)[0]), i * 5000));
         // Primer arranque: asistente (no en las capturas automáticas).
         if (!info.startPage)
-          workApi
-            .settings()
+          trackBoot("ajustes", workApi.settings())
             .then((s) => {
               setOnboarding(!s.onboarded);
               // La primera vez que se abre una versión nueva, sus novedades (una sola vez).
-              if (s.onboarded && seenVersion() !== info.version) openHelp("news");
+              // Con recorrido de esta versión, el recorrido (que acaba ofreciendo las novedades); si no, las novedades.
+              if (s.onboarded && seenVersion() !== info.version) {
+                if (tourFor(info.version)) window.setTimeout(() => startTour(info.version), 1500);
+                else openHelp("news");
+              }
               rememberVersion(info.version);
             })
             .catch(logQuietly("App"));
       })
       .catch(logQuietly("App"));
-    workApi.session().then((s) => setSessionActive(!!s)).catch(logQuietly("App"));
+    trackBoot("sesión de servicio", workApi.session()).then((s) => setSessionActive(!!s)).catch(logQuietly("App"));
   }, []);
 
   const actions = useMemo<PaletteAction[]>(
@@ -512,6 +558,7 @@ export default function App() {
       ...(isAdmin === false ? [{ id: "admin", title: "Reiniciar AdminOps como administrador", run: () => void api.relaunchAsAdmin() }] : []),
       { id: "support", title: "Crear paquete de soporte", subtitle: "Registro y último diagnóstico en un .zip", run: () => void appApi.supportPackage() },
       { id: "help-guide", title: "Guía de AdminOps", subtitle: "Qué hace cada pantalla y cómo se usa", keywords: "ayuda manual glosario como usar documentacion", run: () => openHelp("guide") },
+      { id: "help-tour", title: "Ver el recorrido de novedades", subtitle: "Lo nuevo de esta versión, señalado en la pantalla", keywords: "recorrido tour novedades guia nuevo que hay", run: () => startTour() },
       { id: "help-news", title: "Novedades de cada versión", subtitle: "Lo que se ha añadido desde la primera", keywords: "cambios version changelog nuevo", run: () => openHelp("news") },
       { id: "help-report", title: "Reportar un problema", subtitle: "Prepara el correo para el autor con el diagnóstico adjunto", keywords: "fallo error bug soporte contacto", run: () => openHelp("report") },
       { id: "help-terms", title: "Términos de uso", keywords: "licencia responsabilidad garantia legal", run: () => openHelp("terms") },
@@ -599,6 +646,9 @@ export default function App() {
   const tabs = showTabs ? (visibleAreas(page).find((a) => a.pages.includes(page))?.pages ?? []) : [];
   // La ruta de arriba: área › pantalla › sección.
   const section = sectionLabel(page, sections[page] ?? sectionsOf(page)[0]?.id);
+  // Dónde se está, para ofrecer «Seguir donde lo dejaste» la próxima vez.
+  const sectionId = sections[page] ?? null;
+  useEffect(() => rememberPlace(page, sectionId), [page, sectionId]);
 
   // Cada página se construye una vez y se mantiene viva al cambiar de página (conserva sus datos,
   // su scroll y lo que esté haciendo). Se vuelve a cargar con «Recargar» o al cerrar la app.
@@ -651,7 +701,8 @@ export default function App() {
         right={
           <>
             <NewCaseButton hidden={false} />
-            <TasksIndicator />
+            <UndoLast />
+            <TasksIndicator onNavigate={goTo} />
             <PrivacyToggle />
             <AuditToggle />
             <QuitButton />
@@ -672,10 +723,12 @@ export default function App() {
           recent={recent}
         />
         <main className="flex min-w-0 flex-1 flex-col">
+          <DemoBanner />
           <AuditBanner />
           <PrivacyBanner />
           <CaseBar onOpenChange={setCaseDialog} />
           {prefs.pageTabs && openTabs.length > 1 && <OpenTabs tabs={openTabs} current={page} onPick={(p) => navigate(p)} onClose={closeTab} />}
+          <ResumeRibbon current={page} onGo={goTo} />
           <header className="flex items-end justify-between border-b border-line px-8 pt-4 pb-4">
             <div className="min-w-0">
               {/* Dónde estás: área › pantalla › sección. Cada parte lleva a su sitio. */}
@@ -734,6 +787,7 @@ export default function App() {
             )}
             </div>
           </header>
+          <QuickRead page={page} badges={machine.badges} onGo={(sec) => goTo(page, sec)} />
           <div className="relative min-h-0 flex-1">
             {findOpen && <PageFind page={page} onClose={() => setFindOpen(false)} />}
             {alive.map((p) => {
@@ -763,8 +817,13 @@ export default function App() {
       <Suspense fallback={null}>
         {aboutOpen && <About open onClose={() => setAboutOpen(false)} appInfo={appInfo} />}
         {helpOpen && <HelpCenter version={appInfo?.version ?? ""} />}
-        {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} onNavigate={navigate} onSection={goTo} badges={machine.badges} actions={actions} />}
+        {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} onNavigate={navigate} onSection={goTo} badges={machine.badges} actions={actions} initialQuery={paletteQuery} />}
       </Suspense>
+      <BootBar />
+      <Tour version={appInfo?.version ?? ""} />
+      <CelebrateLayer />
+      <ContextMenu />
+      <DropLayer onNavigate={goTo} />
       {/* Teams y el Correo: como se haya elegido, o pregunta la primera vez. */}
       <CommOpener onAdminOps={(p) => navigate(p)} />
       {onboarding && (

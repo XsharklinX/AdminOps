@@ -17,6 +17,8 @@ import { disksApi, type DiskCheck, type DiskReport, type DiskVolume, type Rescue
 import { withoutUserPaths } from "../lib/errors";
 import { bytes } from "../lib/format";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { readCached } from "../lib/cachedRead";
+import { FreshNote } from "../components/FreshNote";
 import { NeedsAdmin } from "../components/AdminBanner";
 
 const TONE = {
@@ -31,13 +33,18 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
   const [disks, setDisks] = useState<DiskReport[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Cuándo se leyó lo que se ve (al abrir, lo de la última vez mientras se lee de nuevo).
+  const [at, setAt] = useState<number | null>(null);
   const technician = usePrefs().mode !== "user";
 
   const load = (vigente: () => boolean = () => true) => {
     setLoading(true);
-    disksApi
-      .status()
-      .then((d) => vigente() && (setDisks(d), setError(null)))
+    readCached("disks", disksApi.status, (d, _fresh, when) => {
+      if (!vigente()) return;
+      setDisks(d);
+      setAt(when);
+      setError(null);
+    })
       .catch((e) => vigente() && setError(String(e)))
       .finally(() => vigente() && setLoading(false));
   };
@@ -50,6 +57,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
           Qué le pasa a cada disco y qué hacer. Si Windows te dice «Reparar disco» o hay archivos que no se copian, empieza por el veredicto: no es lo mismo un
           índice de archivos dañado (se repara) que un disco que se estropea (se copia lo que se pueda y se cambia).
         </p>
+        <FreshNote at={at} refreshing={loading && disks !== null} />
         <Button kind="ghost" onClick={() => load()} disabled={loading}>
           {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Actualizar
         </Button>

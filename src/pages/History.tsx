@@ -1,3 +1,4 @@
+import { SavedViews } from "../components/SavedViews";
 import {
   CheckCircle2,
   ExternalLink,
@@ -228,6 +229,16 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
                   aria-label="Buscar en el diario"
                 />
               </div>
+              <SavedViews
+                scope="journal"
+                current={{ filter, query }}
+                isDefault={filter === "all" && !query.trim()}
+                onApply={(v) => {
+                  setFilter(v.filter);
+                  setQuery(v.query);
+                  setLimit(PAGE);
+                }}
+              />
               {JOURNAL_FILTERS.map(([id, label]) => (
                 <button
                   key={id}

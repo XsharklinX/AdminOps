@@ -1,20 +1,29 @@
 // Ajustes → Apariencia.
 import { useState } from "react";
-import { Card, Toggle } from "../../components/ui";
-import { type Accent, ACCENTS, applyAppearance, setPrefs, usePrefs, ZOOMS } from "../../lib/prefs";
-import { getTheme, setTheme, type Theme } from "../../lib/theme";
+import { Volume2 } from "lucide-react";
+import { Card, Toggle, inputClass, smallBtn } from "../../components/ui";
+import { type Accent, ACCENTS, setPrefs, usePrefs, ZOOMS } from "../../lib/prefs";
+import { getSchedule, getTheme, getThemeMode, setSchedule, setThemeMode, type ThemeMode } from "../../lib/theme";
+import { playSound } from "../../lib/sounds";
+import { celebrate } from "../../components/Celebrate";
 import { Row } from "./shared";
 
 export function Appearance() {
   const prefs = usePrefs();
-  const [theme, setThemeState] = useState<Theme>(getTheme);
-  const pick = (t: Theme) => {
-    setTheme(t);
+  const [theme, setThemeState] = useState<ThemeMode>(getThemeMode);
+  const [schedule, setScheduleState] = useState(getSchedule);
+  const pick = (t: ThemeMode) => {
+    setThemeMode(t);
     setThemeState(t);
-    applyAppearance();
+  };
+  const hours = Array.from({ length: 24 }, (_, h) => h);
+  const changeSchedule = (patch: Partial<typeof schedule>) => {
+    const next = { ...schedule, ...patch };
+    setScheduleState(next);
+    setSchedule(next);
   };
   const option = (
-    t: Theme,
+    t: ThemeMode,
     title: string,
     sub: string,
     bg: string,
@@ -44,7 +53,7 @@ export function Appearance() {
   return (
     <div className="space-y-4">
       <Card title="Tema">
-        <div className="flex gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {option(
             "dark",
             "Oscuro",
@@ -59,7 +68,26 @@ export function Appearance() {
             "#f6f6f4",
             "#4b5058",
           )}
+          {option("auto", "Como Windows", "Cambia solo cuando cambia Windows", "linear-gradient(135deg,#111315 50%,#f6f6f4 50%)", "#7e8691")}
+          {option("schedule", "Por horario", "Claro de día y oscuro por la tarde", "linear-gradient(180deg,#f6f6f4 50%,#111315 50%)", "#7e8691")}
         </div>
+        {theme === "schedule" && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dim">
+            Claro desde las
+            <select className={`${inputClass} w-20 py-1`} value={schedule.lightFrom} onChange={(e) => changeSchedule({ lightFrom: Number(e.target.value) })} aria-label="Hora a la que empieza el tema claro">
+              {hours.map((h) => (
+                <option key={h} value={h}>{`${h}:00`}</option>
+              ))}
+            </select>
+            y oscuro desde las
+            <select className={`${inputClass} w-20 py-1`} value={schedule.darkFrom} onChange={(e) => changeSchedule({ darkFrom: Number(e.target.value) })} aria-label="Hora a la que empieza el tema oscuro">
+              {hours.map((h) => (
+                <option key={h} value={h}>{`${h}:00`}</option>
+              ))}
+            </select>
+            <span className="text-mute">· ahora toca el {getTheme() === "light" ? "claro" : "oscuro"}</span>
+          </div>
+        )}
       </Card>
       <Card title="Color de acento">
         <div className="flex flex-wrap gap-2">
@@ -74,7 +102,7 @@ export function Appearance() {
                 className="size-4 rounded-full"
                 style={{
                   background:
-                    theme === "light" ? ACCENTS[a].light : ACCENTS[a].dark,
+                    getTheme() === "light" ? ACCENTS[a].light : ACCENTS[a].dark,
                 }}
               />
               {ACCENTS[a].label}
@@ -130,6 +158,39 @@ export function Appearance() {
           sub="Quita transiciones y giros (más cómodo si marean o en equipos lentos)."
         >
           <Toggle checked={prefs.reduceMotion} onChange={(v) => setPrefs({ reduceMotion: v })} />
+        </Row>
+        <Row title="Celebrar cuando todo queda en orden" sub="Un ✓ grande y breve al resolver lo último pendiente de una revisión.">
+          <span className="flex items-center gap-2">
+            <button className={smallBtn} onClick={() => celebrate("Así se ve", true)}>
+              Ver
+            </button>
+            <Toggle checked={prefs.celebrate} onChange={(v) => setPrefs({ celebrate: v })} />
+          </span>
+        </Row>
+      </Card>
+      <Card title="Sonidos">
+        <Row title="Sonidos suaves" sub="Un «tic» al terminar una tarea larga y otro tono si algo falla. Se callan solos mientras el micrófono o la cámara están en uso (llamadas y reuniones).">
+          <Toggle checked={prefs.sounds} onChange={(v) => setPrefs({ sounds: v })} />
+        </Row>
+        <Row title="Volumen" sub="Independiente del volumen del resto del equipo.">
+          <span className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={prefs.soundVolume}
+              onChange={(e) => setPrefs({ soundVolume: Number(e.target.value) })}
+              aria-label="Volumen de los sonidos"
+              className="w-32 accent-[var(--color-neon)]"
+            />
+            <button className={smallBtn} onClick={() => void playSound("done", true)} title="Probar el sonido de «terminado»">
+              <Volume2 size={12} /> Probar
+            </button>
+            <button className={smallBtn} onClick={() => void playSound("error", true)} title="Probar el sonido de «falló»">
+              Error
+            </button>
+          </span>
         </Row>
       </Card>
     </div>

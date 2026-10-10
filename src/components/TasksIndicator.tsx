@@ -1,14 +1,19 @@
 import { listen } from "@tauri-apps/api/event";
-import { CheckCircle2, ListChecks, Loader2, Square, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, ListChecks, Loader2, Square, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { appApi } from "../lib/api";
 import { useToast } from "./feedback";
+import type { PageId } from "./Sidebar";
+import { humanDuration, pageOfTask, percentOf, remainingSeconds, type Sample } from "../lib/taskEta";
+import { playSound } from "../lib/sounds";
 
 interface Running {
   task: string;
   name: string;
   message: string;
   started: number;
+  /** Porcentajes leídos de los mensajes, para calcular lo que falta. */
+  samples: Sample[];
 }
 
 interface Done {
@@ -19,13 +24,13 @@ interface Done {
   at: number;
 }
 
-const human = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`);
+const human = humanDuration;
 
 /**
  * Tareas largas en curso desde cualquier página (instalar, desinstalar,
  * actualizar, diagnosticar…): qué hacen, cuánto llevan y cancelarlas.
  */
-export function TasksIndicator() {
+export function TasksIndicator({ onNavigate }: { onNavigate?: (page: PageId, section: string | null) => void }) {
   const toast = useToast();
   const [running, setRunning] = useState<Record<string, Running>>({});
   const [done, setDone] = useState<Done[]>([]);
@@ -36,10 +41,16 @@ export function TasksIndicator() {
   useEffect(() => {
     const offs = [
       listen<{ task: string; name: string }>("task-started", ({ payload }) =>
-        setRunning((r) => ({ ...r, [payload.task]: { task: payload.task, name: payload.name, message: r[payload.task]?.message ?? "", started: r[payload.task]?.started ?? Date.now() } })),
+        setRunning((r) => ({ ...r, [payload.task]: { task: payload.task, name: payload.name, message: r[payload.task]?.message ?? "", started: r[payload.task]?.started ?? Date.now(), samples: r[payload.task]?.samples ?? [] } })),
       ),
       listen<{ task: string; message: string }>("task-progress", ({ payload }) =>
-        setRunning((r) => (r[payload.task] ? { ...r, [payload.task]: { ...r[payload.task], message: payload.message } } : r)),
+        setRunning((r) => {
+          const cur = r[payload.task];
+          if (!cur) return r;
+          const pct = percentOf(payload.message);
+          const samples = pct === null ? cur.samples : [...cur.samples.filter((x) => x.pct <= pct), { at: Date.now(), pct }].slice(-60);
+          return { ...r, [payload.task]: { ...cur, message: payload.message, samples } };
+        }),
       ),
       listen<{ task: string; name: string; seconds: number; cancelled: boolean }>("task-finished", ({ payload }) => {
         setRunning((r) => {
@@ -49,6 +60,8 @@ export function TasksIndicator() {
         });
         // Las muy cortas (buscar en la red, leer algo) no hace falta recordarlas.
         if (payload.seconds >= 3) setDone((d) => [{ ...payload, at: Date.now() }, ...d].slice(0, 6));
+        // Un «tic» si estabas en otra ventana (con los sonidos encendidos).
+        if (payload.seconds >= 10 && !document.hasFocus()) void playSound(payload.cancelled ? "error" : "done");
       }),
     ];
     return () => offs.forEach((o) => o.then((f) => f()));
@@ -90,19 +103,35 @@ export function TasksIndicator() {
             <>
               <p className="mb-1.5 text-[11px] font-medium tracking-wide text-mute uppercase">En curso</p>
               <ul className="mb-3 space-y-2">
-                {list.map((t) => (
-                  <li key={t.task} className="flex items-start gap-2.5">
-                    <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-neon" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-ink">{t.name}</span>
-                      <span className="block truncate text-xs text-dim">{t.message || "Trabajando…"}</span>
-                      <span className="font-mono text-[11px] text-mute">{human(Math.floor((Date.now() - t.started) / 1000))}</span>
-                    </span>
-                    <button onClick={() => appApi.cancelTask(t.task).catch((e) => toast("error", String(e)))} className="shrink-0 rounded p-1 text-mute hover:text-bad" title="Cancelar">
-                      <Square size={12} />
-                    </button>
-                  </li>
-                ))}
+                {list.map((t) => {
+                  const pct = t.samples.length ? t.samples[t.samples.length - 1].pct : null;
+                  const left = remainingSeconds(t.samples);
+                  const elapsed = Math.floor((Date.now() - t.started) / 1000);
+                  return (
+                    <li key={t.task} className="flex items-start gap-2.5">
+                      <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-neon" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-ink">{t.name}</span>
+                        <span className="block truncate text-xs text-dim">{t.message || "Trabajando…"}</span>
+                        {pct !== null && (
+                          <span className="mt-1 block h-1 overflow-hidden rounded-full bg-line">
+                            <span className="block h-full rounded-full bg-neon transition-[width] duration-500" style={{ width: `${pct}%` }} />
+                          </span>
+                        )}
+                        <span className="mt-0.5 flex justify-between font-mono text-[11px] text-mute">
+                          <span>
+                            {human(elapsed)}
+                            {pct !== null && ` · ${Math.round(pct)} %`}
+                          </span>
+                          {pct !== null && <span title="Con la velocidad real de los últimos dos minutos">{left !== null ? `quedan ~${human(left)}` : "calculando…"}</span>}
+                        </span>
+                      </span>
+                      <button onClick={() => appApi.cancelTask(t.task).catch((e) => toast("error", String(e)))} className="shrink-0 rounded p-1 text-mute hover:text-bad" title="Parar" aria-label={`Parar ${t.name}`}>
+                        <Square size={12} />
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </>
           )}
@@ -110,13 +139,28 @@ export function TasksIndicator() {
             <>
               <p className="mb-1.5 text-[11px] font-medium tracking-wide text-mute uppercase">Terminadas</p>
               <ul className="space-y-1">
-                {done.map((d) => (
-                  <li key={`${d.task}-${d.at}`} className="flex items-center gap-2 text-xs">
-                    {d.cancelled ? <XCircle size={12} className="shrink-0 text-warn" /> : <CheckCircle2 size={12} className="shrink-0 text-ok" />}
-                    <span className="min-w-0 flex-1 truncate text-dim">{d.name}</span>
-                    <span className="shrink-0 font-mono text-[11px] text-mute">{d.cancelled ? "cancelada" : human(d.seconds)}</span>
-                  </li>
-                ))}
+                {done.map((d) => {
+                  const where = pageOfTask(d.task);
+                  return (
+                    <li key={`${d.task}-${d.at}`} className="flex items-center gap-2 text-xs">
+                      {d.cancelled ? <XCircle size={12} className="shrink-0 text-warn" /> : <CheckCircle2 size={12} className="shrink-0 text-ok" />}
+                      <span className="min-w-0 flex-1 truncate text-dim">{d.name}</span>
+                      <span className="shrink-0 font-mono text-[11px] text-mute">{d.cancelled ? "cancelada" : human(d.seconds)}</span>
+                      {where && onNavigate && (
+                        <button
+                          onClick={() => {
+                            setOpen(false);
+                            onNavigate(where[0], where[1]);
+                          }}
+                          className="flex shrink-0 items-center gap-0.5 rounded px-1 text-neon hover:bg-neon/10"
+                          title="Ir a la pantalla donde se ve el resultado"
+                        >
+                          Ver <ArrowRight size={11} />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </>
           )}

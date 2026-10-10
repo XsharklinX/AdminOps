@@ -7,7 +7,7 @@ import { MiniMonitor } from "./components/MiniMonitor";
 import { appApi } from "./lib/api";
 import { showFullTextOnHover } from "./lib/fullTextOnHover";
 import { applyAppearance } from "./lib/prefs";
-import { applyTheme, getTheme } from "./lib/theme";
+import { applyTheme, getTheme, watchTheme } from "./lib/theme";
 import "./index.css";
 
 // ¿Es la ventanita de la nota de llamada (Ctrl+Alt+N) y no la aplicación?
@@ -24,6 +24,7 @@ const isNote = flags.__ADMINOPS_NOTE__ === true || isMonitor;
 if (!isNote) void appApi.uiBooting();
 
 applyTheme(getTheme());
+watchTheme();
 // El tamaño de la interfaz se aplica a la ventana principal; la nota no lo necesita.
 if (!isNote) applyAppearance();
 

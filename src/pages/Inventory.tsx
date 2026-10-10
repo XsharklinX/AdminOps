@@ -3,15 +3,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { inventoryLines, MachineActions, VerdictChip, VERDICT } from "../components/inventory";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card } from "../components/ui";
+import { Button, Card, inputClass } from "../components/ui";
+import { SavedViews } from "../components/SavedViews";
+import { matchesMachine } from "../lib/inventoryFilter";
 import { officeApi, toCsv, workApi, type Client, type Machine } from "../lib/api";
 import { fullDate as date } from "../lib/format";
 
 type Row = { client: Client; machine: Machine };
+
 export function Inventory() {
   const [clients, setClients] = useState<Client[] | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  // Texto libre: «windows 10», «sin tpm», un modelo, un cliente…
+  const [query, setQuery] = useState("");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -32,8 +37,9 @@ export function Inventory() {
       (clients ?? [])
         .filter((c) => clientFilter === "all" || c.id === clientFilter)
         .flatMap((client) => client.machines.map((machine) => ({ client, machine })))
-        .filter((r) => filter === "all" || (r.machine.inventory?.verdict ?? "none") === filter),
-    [clients, filter, clientFilter],
+        .filter((r) => filter === "all" || (r.machine.inventory?.verdict ?? "none") === filter)
+        .filter((r) => matchesMachine(r, query)),
+    [clients, filter, clientFilter, query],
   );
 
   const counts = useMemo(() => {
@@ -142,6 +148,7 @@ export function Inventory() {
           {chip("upgrade", "Mejorar", counts.upgrade)}
           {chip("ok", "Bien", counts.ok)}
         </div>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrar: windows 10, sin tpm, modelo…" className={`${inputClass} w-60 py-1.5`} aria-label="Filtrar el inventario" />
         <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="rounded-md border border-line bg-void/60 px-3 py-1.5 text-sm text-ink outline-none">
           <option value="all">Todos los clientes</option>
           {(clients ?? []).filter((c) => c.machines.length).map((c) => (
@@ -150,6 +157,16 @@ export function Inventory() {
             </option>
           ))}
         </select>
+        <SavedViews
+          scope="inventory"
+          current={{ filter, clientFilter, query }}
+          isDefault={filter === "all" && clientFilter === "all" && !query.trim()}
+          onApply={(v) => {
+            setFilter(v.filter);
+            setClientFilter(v.clientFilter);
+            setQuery(v.query);
+          }}
+        />
         <span className="ml-auto" />
         <Button kind="ghost" onClick={exportCsv} disabled={rows.length === 0}>
           <Download size={14} /> Exportar a Excel (CSV)

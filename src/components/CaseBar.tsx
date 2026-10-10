@@ -23,6 +23,7 @@ export function NewCaseButton({ hidden }: { hidden: boolean }) {
   return (
     <button
       onClick={() => window.dispatchEvent(new CustomEvent(OPEN_CASE_EVENT, { detail: {} }))}
+      data-tour="case"
       className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink"
       title="Abrir un caso: lo que hagas queda apuntado y la resolución se redacta sola"
     >

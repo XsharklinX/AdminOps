@@ -15,6 +15,7 @@ import { showFirstStepsAgain } from "../../components/FirstSteps";
 import { ModeCard } from "./About";
 import { DataCare } from "./DataCare";
 import { Row, selectClass, type SettingsProps } from "./shared";
+import { setDemo } from "../../components/DemoMode";
 
 /** Ajustes → Inicio y ventana: para quién es, qué pasa al abrir y cómo se comporta la ventana. */
 export function StartWindow({ s, set }: SettingsProps) {
@@ -83,6 +84,11 @@ export function StartWindow({ s, set }: SettingsProps) {
             <option value={2000}>Cada 2 segundos</option>
             <option value={5000}>Cada 5 segundos</option>
           </select>
+        </Row>
+      </Card>
+      <Card title="Demostración">
+        <Row title="Modo demostración" sub="Llena AdminOps con clientes, contactos e inventario de ejemplo, sin tocar los tuyos ni guardar nada. Para enseñarlo a un cliente o a un compañero, o para grabar vídeos.">
+          <Toggle checked={prefs.demo} onChange={setDemo} />
         </Row>
       </Card>
     </div>

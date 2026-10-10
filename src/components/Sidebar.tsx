@@ -1,3 +1,4 @@
+import { prefetchPage } from "../lib/prefetch";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type UpdateInfo } from "../lib/api";
 import { getPrefs, setSidebar, usePrefs, type NavLayout } from "../lib/prefs";
@@ -562,8 +563,9 @@ export function Sidebar({
 
   const line = (k: string, label: string, opts: { sub?: boolean; current: boolean; onClick: () => void; badge?: Badge; title?: string }) => {
     const on = sb.favorites.includes(k);
+    const target = parseNavKey(k).page;
     return (
-      <div key={k} className="group/line relative">
+      <div key={k} className="group/line relative" onMouseEnter={() => isPageId(target) && prefetchPage(target)}>
         <button
           onClick={opts.onClick}
           aria-current={opts.current ? "page" : undefined}
@@ -624,7 +626,7 @@ export function Sidebar({
   );
 
   const rail = (
-    <nav aria-label="Áreas" className={`flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
+    <nav aria-label="Áreas" data-tour="sidebar" className={`flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
       {areas.map((a) => {
         const on = !mini ? shown?.id === a.id && (activeArea?.id === a.id || !activeArea) : activeArea?.id === a.id;
         return (

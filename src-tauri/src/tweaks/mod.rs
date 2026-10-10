@@ -7,6 +7,7 @@ pub mod profiles;
 mod engine;
 pub(crate) mod journal;
 pub mod model;
+pub mod preview;
 pub(crate) mod registry;
 mod restore;
 pub mod roundtrip;

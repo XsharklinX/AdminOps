@@ -2,6 +2,7 @@
 // antes de tocar. Está escrita para quien no la conoce. Lo que aquí se dice que
 // se puede deshacer es lo que el programa deshace de verdad: si una pantalla
 // cambia, su apartado se actualiza con ella.
+import { GLOSSARY as TECH_GLOSSARY } from "./glossary";
 import type { PageId } from "../components/Sidebar";
 
 export interface GuideTopic {
@@ -726,6 +727,12 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: "WebView2", def: "El componente de Microsoft Edge, incluido en Windows, con el que AdminOps dibuja su ventana." },
   { term: "winget", def: "El instalador de programas de Windows. AdminOps lo usa para instalar y actualizar." },
 ];
+
+// Los términos técnicos del glosario de bolsillo (el subrayado de puntos) también
+// salen aquí, con qué hacer. Los que ya tenían definición propia se quedan con ella.
+for (const g of TECH_GLOSSARY)
+  if (!GLOSSARY.some((x) => x.term.toLowerCase() === g.term.toLowerCase())) GLOSSARY.push({ term: g.term, def: `${g.what} ${g.worry === "—" ? "" : `${g.worry} `}${g.todo}` });
+GLOSSARY.sort((a, b) => a.term.localeCompare(b.term, "es"));
 
 export interface FaqEntry {
   q: string;

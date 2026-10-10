@@ -5,7 +5,7 @@ import type { PanelPrefs } from "./panelLayout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import type { PageId } from "../components/Sidebar";
-import { getTheme } from "./theme";
+import { getTheme, onThemeApplied } from "./theme";
 
 export type Accent = "blue" | "teal" | "violet" | "orange" | "green" | "graphite";
 
@@ -107,10 +107,18 @@ export interface Prefs {
   pageWidth: "full" | "limited";
   /** El Panel a medida: orden de las tarjetas y cuáles están ocultas (vacío: de fábrica). */
   panel: PanelPrefs;
+  /** Sonidos suaves al terminar una tarea larga o al fallar algo (apagados de fábrica). */
+  sounds: boolean;
+  /** Volumen de esos sonidos, de 0 a 1. */
+  soundVolume: number;
+  /** El gran ✓ cuando se resuelve lo último pendiente de una revisión. */
+  celebrate: boolean;
+  /** Modo demostración: datos de ejemplo en lugar de los reales. */
+  demo: boolean;
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true, sounds: false, soundVolume: 0.5, celebrate: true, demo: false };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -143,6 +151,10 @@ export function getPrefs(): Prefs {
   if (!ZOOMS.some((z) => z.value === p.zoom)) p.zoom = 1;
   if (p.pageWidth !== "limited") p.pageWidth = "full";
   if (![1000, 2000, 5000].includes(p.refreshMs)) p.refreshMs = 2000;
+  if (typeof p.soundVolume !== "number" || !(p.soundVolume >= 0 && p.soundVolume <= 1)) p.soundVolume = 0.5;
+  p.sounds = p.sounds === true;
+  p.celebrate = p.celebrate !== false;
+  p.demo = p.demo === true;
   if (!p.shortcuts || typeof p.shortcuts !== "object") p.shortcuts = {};
   p.sidebar = { ...DEFAULT_SIDEBAR, ...(p.sidebar && typeof p.sidebar === "object" ? p.sidebar : {}) };
   if (!Array.isArray(p.sidebar.favorites)) p.sidebar.favorites = [];
@@ -252,3 +264,6 @@ export function comboOf(e: KeyboardEvent): string | null {
 export function setSidebar(patch: Partial<SidebarPrefs>) {
   setPrefs({ sidebar: { ...getPrefs().sidebar, ...patch } });
 }
+
+// Al cambiar de tema (a mano, con Windows o por horario), el acento se recalcula.
+onThemeApplied(() => applyAppearance());

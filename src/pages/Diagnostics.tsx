@@ -1,3 +1,4 @@
+import { celebrate, celebrationText } from "../components/Celebrate";
 import {
   AlertOctagon,
   ArrowRight,
@@ -320,12 +321,24 @@ export function Diagnostics({
 
   // `fixing`: id del arreglo en curso (o "all" para el lote).
   const [fixing, setFixing] = useState<string | null>(null);
+  // Arreglos hechos desde aquí y problemas del análisis anterior: si se pasa de
+  // «hay cosas» a «nada pendiente», se celebra (Ajustes → Apariencia lo apaga).
+  const fixedHere = useRef(0);
+  const lastProblems = useRef<number | null>(null);
+  useEffect(() => {
+    if (!d) return;
+    const known = new Set(accepted.map((a) => a.key));
+    const n = d.findings.filter((f) => f.severity !== "info" && !known.has(f.key)).length;
+    if (lastProblems.current !== null && lastProblems.current > 0 && n === 0) celebrate(celebrationText(fixedHere.current));
+    lastProblems.current = n;
+  }, [d, accepted]);
 
   const applyFix = useCallback(
     async (id: string, label: string) => {
       setFixing(id);
       try {
         toast("ok", `${label}: ${await tweaksApi.fixFinding(id)}`);
+        fixedHere.current++;
       } catch (e) {
         toast("error", `${label}: ${e}`);
       } finally {
@@ -380,6 +393,7 @@ export function Diagnostics({
       try {
         await tweaksApi.fixFinding(a.id);
         done++;
+        fixedHere.current++;
       } catch {
         failed.push(a.label);
       }

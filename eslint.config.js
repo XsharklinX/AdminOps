@@ -15,7 +15,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri", "node_modules", "release", "installer", "docs", "public", "eslint.config.js"] },
+  { ignores: ["dist", "src-tauri", "node_modules", "release", "installer", "docs", "public", "eslint.config.js", "tests/ui/out", "tests/sandbox"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -48,6 +48,11 @@ export default tseslint.config(
       // Los argumentos que empiezan por «_» son a propósito.
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
+  },
+  {
+    // Las pruebas de la interfaz en marcha: un script de Node que maneja un navegador.
+    files: ["tests/ui/**/*.{mjs,ts}"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
     // Las pruebas pueden ser más laxas con los tipos.

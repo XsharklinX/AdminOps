@@ -98,6 +98,7 @@ mod secrets;
 mod smoke;
 mod timeline;
 mod troubleshoot;
+mod uxio;
 
 use tauri::Manager;
 
@@ -251,6 +252,7 @@ pub fn run() {
             // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
             agenda::start(app.handle().clone());
             disks::start_watch(app.handle().clone());
+            uxio::watch_drops(app.handle());
             backupio::start(app.handle().clone());
             alertrulesio::start(app.handle().clone());
             // Historial de rendimiento de 7 días: una muestra por minuto mientras AdminOps está abierta.
@@ -411,6 +413,12 @@ pub fn run() {
             backupio::backups_run,
             lifeio::life_report,
             partsio::parts_advice,
+            uxio::media_in_use,
+            uxio::describe_file,
+            uxio::reveal_path,
+            uxio::open_dropped_pdf,
+            uxio::compose_mail,
+            tweaks::preview::tweak_preview,
             labelsio::label_qr,
             labelsio::label_sheet,
             disktools::disk_speed_test,

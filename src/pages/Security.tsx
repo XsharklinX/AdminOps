@@ -1,3 +1,6 @@
+import { Term } from "../components/Term";
+import { FreshNote } from "../components/FreshNote";
+import { readCached } from "../lib/cachedRead";
 import {
   CircleCheck,
   CircleHelp,
@@ -41,13 +44,18 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [at, setAt] = useState<number | null>(null);
   const toast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setAudit(await securityApi.audit());
+      // Lo de la última vez al momento; lo nuevo, en cuanto Windows conteste.
+      await readCached("security-audit", securityApi.audit, (a, _fresh, when) => {
+        setAudit(a);
+        setAt(when);
+      });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -88,9 +96,12 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
         title="Nota de seguridad"
         icon={<ShieldCheck size={14} />}
         right={
+          <span className="flex items-center gap-3">
+          <FreshNote at={at} refreshing={loading && audit !== null} />
           <button onClick={load} disabled={loading} className="flex items-center gap-1 text-[11px] text-mute hover:text-ink">
             <RefreshCw size={11} className={loading ? "animate-spin" : ""} /> Volver a comprobar
           </button>
+          </span>
         }
       >
         {error ? (
@@ -196,7 +207,7 @@ function BitlockerCard({ isAdmin }: { isAdmin: boolean }) {
   const anyKey = vols?.some((v) => v.hasRecoveryKey);
 
   return (
-    <Card title="BitLocker" icon={<KeyRound size={14} />}>
+    <Card title="BitLocker" icon={<KeyRound size={14} />} right={<span className="text-[11px] text-mute"><Term k="BitLocker">¿Qué es?</Term></span>}>
       {!isAdmin ? (
         <p className="text-sm text-mute">Requiere administrador para ver el cifrado y las claves de recuperación.</p>
       ) : error ? (

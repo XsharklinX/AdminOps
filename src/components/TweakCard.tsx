@@ -1,6 +1,7 @@
 import { ChevronDown, Loader2, Play, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { TaskStatus } from "./TaskStatus";
+import { ChangePreview } from "./ChangePreview";
 import type { Risk, TweakStatus, TweakView } from "../lib/api";
 
 const RISK: Record<Risk, { label: string; cls: string }> = {
@@ -131,13 +132,17 @@ export function TweakCard({
       </div>
 
       {open && (
-        <ul className="space-y-1 border-t border-line bg-void/40 px-4 py-3 font-mono text-[11px] text-dim">
-          {t.changes.map((c) => (
-            <li key={c} className="break-all select-text">
-              <span className="text-neon/70">›</span> {c}
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-2 border-t border-line bg-void/40 px-4 py-3">
+          {/* Antes → después con los valores de este equipo, ahora mismo. */}
+          <ChangePreview ids={[t.id]} compact />
+          <ul className="space-y-1 font-mono text-[11px] text-mute">
+            {t.changes.map((c) => (
+              <li key={c} className="break-all select-text">
+                <span className="text-neon/70">›</span> {c}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </article>
   );

@@ -1,9 +1,17 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { trackCall } from "../perf";
 import { humanError, onInternalError } from "../errors";
+import { getPrefs } from "../prefs";
 
 /** Todas las llamadas al sistema pasan por aquí: los errores llegan ya traducidos. */
 export async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  // Modo demostración: datos de ejemplo y nada se guarda en los del técnico.
+  if (getPrefs().demo) {
+    const demo = await import("../demo");
+    if (demo.demoBlocks(command)) throw demo.DEMO_BLOCKED;
+    const answer = demo.demoAnswer(command);
+    if (answer !== undefined) return answer as T;
+  }
   try {
     return await trackCall(command, tauriInvoke<T>(command, args));
   } catch (e) {

@@ -1,9 +1,12 @@
-import { Check, ChevronDown, Images, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, ClipboardCopy, Images, Loader2, RotateCw, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { copyAsImage, NO_CAPTURE } from "../lib/copyImage";
 import { logQuietly } from "../lib/api/core";
 import { createPortal } from "react-dom";
 import { loadColor } from "../lib/format";
+import { explainError, supportDetails } from "../lib/errors";
+import { AnimatedValue, SkeletonRows, motionOk } from "./motion";
+import { SendTo } from "./SendTo";
 
 export function Card({
   id,
@@ -68,6 +71,7 @@ export function Card({
               {copy === "busy" ? <Loader2 size={13} className="animate-spin" /> : copy === "done" ? <Check size={13} /> : <Images size={13} />}
             </button>
           )}
+          {!collapsed && <SendTo target={() => ref.current} title={title} />}
           {fold ? (
             <button onClick={fold.onToggle} className="flex items-center gap-1.5 text-[11px] text-mute transition-colors hover:text-ink">
               {collapsed && <span className="text-ok">{fold.note}</span>}
@@ -92,6 +96,8 @@ export function Ring({ value, size = 112, label }: { value: number; size?: numbe
   const c = 2 * Math.PI * r;
   const v = Math.min(100, Math.max(0, value));
   const color = loadColor(v);
+  // Se dibuja la primera vez que aparece; después cambia sin animación (va en vivo).
+  const [draw] = useState(motionOk);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
@@ -106,6 +112,8 @@ export function Ring({ value, size = 112, label }: { value: number; size?: numbe
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c - (v / 100) * c}
+          className={draw ? "ring-draw" : undefined}
+          style={{ ["--ring-c" as string]: c }}
           // Sin transición ni filtro: el arco cambia en cada actualización (medido en la Fase 7).
         />
       </svg>
@@ -344,27 +352,56 @@ export function Button({
   size = "md",
 }: {
   children: ReactNode;
-  onClick?: () => void;
+  /** Si devuelve una promesa, el botón enseña que trabaja y termina en «Hecho». */
+  onClick?: () => unknown;
   disabled?: boolean;
   kind?: "primary" | "danger" | "ghost" | "secondary";
   title?: string;
   /** "sm": la altura de los botones dentro de una fila o una tarjeta. */
   size?: "md" | "sm";
 }) {
+  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const style = {
     primary: "border-neon bg-neon text-on-neon hover:brightness-110",
     danger: "border-bad/50 text-bad hover:bg-bad/10",
     ghost: "border-transparent text-dim hover:bg-panel-2 hover:text-ink",
     secondary: "border-line-2 text-dim hover:border-neon/40 hover:text-ink",
   }[kind];
+  const click = () => {
+    if (state === "busy") return;
+    const r = onClick?.();
+    if (!(r instanceof Promise)) return;
+    setState("busy");
+    r.then(
+      () => {
+        if (!alive.current) return;
+        setState("done");
+        window.setTimeout(() => alive.current && setState("idle"), 1200);
+      },
+      () => alive.current && setState("idle"),
+    );
+  };
   return (
     <button
-      onClick={onClick}
-      disabled={disabled}
+      onClick={click}
+      disabled={disabled || state === "busy"}
       title={title}
-      className={`flex items-center gap-1.5 rounded-lg border font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-[13px]"} ${style}`}
+      aria-busy={state === "busy" || undefined}
+      className={`relative flex items-center gap-1.5 rounded-lg border font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-[13px]"} ${style} ${state === "busy" ? "!opacity-80" : ""}`}
     >
-      {children}
+      <span className={`flex items-center gap-1.5 ${state === "idle" ? "" : "invisible"}`}>{children}</span>
+      {state !== "idle" && (
+        <span className="absolute inset-0 flex items-center justify-center gap-1.5">
+          {state === "busy" ? <Loader2 size={14} className="animate-spin" /> : <><Check size={14} /> Hecho</>}
+        </span>
+      )}
     </button>
   );
 }
@@ -372,10 +409,14 @@ export function Button({
 /** Estado de carga igual en toda la app. `page`: ocupa el sitio de una página entera. */
 export function Loading({ text = "Cargando…", page = false }: { text?: string; page?: boolean }) {
   if (page) return <PageSkeleton text={text} />;
+  // La forma de lo que va a llegar, con lo que se está haciendo en letra pequeña.
   return (
-    <p className="flex items-center gap-2 py-2 text-sm text-mute">
-      <Loader2 size={14} className="animate-spin" /> {text}
-    </p>
+    <div className="max-w-xl">
+      <p className="flex items-center gap-1.5 pt-1 text-[11px] text-mute" aria-hidden>
+        <Loader2 size={11} className="animate-spin" /> {text}
+      </p>
+      <SkeletonRows rows={3} label={text} />
+    </div>
   );
 }
 
@@ -385,7 +426,7 @@ export function Loading({ text = "Cargando…", page = false }: { text?: string;
  * página no salta al llegar los datos.
  */
 function PageSkeleton({ text }: { text: string }) {
-  const bar = "rounded bg-panel-2 motion-safe:animate-pulse";
+  const bar = "skeleton";
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6" role="status" aria-live="polite">
       <span className="sr-only">{text}</span>
@@ -416,20 +457,47 @@ function PageSkeleton({ text }: { text: string }) {
  * La lectura falló: se dice qué pasó y se ofrece reintentar. Sin esto, una
  * página cuya primera lectura fallaba se quedaba en «Cargando…» para siempre.
  */
-export function ErrorState({ message, onRetry, page = false }: { message: string; onRetry?: () => void; page?: boolean }) {
+export function ErrorState({ message, onRetry, page = false, where }: { message: string; onRetry?: () => void; page?: boolean; /** Pantalla o tarjeta, para los detalles de soporte. */ where?: string }) {
+  const e = explainError(message);
+  const [copied, setCopied] = useState(false);
+  const copy = () =>
+    void navigator.clipboard?.writeText(supportDetails(message, where)).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    });
+  const admin = () => void import("../lib/api").then(({ api }) => api.relaunchAsAdmin());
   return (
     <div className={page ? "p-8" : ""}>
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-bad/30 bg-bad/5 px-4 py-3">
-        <TriangleAlert size={16} className="shrink-0 text-bad" />
-        <p className="min-w-0 flex-1 text-sm text-ink">
-          No se pudo leer.
-          <span className="block text-xs break-words text-dim">{message}</span>
-        </p>
-        {onRetry && (
-          <Button kind="ghost" onClick={onRetry}>
-            <RotateCw size={14} /> Reintentar
-          </Button>
-        )}
+      <div className="rounded-xl border border-bad/30 bg-bad/5 px-4 py-3">
+        <div className="flex flex-wrap items-start gap-3">
+          <TriangleAlert size={16} className="mt-0.5 shrink-0 text-bad" />
+          <div className="min-w-0 flex-1 text-sm text-ink">
+            <p className="break-words">{e.what}</p>
+            <p className="mt-1 text-xs text-dim">{e.why}</p>
+            {e.tries.length > 0 && (
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-xs text-dim">
+                {e.tries.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
+          <button onClick={copy} className={smallBtn} title="Texto técnico sin rutas ni nombres de usuario">
+            {copied ? <Check size={12} /> : <ClipboardCopy size={12} />} {copied ? "Copiado" : "Copiar detalles para soporte"}
+          </button>
+          {e.fix === "admin" && (
+            <button onClick={admin} className={smallBtn}>
+              <ShieldCheck size={12} /> Reiniciar como administrador
+            </button>
+          )}
+          {onRetry && (
+            <Button kind="ghost" size="sm" onClick={onRetry}>
+              <RotateCw size={14} /> Reintentar
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -458,7 +526,9 @@ export function Tile({
   const cls = `rounded-xl border px-3 py-2.5 text-left ${active ? "border-neon/50 bg-neon/10" : "border-line bg-panel"} ${onClick ? "transition-colors hover:border-line-2" : ""}`;
   const body = (
     <>
-      <div className={`font-mono text-xl leading-none font-semibold ${warn && value !== 0 && value !== "0" ? "text-warn" : "text-ink"}`}>{value}</div>
+      <div className={`font-mono text-xl leading-none font-semibold ${warn && value !== 0 && value !== "0" ? "text-warn" : "text-ink"}`}>
+        <AnimatedValue value={value} />
+      </div>
       <div className="mt-1 truncate text-[11px] text-mute">{label}</div>
     </>
   );
@@ -475,10 +545,25 @@ export function Tile({
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line px-6 py-10 text-center">
-      {icon && <span className="text-mute">{icon}</span>}
+      {icon ? <span className="text-mute">{icon}</span> : <EmptyArt />}
       <p className="text-sm text-ink">{title}</p>
       {children && <p className="max-w-md text-xs text-mute">{children}</p>}
       {action && <div className="mt-1">{action}</div>}
     </div>
+  );
+}
+
+/** Ilustración sencilla de «aquí todavía no hay nada»: una caja abierta. */
+export function EmptyArt({ size = 72 }: { size?: number }) {
+  return (
+    <svg width={size} height={size * 0.75} viewBox="0 0 96 72" fill="none" aria-hidden className="text-mute">
+      <ellipse cx="48" cy="64" rx="30" ry="4" fill="currentColor" opacity="0.12" />
+      <path d="M20 30 L48 40 L76 30 L76 56 L48 66 L20 56 Z" fill="var(--color-panel-2)" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M48 40 V66" stroke="currentColor" strokeOpacity="0.4" strokeWidth="1.5" />
+      <path d="M20 30 L10 20 L38 10 L48 20 Z" fill="var(--color-panel)" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M76 30 L86 20 L58 10 L48 20 Z" fill="var(--color-panel)" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.5" strokeLinejoin="round" />
+      <circle cx="66" cy="6" r="2" fill="var(--color-neon)" opacity="0.7" />
+      <circle cx="28" cy="4" r="1.5" fill="var(--color-neon)" opacity="0.5" />
+    </svg>
   );
 }
