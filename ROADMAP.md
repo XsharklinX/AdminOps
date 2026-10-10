@@ -107,6 +107,43 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
+### v1.2.9 — Aspecto, fluidez, informes de revista y seguridad (hecho, build local pendiente, sin probar en hardware real)
+
+Elegidas por el autor sobre el artifact «Mejoras visuales y de seguridad» (31 ideas). **Verificado**:
+`tsc`, `eslint`, `vitest` (200+ pruebas), `cargo clippy --all-targets -D warnings` contra Windows, las
+pruebas de la lógica pura (psquote, checksums, errorlog, outbound, datacrypt) y la prueba de pantallas
+con Playwright (52 pantallas, 49 secciones, y las interacciones nuevas: pantalla de taller, cabecera
+compacta, copiar). **Sin verificar**: todo lo que habla con Windows o con el disco real (el PDF con
+portada, `Template::OnePage` y las pruebas nuevas de `report/mod.rs` solo se ejecutan en la CI de
+Windows; el cifrado de los datos con un USB de verdad; la comprobación de la huella contra una versión
+publicada). Probar **cifrar y descifrar los datos** (con una copia antes), **cambiar el PIN con los datos
+cifrados** y **entrar con la contraseña de Windows** (pide la clave de rescate) antes de fiarse.
+
+- **Aspecto**: tres niveles de elevación (`--shadow-elev-*`), `SlideMark` (el resaltado que se desliza,
+  barra lateral y pestañas), aura de estado, tendencia en las cifras del Panel, `TimeChart` con área,
+  punto que late y rótulos, paletas con «Alto contraste» y vista previa, cabecera compacta al bajar,
+  iconos con gesto y estados con forma (solo CSS: `span[class*="size-"].rounded-full.bg-warn|bad`).
+- **Fluidez y sensación**: `Drawer` (panel de detalle), `DataTable` (J/K, `followFocus`, columnas
+  ensanchables con `resizable`, filas nuevas), `useAnimatedList` (Hoy y «Qué hacer ahora»),
+  `useReorder`/`useFlip` (Panel, checklist, fijados), `Switch`/`Toggle` optimistas, `WorkshopScreen`
+  (F11), `HoverCard`, `data-copy` (`lib/copyFlash.ts`), `.glow` (`lib/spotlight.ts`), consejos
+  (`lib/tips.ts`) y ventana estrecha (`useNarrow`).
+- **Informes**: `report/visual.rs` (portada, gráficas, «Lo que conviene hacer»), `Template::OnePage`,
+  `Settings.report_no_cover`, `tagline` y `brand_color` (pantalla de bloqueo y bienvenida).
+- **Seguridad**: `psquote.rs` (la única puerta de las comillas de PowerShell; había 8 sitios que solo
+  escapaban `'`), `lib/safeSvg.ts`, `scripts/scan-secrets.mjs` (+ `.githooks/pre-commit` y CI, también
+  historial), `checksums.rs` (huella contra GitHub y `SHA256SUMS.txt`, que ahora genera
+  `package-release.ps1`), `errorlog.rs`, `outbound.rs` (`Settings.net_off`) y `datacrypt.rs`.
+  **Cifrado de datos**: una clave de datos aleatoria cifra los archivos de `PROTECTED` por nombre;
+  se protege con el PIN y con una clave de rescate; `paths::read_json/write_json` son la única puerta;
+  bloqueado, se lee vacío y **no se escribe** (error). Un PIN de 4 a 8 números se puede probar entero
+  con un USB: se avisa de que para protección de verdad hace falta una contraseña larga. No se cifran
+  los ajustes, la ventana ni los informes PDF. La clave queda en memoria mientras AdminOps está abierta.
+- **No hecho**: desbloqueo con Windows Hello (no hay API sencilla fuera de UWP) y escáner `gitleaks`
+  (lo cubre `scan-secrets.mjs`, sin dependencias). Las pruebas de abuso cubren las comillas de
+  PowerShell, el QR y el escape de rutas en nombres; falta recorrer una a una todas las órdenes con una
+  ruta (ver «Pendiente»).
+
 ### v1.2.8 — Experiencia, más problemas con respuesta y diagnóstico de experto (hecho, build local pendiente, sin probar en hardware real)
 
 Elegidas por el autor sobre los artifacts de experiencia (29) y de profundidad (24), todas.

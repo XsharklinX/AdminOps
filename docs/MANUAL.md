@@ -63,6 +63,8 @@ urgente: caso abierto, seguimientos, visitas y avisos de Windows.
 | Atajo | Qué hace |
 |---|---|
 | Ctrl+K o F1 | «Todo AdminOps»: el programa entero por áreas, y buscar cualquier cosa (secciones, acciones, contactos, síntomas, equipos, códigos de error); entiende erratas |
+| F11 | Pantalla de taller: cifras enormes del equipo y de lo que se está haciendo |
+| J / K o ↑ ↓ | Recorrer las filas de una tabla; Alt+↑/↓ reordena donde se puede |
 | Ctrl+Z | Deshacer lo último que cambió AdminOps (fuera de los campos de texto) |
 | Clic derecho | Copiar, abrir en el Explorador o abrir un caso con lo que hay debajo |
 | Ctrl+Alt+P | Modo privacidad: difumina correos, IP y claves al compartir pantalla |
@@ -71,6 +73,13 @@ urgente: caso abierto, seguimientos, visitas y avisos de Windows.
 | / | Buscar en la página (Contactos, listas) |
 
 ## 5. Lo que conviene saber
+
+- **Tus datos, cifrados**: Ajustes → Seguridad → *Cifrar mis datos* cifra clientes, contactos, notas,
+  casos y agenda con tu PIN o contraseña. Guarda la **clave de rescate** fuera del equipo: sin ella y
+  sin el PIN no hay forma de recuperarlos. Con un PIN de 4 a 8 números, alguien con tiempo y el USB
+  puede probarlos todos: usa una contraseña larga.
+- **Qué sale del equipo**: Ajustes → Seguridad → *Qué sale de este equipo* lista los pocos servicios
+  de Internet que usa AdminOps y deja apagar los que no quieras.
 
 - **El equipo que no arranca**: Herramientas → *Pendrive de rescate arrancable* crea un pendrive con
   un menú para copiar los datos, reparar el arranque o quitar el driver del pantallazo. Hazlo antes de

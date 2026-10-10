@@ -11,6 +11,13 @@ export interface TourStep {
 }
 
 export const TOURS: Record<string, TourStep[]> = {
+  "1.2.9": [
+    { title: "AdminOps 1.2.9: más cuidada y más segura", text: "Cuatro cosas en un minuto. Esc lo salta; puedes volver a verlo desde Ctrl+K → «recorrido»." },
+    { target: "sidebar", title: "El resaltado se desliza", text: "Tarjetas con profundidad, pestañas que se estiran y colores nuevos en Ajustes → Apariencia (pasa el ratón por uno para verlo en vivo)." },
+    { target: "search", title: "Teclado y F11", text: "J/K recorren las tablas, Alt+↑/↓ reordena y F11 abre la pantalla de taller: cifras enormes para dejar en un monitor." },
+    { target: "case", title: "Informes con portada", text: "Con tu marca, un semáforo grande y lo más urgente por orden. También hay «Una página» para entregar en mano." },
+    { title: "Seguridad", text: "En Ajustes → Seguridad: cifrar tus datos, ver qué sale de este equipo y, en Acerca de, los errores de AdminOps." },
+  ],
   "1.2.8": [
     { title: "AdminOps 1.2.8: más cómoda y con más respuestas", text: "Cuatro cosas en un minuto. Esc lo salta; puedes volver a verlo desde Ctrl+K → «recorrido»." },
     { target: "search", title: "Ctrl+K entiende frases y erratas", text: "Escribe «impresora no imprime», «dicsos» o pega un código como 0x80070005: te lleva a la solución, a la herramienta o a la explicación." },

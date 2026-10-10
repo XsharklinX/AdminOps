@@ -18,6 +18,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.9",
+    title: "Más cuidada, más fluida, con informes de revista y más segura",
+    added: [
+      "Aspecto: tarjetas con profundidad (tres niveles de elevación), el resaltado de la barra lateral y de las pestañas se desliza en vez de saltar, un resplandor de estado detrás del veredicto del Panel, cifras grandes con su tendencia («sube 8 pts»), gráficas con área degradada, punto que late y rótulos de lo señalado, y la cabecera de cada pantalla se compacta al bajar.",
+      "Ajustes → Apariencia: «Alto contraste», vista previa de cada color de acento al pasar el ratón, estados con forma (círculo, triángulo, cuadrado) además del color, y apagar el resplandor o los consejos.",
+      "Fluidez: panel lateral de detalle (en Dispositivos, con paso al anterior y al siguiente), J/K y flechas para recorrer las tablas, cabecera fija y columnas que se ensanchan, filas que entran y salen animadas, reordenar arrastrando o con Alt+flechas (Panel, checklist, fijados) e interruptores que responden al instante y se sacuden si falla.",
+      "Sensación: foco que sigue al cursor, iconos que reaccionan (campana, recargar, papelera), progreso con trama y etapas con su palomita, consejos mientras esperas, copiar con un clic (IP, MAC, serie) con destello y fichas al pasar el ratón por un equipo.",
+      "Pantalla de taller (F11): cifras enormes del equipo y de lo que se está haciendo, para dejarla en un monitor. Y en ventanas estrechas (menos de 1000 px) la barra se pliega a iconos para que AdminOps quepa en media pantalla.",
+      "Informes: portada con tu marca, el equipo, un semáforo grande con tres frases y lo más urgente por orden; gráficas del disco y el arranque; nuevo formato «Una página» y elegir formato con miniatura (también por cliente). La pantalla de bloqueo y la bienvenida del modo usuario enseñan tu logo, tu frase, tu color y tu teléfono.",
+      "Ajustes → Seguridad: «Cifrar mis datos» (clientes, contactos, notas, casos, agenda… cifrados con AES-256 y una clave de rescate), «Qué sale de este equipo» (cada servicio de Internet con lo que se envía, cuándo y un interruptor) y «Errores de AdminOps» en Acerca de (agrupados y sin datos personales, con informe para copiar).",
+      "Las actualizaciones comprueban la huella SHA-256 contra dos fuentes (la de GitHub y el SHA256SUMS.txt que se publica con cada versión) y lo dicen en pantalla.",
+    ],
+    fixed: [
+      "PowerShell trata ‘ ’ ‚ ‛ como comillas simples: un nombre como «Bob’s App» (programas de inicio, usuarios, rutas, valores del registro) cerraba la cadena de un script a mitad. Ahora todo pasa por una única función con pruebas que recorren todas las combinaciones.",
+      "El código QR de la Wi-Fi solo se pinta si es exactamente rectángulos y trazos.",
+      "Antes de cada commit y en la CI se buscan claves y tokens pegados por error, también en el historial.",
+    ],
+  },
+  {
     version: "1.2.8",
     title: "Más cómoda, más problemas con respuesta y diagnóstico de experto",
     added: [

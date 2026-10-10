@@ -2,7 +2,7 @@
 // pantalla (las que devuelven un objeto). Las listas vacías, cadenas y números
 // los pone el simulador solo.
 export const FIXTURES: Record<string, unknown> = {
-  app_info: { version: "1.2.8", portable: true, dataDir: "D:\\AdminOps\\datos", reportsDir: "D:\\AdminOps\\informes", startPage: null },
+  app_info: { version: "1.2.9", portable: true, dataDir: "D:\\AdminOps\\datos", reportsDir: "D:\\AdminOps\\informes", startPage: null },
   is_admin: true,
   lock_status: { enabled: false, kind: "", idleMinutes: 0, waitSecs: 0 },
   get_settings: {

@@ -73,7 +73,7 @@ await page.addInitScript((d) => {
   window.__E2E_DEFAULTS__ = d;
   // También corre en los marcos sin almacenamiento (vistas previas de informes).
   try {
-    localStorage.setItem("adminops-seen-version", "1.2.8");
+    localStorage.setItem("adminops-seen-version", "1.2.9");
   } catch {
     /* marco aislado */
   }

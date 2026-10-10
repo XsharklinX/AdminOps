@@ -8,7 +8,7 @@ import { RELEASES } from "./changelog";
 export const NEW_IN: Record<string, string> = {
   "space:space": "1.2.3",
   dashboard: "1.2.4",
-  settings: "1.2.6",
+  settings: "1.2.9",
   "machine:hardware": "1.2.8",
   "space:health": "1.2.7",
   "space:partitions": "1.2.7",

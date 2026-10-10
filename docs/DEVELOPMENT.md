@@ -150,6 +150,18 @@ concreto (y, desde la Fase 2, un `id` de tweak del catálogo embebido en el bina
 - **Prueba de ida y vuelta**: `adminops.exe --roundtrip informe.json [--only id1,id2]` aplica y deshace
   cada ajuste y comprueba que todo vuelve exactamente a su estado. **Modifica el sistema**: úsala en la
   CI o en Windows Sandbox (`tests/sandbox/run-roundtrip.ps1`), no en un PC real.
+- **Secretos**: `npm run scan:secrets` busca claves, tokens y contraseñas pegados por error (`--staged` lo
+  que va a subir un commit, `--history` todo lo que se añadió alguna vez). `npm install` activa
+  `.githooks/pre-commit` (`git config core.hooksPath .githooks`); la CI lo ejecuta también. Una línea con
+  `secrets:ignore` se salta. Una clave que llegó a subirse hay que cambiarla en su servicio.
+- **Texto en scripts de PowerShell**: todo lo que se mete entre comillas simples pasa por
+  `crate::ps::ps_literal` / `ps_escape` (`psquote.rs`). PowerShell toma ‘ ’ ‚ ‛ por comillas simples:
+  escapar solo `'` no basta, y una prueba falla si alguien vuelve a hacerlo a mano.
+- **Versiones**: `scripts/package-release.ps1` genera `SHA256SUMS.txt` junto a los instaladores. Hay que
+  subirlo a la versión de GitHub: AdminOps lo usa para comprobar la descarga al actualizar.
+- **Datos cifrados**: los archivos de `datacrypt::PROTECTED` pasan por `paths::read_json/write_json`, que
+  son la única puerta. Un archivo nuevo con datos del técnico se añade a esa lista; nunca se escribe
+  JSON de esos archivos con `std::fs` a mano.
 - **Registro de actividad**: `%LOCALAPPDATA%\com.adminops.app\logs\adminops.log` (o `AdminOps-data\equipos\<PC>\logs`
   en portable). Visible en Historial → Registro técnico.
 - **Rendimiento**: `cargo test --release bench -- --ignored --nocapture` (consultas) y `scripts/bench.ps1`
