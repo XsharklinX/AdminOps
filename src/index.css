@@ -29,6 +29,12 @@
   --color-warn: #d9a441;
   --color-bad: #e5605a;
 
+  /* Tres niveles de elevación: la tarjeta sobre el fondo, lo que sube al pasar el
+     ratón y lo que flota (menús, diálogos). En oscuro, un filo de luz arriba. */
+  --shadow-elev-1: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-elev-2: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 8px 20px rgb(0 0 0 / 0.35);
+  --shadow-elev-3: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 20px 50px rgb(0 0 0 / 0.55);
+
   --font-sans: "IBM Plex Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
 }
@@ -50,6 +56,24 @@
   --color-ok: #23794d;
   --color-warn: #9a6b00;
   --color-bad: #c2372f;
+
+  --shadow-elev-1: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 1px rgb(16 24 40 / 0.04);
+  --shadow-elev-2: 0 8px 20px rgb(16 24 40 / 0.1), 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow-elev-3: 0 20px 50px rgb(16 24 40 / 0.22), 0 2px 6px rgb(16 24 40 / 0.1);
+}
+
+/* Alto contraste (Ajustes → Apariencia): bordes y textos secundarios más marcados. */
+:root.high-contrast {
+  --color-line: #5d646e;
+  --color-line-2: #8b939e;
+  --color-mute: #bcc3cc;
+  --color-dim: #dde1e6;
+}
+:root[data-theme="light"].high-contrast {
+  --color-line: #8f949b;
+  --color-line-2: #5a6068;
+  --color-mute: #3a3f46;
+  --color-dim: #23272c;
 }
 
 @layer base {
@@ -362,4 +386,114 @@ tr[tabindex]:focus-visible {
 }
 .reduce-motion button:active {
   transform: none;
+}
+
+/* ---------- Aspecto y sensación (1.2.9) ---------- */
+
+/* Lo que se puede pulsar sube un poco al pasar el ratón («lift») y un foco suave
+   sigue al cursor («glow»; lib/spotlight.ts pone --mx y --my). Sin ratón, o con
+   «Reducir animaciones», no hay nada de esto. */
+.lift {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+.glow {
+  position: relative;
+}
+.glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  background: radial-gradient(170px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--color-neon) 15%, transparent), transparent 70%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-elev-2);
+  }
+  .glow:hover::after {
+    opacity: 1;
+  }
+}
+.reduce-motion .lift:hover {
+  transform: none;
+}
+.reduce-motion .glow::after {
+  display: none;
+}
+
+/* Estados con forma: los puntos de color son círculo (bien), triángulo (aviso) y
+   cuadrado (problema), para distinguirlos sin ver los colores. «Ajustes →
+   Apariencia → Estados con forma» lo apaga (clase plain-states). */
+:root:not(.plain-states) span[class*="size-"][class~="rounded-full"][class~="bg-warn"]:not([class*="place-items"]) {
+  border-radius: 0;
+  clip-path: polygon(50% 6%, 100% 94%, 0 94%);
+}
+:root:not(.plain-states) span[class*="size-"][class~="rounded-full"][class~="bg-bad"]:not([class*="place-items"]) {
+  border-radius: 2px;
+}
+
+/* Iconos de la barra que hacen un gesto corto al pasar el ratón. */
+@keyframes ico-ring {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(16deg); }
+  40% { transform: rotate(-13deg); }
+  60% { transform: rotate(8deg); }
+  80% { transform: rotate(-4deg); }
+}
+@keyframes ico-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ico-pop {
+  50% { transform: scale(1.22); }
+}
+@keyframes ico-lid {
+  40% { transform: rotate(-16deg) translate(-1px, -1px); }
+}
+.ico-ring svg { transform-origin: 50% 12%; }
+.ico-lid svg path:first-child { transform-box: fill-box; transform-origin: 85% 100%; }
+@media (hover: hover) {
+  .ico-ring:hover svg { animation: ico-ring 520ms ease-in-out; }
+  .ico-spin:hover svg { animation: ico-spin 600ms ease-in-out; }
+  .ico-pop:hover svg { animation: ico-pop 300ms ease-out; }
+  .ico-lid:hover svg path:first-child { animation: ico-lid 420ms ease-in-out; }
+}
+
+/* Aura de estado en la cabecera del Panel: un resplandor suave que respira. */
+@keyframes aura-breathe {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+.aura {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  transition: background 600ms ease;
+  animation: aura-breathe 5s ease-in-out infinite;
+}
+
+/* Gráficas: el punto del último valor late. */
+@keyframes chart-ping {
+  from { transform: scale(1); opacity: 0.6; }
+  to { transform: scale(3); opacity: 0; }
+}
+.chart-ping {
+  animation: chart-ping 1.8s ease-out infinite;
+}
+
+/* Cabecera de pantalla compacta al bajar. */
+.page-head {
+  transition:
+    padding 200ms ease,
+    box-shadow 200ms ease;
+}
+.page-head[data-compact="true"] {
+  box-shadow: 0 6px 14px -8px rgb(0 0 0 / 0.5);
 }

@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { SlideMark } from "./SlideMark";
 import { PageActiveContext, usePageActive } from "../lib/pageActive";
 import { PageHelp } from "./PageHelp";
 
@@ -12,15 +13,18 @@ export interface PageTab<T extends string> {
 
 /** Pestañas dentro de una página que agrupa varias vistas (Actualizaciones, Mi red…). */
 export function PageTabs<T extends string>({ tabs, value, onChange }: { tabs: PageTab<T>[]; value: T; onChange: (t: T) => void }) {
+  const row = useRef<HTMLDivElement>(null);
   return (
-    <div className="no-scrollbar mx-auto flex w-full max-w-(--page-max) shrink-0 gap-1 overflow-x-auto border-b border-line px-6 pt-4">
+    <div ref={row} className="no-scrollbar relative isolate mx-auto flex w-full max-w-(--page-max) shrink-0 gap-1 overflow-x-auto border-b border-line px-6 pt-4">
+      <SlideMark within={row} kind="underline" />
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => onChange(t.id)}
           title={t.help}
-          className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm whitespace-nowrap transition-colors ${
-            value === t.id ? "border-neon font-medium text-ink" : "border-transparent text-dim hover:text-ink"
+          aria-current={value === t.id ? "page" : undefined}
+          className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2 text-sm whitespace-nowrap transition-colors ${
+            value === t.id ? "font-medium text-ink" : "text-dim hover:text-ink"
           }`}
         >
           {t.icon}

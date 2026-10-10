@@ -48,7 +48,7 @@ export function Card({
       ref={ref}
       id={id}
       data-setting={title}
-      className={`group/card scroll-mt-6 rounded-xl border border-line bg-panel p-4 transition-[border-color,box-shadow] duration-500 ${
+      className={`group/card scroll-mt-6 rounded-xl border border-line bg-panel p-4 shadow-elev-1 transition-[border-color,box-shadow] duration-500 ${
         collapsed ? "py-3" : ""
       } ${className}`}
     >
@@ -274,7 +274,7 @@ export function Modal({
 }) {
   return (
     <Overlay onClose={onClose} label={typeof title === "string" ? title : undefined}>
-      <div className={`flex max-h-[88vh] ${width} max-w-full flex-col rounded-xl border border-line-2 bg-panel shadow-2xl`} onClick={(e) => e.stopPropagation()}>
+      <div className={`flex max-h-[88vh] ${width} max-w-full flex-col rounded-xl border border-line-2 bg-panel shadow-elev-3`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <h3 className="font-semibold">{title}</h3>
           <button onClick={onClose} className="text-mute hover:text-ink" title="Cerrar">
@@ -335,7 +335,7 @@ export function IconButton({
   children: ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} title={label} aria-label={label} className={`${iconBtn} ${danger ? "hover:text-bad" : ""}`}>
+    <button type="button" onClick={onClick} disabled={disabled} title={label} aria-label={label} className={`${iconBtn} ${danger ? "ico-lid hover:text-bad" : "ico-pop"}`}>
       {children}
     </button>
   );
@@ -526,7 +526,7 @@ export function Tile({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const cls = `rounded-xl border px-3 py-2.5 text-left ${active ? "border-neon/50 bg-neon/10" : "border-line bg-panel"} ${onClick ? "transition-colors hover:border-line-2" : ""}`;
+  const cls = `rounded-xl border px-3 py-2.5 text-left ${active ? "border-neon/50 bg-neon/10" : "border-line bg-panel"} ${onClick ? "lift glow hover:border-line-2" : ""}`;
   const body = (
     <>
       <div className={`font-mono text-xl leading-none font-semibold ${warn && value !== 0 && value !== "0" ? "text-warn" : "text-ink"}`}>

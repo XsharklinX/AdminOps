@@ -1,4 +1,5 @@
 import { prefetchPage } from "../lib/prefetch";
+import { SlideMark } from "./SlideMark";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type UpdateInfo } from "../lib/api";
 import { getPrefs, setSidebar, usePrefs, type NavLayout } from "../lib/prefs";
@@ -525,6 +526,8 @@ export function Sidebar({
   const prefs = usePrefs();
   const sb = prefs.sidebar;
   const resize = useSidebarResize(sb.position);
+  const railRef = useRef<HTMLElement>(null);
+  const treeRef = useRef<HTMLDivElement>(null);
   const sections = useCurrentSections();
   const areas = visibleAreas(active);
   const activeArea = areas.find((a) => a.pages.includes(active)) ?? null;
@@ -561,7 +564,7 @@ export function Sidebar({
     return section === (sections[page] ?? list[0].id);
   };
 
-  const line = (k: string, label: string, opts: { sub?: boolean; current: boolean; onClick: () => void; badge?: Badge; title?: string }) => {
+  const line = (k: string, label: string, opts: { sub?: boolean; current: boolean; onClick: () => void; badge?: Badge; title?: string; /** Sin el resaltado que se desliza: lo pinta la propia línea. */ still?: boolean }) => {
     const on = sb.favorites.includes(k);
     const target = parseNavKey(k).page;
     return (
@@ -572,7 +575,7 @@ export function Sidebar({
           title={opts.title}
           className={`relative flex w-full items-center gap-2 rounded-md pr-8 text-left transition-colors ${ROW[sb.density]} ${
             opts.sub ? "pl-7 text-[12.5px]" : "pl-2.5 text-[13px] font-medium"
-          } ${opts.current ? "bg-neon/10 text-ink" : opts.sub ? "text-dim hover:bg-panel-2 hover:text-ink" : "text-ink hover:bg-panel-2"}`}
+          } ${opts.current ? `text-ink ${opts.still ? "bg-neon/10" : ""}` : opts.sub ? "text-dim hover:bg-panel-2 hover:text-ink" : "text-ink hover:bg-panel-2"}`}
         >
           {opts.sub && <span className={`absolute top-0 bottom-0 left-3.5 ${opts.current ? "w-0.5 bg-neon" : "w-px bg-line-2"}`} />}
           <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -616,17 +619,17 @@ export function Sidebar({
       aria-current={on ? "page" : undefined}
       title={title ?? label}
       className={`relative flex w-[76px] flex-col items-center gap-1 rounded-lg px-1 pt-2 pb-1.5 text-[10.5px] leading-tight transition-colors ${
-        on ? "bg-neon/10 text-ink" : "text-mute hover:bg-panel-2 hover:text-ink"
+        on ? "text-ink" : "text-mute hover:bg-panel-2 hover:text-ink"
       }`}
     >
-      {on && <span className="absolute top-2.5 bottom-2.5 -left-1 w-[3px] rounded-full bg-neon" />}
       <Icon size={19} strokeWidth={1.6} />
       <span className="max-w-full text-center break-words">{label}</span>
     </button>
   );
 
   const rail = (
-    <nav aria-label="Áreas" data-tour="sidebar" className={`flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
+    <nav ref={railRef} aria-label="Áreas" data-tour="sidebar" className={`relative isolate flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
+      <SlideMark within={railRef} kind="rail" />
       {areas.map((a) => {
         const on = !mini ? shown?.id === a.id && (activeArea?.id === a.id || !activeArea) : activeArea?.id === a.id;
         return (
@@ -699,6 +702,7 @@ export function Sidebar({
                   current: section ? isCurrent(page, section) : page === active && !sectionsOf(page).length,
                   onClick: () => onNavigate(page, section),
                   badge: badgeOf(k),
+                  still: true,
                   title: section ? `${pageLabel(page)} › ${navLabel(k)}` : undefined,
                 });
               })}
@@ -707,13 +711,16 @@ export function Sidebar({
           {recentPages.length > 0 && (
             <div className="flex flex-col gap-px">
               {header("Recientes")}
-              {recentPages.map((p) => line(navKey(p), pageLabel(p), { current: p === active, onClick: () => onNavigate(p) }))}
+              {recentPages.map((p) => line(navKey(p), pageLabel(p), { current: p === active, onClick: () => onNavigate(p), still: true }))}
             </div>
           )}
           {shown && (
             <div className="flex flex-col gap-2">
               {header(shown.label, <span>{shown.pages.length}</span>)}
-              {shown.pages.map(pageLines)}
+              <div ref={treeRef} className="relative isolate flex flex-col gap-2">
+                <SlideMark within={treeRef} />
+                {shown.pages.map(pageLines)}
+              </div>
             </div>
           )}
         </nav>

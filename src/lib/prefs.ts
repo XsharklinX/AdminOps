@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import type { PageId } from "../components/Sidebar";
 import { getTheme, onThemeApplied } from "./theme";
 
-export type Accent = "blue" | "teal" | "violet" | "orange" | "green" | "graphite";
+export type Accent = "blue" | "teal" | "violet" | "orange" | "green" | "graphite" | "contrast";
 
 export interface NavArea {
   id: string;
@@ -115,10 +115,14 @@ export interface Prefs {
   celebrate: boolean;
   /** Modo demostración: datos de ejemplo en lugar de los reales. */
   demo: boolean;
+  /** Resplandor de estado detrás de la cabecera del Panel. */
+  aura: boolean;
+  /** Los puntos de estado llevan forma (círculo, triángulo, cuadrado) además de color. */
+  stateShapes: boolean;
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true, sounds: false, soundVolume: 0.5, celebrate: true, demo: false };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true, sounds: false, soundVolume: 0.5, celebrate: true, demo: false, aura: true, stateShapes: true };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -127,6 +131,7 @@ export const ACCENTS: Record<Accent, { label: string; dark: string; light: strin
   orange: { label: "Naranja", dark: "#e8914a", light: "#b85a14" },
   green: { label: "Verde", dark: "#4fb477", light: "#1f7f47" },
   graphite: { label: "Grafito", dark: "#a3abb7", light: "#434b57" },
+  contrast: { label: "Alto contraste", dark: "#ffffff", light: "#000000" },
 };
 
 export const ZOOMS = [
@@ -155,6 +160,8 @@ export function getPrefs(): Prefs {
   p.sounds = p.sounds === true;
   p.celebrate = p.celebrate !== false;
   p.demo = p.demo === true;
+  p.aura = p.aura !== false;
+  p.stateShapes = p.stateShapes !== false;
   if (!p.shortcuts || typeof p.shortcuts !== "object") p.shortcuts = {};
   p.sidebar = { ...DEFAULT_SIDEBAR, ...(p.sidebar && typeof p.sidebar === "object" ? p.sidebar : {}) };
   if (!Array.isArray(p.sidebar.favorites)) p.sidebar.favorites = [];
@@ -178,19 +185,32 @@ export function getPrefs(): Prefs {
   return p;
 }
 
-/** Acento, animaciones y zoom según las preferencias y el tema actual. */
-export function applyAppearance(p: Prefs = getPrefs()) {
+/** Pinta un acento (y el alto contraste) sin guardarlo. */
+function paintAccent(accent: Accent) {
   const root = document.documentElement;
-  const a = ACCENTS[p.accent] ?? ACCENTS.blue;
+  const a = ACCENTS[accent] ?? ACCENTS.blue;
   const light = getTheme() === "light";
-  if (p.accent === "blue") {
+  if (accent === "blue") {
     root.style.removeProperty("--color-neon");
     root.style.removeProperty("--color-on-neon");
   } else {
     root.style.setProperty("--color-neon", light ? a.light : a.dark);
-    root.style.setProperty("--color-on-neon", light ? "#ffffff" : "#0c1422");
+    root.style.setProperty("--color-on-neon", accent === "contrast" ? (light ? "#ffffff" : "#000000") : light ? "#ffffff" : "#0c1422");
   }
+  root.classList.toggle("high-contrast", accent === "contrast");
+}
+
+/** Enseña un acento mientras el ratón está encima, sin guardarlo; `null` vuelve al elegido. */
+export function previewAccent(accent: Accent | null) {
+  paintAccent(accent ?? getPrefs().accent);
+}
+
+/** Acento, animaciones y zoom según las preferencias y el tema actual. */
+export function applyAppearance(p: Prefs = getPrefs()) {
+  const root = document.documentElement;
+  paintAccent(p.accent);
   root.classList.toggle("reduce-motion", p.reduceMotion);
+  root.classList.toggle("plain-states", !p.stateShapes);
   // Las pantallas leen este tope (max-w-(--page-max)): sin él usan toda la ventana.
   root.style.setProperty("--page-max", p.pageWidth === "limited" ? "72rem" : "none");
   invoke("set_ui_zoom", { scale: p.zoom }).catch(() => {});

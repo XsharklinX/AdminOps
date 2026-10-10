@@ -18,10 +18,13 @@ import { Slowdown } from "../components/Slowdown";
 import type { PanelBlock } from "../lib/panelLayout";
 import { TodayCard } from "../components/TodayCard";
 import { DIAG_COUNT_CHANGED, DIAG_UPDATED } from "../lib/diagRun";
+import { trend } from "../lib/trend";
 
 type Latest = Awaited<ReturnType<typeof diagApi.latest>>;
 
 const DOT = { bad: "bg-bad", warn: "bg-warn", info: "bg-mute", ok: "bg-ok" };
+/** Color del resplandor según el veredicto. */
+const AURA: Record<string, string> = { "bg-ok": "var(--color-ok)", "bg-warn": "var(--color-warn)", "bg-bad": "var(--color-bad)" };
 
 function Section({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -44,12 +47,24 @@ function Kpi({ label, value, unit, sub, children }: { label: string; value: stri
     <Card className="flex min-w-0 flex-col gap-2">
       <div className="text-[13px] text-dim">{label}</div>
       <div className="flex items-baseline gap-1.5">
-        <span className="text-[26px] leading-none font-semibold tracking-tight tabular">{value}</span>
+        <span className="text-[30px] leading-none font-semibold tracking-tight tabular">{value}</span>
         {unit && <span className="truncate text-[13px] text-dim">{unit}</span>}
       </div>
       {children}
       {sub && <div className="truncate text-xs text-mute">{sub}</div>}
     </Card>
+  );
+}
+
+/** Flecha con la tendencia de los últimos minutos. `worse`: hacia dónde es malo (más carga es peor). */
+function Trend({ data, min, unit, worse = "up" }: { data: number[]; min: number; unit: string; worse?: "up" | "down" | null }) {
+  const t = trend(data, min);
+  if (t.dir === "flat") return <span className="text-mute">estable</span>;
+  const bad = worse === t.dir;
+  return (
+    <span className={worse === null ? "text-dim" : bad ? "text-warn" : "text-ok"}>
+      {t.dir === "up" ? "▲" : "▼"} {t.dir === "up" ? "sube" : "baja"} {Math.round(Math.abs(t.delta))} {unit}
+    </span>
   );
 }
 
@@ -73,7 +88,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   const [reviewing, setReviewing] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const toast = useToast();
-  const userMode = usePrefs().mode === "user";
+  const prefs = usePrefs();
+  const userMode = prefs.mode === "user";
   const navigate = useCallback((p: PageId, f?: string | null) => onNavigate(p, f), [onNavigate]);
 
   const loadLatest = useCallback(
@@ -195,13 +211,19 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
             <>
               {cpuTemp != null ? <span style={{ color: tempColor(cpuTemp) }}>{cpuTemp.toFixed(0)} °C</span> : "Temperatura: requiere administrador"}
               {gpuTemp != null && <span style={{ color: tempColor(gpuTemp) }}> · GPU {gpuTemp.toFixed(0)} °C</span>}
+              {" · "}
+              <Trend data={history.cpu} min={8} unit="pts" />
             </>
           }
         >
-          <Sparkline data={history.cpu} max={100} color={loadColor(m.cpuTotal)} height={26} />
+          <Sparkline data={history.cpu} max={100} color={loadColor(m.cpuTotal)} height={32} />
         </Kpi>
-        <Kpi label="Memoria" value={bytes(m.memoryUsed).replace(/ GB$/, "")} unit={`de ${bytes(m.memoryTotal)}`} sub={`${Math.round(ramPct)} % en uso · ${m.processCount} procesos`}>
-          <Sparkline data={history.ram} max={100} color={loadColor(ramPct)} height={26} />
+        <Kpi label="Memoria" value={bytes(m.memoryUsed).replace(/ GB$/, "")} unit={`de ${bytes(m.memoryTotal)}`} sub={
+          <>
+            {Math.round(ramPct)} % en uso · <Trend data={history.ram} min={3} unit="pts" />
+          </>
+        }>
+          <Sparkline data={history.ram} max={100} color={loadColor(ramPct)} height={32} />
         </Kpi>
         <Kpi
           label={`Disco del sistema${system ? ` (${system.mount.replace(/\\$/, "")})` : ""}`}
@@ -214,7 +236,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
           </div>
         </Kpi>
         <Kpi label="Red" value={rate(m.netRxPerSec)} sub={<>Subida {rate(m.netTxPerSec)} · encendido hace {duration(m.uptime)}</>}>
-          <Sparkline data={history.rx} max={Math.max(...history.rx, ...history.tx, 1)} color="var(--color-dim)" height={26} />
+          <Sparkline data={history.rx} max={Math.max(...history.rx, ...history.tx, 1)} color="var(--color-dim)" height={32} />
         </Kpi>
       </section>
     ),
@@ -342,7 +364,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     <div className="mx-auto flex max-w-(--page-max) flex-col gap-5 px-8 py-6">
       {userMode && <UserHome input={userInput} busy={busy === "fix" ? "fix" : reviewing ? "review" : null} onFix={userFix} onTellTechnician={tellTechnician} onReview={() => void review()} />}
       {/* Veredicto */}
-      <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 px-6 py-5">
+      <Card className="relative isolate flex flex-wrap items-center gap-x-5 gap-y-3 overflow-hidden px-6 py-5">
+        {prefs.aura && <span aria-hidden className="aura" style={{ background: `radial-gradient(ellipse 60% 140% at 4% 0%, color-mix(in srgb, ${AURA[verdict.dot] ?? "var(--color-mute)"} 24%, transparent), transparent 70%)` }} />}
         <span className={`size-3 shrink-0 rounded-full ${verdict.dot}`} />
         <div className="min-w-60 flex-1">
           <div className="text-xl font-semibold tracking-tight">{verdict.text}</div>

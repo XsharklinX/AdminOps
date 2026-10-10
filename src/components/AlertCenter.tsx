@@ -132,7 +132,7 @@ export function AlertCenter({
     <>
       <button
         onClick={() => show(true)}
-        className="relative grid size-8 place-items-center rounded-md text-mute transition-colors hover:bg-panel-2 hover:text-ink"
+        className="ico-ring relative grid size-8 place-items-center rounded-md text-mute transition-colors hover:bg-panel-2 hover:text-ink"
         title={unread ? `Avisos: ${unread} sin leer` : activityNew ? `${activityNew} ${activityNew === 1 ? "tarea terminada" : "tareas terminadas"}` : "Avisos y actividad"}
         aria-label={`Avisos${unread ? `: ${unread} sin leer` : ""}${activityNew ? `. ${activityNew} tareas terminadas` : ""}`}
       >

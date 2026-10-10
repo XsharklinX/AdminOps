@@ -1,4 +1,5 @@
 import { RotateCw } from "lucide-react";
+import { SlideMark } from "./components/SlideMark";
 import { listen } from "@tauri-apps/api/event";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PaletteAction } from "./components/CommandPalette";
@@ -654,6 +655,17 @@ export default function App() {
     [isAdmin, navigate],
   );
 
+  const areaTabsRef = useRef<HTMLDivElement>(null);
+  // Al bajar en una pantalla, la cabecera se compacta (con un margen para que no parpadee).
+  const [compact, setCompact] = useState(false);
+  const onPageScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop;
+    setCompact((c) => (c ? top > 20 : top > 70));
+  }, []);
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>(`[data-page="${page}"]`);
+    setCompact((el?.scrollTop ?? 0) > 70);
+  }, [page]);
   const nav = NAV.find((n) => n.id === page)!;
   const area = areaOf(page);
   // Con la barra de solo áreas, las pantallas del área van como pestañas bajo el título.
@@ -744,10 +756,10 @@ export default function App() {
           <CaseBar onOpenChange={setCaseDialog} />
           {prefs.pageTabs && openTabs.length > 1 && <OpenTabs tabs={openTabs} current={page} onPick={(p) => navigate(p)} onClose={closeTab} />}
           <ResumeRibbon current={page} onGo={goTo} />
-          <header className="flex items-end justify-between border-b border-line px-8 pt-4 pb-4">
+          <header data-compact={compact} className={`page-head flex items-end justify-between border-b border-line px-8 ${compact ? "pt-2 pb-2" : "pt-4 pb-4"}`}>
             <div className="min-w-0">
-              {/* Dónde estás: área › pantalla › sección. Cada parte lleva a su sitio. */}
-              <nav aria-label="Dónde estás" className="mb-1 flex min-w-0 flex-wrap items-center gap-1 text-xs text-mute">
+              {/* Dónde estás: área › pantalla › sección. Cada parte lleva a su sitio. Al bajar en la pantalla se esconde y la cabecera se queda en una línea. */}
+              <nav aria-label="Dónde estás" className={`flex min-w-0 flex-wrap items-center gap-1 overflow-hidden text-xs text-mute transition-[max-height,opacity,margin] duration-200 ${compact ? "mb-0 max-h-0 opacity-0" : "mb-1 max-h-12 opacity-100"}`}>
                 {area && (
                   <>
                     <button onClick={() => openArea(area)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
@@ -768,17 +780,19 @@ export default function App() {
                   <span className="px-1 text-dim">{pageLabel(nav.id)}</span>
                 )}
               </nav>
-              <h1 className="flex items-center gap-2 text-[22px] font-semibold tracking-tight">
+              <h1 className={`flex items-center gap-2 font-semibold tracking-tight transition-[font-size] duration-200 ${compact ? "text-base" : "text-[22px]"}`}>
                 <span className="truncate">{section ?? pageLabel(nav.id)}</span>
                 <PageHelp text={nav.help} />
               </h1>
               {showTabs && tabs.length > 1 && (
-                <div className="no-scrollbar mt-3 -mb-4 flex gap-1 overflow-x-auto">
+                <div ref={areaTabsRef} className="no-scrollbar relative isolate mt-3 -mb-4 flex gap-1 overflow-x-auto">
+                  <SlideMark within={areaTabsRef} kind="underline" />
                   {tabs.map((t) => (
                     <button
                       key={t}
                       onClick={() => navigate(t)}
-                      className={`-mb-px shrink-0 border-b-2 px-3 py-1.5 text-[13px] transition-colors ${t === page ? "border-neon font-medium text-ink" : "border-transparent text-dim hover:text-ink"}`}
+                      aria-current={t === page ? "page" : undefined}
+                      className={`-mb-px shrink-0 border-b-2 border-transparent px-3 py-1.5 text-[13px] transition-colors ${t === page ? "font-medium text-ink" : "text-dim hover:text-ink"}`}
                     >
                       {pageLabel(t)}
                     </button>
@@ -793,7 +807,7 @@ export default function App() {
               page !== "settings" && (
                 <button
                   onClick={() => setReloads((r) => ({ ...r, [page]: (r[page] ?? 0) + 1 }))}
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink"
+                  className="ico-spin flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink"
                   title="Vuelve a cargar esta página desde cero (F5)"
                 >
                   <RotateCw size={13} /> Recargar
@@ -811,7 +825,7 @@ export default function App() {
               const visible = p === page || right;
               const pos = left ? "inset-y-0 left-0 w-[56%] border-r border-line" : right ? "inset-y-0 right-0 w-[44%]" : "inset-0";
               return (
-              <div key={`${p}-${reloads[p] ?? 0}`} data-page={p} hidden={!visible} className={`absolute overflow-y-auto ${pos}`}>
+              <div key={`${p}-${reloads[p] ?? 0}`} data-page={p} hidden={!visible} onScroll={p === page ? onPageScroll : undefined} className={`absolute overflow-y-auto ${pos}`}>
                 <PageIdContext.Provider value={p}>
                 <PageActiveContext.Provider value={visible}>
                   <ErrorBoundary onHome={() => navigate("dashboard")}>

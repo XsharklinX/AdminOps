@@ -391,7 +391,7 @@ function ToolTile({
   const Icon = ICONS[tile.icon] ?? AppWindow;
   const off = !!tile.disabled;
   return (
-    <div className={`group relative -mx-2 rounded-lg transition-colors ${off ? "opacity-45" : "hover:bg-panel-2"}`}>
+    <div className={`group relative -mx-2 rounded-lg transition-colors ${off ? "opacity-45" : "glow hover:bg-panel-2"}`}>
       <button
         onClick={onLaunch}
         disabled={off}

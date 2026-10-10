@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Volume2 } from "lucide-react";
 import { Card, Toggle, inputClass, smallBtn } from "../../components/ui";
-import { type Accent, ACCENTS, setPrefs, usePrefs, ZOOMS } from "../../lib/prefs";
+import { type Accent, ACCENTS, previewAccent, setPrefs, usePrefs, ZOOMS } from "../../lib/prefs";
 import { getSchedule, getTheme, getThemeMode, setSchedule, setThemeMode, type ThemeMode } from "../../lib/theme";
 import { playSound } from "../../lib/sounds";
 import { celebrate } from "../../components/Celebrate";
@@ -95,6 +95,10 @@ export function Appearance() {
             <button
               key={a}
               onClick={() => setPrefs({ accent: a })}
+              onPointerEnter={() => previewAccent(a)}
+              onPointerLeave={() => previewAccent(null)}
+              onFocus={() => previewAccent(a)}
+              onBlur={() => previewAccent(null)}
               aria-pressed={prefs.accent === a}
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${prefs.accent === a ? "border-neon text-ink" : "border-line text-dim hover:border-line-2"}`}
             >
@@ -110,9 +114,19 @@ export function Appearance() {
           ))}
         </div>
         <p className="mt-2 text-[11px] text-mute">
-          Se usa en la selección, los botones principales y los enlaces. Los
-          estados (bien, aviso, error) no cambian.
+          Se usa en la selección, los botones principales y los enlaces. Pasa el
+          ratón por uno para verlo en toda la app sin guardarlo. Los estados
+          (bien, aviso, error) no cambian. «Alto contraste» además marca más los
+          bordes y los textos secundarios.
         </p>
+      </Card>
+      <Card title="Detalles del aspecto">
+        <Row title="Estados con forma" sub="Bien es un círculo, aviso un triángulo y problema un cuadrado, además del color: se distinguen con daltonismo o con poca luz.">
+          <Toggle checked={prefs.stateShapes} onChange={(v) => setPrefs({ stateShapes: v })} />
+        </Row>
+        <Row title="Resplandor de estado en el Panel" sub="Una luz suave detrás del veredicto: verde si todo va bien, ámbar si hay avisos y roja si hay problemas.">
+          <Toggle checked={prefs.aura} onChange={(v) => setPrefs({ aura: v })} />
+        </Row>
       </Card>
       <Card title="Tamaño y movimiento">
         <Row
