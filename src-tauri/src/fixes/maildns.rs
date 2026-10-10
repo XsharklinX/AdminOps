@@ -173,14 +173,14 @@ fn tcp(host: &str, port: u16) -> (bool, u64) {
 /// Revisión completa del correo de un dominio. `server`: el servidor de envío y
 /// recepción de la oficina (si se sabe); si no, se prueba el MX.
 #[tauri::command]
-pub async fn mail_domain_check(domain: String, server: Option<String>) -> Result<MailReport, String> {
+pub async fn mail_domain_check(app: tauri::AppHandle, domain: String, server: Option<String>) -> Result<MailReport, String> {
     let domain = domain.trim().trim_start_matches('@').to_ascii_lowercase();
     let domain = domain.rsplit('@').next().unwrap_or(&domain).to_string();
     if !valid_domain(&domain) {
         return Err("Escribe un dominio como empresa.com.".into());
     }
     let server = server.map(|s| s.trim().to_string()).filter(|s| valid_domain(s));
-    let ip = crate::network::lan::public_ip().await.map(|p| p.ip).unwrap_or_default();
+    let ip = crate::network::lan::public_ip(app).await.map(|p| p.ip).unwrap_or_default();
     let rev = reverse_ip(&ip).unwrap_or_default();
     let d2 = domain.clone();
     let raw: DnsRaw = tokio::task::spawn_blocking(move || {

@@ -123,8 +123,12 @@ struct IpInfo {
 }
 
 /// Datos de la conexión: IP pública (v4 y v6), proveedor, ubicación y centro de datos.
-async fn meta(client: &reqwest::Client) -> Meta {
+async fn meta(client: &reqwest::Client, ip_lookup: bool) -> Meta {
     let info = async {
+        // Con «IP pública» apagada en Ajustes, no se pregunta a ipinfo.io.
+        if !ip_lookup {
+            return IpInfo::default();
+        }
         match client.get("https://ipinfo.io/json").timeout(Duration::from_secs(6)).send().await {
             Ok(r) => r.json::<IpInfo>().await.unwrap_or_default(),
             Err(_) => IpInfo::default(),
@@ -346,10 +350,10 @@ fn save(app: &tauri::AppHandle, r: &SpeedResult) {
     }
 }
 
-async fn run(on: OnProgress<'_>, on_meta: &(dyn Fn(&Meta) + Sync)) -> Result<SpeedResult, String> {
+async fn run(on: OnProgress<'_>, on_meta: &(dyn Fn(&Meta) + Sync), ip_lookup: bool) -> Result<SpeedResult, String> {
     let client = client()?;
     on("meta", 0.0, 0.0, None);
-    let meta = meta(&client).await;
+    let meta = meta(&client, ip_lookup).await;
     on_meta(&meta);
     // La primera petición abre la conexión y no cuenta para la latencia.
     if let Err(e) = ping(&client).await {
@@ -399,6 +403,7 @@ async fn run(on: OnProgress<'_>, on_meta: &(dyn Fn(&Meta) + Sync)) -> Result<Spe
 
 #[tauri::command]
 pub async fn run_speedtest(app: tauri::AppHandle) -> Result<SpeedResult, String> {
+    crate::outbound::guard(&app, "speedtest")?;
     if RUNNING.swap(true, Ordering::SeqCst) {
         return Err("Ya hay un test de velocidad en curso.".into());
     }
@@ -413,7 +418,8 @@ pub async fn run_speedtest(app: tauri::AppHandle) -> Result<SpeedResult, String>
         let _ = meta_emitter.emit("speedtest-meta", m.clone());
     };
     let started = std::time::Instant::now();
-    let result = run(&on, &on_meta).await;
+    let ip_lookup = crate::outbound::is_enabled(&crate::workflow::settings(&app).net_off, "publicip");
+    let result = run(&on, &on_meta, ip_lookup).await;
     RUNNING.store(false, Ordering::SeqCst);
     crate::task::notify_if_long(&app, "Prueba de velocidad", started.elapsed(), CANCEL.load(Ordering::SeqCst));
     match &result {
@@ -471,7 +477,7 @@ mod tests {
             }
             let _ = mbps;
         };
-        let r = tauri::async_runtime::block_on(run(&on, &|_m: &Meta| {})).unwrap();
+        let r = tauri::async_runtime::block_on(run(&on, &|_m: &Meta| {}, true)).unwrap();
         println!("{r:#?}");
         assert!(r.download_mbps > 0.0 && r.upload_mbps > 0.0);
     }

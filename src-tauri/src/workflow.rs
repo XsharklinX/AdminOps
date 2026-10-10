@@ -78,6 +78,8 @@ pub struct Settings {
     pub tagline: String,
     /// Color de la marca (#rrggbb) para esas pantallas. Vacío: el de AdminOps.
     pub brand_color: String,
+    /// Servicios de Internet que se apagaron en Ajustes → Seguridad (ver `outbound`).
+    pub net_off: Vec<String>,
 }
 
 /// ¿Es un color #rrggbb?
@@ -232,6 +234,7 @@ impl Default for Settings {
             report_no_cover: false,
             tagline: String::new(),
             brand_color: String::new(),
+            net_off: vec![],
         }
     }
 }

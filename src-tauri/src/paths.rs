@@ -262,8 +262,10 @@ pub fn logs_dir(app: &tauri::AppHandle) -> PathBuf {
 
 /// Errores de la interfaz (página que falla, promesas sin capturar) al registro técnico.
 #[tauri::command]
-pub fn log_frontend_error(message: String) {
+pub fn log_frontend_error(app: tauri::AppHandle, message: String) {
     log::error!("Interfaz: {}", message.chars().take(4000).collect::<String>());
+    // Y en el registro de errores de la app (agrupado, sin datos personales).
+    crate::errorlog::note(&app, "pantalla", "interfaz", &message);
 }
 
 /// Últimas `lines` líneas del registro de actividad.

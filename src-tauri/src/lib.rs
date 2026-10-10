@@ -109,6 +109,8 @@ mod eventdigest;
 mod learned;
 mod escalate;
 mod checksums;
+mod errorlog;
+mod outbound;
 mod psquote;
 mod rescue;
 mod vulndb;
@@ -448,6 +450,11 @@ pub fn run() {
             learned::learned_stats,
             escalate::escalation_pack,
             vulndb::vulnerable_programs,
+            outbound::outbound_list,
+            errorlog::error_log_record,
+            errorlog::error_log_list,
+            errorlog::error_log_report,
+            errorlog::error_log_clear,
             rescue::rescue_status,
             rescue::rescue_create,
             uxio::save_text_file,

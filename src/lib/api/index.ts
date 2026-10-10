@@ -17,6 +17,8 @@ export * from "./lan";
 export * from "./vault";
 export * from "./office";
 export * from "./appcare";
+export * from "./errorlog";
+export * from "./outbound";
 export * from "./remote";
 export * from "./library";
 export * from "./accounts";

@@ -152,7 +152,8 @@ pub struct PublicIp {
 }
 
 #[tauri::command]
-pub async fn public_ip() -> Result<PublicIp, String> {
+pub async fn public_ip(app: tauri::AppHandle) -> Result<PublicIp, String> {
+    crate::outbound::guard(&app, "publicip")?;
     let client = reqwest::Client::builder().timeout(Duration::from_secs(6)).build().map_err(|e| e.to_string())?;
     let mut ip: PublicIp = client
         .get("https://ipinfo.io/json")
@@ -889,6 +890,11 @@ pub fn set_device_alias(app: tauri::AppHandle, key: String, mac: String, alias: 
 pub async fn lookup_vendors(app: tauri::AppHandle, key: String, macs: Vec<String>) -> Result<HashMap<String, String>, String> {
     let cache_path = crate::paths::shared_data_dir(&app).join("oui-cache.json");
     let mut cache: HashMap<String, String> = crate::paths::read_json(&cache_path);
+    // Con el servicio apagado se usa lo que ya se sabía, sin preguntar a nadie.
+    if !crate::outbound::is_enabled(&crate::workflow::settings(&app).net_off, "vendors") {
+        let known = macs.iter().map(|m| norm_mac(m)).filter(|m| m.len() == 17 && !private_mac(m)).filter_map(|m| cache.get(&m.chars().take(8).collect::<String>()).filter(|v| !v.is_empty()).map(|v| (m.clone(), v.clone()))).collect();
+        return Ok(known);
+    }
     let client = reqwest::Client::builder().timeout(Duration::from_secs(6)).build().map_err(|e| e.to_string())?;
     let mut result = HashMap::new();
     let mut asked = 0;
@@ -898,6 +904,9 @@ pub async fn lookup_vendors(app: tauri::AppHandle, key: String, macs: Vec<String
             // El servicio gratuito admite una consulta por segundo.
             if asked > 0 {
                 tokio::time::sleep(Duration::from_millis(1100)).await;
+            }
+            if asked == 0 {
+                crate::outbound::guard(&app, "vendors")?;
             }
             asked += 1;
             match client.get(format!("https://api.macvendors.com/{oui}")).send().await {

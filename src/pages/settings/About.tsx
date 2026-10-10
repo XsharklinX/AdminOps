@@ -1,12 +1,14 @@
 // Ajustes → Acerca de.
-import { BadgeCheck, BookOpen, Bug, Scale, Sparkles, UserRound, Wrench } from "lucide-react";
+import { BadgeCheck, BookOpen, Bug, ClipboardCopy, Scale, Sparkles, Trash2, UserRound, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import logo from "../../assets/logo.svg";
 import { useToast } from "../../components/feedback";
 import { Button, Card, inputClass, Modal } from "../../components/ui";
-import { appApi, type AppInfo, lockApi, type LockStatus, logQuietly } from "../../lib/api";
+import { appApi, type AppInfo, errorLogApi, type ErrorGroup, lockApi, type LockStatus, logQuietly } from "../../lib/api";
 import { type AppMode, setPrefs, usePrefs } from "../../lib/prefs";
 import { openHelp } from "../../lib/help";
+import { ago } from "../../lib/format";
+import { EmptyLine, smallBtn } from "../../components/ui";
 
 export function About({ appInfo }: { appInfo: AppInfo | null }) {
   const toast = useToast();
@@ -220,6 +222,68 @@ export function ModeCard() {
             />
           </label>
         </Modal>
+      )}
+    </Card>
+  );
+}
+
+/** Errores de la propia AdminOps: lo que falló dentro de la app, agrupado y sin datos personales. */
+export function ErrorLogCard() {
+  const toast = useToast();
+  const [groups, setGroups] = useState<ErrorGroup[] | null>(null);
+  const load = () => errorLogApi.list().then(setGroups, (e) => toast("error", String(e)));
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir
+  }, []);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(await errorLogApi.report());
+      toast("ok", "Informe copiado, sin rutas ni nombres de usuario. Pégalo en un aviso de fallo.");
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+  const clear = async () => {
+    await errorLogApi.clear().catch((e) => toast("error", String(e)));
+    void load();
+  };
+  return (
+    <Card
+      title="Errores de AdminOps"
+      icon={<Bug size={14} />}
+      right={
+        <span className="flex items-center gap-2">
+          <button className={smallBtn} onClick={() => void copy()} disabled={!groups?.length}>
+            <ClipboardCopy size={12} /> Copiar informe
+          </button>
+          <button className={smallBtn} onClick={() => void clear()} disabled={!groups?.length}>
+            <Trash2 size={12} /> Vaciar
+          </button>
+        </span>
+      }
+    >
+      <p className="mb-3 text-xs text-dim">Lo que ha fallado dentro de AdminOps (una pantalla que no se pintó, una orden que reventó), agrupado. Se guarda solo en este equipo y nada se envía: el informe se copia para pegarlo tú donde quieras.</p>
+      {groups === null ? null : groups.length === 0 ? (
+        <EmptyLine>Ningún error anotado. Si algo falla dentro de AdminOps, aparecerá aquí.</EmptyLine>
+      ) : (
+        <ul className="divide-y divide-line/60 rounded-lg border border-line">
+          {groups.slice(0, 15).map((g) => (
+            <li key={`${g.source}|${g.place}|${g.message}`} className="flex items-start gap-3 px-3 py-2">
+              <span className={`mt-0.5 shrink-0 rounded px-1.5 py-px font-mono text-[11px] ${g.count >= 5 ? "bg-bad/15 text-bad" : "bg-warn/15 text-warn"}`} title="Veces que ha pasado">
+                ×{g.count}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-ink" title={g.message}>
+                  {g.message}
+                </span>
+                <span className="block truncate text-xs text-mute">
+                  {g.source === "orden" ? "Orden" : "Pantalla"} · {g.place} · última {ago(g.last)} · v{g.version}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </Card>
   );

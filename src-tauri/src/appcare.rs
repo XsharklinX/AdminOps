@@ -248,7 +248,8 @@ fn portable_zip() -> bool {
     crate::paths::portable_reason() == "marker"
 }
 
-async fn latest_release(current: &str) -> Result<Release, String> {
+async fn latest_release(app: &tauri::AppHandle, current: &str) -> Result<Release, String> {
+    crate::outbound::guard(app, "updates")?;
     let client = reqwest::Client::builder().timeout(Duration::from_secs(8)).user_agent(format!("AdminOps/{current}")).build().map_err(|e| e.to_string())?;
     let resp = client.get(RELEASES).send().await.map_err(|_| "No se pudo consultar si hay versiones nuevas: no hay conexión con GitHub.".to_string())?;
     // 404: el repositorio no tiene ninguna versión publicada (o no es público).
@@ -261,7 +262,7 @@ async fn latest_release(current: &str) -> Result<Release, String> {
 #[tauri::command]
 pub async fn check_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
     let current = app.package_info().version.to_string();
-    let r = match latest_release(&current).await {
+    let r = match latest_release(&app, &current).await {
         Ok(r) => r,
         // Sin ninguna versión publicada no hay error que contar: se dice tal cual.
         Err(e) if e.starts_with("Todavía no hay") => {
@@ -301,7 +302,7 @@ pub async fn install_update(app: tauri::AppHandle) -> Result<InstallOutcome, Str
     use sha2::Digest;
     use std::io::Write;
     let current = app.package_info().version.to_string();
-    let r = latest_release(&current).await?;
+    let r = latest_release(&app, &current).await?;
     if parse_version(&r.tag_name) <= parse_version(&current) {
         return Err(format!("Ya tienes la última versión ({current})."));
     }

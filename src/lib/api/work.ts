@@ -38,6 +38,8 @@ export interface Settings {
   tagline?: string;
   /** Color de la marca (#rrggbb) para esas pantallas. */
   brandColor?: string;
+  /** Servicios de Internet apagados en Ajustes → Seguridad. */
+  netOff?: string[];
 }
 
 export interface CatalogItem {

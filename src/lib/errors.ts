@@ -18,6 +18,17 @@ const RULES: Rule[] = [
 /** ¿Es un fallo interno de AdminOps (datos mal enviados entre la interfaz y el sistema)? */
 const INTERNAL = /invalid args|missing required key|invalid type:|unknown variant|command .+ not found/i;
 
+/** Lo que delata un fallo de verdad y no una condición normal (sin permisos, sin red, falta de espacio). */
+const UNEXPECTED = /panicked|os error \d+|0x8[0-9a-f]{7}|exception|timed out|tiempo agotado|se agotó|thread .* panicked/i;
+
+/** ¿Un error de una orden merece anotarse en el registro de errores de la app? */
+export function isUnexpected(error: unknown): boolean {
+  const raw = typeof error === "string" ? error : error instanceof Error ? error.message : String(error);
+  if (INTERNAL.test(raw)) return false; // ya se anota por su lado (onInternalError)
+  if (RULES.some(([re]) => re.test(raw))) return false; // condiciones conocidas: explicadas, no son un fallo de la app
+  return UNEXPECTED.test(raw);
+}
+
 let report: ((message: string) => void) | null = null;
 
 /** Dónde anotar los fallos internos (lo configura api.ts con el registro técnico). */

@@ -1,6 +1,6 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { trackCall } from "../perf";
-import { humanError, onInternalError } from "../errors";
+import { humanError, isUnexpected, onInternalError } from "../errors";
 import { getPrefs } from "../prefs";
 
 /** Todas las llamadas al sistema pasan por aquí: los errores llegan ya traducidos. */
@@ -15,7 +15,10 @@ export async function invoke<T>(command: string, args?: Record<string, unknown>)
   try {
     return await trackCall(command, tauriInvoke<T>(command, args));
   } catch (e) {
-    throw humanError(command, e);
+    const message = humanError(command, e);
+    // Un fallo inesperado de una orden (no «requiere administrador» ni «sin conexión»): al registro de errores de la app.
+    if (isUnexpected(e)) void tauriInvoke("error_log_record", { source: "orden", place: command, message: String(typeof e === "string" ? e : e instanceof Error ? e.message : e) }).catch(() => {});
+    throw message;
   }
 }
 

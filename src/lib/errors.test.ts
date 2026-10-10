@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { humanError, onInternalError, withoutUserPaths } from "./errors";
+import { humanError, isUnexpected, onInternalError, withoutUserPaths } from "./errors";
 
 describe("sin nombres de usuario", () => {
   it("quita la carpeta del usuario de cualquier mensaje", () => {
@@ -46,5 +46,23 @@ describe("errores que ayudan", () => {
     expect(t).not.toMatch(/ana/);
     expect(t).not.toMatch(/SRV01/);
     expect(t).toMatch(/\[correo\]/);
+  });
+});
+
+describe("qué va al registro de errores de la app", () => {
+  it("anota los fallos de verdad", () => {
+    expect(isUnexpected("thread 'main' panicked at src/x.rs:10")).toBe(true);
+    expect(isUnexpected("No se pudo leer el disco: HRESULT 0x80041003")).toBe(true);
+    expect(isUnexpected(new Error("Unhandled exception in module"))).toBe(true);
+    expect(isUnexpected("El comando tardó demasiado: tiempo agotado")).toBe(true);
+  });
+  it("no anota lo que es una condición normal", () => {
+    expect(isUnexpected("Acceso denegado (0x80070005)")).toBe(false);
+    expect(isUnexpected("os error 5: access is denied")).toBe(false);
+    expect(isUnexpected("os error 112: no hay espacio suficiente")).toBe(false);
+    expect(isUnexpected("No hay conexión: error sending request")).toBe(false);
+    expect(isUnexpected("Escribe entre 2 y 60 caracteres.")).toBe(false);
+    // Los internos ya se anotan por su lado: no se duplican.
+    expect(isUnexpected("invalid args `x` for command y")).toBe(false);
   });
 });
