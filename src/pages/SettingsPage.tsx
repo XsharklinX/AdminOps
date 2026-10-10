@@ -11,6 +11,7 @@ import { NavEditor } from "./settings/NavEditor";
 import { ShortcutEditor } from "./settings/ShortcutEditor";
 import { About, ErrorLogCard } from "./settings/About";
 import { Outbound } from "./settings/Outbound";
+import { DataEncryption } from "./settings/DataEncryption";
 import { Appearance } from "./settings/Appearance";
 import { AppPreview } from "./settings/AppPreview";
 import { Summary } from "./settings/Summary";
@@ -319,6 +320,7 @@ export function SettingsPage({
             {tab === "security" && (
               <div className="space-y-4">
                 <LockSettings />
+                <DataEncryption />
                 <Outbound s={s} set={set} />
                 <SystemChanges s={s} set={set} />
               </div>

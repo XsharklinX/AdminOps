@@ -155,7 +155,7 @@ const SAFE: &[&str] = &[
     // appcare
     "autostart_enabled", "data_usage", "data_cleanup", "check_update", "open_release_page",
     // applock
-    "lock_status", "lock_verify", "lock_set", "lock_set_idle", "lock_disable", "lock_verify_windows",
+    "lock_status", "lock_verify", "lock_set", "lock_set_idle", "lock_disable", "lock_verify_windows", "data_crypt_status", "data_crypt_enable", "data_crypt_disable", "data_crypt_unlock_recovery",
     // apps
     "app_catalog", "set_catalog_view", "installed_apps", "search_apps", "install_preflight", "save_app_list", "delete_app_list",
     // audit

@@ -112,6 +112,12 @@ fn attempt(ok: impl FnOnce() -> bool) -> Result<bool, String> {
     Ok(good)
 }
 
+/// ¿Es este el PIN o la contraseña de AdminOps? (Con espera tras varios fallos.)
+pub(crate) fn verify(app: &tauri::AppHandle, secret: &str) -> Result<bool, String> {
+    let Some(s) = load(app) else { return Ok(false) };
+    attempt(|| matches(&s, secret))
+}
+
 #[tauri::command]
 pub fn lock_status(app: tauri::AppHandle) -> LockStatus {
     match load(&app) {
@@ -132,6 +138,10 @@ pub fn lock_verify(app: tauri::AppHandle, secret: String) -> Result<bool, String
                 log::warn!("La clave del pendrive no se pudo abrir con el PIN");
             }
         }
+        // Los datos cifrados (si los hay) se abren con el mismo PIN o contraseña.
+        if !crate::datacrypt::unlock_with(&secret) {
+            log::warn!("Los datos cifrados no se pudieron abrir con el PIN: hace falta la clave de rescate");
+        }
     }
     Ok(ok)
 }
@@ -145,6 +155,8 @@ pub fn lock_set(app: tauri::AppHandle, kind: String, secret: String, idle_minute
         }
     }
     validate(&kind, &secret)?;
+    // Los datos cifrados pasan a abrirse con el PIN nuevo (si falla, no se cambia nada).
+    crate::datacrypt::rewrap(&current, &secret)?;
     // En el pendrive, la clave de las contraseñas pasa a ir cifrada con el PIN nuevo.
     if let Some(root) = crate::paths::portable_data_root() {
         if !current.is_empty() {
@@ -181,6 +193,10 @@ pub fn lock_disable(app: tauri::AppHandle, current: String) -> Result<(), String
     let Some(s) = load(&app) else { return Ok(()) };
     if !attempt(|| matches(&s, &current))? {
         return Err("El PIN o la contraseña no es correcto.".into());
+    }
+    // Los datos cifrados se abren con este PIN: antes hay que quitar el cifrado (Ajustes → Seguridad).
+    if crate::datacrypt::enabled() {
+        return Err("Tus datos están cifrados con este PIN. Quita antes el cifrado en Ajustes → Seguridad → «Cifrar mis datos».".into());
     }
     if let Some(root) = crate::paths::portable_data_root() {
         if crate::secrets::key_unlock(root, &current) {

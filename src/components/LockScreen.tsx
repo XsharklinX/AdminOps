@@ -1,7 +1,7 @@
 import { Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.svg";
-import { lockApi, workApi, type Settings } from "../lib/api";
+import { dataCryptApi, lockApi, workApi, type Settings } from "../lib/api";
 import { Button, inputClass } from "./ui";
 
 /** Pantalla de bloqueo: PIN o contraseña de AdminOps, o la de Windows si se olvidó. */
@@ -10,6 +10,7 @@ export function LockScreen({ kind, onUnlock }: { kind: string; onUnlock: () => v
   const [windows, setWindows] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [needKey, setNeedKey] = useState(false);
   const pin = kind === "pin" && !windows;
   // La marca del técnico: si alguien se acerca al equipo desatendido, ve su nombre y un teléfono.
   const [brand, setBrand] = useState<Settings | null>(null);
@@ -30,8 +31,11 @@ export function LockScreen({ kind, onUnlock }: { kind: string; onUnlock: () => v
     setError("");
     try {
       const ok = windows ? await lockApi.verifyWindows(secret) : await lockApi.verify(secret);
-      if (ok) onUnlock();
-      else setError(windows ? "La contraseña de Windows no es correcta." : pin ? "PIN incorrecto." : "Contraseña incorrecta.");
+      if (ok) {
+        // Con la contraseña de Windows no se puede abrir la clave de los datos cifrados: hace falta la de rescate.
+        if (windows && (await dataCryptApi.status().then((d) => d.enabled && !d.unlocked, () => false))) setNeedKey(true);
+        else onUnlock();
+      } else setError(windows ? "La contraseña de Windows no es correcta." : pin ? "PIN incorrecto." : "Contraseña incorrecta.");
     } catch (err) {
       setError(String(err));
     } finally {
@@ -39,6 +43,42 @@ export function LockScreen({ kind, onUnlock }: { kind: string; onUnlock: () => v
       setSecret("");
     }
   };
+
+  const openWithKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secret || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      if (await dataCryptApi.unlockRecovery(secret)) onUnlock();
+      else setError("Esa clave de rescate no es correcta.");
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (needKey)
+    return (
+      <div className="fixed inset-0 z-[100] grid place-items-center bg-void">
+        <form onSubmit={openWithKey} className="flex w-96 flex-col items-center gap-4">
+          <Lock size={28} className="text-mute" />
+          <div className="text-center">
+            <div className="text-lg font-semibold text-ink">Tus datos están cifrados</div>
+            <p className="mt-1 text-sm text-dim">Entraste con la contraseña de Windows: para abrir los datos escribe la clave de rescate.</p>
+          </div>
+          <input autoFocus value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" className={`${inputClass} text-center font-mono`} aria-label="Clave de rescate" />
+          {error && <p className="text-center text-sm text-bad">{error}</p>}
+          <Button onClick={() => {}} disabled={busy || secret.trim().length < 10}>
+            Abrir los datos
+          </Button>
+          <button type="button" onClick={onUnlock} className="text-xs text-mute hover:text-ink">
+            Entrar sin abrir los datos (se verán vacíos y no se podrá guardar nada)
+          </button>
+        </form>
+      </div>
+    );
 
   return (
     <div

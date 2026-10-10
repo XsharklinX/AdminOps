@@ -148,7 +148,7 @@ export function LockSettings() {
       <Card title="Bloqueo de AdminOps" icon={status.enabled ? <Lock size={14} /> : <LockOpen size={14} />}>
         <p className="mb-4 text-sm text-dim">
           Pide un PIN o una contraseña al abrir AdminOps y, si quieres, tras un tiempo sin usarla. Útil si el equipo lo usan otras personas o lo dejas en
-          casa de un cliente. Bloquea la aplicación, no cifra los datos (para eso está la Caja fuerte). Si lo olvidas, se desbloquea con la contraseña de
+          casa de un cliente. Bloquea la aplicación; para cifrar también los datos usa «Cifrar mis datos», más abajo (y la Caja fuerte para carpetas enteras). Si lo olvidas, se desbloquea con la contraseña de
           Windows de esta cuenta.
         </p>
         {portable && (

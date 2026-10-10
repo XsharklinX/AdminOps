@@ -109,6 +109,7 @@ mod eventdigest;
 mod learned;
 mod escalate;
 mod checksums;
+mod datacrypt;
 mod errorlog;
 mod outbound;
 mod psquote;
@@ -450,6 +451,10 @@ pub fn run() {
             learned::learned_stats,
             escalate::escalation_pack,
             vulndb::vulnerable_programs,
+            datacrypt::data_crypt_status,
+            datacrypt::data_crypt_enable,
+            datacrypt::data_crypt_disable,
+            datacrypt::data_crypt_unlock_recovery,
             outbound::outbound_list,
             errorlog::error_log_record,
             errorlog::error_log_list,

@@ -215,7 +215,8 @@ pub fn drivers_backup_dir(app: &tauri::AppHandle) -> PathBuf {
 
 /// Lee un JSON (o el valor por defecto si no existe o está dañado).
 pub fn read_json<T: serde::de::DeserializeOwned + Default>(path: &std::path::Path) -> T {
-    std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+    // Los datos cifrados (Ajustes → Seguridad) se abren aquí; sin la clave se leen como vacíos.
+    std::fs::read(path).ok().and_then(crate::datacrypt::read).and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
 
 /// Escribe un JSON de forma atómica (archivo temporal + renombrado).
@@ -225,7 +226,9 @@ pub fn write_json<T: Serialize>(path: &std::path::Path, value: &T) -> Result<(),
     }
     let tmp = path.with_extension("json.tmp");
     let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
-    std::fs::write(&tmp, json).map_err(|e| e.to_string())?;
+    // Cifrado si toca; y con lo cifrado bloqueado, un error en lugar de pisarlo con lo vacío.
+    let bytes = crate::datacrypt::for_write(path, json.into_bytes())?;
+    std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
 
