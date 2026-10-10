@@ -101,6 +101,11 @@ mod troubleshoot;
 mod uxio;
 mod fixes;
 mod errcodes;
+mod autoruns;
+mod crashes;
+mod stress;
+mod perfinsight;
+mod eventdigest;
 
 use tauri::Manager;
 
@@ -422,6 +427,17 @@ pub fn run() {
             uxio::compose_mail,
             tweaks::preview::tweak_preview,
             errcodes::error_lookup,
+            autoruns::autoruns_list,
+            autoruns::autorun_disable,
+            crashes::crash_report,
+            crashes::driver_rollback,
+            crashes::verifier_enable,
+            crashes::verifier_disable,
+            stress::stress_run,
+            stress::stress_live,
+            stress::stress_history,
+            perfinsight::perf_insights,
+            eventdigest::event_digest,
             errcodes::error_codes,
             fixes::maildns::mail_domain_check,
             labelsio::label_qr,

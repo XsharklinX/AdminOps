@@ -63,7 +63,7 @@ export const remoteApi = {
 
 // ---------- Solucionar problemas, reparación de red y línea de tiempo (1.1.1) ----------
 
-export type Symptom = "internet" | "wifi" | "audio" | "bluetooth" | "display" | "printer" | "slow" | "winupdate" | "outlook" | "onedrive" | "profile" | "browser" | "license" | "usb" | "mail";
+export type Symptom = "internet" | "wifi" | "audio" | "bluetooth" | "display" | "printer" | "slow" | "winupdate" | "outlook" | "onedrive" | "profile" | "browser" | "license" | "usb" | "mail" | "security";
 
 export interface TroubleFix {
   id: string;

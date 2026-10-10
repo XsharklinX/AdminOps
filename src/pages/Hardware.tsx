@@ -1,4 +1,5 @@
 import { LifeCard } from "../components/LifeCard";
+import { StressCard } from "../components/expert";
 import { PartsCard } from "../components/PartsCard";
 import {
   Check,
@@ -391,6 +392,10 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
           />
         )}
       </Card>
+
+      <div className="col-span-12">
+        <StressCard />
+      </div>
 
       <p className="col-span-12 text-center text-[11px] text-mute">
         Sensores: LibreHardwareMonitor (MPL-2.0).{" "}

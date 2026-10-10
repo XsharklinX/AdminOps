@@ -37,6 +37,22 @@ function pages() {
   return [...block.matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
 }
 
+// Las secciones de cada pantalla (src/lib/sections.ts): también se visitan.
+function sections() {
+  const src = readFileSync(join(root, "src", "lib", "sections.ts"), "utf8");
+  const body = src.slice(src.indexOf("export const SECTIONS"));
+  const out = [];
+  let page = null;
+  for (const line of body.split("\n")) {
+    const p = line.match(/^  ([a-z]+): \[/);
+    if (p) page = p[1];
+    const sec = line.match(/^    \{ id: "([a-z-]+)"/);
+    if (page && sec) out.push([page, sec[1]]);
+    if (/^};/.test(line)) break;
+  }
+  return out;
+}
+
 let playwright;
 try {
   playwright = await import("playwright");
@@ -88,11 +104,34 @@ for (const p of pages()) {
   if (state.empty || state.crashed || newErrors.length) failures.push({ page: p, shown: state.id, empty: state.empty, crashed: state.crashed, errors: newErrors.slice(0, 3) });
 }
 
+// Cada sección de cada pantalla (la primera ya se vio arriba).
+const secs = sections();
+for (const [p, sec] of secs) {
+  if (["tickets", "mail", "teams", "inventory", "router"].includes(p) && ["webinventory", "router"].includes(sec)) continue;
+  const before = errors.length;
+  await page.evaluate(([id, s]) => {
+    window.dispatchEvent(new CustomEvent("adminops:navigate", { detail: { page: id, focus: s } }));
+    window.dispatchEvent(new CustomEvent("adminops:open-section", { detail: { page: id, section: s } }));
+  }, [p, sec]);
+  await page.waitForTimeout(600);
+  const state = await page.evaluate(() => {
+    const visible = [...document.querySelectorAll("[data-page]")].find((el) => !el.hidden);
+    const text = visible?.innerText ?? "";
+    return { id: visible?.getAttribute("data-page") ?? "", empty: text.trim().length < 20, crashed: /Algo falló|Something went wrong/.test(text) };
+  });
+  await page.screenshot({ path: join(out, `${p}-${sec}.png`) });
+  const toasts = await page.evaluate(() => [...document.querySelectorAll('[data-toast="error"]')].map((t) => t.textContent ?? ""));
+  for (const t of toasts) if (/TypeError|ReferenceError|undefined|null \(reading/.test(t)) errors.push(`[aviso] ${t.slice(0, 200)}`);
+  await page.evaluate(() => document.querySelectorAll('[data-toast] button[aria-label="Cerrar aviso"]').forEach((b) => b.click()));
+  const newErrors = errors.slice(before);
+  if (state.empty || state.crashed || newErrors.length) failures.push({ page: `${p} › ${sec}`, shown: state.id, empty: state.empty, crashed: state.crashed, errors: newErrors.slice(0, 3) });
+}
+
 const unknown = await page.evaluate(() => [...window.__E2E_UNKNOWN__]);
 await browser.close();
 await server.close();
 
-console.log(`Pantallas revisadas: ${pages().length - 3}. Con problemas: ${failures.length}.`);
+console.log(`Pantallas revisadas: ${pages().length - 3} y ${secs.length} secciones. Con problemas: ${failures.length}.`);
 for (const f of failures) console.log(`✗ ${f.page} (se ve «${f.shown}»)${f.empty ? " · vacía" : ""}${f.crashed ? " · «Algo falló»" : ""}\n   ${f.errors.join("\n   ")}`);
 if (unknown.length) console.log(`Órdenes sin tipo conocido (respondidas con null): ${unknown.join(", ")}`);
 process.exit(failures.length ? 1 : 0);

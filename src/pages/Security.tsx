@@ -1,4 +1,5 @@
 import { Term } from "../components/Term";
+import { SecurityDeepCard } from "../components/expert";
 import { FreshNote } from "../components/FreshNote";
 import { readCached } from "../lib/cachedRead";
 import {
@@ -171,6 +172,7 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
       )}
 
       <BitlockerCard isAdmin={isAdmin} />
+      <SecurityDeepCard isAdmin={isAdmin} onNavigate={(p) => onNavigate(p)} />
       <SuspiciousCard isAdmin={isAdmin} />
       <ExtensionsCard />
 

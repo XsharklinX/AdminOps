@@ -10,6 +10,7 @@ pub mod maildns;
 pub mod onedrive;
 pub mod outlook;
 pub mod printdeep;
+pub mod secdeep;
 pub mod tempprofile;
 pub mod usbdrop;
 pub mod wudeep;
@@ -26,6 +27,7 @@ pub fn check(symptom: &str) -> Option<Result<Vec<Finding>, String>> {
         "browser" => browsers::check(),
         "license" => licenses::check(),
         "usb" => usbdrop::check(),
+        "security" => secdeep::check(),
         _ => return None,
     })
 }
@@ -41,6 +43,7 @@ pub fn run(tweaks: &TweakState, kind: &str, arg: &str) -> Option<Result<String, 
         "usb" => usbdrop::run(tweaks, kind, arg),
         "wu" => wudeep::run(tweaks, kind, arg),
         "pr" => printdeep::run(kind, arg),
+        "sec" => secdeep::run(tweaks, kind, arg),
         "reveal" => Some(crate::uxio::reveal_path(arg.to_string()).map(|()| String::new())),
         _ => None,
     }
@@ -55,6 +58,7 @@ pub fn title(kind: &str) -> &'static str {
         .or_else(|| usbdrop::title(kind))
         .or_else(|| wudeep::title(kind))
         .or_else(|| printdeep::title(kind))
+        .or_else(|| secdeep::title(kind))
         .unwrap_or("")
 }
 

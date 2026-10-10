@@ -1,5 +1,6 @@
 // Rendimiento de los últimos días: procesador, memoria y disco minuto a minuto,
 // y qué programa estaba detrás de cada pico. Para «va lento desde el martes».
+import { PerfInsightsCard } from "../components/expert";
 import { PictureInPicture2, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TimeChart } from "../components/TimeChart";
@@ -178,6 +179,9 @@ export function PerfHistory() {
           </>
         )
       )}
+      <div className="mt-4">
+        <PerfInsightsCard />
+      </div>
     </div>
   );
 }

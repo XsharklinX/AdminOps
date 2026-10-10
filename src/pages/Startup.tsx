@@ -1,4 +1,5 @@
 import { FileWarning, RefreshCw, Search } from "lucide-react";
+import { AutorunsCard } from "../components/expert";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { Switch } from "../components/TweakCard";
@@ -175,6 +176,9 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
         Desactivar no borra nada: usa el mismo mecanismo que el Administrador de tareas y se puede deshacer desde el
         Historial.
       </p>
+      <div className="mt-4">
+        <AutorunsCard isAdmin={isAdmin} />
+      </div>
     </div>
   );
 }

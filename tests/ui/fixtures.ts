@@ -54,5 +54,13 @@ export const FIXTURES: Record<string, unknown> = {
   dns_filter_status: { active: "none", adapters: ["Ethernet"] },
   update_pause_state: { pausedUntil: null },
   network_drives: { drives: [], free: ["Z:", "Y:", "X:"] },
+  troubleshoot_check: (a: { symptom: string }) => ({ symptom: a?.symptom ?? "", findings: [{ level: "warn", title: "SMBv1 está activado", detail: "Versión antigua.\nSegunda línea con 0x80070005.", fixes: [{ id: "sec.smb1", label: "Desactivar SMBv1", admin: true, confirm: null }], page: null }] }),
+  crash_report: {
+    groups: [{ driver: "nvlddmkm.sys", hint: "Driver de la gráfica NVIDIA.", count: 5, codes: ["0x00000116"], first: 1_727_000_000, last: 1_728_000_000, device: "NVIDIA GeForce GTX 1650", version: "31.0.15.6603", driverDate: "2024-10-03", installed: 1_726_900_000, sinceInstall: true, inf: "oem12.inf", older: [{ published: "oem8.inf", original: "nv_dispi.inf", provider: "NVIDIA", class: "Display", date: "05/14/2024", version: "31.0.15.5222" }] }],
+    withoutDump: 0,
+    verifier: [],
+  },
+  perf_insights: { samples: 600, hours: 10, leaks: [{ name: "Teams.exe", fromMb: 400, toMb: 3100, hours: 6, at: 1_728_000_000, series: [] }], saturatedMinutes: 12, diskHogs: [{ name: "SearchIndexer.exe", minutes: 10, avgKbs: 30000 }], peak: { hour: 17, cpu: 80, busy: 60, names: ["backup.exe"] } },
+  event_digest: [{ provider: "disk", id: 7, log: "System", count: 3, last: 1_728_000_000, weight: "matter", title: "Sectores dañados en un disco", meaning: "El disco no pudo leer un bloque.", todo: "Copia de seguridad ya.", page: "space", sample: "El dispositivo tiene un bloque defectuoso." }],
   security_audit: { score: 82, checks: [{ id: "fw", label: "Cortafuegos", status: "ok", detail: "Activo en los tres perfiles", weight: 10, fix: null }], vulnerable: [] },
 };

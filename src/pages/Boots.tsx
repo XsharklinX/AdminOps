@@ -1,6 +1,7 @@
 // Arranques y cuelgues de los últimos 60 días: cuántas veces arrancó, cuántas
 // se apagó mal (corte de luz, botón, cuelgue), los pantallazos azules con su
 // explicación, y cuánto tarda en arrancar (esto último, con administrador).
+import { CrashCulprits } from "../components/expert";
 import { RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NeedsAdmin } from "../components/AdminBanner";
@@ -145,6 +146,7 @@ export function Boots({ isAdmin }: { isAdmin: boolean }) {
           {log.events.length === 0 && <li className="py-2 text-mute">Sin sucesos en estos 60 días.</li>}
         </ul>
       </Card>
+      <CrashCulprits isAdmin={isAdmin} />
     </div>
   );
 }

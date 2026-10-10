@@ -1,4 +1,5 @@
 import { SavedViews } from "../components/SavedViews";
+import { EventDigestCard } from "../components/expert";
 import {
   CheckCircle2,
   ExternalLink,
@@ -309,6 +310,8 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
           </>
         )}
       </Card>
+
+      <EventDigestCard onNavigate={(p) => onNavigate?.(p)} />
 
       <LogViewer />
     </div>

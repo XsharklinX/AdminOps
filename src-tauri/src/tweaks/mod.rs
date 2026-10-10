@@ -11,7 +11,7 @@ pub mod preview;
 pub(crate) mod registry;
 mod restore;
 pub mod roundtrip;
-mod service;
+pub(crate) mod service;
 pub mod startup;
 
 use engine::Status;
@@ -125,6 +125,21 @@ impl TweakState {
             let _ = app.emit("undoable-change", serde_json::json!({ "id": id, "title": title }));
         }
         id
+    }
+
+    /// Apunta en el diario un cambio hecho fuera del catálogo junto con lo
+    /// necesario para deshacerlo (valor anterior del registro, tipo de inicio
+    /// de un servicio, tarea habilitada…). Así sale con su «Deshacer».
+    pub fn log_change(&self, title: &str, backups: Vec<journal::Backup>, result: &Result<(), String>) -> u64 {
+        let mut e = entry(Op::Apply, None, title);
+        match result {
+            Ok(()) => e.backups = backups,
+            Err(err) => {
+                e.ok = false;
+                e.message = Some(err.clone());
+            }
+        }
+        self.log(e)
     }
 
     /// Ejecuta una tarea del catálogo (reparación, limpieza) desde otra parte de AdminOps.
