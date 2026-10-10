@@ -1,11 +1,11 @@
-import { AppWindow, BookOpen, CornerDownLeft, FileText, Lightbulb, ListTree, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, Zap } from "lucide-react";
+import { AppWindow, BookOpen, Bug, CornerDownLeft, FileText, Lightbulb, ListTree, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, allowedInMode, isPageId, navLabel, pageLabel, visibleAreas, type Area, type PageId } from "./Sidebar";
 import type { Badge } from "../lib/machineState";
 import { usePrefs } from "../lib/prefs";
 import { navKey, PAGE_KEYWORDS, parseNavKey, sectionsOf } from "../lib/sections";
 import { useToast } from "./feedback";
-import { logQuietly, contactsApi, lanApi, libraryApi, officeApi, toolboxApi, tweaksApi, type Contact, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
+import { logQuietly, contactsApi, errorsApi, lanApi, libraryApi, officeApi, toolboxApi, tweaksApi, type Contact, type ErrorInfo, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
 import { openCase } from "../lib/currentCase";
 import { recognize, type Recognized } from "../lib/recognize";
 import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
@@ -27,7 +27,7 @@ const CATEGORY_PAGE: Record<string, PageId> = {
   security: "security",
 };
 
-const KIND_LABEL = { smart: "Sugerido", page: "Pantalla", section: "Sección", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla", help: "Guía" };
+const KIND_LABEL = { error: "Código de error", smart: "Sugerido", page: "Pantalla", section: "Sección", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla", help: "Guía" };
 
 type Kind = keyof typeof KIND_LABEL;
 
@@ -45,6 +45,13 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 // Se cargan una vez y se reutilizan entre aperturas.
 let toolsCache: ToolboxView | null = null;
 let tweaksCache: { id: string; name: string; description: string; category: string }[] | null = null;
+let errorsCache: ErrorInfo[] | null = null;
+
+/** ¿Lo escrito parece un código de error? (0x80070005, 80070005, -2147024891, stop 0x133) */
+export function looksLikeCode(q: string): boolean {
+  const t = q.trim().toLowerCase().replace(/^stop\s*:?\s*/, "");
+  return /^0x[0-9a-f]{1,8}$/.test(t) || /^[0-9a-f]{8}$/.test(t) || /^-\d{9,10}$/.test(t);
+}
 
 export interface PaletteAction {
   id: string;
@@ -151,6 +158,9 @@ export function CommandPalette({
   const [index, setIndex] = useState(0);
   const [tools, setTools] = useState(toolsCache);
   const [tweaks, setTweaks] = useState(tweaksCache);
+  const [errors, setErrors] = useState(errorsCache);
+  // Código pegado que no está en el diccionario: se pregunta al programa (sabe leer los de Windows).
+  const [codeHit, setCodeHit] = useState<ErrorInfo[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [templates, setTemplates] = useState<TextTemplate[]>([]);
@@ -166,6 +176,7 @@ export function CommandPalette({
       window.setTimeout(() => input.current?.focus(), 0);
       if (!toolsCache) toolboxApi.list().then((t) => vigente() && setTools((toolsCache = t))).catch(logQuietly("CommandPalette"));
       if (!tweaksCache) tweaksApi.index().then((t) => vigente() && setTweaks((tweaksCache = t))).catch(logQuietly("CommandPalette"));
+      if (!errorsCache) errorsApi.all().then((t) => vigente() && setErrors((errorsCache = t))).catch(logQuietly("CommandPalette"));
       // Sin caché: la agenda cambia a menudo.
       contactsApi.list().then((l) => vigente() && setContacts(l.filter((c) => !c.deleted))).catch(logQuietly("CommandPalette"));
       // Las del técnico y las que trae AdminOps: Ctrl+K encuentra ambas.
@@ -249,6 +260,16 @@ export function CommandPalette({
     for (const ch of GUIDE)
       for (const t of ch.topics)
         out.push({ key: `help:${t.id}`, kind: "help", title: t.title, subtitle: ch.title, search: norm(`${t.title} ${ch.title} ${t.what}`), run: () => openHelpTopic(ch.id, t.id) });
+    // El diccionario de códigos de error: «0x80070005», «dpc watchdog».
+    for (const er of errors ?? [])
+      out.push({
+        key: `error:${er.code}`,
+        kind: "error",
+        title: `${er.code} · ${er.name}`,
+        subtitle: `${er.what} Qué hacer: ${er.todo}`,
+        search: norm(`${er.code} ${er.code.replace(/^0x/i, "")} ${er.name} ${er.name.replace(/_/g, " ")}`),
+        run: () => (er.page && isPageId(er.page) ? onNavigate(er.page) : navigator.clipboard?.writeText(`${er.code} ${er.name}\n${er.what}\nPor qué: ${er.why}\nQué hacer: ${er.todo}`).then(() => `${er.code}: explicación copiada.`)),
+      });
     // «qué es tpm», «bcd»: el término explicado, con qué hacer.
     for (const g of TERMS)
       out.push({ key: `term:${g.term}`, kind: "help", title: `¿Qué es ${g.term}?`, subtitle: `${g.what} ${g.todo}`, search: norm(`que es ${g.term} ${(g.aliases ?? []).join(" ")} ${g.what}`), run: () => openHelp("glossary") });
@@ -264,7 +285,19 @@ export function CommandPalette({
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- las áreas salen de las preferencias (prefs.layout), que ya están en la lista
-  }, [tools, tweaks, contacts, solutions, templates, actions, onNavigate, onSection, toast, prefs.mode, prefs.layout, prefs.pageLabels]);
+  }, [tools, tweaks, errors, contacts, solutions, templates, actions, onNavigate, onSection, toast, prefs.mode, prefs.layout, prefs.pageLabels]);
+
+  useEffect(() => {
+    if (!looksLikeCode(query)) return setCodeHit([]);
+    let alive = true;
+    errorsApi
+      .lookup(query)
+      .then((r) => alive && setCodeHit(r))
+      .catch(() => alive && setCodeHit([]));
+    return () => {
+      alive = false;
+    };
+  }, [query]);
 
   // Lo que se ha escrito es un equipo, una persona, una IP…: sus acciones.
   const smart = useMemo(() => {
@@ -276,10 +309,15 @@ export function CommandPalette({
     const q = norm(query.trim());
     // Sin texto se ve el mapa, no una lista.
     if (!q) return [];
-    const found = searchEntries(entries, q);
+    let found = searchEntries(entries, q);
+    // Un código conocido por su número va primero, aunque se haya escrito distinto (decimal, sin 0x).
+    if (codeHit.length) {
+      const top = codeHit.map((er) => entries.find((e) => e.key === `error:${er.code}`) ?? { key: `error:${er.code}`, kind: "error" as const, title: `${er.code} · ${er.name}`, subtitle: `${er.what} Qué hacer: ${er.todo}`, search: "", run: () => undefined });
+      found = [...top, ...found.filter((e) => !top.some((t) => t.key === e.key))];
+    }
     if (!smart) return found;
     return (smart.sure ? [...smart.entries, ...found] : [...found, ...smart.entries]).slice(0, 40);
-  }, [entries, query, smart]);
+  }, [entries, query, smart, codeHit]);
 
   // Palabras que conoce Ctrl+K, para «¿Quisiste decir…?» cuando no encuentra nada.
   const vocabulary = useMemo(() => {
@@ -304,7 +342,7 @@ export function CommandPalette({
   };
 
   const icon = (k: Kind) => {
-    const I = { smart: Sparkles, page: CornerDownLeft, section: ListTree, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText, help: BookOpen }[k];
+    const I = { error: Bug, smart: Sparkles, page: CornerDownLeft, section: ListTree, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText, help: BookOpen }[k];
     return <I size={14} className="shrink-0 text-neon" />;
   };
 

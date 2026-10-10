@@ -42,30 +42,30 @@ pub struct CheckResult {
     pub findings: Vec<Finding>,
 }
 
-fn fix(id: impl Into<String>, label: &str, admin: bool) -> Fix {
+pub(crate) fn fix(id: impl Into<String>, label: &str, admin: bool) -> Fix {
     Fix { id: id.into(), label: label.into(), admin, confirm: None }
 }
 
-fn fix_confirm(id: impl Into<String>, label: &str, admin: bool, confirm: &str) -> Fix {
+pub(crate) fn fix_confirm(id: impl Into<String>, label: &str, admin: bool, confirm: &str) -> Fix {
     Fix { confirm: Some(confirm.into()), ..fix(id, label, admin) }
 }
 
-fn finding(level: &'static str, title: impl Into<String>, detail: impl Into<String>) -> Finding {
+pub(crate) fn finding(level: &'static str, title: impl Into<String>, detail: impl Into<String>) -> Finding {
     Finding { level, title: title.into(), detail: detail.into(), fixes: vec![], page: None }
 }
 
 impl Finding {
-    fn fixes(mut self, f: Vec<Fix>) -> Self {
+    pub(crate) fn fixes(mut self, f: Vec<Fix>) -> Self {
         self.fixes = f;
         self
     }
-    fn page(mut self, p: &'static str) -> Self {
+    pub(crate) fn page(mut self, p: &'static str) -> Self {
         self.page = Some(p);
         self
     }
 }
 
-fn open(uri: &str, label: &str) -> Fix {
+pub(crate) fn open(uri: &str, label: &str) -> Fix {
     fix(format!("open:{uri}"), label, false)
 }
 
@@ -909,12 +909,26 @@ pub fn troubleshoot_check(symptom: String) -> Result<CheckResult, String> {
         "audio" => check_audio(),
         "bluetooth" => check_bluetooth(),
         "display" => check_display(),
-        "printer" => check_printer(),
+        "printer" => check_printer().map(|mut v| {
+            v.extend(crate::fixes::printdeep::check());
+            drop_stale_ok(v)
+        }),
         "slow" => check_slow(),
-        "winupdate" => check_winupdate(),
-        _ => Err("Síntoma desconocido.".into()),
+        "winupdate" => check_winupdate().map(|mut v| {
+            v.extend(crate::fixes::wudeep::check());
+            drop_stale_ok(v)
+        }),
+        other => crate::fixes::check(other).unwrap_or_else(|| Err("Síntoma desconocido.".into())),
     }?;
     Ok(CheckResult { symptom, findings })
+}
+
+/// Si lo añadido a fondo encontró problemas, el «todo bien» de la comprobación básica sobra.
+fn drop_stale_ok(mut v: Vec<Finding>) -> Vec<Finding> {
+    if v.iter().any(|f| f.level == "bad" || f.level == "warn") {
+        v.retain(|f| f.level != "ok");
+    }
+    v
 }
 
 fn allowed_uri(uri: &str) -> bool {
@@ -1007,7 +1021,7 @@ Remove-ItemProperty $k -Name AutoConfigURL -ErrorAction SilentlyContinue
             crate::shellopen::open(arg)?;
             return Ok(String::new());
         }
-        _ => return Err("Reparación desconocida.".into()),
+        _ => return crate::fixes::run(tweaks, kind, arg).unwrap_or_else(|| Err("Reparación desconocida.".into())),
     })
 }
 
@@ -1027,7 +1041,7 @@ fn fix_title(id: &str) -> &'static str {
         "wifi.ghosts" => "Quitar adaptadores Wi-Fi fantasma",
         "power.balanced" => "Plan de energía Equilibrado",
         "display.reset" => "Reiniciar el driver de la gráfica",
-        _ => "",
+        other => crate::fixes::title(other),
     }
 }
 

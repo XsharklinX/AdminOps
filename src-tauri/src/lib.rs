@@ -99,6 +99,8 @@ mod smoke;
 mod timeline;
 mod troubleshoot;
 mod uxio;
+mod fixes;
+mod errcodes;
 
 use tauri::Manager;
 
@@ -419,6 +421,9 @@ pub fn run() {
             uxio::open_dropped_pdf,
             uxio::compose_mail,
             tweaks::preview::tweak_preview,
+            errcodes::error_lookup,
+            errcodes::error_codes,
+            fixes::maildns::mail_domain_check,
             labelsio::label_qr,
             labelsio::label_sheet,
             disktools::disk_speed_test,

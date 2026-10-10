@@ -7,6 +7,7 @@ import { loadColor } from "../lib/format";
 import { explainError, supportDetails } from "../lib/errors";
 import { AnimatedValue, SkeletonRows, motionOk } from "./motion";
 import { SendTo } from "./SendTo";
+import { CodeLinks } from "./CodeLinks";
 
 export function Card({
   id,
@@ -472,7 +473,9 @@ export function ErrorState({ message, onRetry, page = false, where }: { message:
         <div className="flex flex-wrap items-start gap-3">
           <TriangleAlert size={16} className="mt-0.5 shrink-0 text-bad" />
           <div className="min-w-0 flex-1 text-sm text-ink">
-            <p className="break-words">{e.what}</p>
+            <p className="break-words">
+              <CodeLinks text={e.what} />
+            </p>
             <p className="mt-1 text-xs text-dim">{e.why}</p>
             {e.tries.length > 0 && (
               <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-xs text-dim">

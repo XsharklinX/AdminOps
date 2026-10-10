@@ -144,3 +144,37 @@ pub fn delete(path: &str, name: &str) -> Result<(), String> {
         Err(e) => Err(access_err(path, e)),
     }
 }
+
+/// Nombres de las subclaves de una clave. Vacío si no existe.
+pub fn subkeys(path: &str) -> Vec<String> {
+    let Some(key) = open_read(path) else { return vec![] };
+    key.enum_keys().filter_map(Result::ok).collect()
+}
+
+/// ¿Existe la clave?
+pub fn key_exists(path: &str) -> bool {
+    open_read(path).is_some()
+}
+
+/// Borra una clave entera con todo lo que tiene dentro. No falla si no existe.
+pub fn delete_tree(path: &str) -> Result<(), String> {
+    let (root, sub) = split(path)?;
+    let Some((parent, leaf)) = sub.rsplit_once('\\') else { return Err(format!("No se borra una clave de primer nivel: {path}")) };
+    let Ok(key) = root.open_subkey_with_flags(parent, KEY_ALL_ACCESS | KEY_WOW64_64KEY) else { return Ok(()) };
+    match key.delete_subkey_all(leaf) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(access_err(path, e)),
+    }
+}
+
+/// La misma clave en la notación de `reg.exe` (HKU\<SID> si HKCU se redirige al usuario de la sesión).
+pub fn reg_exe_path(path: &str) -> String {
+    match path.split_once('\\') {
+        Some((h, rest)) if h.eq_ignore_ascii_case("HKCU") || h.eq_ignore_ascii_case("HKEY_CURRENT_USER") => match crate::target_user::hkcu_redirect() {
+            Some(sid) => format!(r"HKU\{sid}\{rest}"),
+            None => format!(r"HKCU\{rest}"),
+        },
+        _ => path.to_string(),
+    }
+}

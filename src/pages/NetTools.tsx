@@ -1,5 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import { Calculator, CircleCheck, FileText, Loader2, Play, RefreshCw, Route, Save, Search, Server, Square, Undo2, Waypoints } from "lucide-react";
+import { Calculator, CircleCheck, Mail, FileText, Loader2, Play, RefreshCw, Route, Save, Search, Server, Square, Undo2, Waypoints } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Loading } from "../components/ui";
@@ -7,12 +7,14 @@ import { netApi, type DnsAdapter, type PortEntry, type Probe } from "../lib/api"
 import { DataTable } from "../components/DataTable";
 import { NeedsAdmin } from "../components/AdminBanner";
 import { sameNetwork, subnet } from "../lib/subnet";
+import { MailDomainCard } from "../components/MailDomainCard";
 
-type Tab = "probe" | "dns" | "ports" | "hosts" | "calc";
+type Tab = "probe" | "dns" | "mail" | "ports" | "hosts" | "calc";
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
   { id: "probe", label: "Ping y traza de ruta", icon: Route },
   { id: "dns", label: "DNS", icon: Server },
+  { id: "mail", label: "Correo del dominio", icon: Mail },
   { id: "ports", label: "Puertos en uso", icon: Waypoints },
   { id: "hosts", label: "Archivo hosts", icon: FileText },
   { id: "calc", label: "Calculadora de red", icon: Calculator },
@@ -37,6 +39,7 @@ export function NetTools({ isAdmin }: { isAdmin: boolean }) {
       </div>
       {tab === "probe" && <ProbePanel />}
       {tab === "dns" && <DnsPanel isAdmin={isAdmin} />}
+      {tab === "mail" && <MailDomainCard />}
       {tab === "ports" && <PortsPanel />}
       {tab === "hosts" && <HostsPanel isAdmin={isAdmin} />}
       {tab === "calc" && <SubnetCalc />}

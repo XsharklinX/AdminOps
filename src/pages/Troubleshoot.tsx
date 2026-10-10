@@ -8,6 +8,8 @@ import { TweaksPage } from "./TweaksPage";
 import { troubleshootApi, type TroubleFinding, type TroubleFix } from "../lib/api";
 import { SYMPTOMS } from "../lib/symptoms";
 import type { Symptom } from "../lib/api";
+import { MailDomainCard } from "../components/MailDomainCard";
+import { CodeLinks } from "../components/CodeLinks";
 
 
 
@@ -34,6 +36,13 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
   const check = useCallback(async (s: Symptom) => {
     const n = ++seq.current;
     setSymptom(s);
+    // El correo del dominio se revisa con su propia tarjeta (pide el dominio).
+    if (s === "mail") {
+      setFindings(null);
+      setChecking(false);
+      setError(null);
+      return;
+    }
     setChecking(true);
     setError(null);
     setFindings(null);
@@ -102,7 +111,12 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
         </div>
       </Card>
 
-      {current && (
+      {current?.id === "mail" && (
+        <div className="col-span-12">
+          <MailDomainCard />
+        </div>
+      )}
+      {current && current.id !== "mail" && (
         <Card
           title={current.title}
           icon={<current.icon size={14} />}
@@ -128,8 +142,8 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
                     <div className="flex items-start gap-2.5">
                       <L.icon size={16} className={`mt-0.5 shrink-0 ${L.color}`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-ink">{f.title}</p>
-                        {f.detail && <p className="mt-0.5 text-xs leading-relaxed break-words text-dim select-text">{f.detail}</p>}
+                        <p className="text-sm font-medium text-ink"><CodeLinks text={f.title} /></p>
+                        {f.detail && <p className="mt-0.5 text-xs leading-relaxed break-words whitespace-pre-line text-dim select-text"><CodeLinks text={f.detail} /></p>}
                         {(f.fixes.length > 0 || isPage(f.page)) && (
                           <div className="mt-2.5 flex flex-wrap items-center gap-2">
                             {f.fixes.map((x) => {

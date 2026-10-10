@@ -238,6 +238,13 @@ const CATALOG: Builtin[] = [
     actions: [
       {
         step: 3,
+        kind: "page",
+        id: "troubleshoot",
+        focus: "profile",
+        label: "Comprobarlo y arreglarlo con AdminOps (con copia del registro)",
+      },
+      {
+        step: 3,
         kind: "fix",
         id: "repair.temp-profile",
         label: "Reparar el perfil temporal",
