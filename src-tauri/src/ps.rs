@@ -213,22 +213,7 @@ pub fn powershell_opts(script: &str, opts: Opts) -> Result<String, String> {
     run_with_input(cmd, "PowerShell", &summary(script), opts, Some(full))
 }
 
-/// Texto cualquiera como cadena literal de PowerShell (entre comillas simples):
-/// dentro no se interpreta nada (`$()`, comillas dobles, saltos de línea…). Solo
-/// hay que duplicar las comillas simples, incluidas las tipográficas, que
-/// PowerShell también trata como comillas.
-pub fn ps_literal(value: &str) -> String {
-    let mut out = String::with_capacity(value.len() + 2);
-    out.push('\'');
-    for c in value.chars().filter(|c| *c != '\0') {
-        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
-            out.push(c);
-        }
-        out.push(c);
-    }
-    out.push('\'');
-    out
-}
+pub use crate::psquote::{ps_escape, ps_literal};
 
 /// Línea de PowerShell que define `$var` como SecureString con una contraseña,
 /// sin que aparezca legible en el script ni en el registro: es el formato de

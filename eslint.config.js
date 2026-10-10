@@ -51,7 +51,7 @@ export default tseslint.config(
   },
   {
     // Las pruebas de la interfaz en marcha: un script de Node que maneja un navegador.
-    files: ["tests/ui/**/*.{mjs,ts}"],
+    files: ["tests/ui/**/*.{mjs,ts}", "scripts/**/*.{mjs,ts}"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

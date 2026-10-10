@@ -12,6 +12,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # El historial entero: el buscador de secretos mira también lo que se añadió alguna vez.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -87,6 +90,13 @@ jobs:
 
       - name: Auditoria de dependencias de la interfaz
         run: npm audit --omit=dev --audit-level=high
+
+      # Una clave o un token pegado por error: en lo que hay ahora y en todo lo
+      # que se añadió alguna vez (una clave subida ya no es secreta).
+      - name: Buscar claves y secretos
+        run: |
+          node scripts/scan-secrets.mjs
+          node scripts/scan-secrets.mjs --history
 
       - name: Instalador y portable
         run: npm run build:release

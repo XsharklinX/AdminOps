@@ -115,7 +115,7 @@ pub fn user_dirs() -> Option<UserDirs> {
 }
 
 fn ps_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
+    crate::ps::ps_literal(s)
 }
 
 /// Variables que reciben todos los scripts del catálogo para actuar sobre el

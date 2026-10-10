@@ -1,3 +1,4 @@
+import { safeSvg } from "../lib/safeSvg";
 import { listen } from "@tauri-apps/api/event";
 import {
   ArrowLeft,
@@ -402,8 +403,12 @@ export function Router({ covered = false }: { covered?: boolean }) {
 
       {qr && (
         <Modal title={`Conectarse a «${info.ssid}»`} onClose={() => setQr(null)} width="w-[360px]">
-          {/* SVG generado por AdminOps (solo rectángulos): no incluye texto del usuario. */}
-          <div className="mx-auto w-60 overflow-hidden rounded-lg bg-white p-2 [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: qr }} />
+          {/* SVG generado por AdminOps: solo se pinta si es exactamente rectángulos y trazos (lib/safeSvg.ts). */}
+          {safeSvg(qr) ? (
+            <div className="mx-auto w-60 overflow-hidden rounded-lg bg-white p-2 [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: safeSvg(qr)! }} />
+          ) : (
+            <p className="text-center text-sm text-bad">No se pudo dibujar el código QR.</p>
+          )}
           <p className="mt-3 text-center text-xs text-dim">Apunta la cámara del móvil al código para conectarte sin escribir la contraseña.</p>
         </Modal>
       )}

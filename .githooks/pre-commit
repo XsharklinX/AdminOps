@@ -1,0 +1,4 @@
+#!/bin/sh
+# Antes de cada commit: que no se cuele una clave o un token (scripts/scan-secrets.mjs).
+# Se activa solo con «npm install» (scripts/install-hooks.mjs). Saltarlo: git commit --no-verify
+exec node scripts/scan-secrets.mjs --staged

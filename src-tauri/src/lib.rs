@@ -108,6 +108,8 @@ mod perfinsight;
 mod eventdigest;
 mod learned;
 mod escalate;
+mod checksums;
+mod psquote;
 mod rescue;
 mod vulndb;
 

@@ -56,8 +56,8 @@ export const appcareApi = {
   cleanup: (months: number, journal: boolean, snapshots: boolean, reports: boolean) =>
     invoke<{ journal: number; snapshots: number; reports: number; freed: number }>("data_cleanup", { months, journal, snapshots, reports }),
   checkUpdate: () => invoke<UpdateInfo>("check_update"),
-  /** Descarga la versión nueva y abre su instalador ("installer") o enseña el .zip ("portable"). */
-  installUpdate: () => invoke<"installer" | "portable">("install_update"),
+  /** Descarga la versión nueva y abre su instalador ("installer") o enseña el .zip ("portable"), comprobando su huella SHA-256. */
+  installUpdate: () => invoke<{ how: "installer" | "portable"; verified: "both" | "one" | "none"; sha256: string }>("install_update"),
   openRelease: (url: string) => invoke<void>("open_release_page", { url }),
 };
 

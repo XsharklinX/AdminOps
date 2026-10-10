@@ -76,12 +76,17 @@ export function DataCare({ s, set, part }: SettingsProps & { part: "data" | "upd
   const install = async () => {
     setInstalling(true);
     try {
-      const how = await appcareApi.installUpdate();
+      const r = await appcareApi.installUpdate();
       setReady(null);
+      // Qué se comprobó: la huella SHA-256 contra lo publicado, una o dos veces.
+      const check =
+        r.verified === "none"
+          ? " Esta versión no publica huella para comprobar el archivo: solo se comprobó el tamaño."
+          : ` Huella SHA-256 comprobada${r.verified === "both" ? " con dos fuentes" : ""}: ${r.sha256.slice(0, 12)}…`;
       setUpdate(
-        how === "installer"
+        (r.how === "installer"
           ? "Descargada. Acepta el aviso de Windows y pulsa «Actualizar» en el instalador: AdminOps se cierra sola en cuanto el instalador se abre, y tus datos se conservan."
-          : "Descargada en tu carpeta de Descargas (se abrió). Cierra AdminOps y descomprime el .zip encima de la carpeta del portable: tus datos se conservan.",
+          : "Descargada en tu carpeta de Descargas (se abrió). Cierra AdminOps y descomprime el .zip encima de la carpeta del portable: tus datos se conservan.") + check,
       );
     } catch (e) {
       toast("error", String(e));

@@ -440,7 +440,7 @@ fn clean_field(v: &str, max: usize) -> String {
 
 /// Escapa una cadena para ir entre comillas simples de PowerShell.
 fn ps_quote(v: &str) -> String {
-    v.replace('\'', "''")
+    crate::ps::ps_escape(v)
 }
 
 #[derive(Serialize)]

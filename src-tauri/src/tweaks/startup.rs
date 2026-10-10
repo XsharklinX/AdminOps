@@ -167,7 +167,7 @@ struct Enriched {
 /// editor/descripción del ejecutable de cada entrada (incluidas las tareas).
 fn enrich(items: &[StartupItem]) -> Result<Enriched, String> {
     let probes: Vec<Probe> = items.iter().map(|i| Probe { i: &i.id, c: &i.command }).collect();
-    let json = serde_json::to_string(&probes).unwrap().replace('\'', "''");
+    let json = crate::ps::ps_escape(&serde_json::to_string(&probes).unwrap());
     let script = format!(
         r#"
 $items = [System.Collections.ArrayList]::new()
@@ -274,7 +274,7 @@ pub fn list_startup() -> Result<Vec<StartupItem>, String> {
 
 pub fn set_task_enabled(path: &str, name: &str, enabled: bool) -> Result<(), String> {
     let verb = if enabled { "Enable" } else { "Disable" };
-    let (p, n) = (path.replace('\'', "''"), name.replace('\'', "''"));
+    let (p, n) = (crate::ps::ps_escape(path), crate::ps::ps_escape(name));
     ps::powershell(&format!("{verb}-ScheduledTask -TaskPath '{p}' -TaskName '{n}' | Out-Null")).map(|_| ())
 }
 

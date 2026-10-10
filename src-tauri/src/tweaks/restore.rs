@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 ///   lo ponemos a 0 durante la llamada y lo dejamos como estaba.
 /// - Si la Protección del sistema está desactivada en C:, la activamos.
 pub fn create(description: &str, task: &crate::task::Task) -> Result<(), String> {
-    let desc = description.replace('\'', "''");
+    let desc = crate::ps::ps_escape(description);
     let script = format!(
         r#"
 $k = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore'

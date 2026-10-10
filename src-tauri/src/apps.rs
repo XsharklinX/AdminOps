@@ -216,8 +216,8 @@ pub fn search_apps(query: String) -> Result<Vec<SearchResult>, String> {
         return Err("Escribe entre 2 y 60 caracteres.".into());
     }
     let script = format!(
-        "winget search --query '{}' --count 40 --accept-source-agreements --disable-interactivity | Out-String",
-        q.replace('\'', "''")
+        "winget search --query {} --count 40 --accept-source-agreements --disable-interactivity | Out-String",
+        crate::ps::ps_literal(q)
     );
     let out = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: Some("apps-search") })
         .map_err(winget_missing)?;

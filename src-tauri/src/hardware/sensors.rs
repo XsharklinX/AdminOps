@@ -174,8 +174,8 @@ public static class AdminOpsResolver {
 "#;
 
 pub fn raw_from_dir(dir: &std::path::Path) -> Result<Vec<Sensor>, String> {
-    let dir = dir.display().to_string().replace('\'', "''");
-    let resolver = RESOLVER.replace('\'', "''");
+    let dir = crate::ps::ps_escape(&dir.display().to_string());
+    let resolver = crate::ps::ps_escape(RESOLVER);
     let script = format!(
         r#"
 if (-not $global:AdminOpsLhm) {{

@@ -214,6 +214,24 @@ struct Release {
     assets: Vec<Asset>,
 }
 
+/// Lo que se hizo con la huella del archivo descargado.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallOutcome {
+    /// "installer" o "portable".
+    how: String,
+    /// "both" (dos huellas publicadas coinciden), "one" (una) o "none" (no había con qué comparar).
+    verified: String,
+    /// La huella SHA-256 de lo descargado, para comprobarla a mano.
+    sha256: String,
+}
+
+/// El `SHA256SUMS.txt` de la versión, si la versión lo trae (solo del repositorio de AdminOps).
+async fn published_sums(client: &reqwest::Client, assets: &[Asset]) -> Option<String> {
+    let a = assets.iter().find(|a| a.name == "SHA256SUMS.txt" && a.browser_download_url.starts_with(DOWNLOADS) && a.size < 64 * 1024)?;
+    client.get(&a.browser_download_url).send().await.ok()?.error_for_status().ok()?.text().await.ok()
+}
+
 /// De dónde se descarga: solo los archivos publicados en el repositorio de AdminOps.
 const DOWNLOADS: &str = "https://github.com/XsharklinX/AdminOps/releases/download/";
 
@@ -278,7 +296,7 @@ fn hex(bytes: &[u8]) -> String {
 /// No instala nada por su cuenta ni en silencio: el instalador se abre a la
 /// vista y es el técnico quien pulsa «Actualizar».
 #[tauri::command]
-pub async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
+pub async fn install_update(app: tauri::AppHandle) -> Result<InstallOutcome, String> {
     use futures_util::StreamExt;
     use sha2::Digest;
     use std::io::Write;
@@ -336,24 +354,32 @@ pub async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
     if got != asset.size {
         return Err(fail(&part, "La descarga quedó incompleta. Vuelve a intentarlo.".into()));
     }
-    match asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")) {
-        Some(expected) if !expected.eq_ignore_ascii_case(&hex(&hasher.finalize())) => {
-            return Err(fail(&part, "El archivo descargado no coincide con el publicado. No se instala.".into()));
+    // La huella de lo descargado contra las publicadas: la que calcula GitHub y la del SHA256SUMS.txt.
+    let sha256 = hex(&hasher.finalize());
+    let sums = published_sums(&client, &r.assets).await.and_then(|t| crate::checksums::hash_for(&t, &asset.name));
+    let verified = match crate::checksums::verdict(&sha256, asset.digest.as_deref(), sums.as_deref()) {
+        crate::checksums::Verdict::Mismatch => {
+            return Err(fail(&part, "El archivo descargado no coincide con la huella publicada. No se instala.".into()));
         }
-        Some(_) => {}
-        None => log::warn!("Actualización: GitHub no dio la huella del archivo; solo se comprobó el tamaño."),
-    }
+        crate::checksums::Verdict::Verified { sources: 2 } => "both",
+        crate::checksums::Verdict::Verified { .. } => "one",
+        crate::checksums::Verdict::Unavailable => {
+            log::warn!("Actualización: la versión no publica huella del archivo; solo se comprobó el tamaño.");
+            "none"
+        }
+    };
     let _ = std::fs::remove_file(&out);
     std::fs::rename(&part, &out).map_err(|e| format!("No se pudo guardar la descarga: {e}"))?;
     log::info!("Actualización {latest} descargada ({} bytes)", got);
 
+    let outcome = |how: &str| InstallOutcome { how: how.into(), verified: verified.into(), sha256: sha256.clone() };
     if zip {
         let _ = std::process::Command::new("explorer.exe").arg(format!("/select,{}", out.display())).spawn();
-        Ok("portable".into())
+        Ok(outcome("portable"))
     } else {
         crate::shellopen::open(&out.display().to_string())?;
         close_when_installer_runs(app.clone(), asset.name.clone());
-        Ok("installer".into())
+        Ok(outcome("installer"))
     }
 }
 

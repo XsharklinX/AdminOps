@@ -236,7 +236,7 @@ pub fn recommended_installed() -> Result<Vec<String>, String> {
 }
 
 fn remove(name: &str, task: &Task) -> Result<(), String> {
-    let n = name.replace('\'', "''");
+    let n = crate::ps::ps_escape(name);
     appx_script(&format!(
         r#"
 $n = '{n}'

@@ -180,7 +180,7 @@ fn run_revert_script(t: &Tweak, previous: Option<&str>, task: Option<&Task>) -> 
     match t.script.as_ref().and_then(|s| s.revert.as_deref()) {
         Some(script) => {
             let prelude = match previous {
-                Some(p) => format!("$Previous = '{}'\n", p.replace('\'', "''")),
+                Some(p) => format!("$Previous = {}\n", crate::ps::ps_literal(p)),
                 None => "$Previous = $null\n".to_string(),
             };
             run_script(&format!("{prelude}{script}"), task, timeout_of(t)).map(|_| ()).map_err(|e| format!("Script: {e}"))
