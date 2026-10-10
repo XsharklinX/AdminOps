@@ -1,7 +1,9 @@
 // «¿Está bien mi equipo?»: lo primero que ve una persona en el modo usuario. Un sí o un no, tres
 // tarjetas en lenguaje normal y un único botón de arreglo. Cada tarjeta se abre en un «por qué».
 import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Loader2, MessageSquareShare, Stethoscope, Wrench, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import logo from "../assets/logo.svg";
+import { workApi, type Settings } from "../lib/api";
 import { Bar, Button, Card } from "./ui";
 import { summarize, type Level, type UserInput } from "../lib/userHome";
 
@@ -16,8 +18,27 @@ export function UserHome({ input, busy, onFix, onTellTechnician, onReview }: { i
   const s = summarize(input);
   const [open, setOpen] = useState<string | null>(null);
   const t = TONE[s.level];
+  // «Tu técnico»: su logo, su nombre y su frase, para que la persona sepa a quién llamar.
+  const [brand, setBrand] = useState<Settings | null>(null);
+  useEffect(() => {
+    let alive = true;
+    workApi.settings().then((b) => alive && setBrand(b), () => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const name = brand?.company?.trim() || "";
   return (
     <Card className={`space-y-4 p-6 ${t.ring}`}>
+      {name && (
+        <div className="flex items-center gap-3 border-b border-line/60 pb-3">
+          <img src={brand?.logo ?? logo} alt="" className="size-9 object-contain" draggable={false} />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-ink">{name}</div>
+            {(brand?.tagline?.trim() || brand?.phone?.trim()) && <div className="truncate text-xs text-mute">{[brand?.tagline?.trim(), brand?.phone?.trim()].filter(Boolean).join(" · ")}</div>}
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-4">
         <t.Icon size={44} strokeWidth={1.4} className={t.text} />
         <div className="min-w-60 flex-1">

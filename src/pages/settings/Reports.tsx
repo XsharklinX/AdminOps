@@ -96,6 +96,29 @@ export function Reports({ s, set }: SettingsProps) {
           {field("phone", "Teléfono")}
           {field("email", "Correo")}
           <div className="col-span-2">{field("website", "Web o redes")}</div>
+          <label className="col-span-2 block sm:col-span-1">
+            <span className="mb-1 block text-xs text-dim">Frase de la pantalla de bloqueo</span>
+            <input value={s.tagline ?? ""} onChange={(e) => set({ tagline: e.target.value.slice(0, 80) })} maxLength={80} placeholder="Tu informática, sin sustos" className={input} />
+          </label>
+          <div className="col-span-2 sm:col-span-1">
+            <span className="mb-1 block text-xs text-dim">Color de tu marca</span>
+            <span className="flex items-center gap-2">
+              <input
+                type="color"
+                value={s.brandColor || "#2f63d8"}
+                onChange={(e) => set({ brandColor: e.target.value })}
+                aria-label="Color de la marca"
+                className="h-9 w-14 cursor-pointer rounded-md border border-line bg-void/60 p-1"
+              />
+              <span className="font-mono text-xs text-mute">{s.brandColor || "el de AdminOps"}</span>
+              {s.brandColor && (
+                <button type="button" onClick={() => set({ brandColor: "" })} className="text-xs text-mute hover:text-ink">
+                  Quitar
+                </button>
+              )}
+            </span>
+          </div>
+          <p className="col-span-2 -mt-1 text-[11px] text-mute">Con tu logo y tu empresa, salen en la pantalla de bloqueo: quien se acerque a un equipo desatendido ve tu nombre y tu teléfono.</p>
           <label className="col-span-2 block">
             <span className="mb-1 block text-xs text-dim">
               Condiciones / garantía (pie del informe)

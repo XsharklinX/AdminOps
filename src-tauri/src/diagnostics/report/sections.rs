@@ -80,35 +80,8 @@ pub(super) fn summary(h: &mut String, c: &Ctx, work: usize) {
     let d = c.cur;
     let n = |s| d.findings.iter().filter(|f| f.severity == s).count();
     let (bad, warn) = (n(Severity::Bad), n(Severity::Warn));
-    let (cls, title) = match (bad, warn) {
-        (0, 0) => ("v-ok", "Equipo en buen estado"),
-        (0, _) => ("v-warn", "Equipo en buen estado, con puntos a mejorar"),
-        _ => ("v-bad", "El equipo requiere atención"),
-    };
+    let (cls, title, text) = verdict(c, work);
     let solved = c.base.map(|b| resolved(d, b).len());
-    let mut text = Vec::new();
-    if work > 0 {
-        text.push(format!("Se realizaron {work} {} de mantenimiento y reparación.", if work == 1 { "acción" } else { "acciones" }));
-    }
-    if let (Some(s), Some(b)) = (solved, c.base) {
-        let before = b.findings.iter().filter(important).count();
-        if before > 0 && s > 0 {
-            text.push(format!("Se {} {s} de los {before} problemas detectados al llegar.", if s == 1 { "resolvió" } else { "resolvieron" }));
-        }
-    }
-    let minor = |w: usize| if w == 1 { "1 punto a mejorar".to_string() } else { format!("{w} puntos a mejorar") };
-    match (bad, warn) {
-        (0, 0) => text.push("No quedan problemas pendientes.".into()),
-        (0, w) => text.push(format!("{} {}, sin gravedad.", if w == 1 { "Queda" } else { "Quedan" }, minor(w))),
-        (1, 0) => text.push("Queda 1 problema importante que conviene resolver.".into()),
-        (b, 0) => text.push(format!("Quedan {b} problemas importantes que conviene resolver.")),
-        (b, w) => text.push(format!(
-            "{} {b} {} y {} que conviene resolver.",
-            if b == 1 { "Queda" } else { "Quedan" },
-            if b == 1 { "problema importante" } else { "problemas importantes" },
-            minor(w)
-        )),
-    }
     let _ = write!(h, "<div class=\"verdict {cls}\"><div class=state><div class=t>{title}</div><p>{}</p></div><div class=kpis>", esc(&text.join(" ")));
     if let Some(a) = &d.security.data {
         h.push_str(&ring(a.score));

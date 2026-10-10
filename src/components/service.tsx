@@ -1,8 +1,8 @@
 import { fillTemplate, recipients, reportNumber } from "../lib/reportText";
 import { quoteTemplates, saveQuoteTemplate, useQuoteQueue } from "../lib/quote";
 import { goToPage } from "../lib/navigate";
-import { Eraser, FileText, Mail, Plus, Trash2, Wrench, LayoutList } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Eraser, Mail, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { logQuietly, diagApi, portalsApi, workApi, type Billing, type ClientReport, type DocKind, type Line, type Settings, type Template } from "../lib/api";
 import { money } from "../lib/format";
 import { useToast } from "./feedback";
@@ -38,16 +38,67 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
   );
 }
 
-/** Plantilla del informe: resumen para el cliente o detalle técnico. */
+/** Una hoja en miniatura: lo que lleva cada formato, a un golpe de vista. */
+function Thumb({ kind }: { kind: Template }) {
+  const line = (w: string, key: string, tone = "bg-line-2") => <i key={key} className={`block h-[3px] rounded-full ${tone}`} style={{ width: w }} />;
+  return (
+    <span aria-hidden className="flex h-[74px] w-[54px] shrink-0 flex-col gap-[3px] rounded border border-line-2 bg-white p-1.5 shadow-elev-1">
+      {line("100%", "a", "bg-neon/70")}
+      <span className="my-px flex h-4 items-center gap-1 rounded-sm bg-[#eef1f5] px-1">
+        <span className="size-2.5 rounded-full bg-ok" />
+        <i className="block h-[3px] flex-1 rounded-full bg-[#b9c1cd]" />
+      </span>
+      {kind === "onePage" ? (
+        <>
+          {line("90%", "b")}
+          {line("70%", "c")}
+          <span className="mt-0.5 flex h-2.5 gap-0.5">
+            <i className="block flex-1 rounded-sm bg-ok/50" />
+            <i className="block flex-1 rounded-sm bg-warn/50" />
+          </span>
+          {line("85%", "d")}
+        </>
+      ) : kind === "technical" ? (
+        <>
+          {[0, 1, 2, 3, 4].map((n) => line(n % 2 ? "76%" : "94%", `t${n}`))}
+          <span className="mt-0.5 grid flex-1 grid-cols-2 gap-0.5">
+            <i className="block rounded-sm bg-[#d8dde5]" />
+            <i className="block rounded-sm bg-[#d8dde5]" />
+          </span>
+        </>
+      ) : kind === "custom" ? (
+        <>
+          {line("80%", "b")}
+          <span className="my-0.5 flex-1 rounded-sm border border-dashed border-line-2" />
+          {line("60%", "c")}
+        </>
+      ) : (
+        <>
+          {line("90%", "b")}
+          {line("75%", "c")}
+          {line("85%", "d")}
+          {line("55%", "e")}
+          <span className="mt-0.5 flex h-2.5 gap-0.5">
+            <i className="block flex-1 rounded-sm bg-[#d8dde5]" />
+            <i className="block flex-1 rounded-sm bg-[#d8dde5]" />
+            <i className="block flex-1 rounded-sm bg-[#d8dde5]" />
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** Formato del informe: una página, detallado para el cliente, técnico o el propio. */
 export function TemplatePicker({ value, onChange, custom }: { value: Template; onChange: (t: Template) => void; /** Nombre de la plantilla propia (Ajustes → Informes). */ custom?: string }) {
-  const option = (t: Template, icon: ReactNode, title: string, sub: string) => (
+  const option = (t: Template, title: string, sub: string) => (
     <button
       type="button"
       onClick={() => onChange(t)}
       aria-pressed={value === t}
-      className={`flex flex-1 items-start gap-3 rounded-lg border p-3 text-left transition-colors ${value === t ? "border-neon bg-neon/5" : "border-line hover:border-line-2"}`}
+      className={`lift flex min-w-[220px] flex-1 items-start gap-3 rounded-lg border p-3 text-left transition-colors ${value === t ? "border-neon bg-neon/5" : "border-line hover:border-line-2"}`}
     >
-      <span className={`mt-0.5 ${value === t ? "text-neon" : "text-mute"}`}>{icon}</span>
+      <Thumb kind={t} />
       <span>
         <span className="block text-sm font-medium text-ink">{title}</span>
         <span className="block text-xs text-mute">{sub}</span>
@@ -56,9 +107,10 @@ export function TemplatePicker({ value, onChange, custom }: { value: Template; o
   );
   return (
     <div className="flex flex-wrap gap-3">
-      {option("client", <FileText size={16} />, "Para el cliente", "Estado del equipo en lenguaje claro, trabajo hecho, pendientes y firmas.")}
-      {option("technical", <Wrench size={16} />, "Técnico", "Lo mismo más hardware, discos, SMART, estabilidad, drivers y seguridad.")}
-      {option("custom", <LayoutList size={16} />, custom?.trim() || "Mi plantilla", "Las secciones que elegiste, en tu orden (Ajustes → Informes y cobros).")}
+      {option("onePage", "Una página", "El veredicto, lo más urgente, las gráficas y las recomendaciones. Para entregar en mano.")}
+      {option("client", "Detallado", "Con portada: estado del equipo en lenguaje claro, trabajo hecho, pendientes y firmas.")}
+      {option("technical", "Técnico", "Lo mismo más hardware, discos, SMART, estabilidad, drivers y seguridad, para tu archivo.")}
+      {option("custom", custom?.trim() || "Mi plantilla", "Las secciones que elegiste, en tu orden (Ajustes → Informes y cobros).")}
     </div>
   );
 }

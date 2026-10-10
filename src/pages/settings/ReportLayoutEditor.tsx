@@ -58,6 +58,10 @@ export function ReportLayoutEditor({ s, set }: { s: Settings; set: (patch: Parti
           <Toggle checked={layout.technical} onChange={(v) => update({ technical: v })} />
           Con el detalle técnico (hardware, discos, drivers, estabilidad)
         </label>
+        <label className="flex items-center gap-2 pb-2 text-sm text-dim" title="La portada lleva tu marca, el equipo y un semáforo con lo más importante. «Una página» nunca lleva portada.">
+          <Toggle checked={!s.reportNoCover} onChange={(v) => set({ reportNoCover: !v })} />
+          Portada en los informes largos
+        </label>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

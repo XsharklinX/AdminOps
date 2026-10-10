@@ -22,6 +22,7 @@ mod style;
 mod compare;
 mod sections;
 mod mail;
+mod visual;
 #[allow(unused_imports)]
 pub use format::*;
 #[allow(unused_imports)]
@@ -32,6 +33,8 @@ pub use compare::*;
 pub use sections::*;
 #[allow(unused_imports)]
 pub use mail::*;
+#[allow(unused_imports)]
+pub use visual::*;
 
 /// Datos del informe además del diagnóstico.
 pub struct ReportInput {
@@ -79,7 +82,7 @@ impl Ctx<'_> {
         match self.input.template {
             Template::Technical => true,
             Template::Custom => self.settings.report_layout.technical,
-            Template::Client => false,
+            Template::Client | Template::OnePage => false,
         }
     }
 
@@ -88,6 +91,7 @@ impl Ctx<'_> {
     fn layout(&self) -> Vec<&'static str> {
         match self.input.template {
             Template::Custom => self.settings.report_layout.valid_sections(),
+            Template::OnePage => crate::workflow::ONE_PAGE_SECTIONS.to_vec(),
             _ => crate::workflow::REPORT_SECTIONS.to_vec(),
         }
     }
@@ -113,6 +117,11 @@ fn build(c: &Ctx) -> String {
         css_str(&format!("{} · {}", d.host, fmt_day(d.timestamp))),
         font_faces()
     );
+    let work: Vec<&Entry> = c.journal.iter().filter(|e| e.ok && e.op != Op::Revert).collect();
+    // La portada (salvo en «Una página» o si se quitó en Ajustes → Informes).
+    if !st.report_no_cover && c.input.template != Template::OnePage {
+        cover(&mut h, c, work.len());
+    }
     header(&mut h, c);
 
     // Presentación propia de este cliente (plantilla de su ficha).
@@ -132,13 +141,17 @@ fn build(c: &Ctx) -> String {
         let _ = write!(h, "<div class=intro>{}</div>", esc(&intro));
     }
 
-    let work: Vec<&Entry> = c.journal.iter().filter(|e| e.ok && e.op != Op::Revert).collect();
     // Cada sección, en el orden de la plantilla (las de fábrica: todas, en el de siempre).
     for section in c.layout() {
         match section {
             "summary" => {
                 summary(&mut h, c, work.len());
-                areas_section(&mut h, d);
+                if c.input.template == Template::OnePage {
+                    top_issues(&mut h, c, 5);
+                } else {
+                    areas_section(&mut h, d);
+                }
+                charts(&mut h, c);
             }
             "problem" if !c.input.problem.trim().is_empty() => {
                 let _ = write!(h, "<h2>Motivo de la visita</h2><div class=text>{}</div>", esc(c.input.problem.trim()));
@@ -721,6 +734,34 @@ mod tests {
         let tech = Settings { report_layout: crate::workflow::ReportLayout { technical: true, ..Default::default() }, ..Default::default() };
         assert!(render(Template::Custom, &tech).contains("<h2>Equipo en detalle</h2>"));
         assert!(!render(Template::Custom, &Settings::default()).contains("<h2>Equipo en detalle</h2>"));
+    }
+
+    /// La portada sale de fábrica en las plantillas largas, se puede quitar y «Una página» no la lleva.
+    #[test]
+    fn cover_and_one_page() {
+        use crate::diagnostics::{Finding, Severity, Volume};
+        let finding = |sev, title: &str| Finding { severity: sev, area: "Discos".into(), title: title.into(), detail: None, actions: vec![], key: String::new() };
+        let cur = Diagnostics {
+            host: "PC-01".into(),
+            volumes: vec![Volume { mount: "C:\\".into(), total: 500 << 30, free: 30 << 30 }],
+            findings: vec![finding(Severity::Warn, "El disco se llena"), finding(Severity::Bad, "Un disco falla")],
+            ..Default::default()
+        };
+        let render = |template, settings: &Settings| {
+            let input = sample_input(template);
+            build(&Ctx { cur: &cur, base: None, journal: &[], technician: "Ana", input: &input, settings, speed: None, disks: &Default::default(), backups: &[], number: "2026-0001", since: 0 })
+        };
+        let full = render(Template::Client, &Settings::default());
+        assert!(full.contains("<section class=cover>") && full.contains("cv-light v-bad") && full.contains("Lo más importante"));
+        // Lo urgente, antes que lo recomendado.
+        assert!(full.find("Un disco falla") < full.find("El disco se llena"));
+        assert!(full.contains("<h2>Disco y arranque</h2>") && full.contains("94 %"));
+        let bare = render(Template::Client, &Settings { report_no_cover: true, ..Default::default() });
+        assert!(!bare.contains("<section class=cover>"));
+        let one = render(Template::OnePage, &Settings::default());
+        assert!(!one.contains("<section class=cover>") && !one.contains("<h2>Estado por áreas</h2>"));
+        assert!(one.contains("<h2>Lo que conviene hacer</h2>") && one.contains("<h2>Recomendaciones</h2>") && one.contains("<h2>Disco y arranque</h2>"));
+        assert!(!one.contains("<h2>Observaciones del técnico</h2>"));
     }
 
     #[test]

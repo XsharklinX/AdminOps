@@ -72,6 +72,17 @@ pub struct Settings {
     pub visit_types: Vec<VisitType>,
     /// La plantilla de informe propia: qué secciones lleva y en qué orden.
     pub report_layout: ReportLayout,
+    /// Sin portada: el informe empieza directamente en la primera página de contenido.
+    pub report_no_cover: bool,
+    /// Una frase corta que sale en la pantalla de bloqueo y de bienvenida.
+    pub tagline: String,
+    /// Color de la marca (#rrggbb) para esas pantallas. Vacío: el de AdminOps.
+    pub brand_color: String,
+}
+
+/// ¿Es un color #rrggbb?
+pub fn is_hex_color(s: &str) -> bool {
+    s.len() == 7 && s.starts_with('#') && s[1..].chars().all(|c| c.is_ascii_hexdigit())
 }
 
 /// Un tipo de visita y lo que hay que hacer en ella.
@@ -218,6 +229,9 @@ impl Default for Settings {
             tray_icon: false,
             visit_types: default_visit_types(),
             report_layout: ReportLayout::default(),
+            report_no_cover: false,
+            tagline: String::new(),
+            brand_color: String::new(),
         }
     }
 }
@@ -256,6 +270,12 @@ pub fn save_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), St
         }
     }
     check_signature(settings.tech_signature.as_deref())?;
+    if settings.tagline.chars().count() > 80 {
+        return Err("La frase de la pantalla de bloqueo admite hasta 80 caracteres.".into());
+    }
+    if !settings.brand_color.is_empty() && !is_hex_color(&settings.brand_color) {
+        return Err("El color de la marca debe ser como #2f63d8.".into());
+    }
     if !settings.tax_rate.is_finite() || !(0.0..=100.0).contains(&settings.tax_rate) {
         return Err("El impuesto debe estar entre 0 y 100 %.".into());
     }
@@ -283,10 +303,15 @@ pub enum Template {
     Technical,
     /// La del técnico: las secciones que elija, en su orden (Ajustes → Informes).
     Custom,
+    /// Una sola página para el cliente: el veredicto, lo más urgente y las recomendaciones.
+    OnePage,
 }
 
 /// Secciones del informe que se pueden quitar o cambiar de sitio, en su orden
 /// de fábrica. La cabecera va siempre arriba y las firmas y condiciones, abajo.
+/// Lo que lleva «Una página»: el resumen (con lo más urgente y las gráficas), el motivo y las recomendaciones.
+pub const ONE_PAGE_SECTIONS: [&str; 3] = ["summary", "problem", "recommendations"];
+
 pub const REPORT_SECTIONS: [&str; 12] = ["summary", "problem", "work", "findings", "disks", "backups", "comparison", "recommendations", "billing", "machine", "speed", "notes"];
 
 /// La plantilla propia del técnico.
@@ -1466,6 +1491,12 @@ mod tests {
         let neg = Billing { discount: -1.0, ..b };
         assert!(neg.validate().is_err());
         assert_eq!(maintenance_date(0, 5), None);
+    }
+
+    #[test]
+    fn brand_color_must_be_hex() {
+        assert!(is_hex_color("#2f63d8") && is_hex_color("#FFFFFF"));
+        assert!(!is_hex_color("2f63d8") && !is_hex_color("#2f63d") && !is_hex_color("#2f63dz") && !is_hex_color("red") && !is_hex_color(""));
     }
 
     /// Con un análisis real: `ADMINOPS_SNAPSHOTS=<carpeta> cargo test inventory_real -- --ignored --nocapture`

@@ -556,7 +556,8 @@ function ClientReportFields({ value, onChange }: { value: ClientReport; onChange
         <label className="block">
           <span className="mb-1 block text-xs text-dim">Formato</span>
           <select value={value.template ?? ""} onChange={(e) => onChange({ ...value, template: (e.target.value || null) as ClientReport["template"] })} className={inputClass}>
-            <option value="">Para el cliente (resumen claro)</option>
+            <option value="onePage">Una página (resumen para el cliente)</option>
+            <option value="">Detallado (para el cliente, con todo lo hecho)</option>
             <option value="technical">Técnico (todo el detalle)</option>
           </select>
         </label>

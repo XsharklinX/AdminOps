@@ -885,7 +885,7 @@ pub fn diag_unaccept(app: tauri::AppHandle, key: String) -> Result<Vec<Accepted>
 const SLOW_BOOT_MS: u64 = 60_000;
 
 /// Lo que tarda en arrancar normalmente: la mediana de los arranques apuntados.
-fn typical_boot_ms(times: &[collect::BootTime]) -> Option<u64> {
+pub(crate) fn typical_boot_ms(times: &[collect::BootTime]) -> Option<u64> {
     let mut ms: Vec<u64> = times.iter().map(|b| b.ms).collect();
     ms.sort_unstable();
     ms.get(ms.len().checked_sub(1)? / 2).copied()

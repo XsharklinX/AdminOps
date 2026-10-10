@@ -32,6 +32,12 @@ export interface Settings {
   catalog: CatalogItem[];
   techSignature: string | null;
   reportLayout: ReportLayout;
+  /** Sin portada: el informe empieza en la primera página de contenido. */
+  reportNoCover?: boolean;
+  /** Frase corta de la pantalla de bloqueo. */
+  tagline?: string;
+  /** Color de la marca (#rrggbb) para esas pantallas. */
+  brandColor?: string;
 }
 
 export interface CatalogItem {
@@ -43,7 +49,7 @@ export interface CatalogItem {
   cost?: number;
 }
 
-export type Template = "client" | "technical" | "custom";
+export type Template = "onePage" | "client" | "technical" | "custom";
 
 /** La plantilla de informe propia: qué secciones lleva y en qué orden. */
 export interface ReportLayout {
