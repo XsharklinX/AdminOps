@@ -15,7 +15,7 @@ import { CommOpener } from "./components/CommOpener";
 import { useMachineState } from "./lib/machineState";
 import { sectionLabel, sectionsOf } from "./lib/sections";
 import { PageIdContext, requestSection, useCurrentSections } from "./lib/sectionState";
-import { logQuietly, api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { casesApi, knowledgeApi, logQuietly, api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { analyze, analyzeQuick } from "./lib/diagRun";
@@ -557,6 +557,21 @@ export default function App() {
     () => [
       ...(isAdmin === false ? [{ id: "admin", title: "Reiniciar AdminOps como administrador", run: () => void api.relaunchAsAdmin() }] : []),
       { id: "support", title: "Crear paquete de soporte", subtitle: "Registro y último diagnóstico en un .zip", run: () => void appApi.supportPackage() },
+      {
+        id: "escalate",
+        title: "Paquete de pruebas para escalar",
+        subtitle: "Volcados, eventos, CBS, sistema y lo hecho en el caso, en un zip con resumen",
+        keywords: "escalar microsoft fabricante pruebas logs volcados zip soporte compañero",
+        run: async () => {
+          const c = await casesApi.current().catch(() => null);
+          const acts = c ? await casesApi.actions().catch(() => []) : [];
+          const summary = c
+            ? `CASO${c.ticket ? ` ${c.ticket}` : ""}${c.person ? ` · ${c.person}` : ""}${c.machine ? ` · ${c.machine}` : ""}\n\nSÍNTOMA Y NOTAS\n${c.notes || "(sin notas)"}\n\nLO PROBADO\n${acts.map((a) => `- ${a.ok ? "bien" : "falló"}: ${a.title}`).join("\n") || "(nada apuntado)"}`
+            : "Sin caso abierto: describe aquí el síntoma, lo probado y lo que falló antes de enviarlo.";
+          const path = await knowledgeApi.escalate(summary);
+          return `Paquete creado: ${path}`;
+        },
+      },
       { id: "help-guide", title: "Guía de AdminOps", subtitle: "Qué hace cada pantalla y cómo se usa", keywords: "ayuda manual glosario como usar documentacion", run: () => openHelp("guide") },
       { id: "help-tour", title: "Ver el recorrido de novedades", subtitle: "Lo nuevo de esta versión, señalado en la pantalla", keywords: "recorrido tour novedades guia nuevo que hay", run: () => startTour() },
       { id: "help-news", title: "Novedades de cada versión", subtitle: "Lo que se ha añadido desde la primera", keywords: "cambios version changelog nuevo", run: () => openHelp("news") },

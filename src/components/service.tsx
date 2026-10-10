@@ -1,4 +1,5 @@
 import { fillTemplate, recipients, reportNumber } from "../lib/reportText";
+import { quoteTemplates, saveQuoteTemplate, useQuoteQueue } from "../lib/quote";
 import { goToPage } from "../lib/navigate";
 import { Eraser, FileText, Mail, Plus, Trash2, Wrench, LayoutList } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -78,6 +79,9 @@ export function BillingEditor({ billing, onChange, settings }: { billing: Billin
     onChange({ ...billing, lines: [...billing.lines, { description: "", part: false, qty: 1, price: 0, warrantyDays: 0, ...l }] });
   const t = totals(billing, taxRate);
   const catalog = settings?.catalog.filter((c) => c.name.trim()) ?? [];
+  // Lo que llega desde «¿Reparar o cambiar?» o los repuestos compatibles, sin volver a escribirlo.
+  useQuoteQueue((lines) => onChange({ ...billing, kind: billing.kind === "none" ? "quote" : billing.kind, lines: [...billing.lines.filter((l) => l.description.trim() || l.price), ...lines] }));
+  const [templates, setTemplates] = useState(quoteTemplates);
 
   return (
     <div>
@@ -164,6 +168,37 @@ export function BillingEditor({ billing, onChange, settings }: { billing: Billin
                   </option>
                 ))}
               </select>
+            )}
+            {templates.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  const tpl = templates.find((x) => x.name === e.target.value);
+                  if (tpl) onChange({ ...billing, lines: [...billing.lines.filter((l) => l.description.trim() || l.price), ...tpl.lines] });
+                }}
+                className="rounded-md border border-line-2 bg-void px-2 py-1.5 text-xs text-dim outline-none"
+                aria-label="Usar una plantilla de presupuesto"
+              >
+                <option value="">Usar una plantilla…</option>
+                {templates.map((x) => (
+                  <option key={x.name} value={x.name}>
+                    {x.name} · {x.lines.length} líneas
+                  </option>
+                ))}
+              </select>
+            )}
+            {billing.lines.some((l) => l.description.trim()) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const name = window.prompt("Nombre de la plantilla (p. ej. «Cambio a SSD con clonado»)")?.trim();
+                  if (name) setTemplates(saveQuoteTemplate(name, billing.lines.filter((l) => l.description.trim())));
+                }}
+                className="flex items-center gap-1 rounded-md border border-line-2 px-2.5 py-1.5 text-xs text-dim hover:text-ink"
+                title="Guarda estas líneas para usarlas en otros presupuestos"
+              >
+                Guardar como plantilla
+              </button>
             )}
           </div>
 

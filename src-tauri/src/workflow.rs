@@ -163,6 +163,9 @@ pub struct CatalogItem {
     /// Pieza (lleva garantía propia) o servicio.
     pub part: bool,
     pub warranty_days: u32,
+    /// Lo que le cuesta al técnico (para ver el margen). 0: no se sabe.
+    #[serde(default)]
+    pub cost: f64,
 }
 
 impl Default for Settings {

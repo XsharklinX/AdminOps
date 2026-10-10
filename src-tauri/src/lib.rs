@@ -106,6 +106,8 @@ mod crashes;
 mod stress;
 mod perfinsight;
 mod eventdigest;
+mod learned;
+mod escalate;
 
 use tauri::Manager;
 
@@ -438,6 +440,11 @@ pub fn run() {
             stress::stress_history,
             perfinsight::perf_insights,
             eventdigest::event_digest,
+            learned::learned_record,
+            learned::learned_stats,
+            escalate::escalation_pack,
+            uxio::save_text_file,
+            uxio::open_text_file,
             errcodes::error_codes,
             fixes::maildns::mail_domain_check,
             labelsio::label_qr,

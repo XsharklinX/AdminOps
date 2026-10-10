@@ -4,6 +4,9 @@
 // atiende, qué equipo, cuánto lleva y cuántas acciones van apuntadas. Todo lo
 // que se hace en AdminOps queda en el diario, y al cerrar el caso se redacta la
 // resolución con eso, para pegarla en el ticket en vez de escribirla de memoria.
+import { knowledgeApi } from "../lib/api";
+import { SYMPTOMS } from "../lib/symptoms";
+import { lastSymptom } from "../lib/lastSymptom";
 import { ClipboardCheck, Copy, Crop, Loader2, Pencil, Send, TicketPlus, Trash2, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
@@ -255,9 +258,23 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
   const [busy, setBusy] = useState<"close" | "paste" | "discard" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // «¿Qué lo arregló?»: se apunta para que las soluciones aprendan de lo que funcionó.
+  const [topic, setTopic] = useState(() => lastSymptom() ?? "");
+  const [fix, setFix] = useState("");
+  const [doneActions, setDoneActions] = useState<string[]>([]);
   const toast = useToast();
 
   useLiveEffect((vigente) => {
+    void casesApi
+      .actions()
+      .then((a) => {
+        if (!vigente()) return;
+        const ok = a.filter((x) => x.ok).map((x) => x.title);
+        setDoneActions([...new Set(ok)].reverse());
+        // Lo último que se hizo bien suele ser lo que lo arregló.
+        if (ok.length) setFix((f) => f || ok[ok.length - 1]);
+      })
+      .catch(() => undefined);
     void casesApi
       .draft()
       .then((t) => vigente() && setText(t))
@@ -304,6 +321,7 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
     setBusy("close");
     try {
       await casesApi.close(text ?? "");
+      if (topic && fix.trim()) void knowledgeApi.record(topic, fix.trim()).catch(() => undefined);
       toast("ok", "Caso cerrado. Queda en la ficha de la persona.");
       onClosed();
     } catch (e) {
@@ -389,7 +407,26 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
               ))}
             </div>
           )}
-          <textarea value={text ?? ""} onChange={(e) => setText(e.target.value)} rows={13} className={`${inputClass} font-mono text-[12.5px] leading-relaxed`} aria-label="Resolución del caso" />
+          <textarea value={text ?? ""} onChange={(e) => setText(e.target.value)} rows={11} className={`${inputClass} font-mono text-[12.5px] leading-relaxed`} aria-label="Resolución del caso" />
+          <div className="mt-3 rounded-lg border border-line bg-void/30 p-3">
+            <p className="mb-2 text-xs font-medium text-ink">¿Qué lo arregló? <span className="font-normal text-mute">(opcional: así cada problema ordena sus soluciones por lo que de verdad funciona)</span></p>
+            <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
+              <select value={topic} onChange={(e) => setTopic(e.target.value)} className={inputClass} aria-label="Qué problema era">
+                <option value="">Qué problema era…</option>
+                {SYMPTOMS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+              <input value={fix} onChange={(e) => setFix(e.target.value)} list="case-fixes" placeholder="Vaciar la cola de impresión, cambiar el cable…" className={inputClass} aria-label="Qué lo arregló" />
+              <datalist id="case-fixes">
+                {doneActions.map((a) => (
+                  <option key={a} value={a} />
+                ))}
+              </datalist>
+            </div>
+          </div>
           <p className="mt-2 text-[11px] text-mute">
             Sale del diario: cada línea es algo que se hizo de verdad en AdminOps. Puedes retocarla antes de pegarla. Para «Pegar en Tickets», deja antes seleccionado en el portal el
             campo donde va la resolución.

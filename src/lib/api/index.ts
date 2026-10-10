@@ -24,3 +24,4 @@ export * from "./context";
 export * from "./insight";
 export * from "./ux";
 export * from "./expert";
+export * from "./knowledge";

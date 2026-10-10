@@ -15,7 +15,11 @@ import {
   Trash2,
   Wand2,
   Zap,
+  ListChecks,
 } from "lucide-react";
+import { GuidedSolution } from "../components/GuidedSolution";
+import { LearnedStats } from "../components/LearnedStats";
+import { LibraryPackCard } from "../components/LibraryPack";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TagChip, TagInput } from "../components/contacts/Tags";
 import { useConfirm, useToast } from "../components/feedback";
@@ -144,7 +148,12 @@ export function Knowledge({
       </div>
       <p className="text-xs text-dim">{current.hint}</p>
       {tab === "solutions" && (
-        <Solutions openId={openId} onNavigate={onNavigate} />
+        <>
+          <Solutions openId={openId} onNavigate={onNavigate} />
+          <div className="mt-4">
+            <LibraryPackCard />
+          </div>
+        </>
       )}
       {tab === "templates" && <Templates openId={openId} />}
       {tab === "notes" && <Notes />}
@@ -398,6 +407,8 @@ function Solutions({
   const mine = (list ?? []).length;
 
   const [running, setRunning] = useState<string | null>(null);
+  // Solución abierta en modo paso a paso.
+  const [guided, setGuided] = useState<Solution | null>(null);
   const run = async (a: SolutionAction) => {
     if (a.kind === "page") return onNavigate?.(a.id as PageId, a.focus ?? null);
     const key = `${a.kind}-${a.id}`;
@@ -549,7 +560,11 @@ function Solutions({
                   onRun={run}
                   running={running}
                 />
+                <LearnedStats topic={`solution:${s.id}`} className="mt-3" />
                 <div className="mt-3 flex items-center gap-2">
+                  <Button onClick={() => setGuided(s)} title="Un paso cada vez, con comprobación y «¿ya funciona?»">
+                    <ListChecks size={13} /> Paso a paso
+                  </Button>
                   <Button onClick={() => copy(s)}>
                     <ClipboardCopy size={13} /> Copiar
                   </Button>
@@ -590,6 +605,7 @@ function Solutions({
         />
       )}
       {dialog}
+      {guided && <GuidedSolution solution={guided} actions={SOLUTION_ACTIONS[guided.id] ?? []} onRun={run} running={running} onClose={() => setGuided(null)} />}
     </div>
   );
 }

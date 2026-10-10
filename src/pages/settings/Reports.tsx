@@ -1,4 +1,5 @@
 // Ajustes → Informes y cobros.
+import { margin } from "../../lib/quote";
 import { ArrowDown, ArrowUp, ImagePlus, PenLine, Plus, Receipt, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import logo from "../../assets/logo.svg";
@@ -268,7 +269,9 @@ export function Reports({ s, set }: SettingsProps) {
           <thead>
             <tr className="text-left text-xs text-mute">
               <th className="pb-1.5 font-medium">Nombre</th>
-              <th className="w-32 pb-1.5 font-medium">Precio</th>
+              <th className="w-28 pb-1.5 font-medium">Precio</th>
+              <th className="w-28 pb-1.5 font-medium" title="Lo que te cuesta a ti: para ver el margen">Coste</th>
+              <th className="w-16 pb-1.5 text-right font-medium">Margen</th>
               <th className="w-14 pb-1.5 text-center font-medium">Pieza</th>
               <th className="w-28 pb-1.5 font-medium">Garantía (días)</th>
               <th className="w-8" />
@@ -298,6 +301,18 @@ export function Reports({ s, set }: SettingsProps) {
                     className={input}
                   />
                 </td>
+                <td className="py-1 pr-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={c.cost ?? 0}
+                    onChange={(e) => setItem(i, { cost: Math.max(0, Number(e.target.value) || 0) })}
+                    className={input}
+                    aria-label="Coste"
+                  />
+                </td>
+                <td className={`py-1 pr-2 text-right font-mono text-xs ${(margin(c) ?? 100) < 15 ? "text-warn" : "text-dim"}`}>{margin(c) === null ? "—" : `${margin(c)} %`}</td>
                 <td className="py-1 text-center">
                   <input type="checkbox" checked={c.part} onChange={(e) => setItem(i, { part: e.target.checked })} className="size-4 accent-[var(--color-neon)]" />
                 </td>
@@ -338,7 +353,7 @@ export function Reports({ s, set }: SettingsProps) {
             set({
               catalog: [
                 ...s.catalog,
-                { name: "", price: 0, part: false, warrantyDays: 0 },
+                { name: "", price: 0, part: false, warrantyDays: 0, cost: 0 },
               ],
             })
           }

@@ -44,9 +44,9 @@ function sections() {
   const out = [];
   let page = null;
   for (const line of body.split("\n")) {
-    const p = line.match(/^  ([a-z]+): \[/);
+    const p = line.match(/^ {2}([a-z]+): \[/);
     if (p) page = p[1];
-    const sec = line.match(/^    \{ id: "([a-z-]+)"/);
+    const sec = line.match(/^ {4}\{ id: "([a-z-]+)"/);
     if (page && sec) out.push([page, sec[1]]);
     if (/^};/.test(line)) break;
   }

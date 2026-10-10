@@ -1,5 +1,6 @@
 // ¿Reparar o cambiar este equipo? Junta la edad, el procesador, el disco, la memoria, Windows 11 y la
 // batería, dice qué pieza lo limita y compara alargarle la vida con comprar uno nuevo.
+import { addToQuote } from "../lib/quote";
 import { ClipboardCopy, Loader2, Scale } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "./feedback";
@@ -127,6 +128,16 @@ export function LifeCard() {
                   <span>Un equipo nuevo, aproximadamente</span>
                   <span className="tabular font-mono">{eur(r.newCost)}</span>
                 </div>
+                <button
+                  type="button"
+                  className="mt-2 text-neon hover:underline"
+                  onClick={() => {
+                    addToQuote(r.upgrades.map((u) => ({ description: u.label, price: u.cost, part: true })));
+                    toast("ok", "Mejoras pasadas al presupuesto: están en Sesión de servicio → Informe.");
+                  }}
+                >
+                  Pasar las mejoras al presupuesto
+                </button>
               </div>
             )}
             <button

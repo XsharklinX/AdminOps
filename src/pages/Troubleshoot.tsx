@@ -10,6 +10,9 @@ import { SYMPTOMS } from "../lib/symptoms";
 import type { Symptom } from "../lib/api";
 import { MailDomainCard } from "../components/MailDomainCard";
 import { FindingList } from "../components/FindingList";
+import { LearnedStats } from "../components/LearnedStats";
+import { rememberSymptom } from "../lib/lastSymptom";
+import { knowledgeApi } from "../lib/api";
 
 
 
@@ -27,6 +30,7 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
   const check = useCallback(async (s: Symptom) => {
     const n = ++seq.current;
     setSymptom(s);
+    rememberSymptom(s);
     // El correo del dominio se revisa con su propia tarjeta (pide el dominio).
     if (s === "mail") {
       setFindings(null);
@@ -127,7 +131,24 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
           ) : (
             <FindingList findings={findings ?? []} isAdmin={isAdmin} fixing={fixing} onFix={runFix} onNavigate={onNavigate} />
           )}
+          {!checking && <LearnedStats topic={current.id} className="mt-3" />}
           {findings?.some((f) => f.level === "bad" || f.level === "warn") && <Responsible topic={current.id} className="mt-3 border-t border-line pt-3" />}
+          {findings?.some((f) => f.level === "bad" || f.level === "warn") && (
+            <p className="mt-3 text-[11px] text-mute">
+              ¿No se arregla? Reúne las pruebas para pasarlo a Microsoft, al fabricante o a un compañero:{" "}
+              <button
+                className="text-neon hover:underline"
+                onClick={() =>
+                  void knowledgeApi
+                    .escalate(`SÍNTOMA\n${current.title}\n\nLO QUE ENCONTRÓ ADMINOPS\n${(findings ?? []).map((f) => `- [${f.level}] ${f.title}: ${f.detail}`).join("\n")}`)
+                    .then((p) => toast("ok", `Paquete creado: ${p}`), (e) => toast("error", String(e)))
+                }
+              >
+                paquete para escalar
+              </button>
+              .
+            </p>
+          )}
         </Card>
       )}
       {dialog}

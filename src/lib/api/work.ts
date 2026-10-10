@@ -39,6 +39,8 @@ export interface CatalogItem {
   price: number;
   part: boolean;
   warrantyDays: number;
+  /** Lo que le cuesta al técnico, para ver el margen (0: no se sabe). */
+  cost?: number;
 }
 
 export type Template = "client" | "technical" | "custom";

@@ -70,7 +70,12 @@ fn upsert(list: &mut Vec<Value>, mut item: Map<String, Value>, max: usize) -> Re
             if list.len() >= max {
                 return Err(format!("Se admiten hasta {max} elementos."));
             }
-            item.insert("id".into(), new_id().into());
+            // Lo que llega de una biblioteca compartida conserva su id: así, al
+            // importar una versión nueva del mismo paquete, se reconoce y no se duplica.
+            let keep = id.len() >= 6 && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+            if !keep {
+                item.insert("id".into(), new_id().into());
+            }
             item.insert("created".into(), t.into());
             list.push(Value::Object(item));
             Ok(list.last().cloned().unwrap_or(Value::Null))
@@ -238,5 +243,17 @@ mod tests {
         assert_eq!(b["created"], created);
         upsert(&mut l, Map::new(), 2).unwrap();
         assert!(upsert(&mut l, Map::new(), 2).is_err());
+    }
+
+    #[test]
+    fn upsert_conserva_el_id_de_una_biblioteca() {
+        let mut l = Vec::new();
+        let mut m = Map::new();
+        m.insert("id".into(), "sol-impresora-01".into());
+        let a = upsert(&mut l, m, 5).unwrap();
+        assert_eq!(a["id"], "sol-impresora-01");
+        let mut bad = Map::new();
+        bad.insert("id".into(), "x".into());
+        assert_ne!(upsert(&mut l, bad, 5).unwrap()["id"], "x");
     }
 }

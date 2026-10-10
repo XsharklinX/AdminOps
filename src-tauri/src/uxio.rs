@@ -183,6 +183,34 @@ pub fn compose_mail(subject: String, body: String) -> Result<(), String> {
     crate::shellopen::open(&format!("mailto:?subject={}&body={}", mail_encode(&subject), mail_encode(&body)))
 }
 
+/// Guarda un texto en un archivo que elige el técnico (biblioteca compartida…). None si cancela.
+#[tauri::command(async)]
+pub fn save_text_file(app: tauri::AppHandle, name: String, content: String, ext: String) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let ext: String = ext.chars().filter(|c| c.is_ascii_alphanumeric()).take(10).collect();
+    let safe: String = name.chars().map(|c| if "\\/:*?\"<>|".contains(c) { '_' } else { c }).collect();
+    let Some(path) = app.dialog().file().set_file_name(&safe).add_filter("AdminOps", &[ext.as_str()]).blocking_save_file().and_then(|p| p.into_path().ok()) else {
+        return Ok(None);
+    };
+    std::fs::write(&path, content).map_err(|e| format!("No se pudo guardar: {e}"))?;
+    Ok(Some(path.display().to_string()))
+}
+
+/// Abre un archivo de texto que elige el técnico. None si cancela.
+#[tauri::command(async)]
+pub fn open_text_file(app: tauri::AppHandle, ext: String) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let ext: String = ext.chars().filter(|c| c.is_ascii_alphanumeric()).take(10).collect();
+    let Some(path) = app.dialog().file().add_filter("AdminOps", &[ext.as_str(), "json"]).blocking_pick_file().and_then(|p| p.into_path().ok()) else {
+        return Ok(None);
+    };
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > 20 * 1024 * 1024 {
+        return Err("El archivo es demasiado grande para ser una biblioteca de AdminOps.".into());
+    }
+    std::fs::read_to_string(&path).map(Some).map_err(|e| format!("No se pudo leer: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

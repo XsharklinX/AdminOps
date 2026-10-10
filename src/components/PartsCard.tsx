@@ -1,10 +1,11 @@
 // Repuestos compatibles: con lo que el equipo cuenta de sí mismo (tipo y velocidad de la memoria, ranuras,
 // discos), dice qué se puede comprar para ampliarlo y qué no encaja. Lo que Windows no sabe, lo dice.
-import { CircleAlert, CircleCheck, ClipboardCopy, Info, Loader2, MemoryStick } from "lucide-react";
-import { useState } from "react";
+import { CircleAlert, CircleCheck, ClipboardCopy, Info, Loader2, MemoryStick, Receipt } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useToast } from "./feedback";
 import { Button, Card, smallBtn } from "./ui";
-import { partsApi, type PartsAdvice } from "../lib/api";
+import { partsApi, workApi, type CatalogItem, type PartsAdvice } from "../lib/api";
+import { addToQuote, lineFor } from "../lib/quote";
 
 const ICON = {
   ok: <CircleCheck size={14} className="text-ok" />,
@@ -16,6 +17,12 @@ export function PartsCard() {
   const toast = useToast();
   const [a, setA] = useState<PartsAdvice | null>(null);
   const [busy, setBusy] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  useEffect(() => void workApi.settings().then((s) => setCatalog(s.catalog), () => undefined), []);
+  const toQuote = (items: string[]) => {
+    addToQuote(items.map((x) => lineFor(x, catalog)));
+    toast("ok", `${items.length} línea(s) al presupuesto: están en Sesión de servicio → Informe.`);
+  };
   const copy = (text: string, ok: string) => void navigator.clipboard.writeText(text).then(() => toast("ok", ok), () => toast("error", "No se pudo copiar."));
 
   const run = async () => {
@@ -54,6 +61,11 @@ export function PartsCard() {
               {a.shopping.length > 0 && (
                 <button type="button" className={smallBtn} onClick={() => copy(a.shopping.map((s) => `• ${s}`).join("\n"), "Lista de compra copiada.")}>
                   <ClipboardCopy size={12} /> Copiar la lista de compra
+                </button>
+              )}
+              {a.shopping.length > 0 && (
+                <button type="button" className={smallBtn} onClick={() => toQuote(a.shopping)} title="Con el precio de tu catálogo cuando encaja">
+                  <Receipt size={12} /> Al presupuesto
                 </button>
               )}
               <button type="button" className={smallBtn} onClick={() => copy(a.manualQuery, "Búsqueda copiada: pégala en el navegador.")} title="Para buscar el manual de servicio de este modelo">
