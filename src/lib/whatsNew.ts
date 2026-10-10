@@ -8,14 +8,20 @@ import { RELEASES } from "./changelog";
 export const NEW_IN: Record<string, string> = {
   "space:space": "1.2.3",
   dashboard: "1.2.4",
-  "machine:performance": "1.2.4",
   settings: "1.2.6",
-  "machine:hardware": "1.2.7",
+  "machine:hardware": "1.2.8",
   "space:health": "1.2.7",
   "space:partitions": "1.2.7",
   "data:backups": "1.2.7",
   "data:recover": "1.2.7",
   "session:report": "1.2.6",
+  troubleshoot: "1.2.8",
+  stations: "1.2.8",
+  "machine:security": "1.2.8",
+  "machine:boots": "1.2.8",
+  "machine:performance": "1.2.8",
+  "apps:update": "1.2.8",
+  "tools:tools": "1.2.8",
 };
 
 /** Solo se señala lo de las últimas versiones: lo de hace un año ya no es novedad. */

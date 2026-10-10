@@ -107,6 +107,37 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
+### v1.2.8 — Experiencia, más problemas con respuesta y diagnóstico de experto (hecho, build local pendiente, sin probar en hardware real)
+
+Elegidas por el autor sobre los artifacts de experiencia (29) y de profundidad (24), todas.
+**Verificado**: `tsc`, `eslint`, `vitest`, `cargo clippy --all-targets -D warnings` contra Windows,
+las pruebas de la lógica pura (códigos de error, problemas nuevos, Autoruns, pantallazos, estrés,
+fugas, eventos, aprendizaje, paquete de escalado, base de vulnerabilidades, pendrive de rescate) y la
+prueba de pantallas con Playwright (`npm run test:ui`, 52 pantallas y 49 secciones). **Sin
+verificar**: todo lo que habla con Windows (scripts de PowerShell, WebView2 para soltar archivos, PDH,
+WinPE y MakeWinPEMedia, CIM a otros equipos). Probar **volver al driver anterior**, **Driver
+Verifier**, **crear el pendrive de rescate** (con un pendrive de usar y tirar) y las acciones a
+distancia en Equipos antes de fiarse.
+
+- **Experiencia** (fase D): transiciones, esqueletos, datos al instante (`cachedRead`), arranque con
+  barra, cifras animadas, botones con estado, celebración, sonidos, deshacer con cuenta atrás, centro
+  de tareas con tiempo estimado, tema automático, estados vacíos y de error útiles, clic derecho,
+  Ctrl+Z global, soltar archivos, vistas guardadas, antes → después (`tweak_preview`), foco y
+  teclado, «Enviar a…», volver a donde lo dejaste, Ctrl+K con erratas, glosario, asistentes, lectura
+  rápida, errores que explican, recorrido tras actualizar, modo demostración y pruebas de interfaz.
+- **Más problemas con respuesta** (fase E, `fixes/`): Outlook/Office, OneDrive/Teams, perfil
+  temporal, navegador secuestrado, motivo de fallo de Windows Update, licencias, impresoras a fondo,
+  correo del dominio y USB que se desconectan. Diccionario de códigos (`errcodes.rs`).
+- **Diagnóstico de experto** (fase F): `autoruns.rs`, `crashes.rs` (culpable, volver atrás,
+  Verifier), `stress.rs`, `perfinsight.rs` (fugas, disco al 100 %, hora punta; el historial guarda
+  memoria y E/S por programa), `eventdigest.rs` y `fixes/secdeep.rs`.
+- **Conocimiento y presupuestos** (fase G): `learned.rs`, `escalate.rs`, soluciones paso a paso,
+  biblioteca por paquetes, presupuestos con catálogo, coste y margen.
+- **Apuestas grandes** (fase H): Equipos con discos, antivirus y pantallazos y dos acciones a distancia
+  (`stations.rs`); `vulndb.rs`, base de CVE explotados y fin de soporte hasta septiembre de 2025, que
+  hay que ampliar en cada versión; `rescue.rs`, pendrive WinPE con ADK y menú de consola. La interfaz
+  completa no corre en WinPE (no hay WebView2).
+
 ### v1.2.7 — Discos a fondo y banco de ideas (hecho, build local pendiente, sin probar en hardware real)
 
 Elegidas por el autor sobre el artifact «Ideas para AdminOps» (19 ideas, todas). **Verificado**: tipos

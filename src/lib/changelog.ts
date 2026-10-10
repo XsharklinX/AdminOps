@@ -18,6 +18,23 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.8",
+    title: "Más cómoda, más problemas con respuesta y diagnóstico de experto",
+    added: [
+      "Más fluida: transiciones entre pantallas, esqueletos en vez de «Cargando…», los datos de la última vez al instante mientras llegan los nuevos, cifras que cuentan hacia arriba y destellan al cambiar, botones que dicen «Trabajando…» y «Hecho», una pequeña celebración al terminar algo largo y sonidos discretos (se quitan en Ajustes). Arranca con una barra de progreso y sin pantalla en blanco.",
+      "Deshacer de verdad: los avisos de cambio llevan «Deshacer» con cuenta atrás (se para al pasar el ratón), Ctrl+Z deshace lo último que cambió AdminOps fuera de los campos de texto, y antes de aplicar un ajuste se ve el antes → después.",
+      "Más cómoda: menú de clic derecho en todas partes, arrastrar un archivo a la ventana para saber qué hacer con él, «Enviar a…» en cada tarjeta (caso, correo, Teams, Excel), vistas guardadas en las listas, volver a donde lo dejaste, tema automático según la hora y con fundido, y lectura rápida de una pantalla en tres frases.",
+      "Ctrl+K entiende erratas y frases («dicsos», «impresora no imprime») y códigos de error como 0x80070005, con un diccionario de unos 85 códigos explicados. Glosario al pasar el ratón por los términos técnicos, asistentes paso a paso, errores que dicen qué hacer y un recorrido corto tras cada actualización.",
+      "Más problemas con respuesta: Outlook y Office (perfil, OST, complementos, reparar Office), OneDrive y Teams, perfil temporal, navegador secuestrado, por qué falla Windows Update, licencias de Windows y Office, impresoras a fondo, el correo del dominio (MX, SPF, DKIM, DMARC) y USB que se desconectan.",
+      "Diagnóstico de experto: todo lo que arranca con Windows (como Autoruns, con firma y avisos), el driver culpable de cada pantallazo con volver al anterior y Driver Verifier, prueba de estrés con temperatura y frecuencia, fugas de memoria y quién satura el disco, el Visor de eventos agrupado y explicado, y seguridad a fondo (exclusiones de Defender, SMBv1, Escritorio remoto, administradores, contraseñas en claro, macros).",
+      "Conocimiento: soluciones paso a paso que recuerdan qué arregló cada problema en tus equipos, un paquete para escalar el caso (con datos personales tapados), biblioteca compartida por paquetes, y presupuestos con catálogo de precios, coste y margen.",
+      "La oficina entera desde un equipo: salud de discos, antivirus y pantallazos de cada equipo de la red, y desatascar la impresión o actualizar Defender a distancia.",
+      "Programas con fallos de seguridad conocidos (Programas → Actualizar): lo instalado cruzado con los fallos que se están explotando y con lo que ya no tiene soporte, con un botón para actualizarlo.",
+      "Pendrive de rescate arrancable (Herramientas): un Windows mínimo con el menú de rescate de AdminOps para el equipo que no arranca: copiar los datos, reparar el arranque, chkdsk, quitar Driver Verifier o el driver del pantallazo.",
+      "Modo demostración (Ajustes → General) con clientes y equipos de ejemplo, sin tocar ni guardar nada.",
+    ],
+  },
+  {
     version: "1.2.7",
     title: "Discos a fondo, copias comprobadas y un banco de mejoras",
     added: [

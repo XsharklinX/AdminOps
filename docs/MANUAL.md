@@ -62,13 +62,21 @@ urgente: caso abierto, seguimientos, visitas y avisos de Windows.
 
 | Atajo | Qué hace |
 |---|---|
-| Ctrl+K o F1 | «Todo AdminOps»: el programa entero por áreas, y buscar cualquier cosa (secciones, acciones, contactos, síntomas, equipos) |
+| Ctrl+K o F1 | «Todo AdminOps»: el programa entero por áreas, y buscar cualquier cosa (secciones, acciones, contactos, síntomas, equipos, códigos de error); entiende erratas |
+| Ctrl+Z | Deshacer lo último que cambió AdminOps (fuera de los campos de texto) |
+| Clic derecho | Copiar, abrir en el Explorador o abrir un caso con lo que hay debajo |
 | Ctrl+Alt+P | Modo privacidad: difumina correos, IP y claves al compartir pantalla |
 | Ctrl+Alt+N | Nota de llamada (aunque AdminOps esté minimizado) |
 | Ctrl+L | Bloquear AdminOps |
 | / | Buscar en la página (Contactos, listas) |
 
 ## 5. Lo que conviene saber
+
+- **El equipo que no arranca**: Herramientas → *Pendrive de rescate arrancable* crea un pendrive con
+  un menú para copiar los datos, reparar el arranque o quitar el driver del pantallazo. Hazlo antes de
+  necesitarlo.
+- **Programas peligrosos**: Programas → *Actualizar* empieza por los que tienen fallos de seguridad
+  que se están usando en ataques; actualízalos primero.
 
 - **Todo cambio es reversible**: cada ajuste queda en el *historial* con «Deshacer», y antes de lo
   arriesgado se crea un punto de restauración.
