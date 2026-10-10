@@ -10,6 +10,7 @@ import { type Settings } from "../../lib/api";
 import { VisitTypesEditor } from "./VisitTypesEditor";
 import { ReportLayoutEditor } from "./ReportLayoutEditor";
 import { type SettingsProps } from "./shared";
+import { useReorder } from "../../lib/reorder";
 
 export function Reports({ s, set }: SettingsProps) {
   const [newItem, setNewItem] = useState("");
@@ -33,6 +34,10 @@ export function Reports({ s, set }: SettingsProps) {
     [list[i], list[j]] = [list[j], list[i]];
     set({ checklist: list });
   };
+
+  // Arrastrar o Alt+↑/↓: el orden del checklist (las claves son las posiciones).
+  const items = s.checklist.map((text, i) => ({ text, i }));
+  const reorder = useReorder(items, (x) => String(x.i), (next) => set({ checklist: next.map((x) => x.text) }));
 
   const input = inputClass;
   const numField = (
@@ -146,7 +151,8 @@ export function Reports({ s, set }: SettingsProps) {
           {s.checklist.map((item, i) => (
             <li
               key={i}
-              className="group flex items-center gap-2 rounded-md px-2 py-1 hover:bg-panel-2"
+              {...reorder.rowProps(items[i])}
+              className={`group flex items-center gap-2 rounded-md px-2 py-1 hover:bg-panel-2 ${reorder.over === String(i) ? "border-t-2 border-neon" : ""} ${reorder.dragging === String(i) ? "opacity-40" : ""}`}
             >
               <span className="w-5 font-mono text-[11px] text-mute">
                 {i + 1}

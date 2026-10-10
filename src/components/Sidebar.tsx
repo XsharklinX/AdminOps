@@ -1,5 +1,7 @@
 import { prefetchPage } from "../lib/prefetch";
 import { SlideMark } from "./SlideMark";
+import { useNarrow } from "../lib/useNarrow";
+import { useFlip, useReorder } from "../lib/reorder";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type UpdateInfo } from "../lib/api";
 import { getPrefs, setSidebar, usePrefs, type NavLayout } from "../lib/prefs";
@@ -539,7 +541,9 @@ export function Sidebar({
     if (activeAreaId) setShownId(activeAreaId);
   }, [activeAreaId]);
   const shown = areas.find((a) => a.id === shownId) ?? activeArea ?? areas[0] ?? null;
-  const mini = sb.mode === "mini";
+  // En una ventana estrecha, solo las áreas (las pantallas pasan a pestañas bajo el título).
+  const narrow = useNarrow();
+  const mini = sb.mode === "mini" || narrow;
   const badgeOf = (k: string) => (sb.showBadges ? badges[k] : undefined);
   const areaAlert = (a: Area) =>
     a.pages.some((p) => [navKey(p), ...sectionsOf(p).map((s) => navKey(p, s.id))].some((k) => {
@@ -547,6 +551,10 @@ export function Sidebar({
       return b && (b.tone === "warn" || b.tone === "bad");
     }));
   const pinned = sb.favorites.filter((k) => isPageId(parseNavKey(k).page) && allowedInMode(parseNavKey(k).page, prefs.mode));
+  // Los fijados se reordenan arrastrando (o con Alt+↑/↓), con animación al recolocarse.
+  const pinRef = useRef<HTMLDivElement>(null);
+  const pinReorder = useReorder(pinned, (k) => k, (next) => setSidebar({ favorites: [...next, ...sb.favorites.filter((k) => !next.includes(k))] }));
+  useFlip(pinRef, pinned.join());
   const togglePin = (k: string) => setSidebar({ favorites: sb.favorites.includes(k) ? sb.favorites.filter((x) => x !== k) : [...sb.favorites, k] });
 
   // Marca «Nuevo» tras actualizar: se va al entrar en la pantalla o en la sección.
@@ -564,11 +572,11 @@ export function Sidebar({
     return section === (sections[page] ?? list[0].id);
   };
 
-  const line = (k: string, label: string, opts: { sub?: boolean; current: boolean; onClick: () => void; badge?: Badge; title?: string; /** Sin el resaltado que se desliza: lo pinta la propia línea. */ still?: boolean }) => {
+  const line = (k: string, label: string, opts: { sub?: boolean; current: boolean; onClick: () => void; badge?: Badge; title?: string; /** Sin el resaltado que se desliza: lo pinta la propia línea. */ still?: boolean; /** Arrastrar y soltar (fijados). */ drag?: ReturnType<typeof pinReorder.rowProps> }) => {
     const on = sb.favorites.includes(k);
     const target = parseNavKey(k).page;
     return (
-      <div key={k} className="group/line relative" onMouseEnter={() => isPageId(target) && prefetchPage(target)}>
+      <div key={k} {...opts.drag} className={`group/line relative ${opts.drag && pinReorder.dragging === k ? "opacity-40" : ""} ${opts.drag && pinReorder.over === k ? "border-t border-neon" : ""}`} onMouseEnter={() => isPageId(target) && prefetchPage(target)}>
         <button
           onClick={opts.onClick}
           aria-current={opts.current ? "page" : undefined}
@@ -694,7 +702,7 @@ export function Sidebar({
         />
         <nav aria-label="Pantallas y secciones" className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 pt-3 pb-3">
           {pinned.length > 0 && (
-            <div className="flex flex-col gap-px">
+            <div ref={pinRef} className="flex flex-col gap-px">
               {header("Fijados")}
               {pinned.map((k) => {
                 const { page, section } = parseNavKey(k);
@@ -703,6 +711,7 @@ export function Sidebar({
                   onClick: () => onNavigate(page, section),
                   badge: badgeOf(k),
                   still: true,
+                  drag: pinReorder.rowProps(k),
                   title: section ? `${pageLabel(page)} › ${navLabel(k)}` : undefined,
                 });
               })}

@@ -2,19 +2,34 @@
 // todas las pantallas. Antes cada página pintaba la suya, cada una a su manera.
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { SlideMark } from "./SlideMark";
 
 /** Filas que se pintan de golpe; el resto, a medida que se desplaza (listas de miles). */
 export const FIRST_ROWS = 200;
 const MORE_ROWS = 300;
 
-/** Mueve el foco a la fila de arriba o de abajo (flechas) dentro de la misma tabla. */
-function moveFocus(e: KeyboardEvent<HTMLTableRowElement>, dir: 1 | -1) {
+/** Mueve el foco a la fila de arriba o de abajo (flechas, J y K) dentro de la misma tabla. Con `follow`, la fila nueva se abre como si se pulsara. */
+function moveFocus(e: KeyboardEvent<HTMLTableRowElement>, dir: 1 | -1, follow = false) {
   let el: Element | null = e.currentTarget;
   do el = dir === 1 ? el.nextElementSibling : el.previousElementSibling;
   while (el && !(el as HTMLElement).hasAttribute("tabindex"));
   if (el) {
     e.preventDefault();
     (el as HTMLElement).focus();
+    if (follow) (el as HTMLElement).click();
+  }
+}
+
+const COLS_KEY = "adminops.cols.";
+const MIN_COL = 56;
+
+function loadWidths(key: string | undefined): Record<string, number> {
+  if (!key) return {};
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLS_KEY + key) ?? "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch {
+    return {};
   }
 }
 
@@ -74,6 +89,9 @@ export function DataTable<T>({
   mono = false,
   size = "sm",
   alignTop = false,
+  followFocus = false,
+  selected,
+  resizable,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -94,6 +112,12 @@ export function DataTable<T>({
   mono?: boolean;
   size?: "xs" | "sm";
   alignTop?: boolean;
+  /** Con las flechas (o J y K) la fila nueva se abre sola: para listas con un panel de detalle al lado. */
+  followFocus?: boolean;
+  /** La fila que tiene su detalle abierto. */
+  selected?: (row: T) => boolean;
+  /** Nombre con el que se recuerda el ancho de las columnas que se ensanchan arrastrando. Sin él, no se pueden ensanchar. */
+  resizable?: string;
 }) {
   const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
   // Mientras se escribe en un filtro, la tabla se pone al día un instante después:
@@ -119,6 +143,46 @@ export function DataTable<T>({
   }, [sorted.length, limit]);
   const visible = sorted.length > limit ? sorted.slice(0, limit) : sorted;
 
+  // Filas que acaban de llegar (un escaneo que encuentra otro equipo): bajan y se resaltan un instante.
+  const known = useRef<Set<string | number> | null>(null);
+  const keys = visible.map((r, i) => rowKey(r, i));
+  const fresh = new Set<string | number>();
+  if (known.current && known.current.size > 0) for (const k of keys) if (!known.current.has(k)) fresh.add(k);
+  if (fresh.size > 8) fresh.clear();
+  useEffect(() => {
+    known.current = new Set(keys);
+  });
+
+  // Fila con el foco del teclado: el resaltado se desliza hasta ella.
+  const wrap = useRef<HTMLDivElement>(null);
+  const [focusKey, setFocusKey] = useState<string | number | null>(null);
+
+  // Ancho de las columnas, si se pueden ensanchar.
+  const [widths, setWidths] = useState(() => loadWidths(resizable));
+  const startResize = (e: React.PointerEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.currentTarget as HTMLElement).closest("th");
+    const from = th?.getBoundingClientRect().width ?? 120;
+    const x0 = e.clientX;
+    let last = from;
+    const move = (ev: PointerEvent) => {
+      last = Math.max(MIN_COL, Math.round(from + ev.clientX - x0));
+      setWidths((w) => ({ ...w, [id]: last }));
+    };
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      try {
+        localStorage.setItem(COLS_KEY + resizable, JSON.stringify({ ...loadWidths(resizable), [id]: last }));
+      } catch {
+        /* dura esta sesión */
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  };
+
   const toggle = (c: Column<T>) =>
     setSort((cur) => {
       if (cur?.id === c.id) return { id: c.id, desc: !cur.desc };
@@ -129,8 +193,10 @@ export function DataTable<T>({
 
   const pad = padded ? "px-3" : "pr-3 last:pr-0";
   return (
+    <div ref={wrap} className="relative isolate">
+    {onRowClick && <SlideMark within={wrap} selector={focusKey !== null ? 'tr[data-focused="true"]' : 'tr[data-selected="true"]'} />}
     <table className={`w-full ${size === "xs" ? "text-xs" : "text-[13px]"}`}>
-      <thead className={sticky ? "sticky top-0 z-10 bg-panel" : undefined}>
+      <thead className={sticky ? "sticky top-0 z-10 bg-panel shadow-[0_1px_0_var(--color-line)]" : undefined}>
         <tr className="text-[11px] text-mute">
           {columns.map((c) => {
             const on = sort?.id === c.id;
@@ -139,12 +205,36 @@ export function DataTable<T>({
                 key={c.id}
                 onClick={c.sortBy ? () => toggle(c) : undefined}
                 aria-sort={on ? (sort.desc ? "descending" : "ascending") : undefined}
-                className={`${pad} ${padded ? "py-2" : "pb-2"} font-medium ${ALIGN[c.align ?? "left"]} ${c.sortBy ? "cursor-pointer select-none hover:text-ink" : ""} ${c.headClass ?? ""}`}
+                style={resizable && widths[c.id] ? { width: widths[c.id], minWidth: widths[c.id], maxWidth: widths[c.id] } : undefined}
+                className={`${resizable ? "relative" : ""} ${pad} ${padded ? "py-2" : "pb-2"} font-medium ${ALIGN[c.align ?? "left"]} ${c.sortBy ? "cursor-pointer select-none hover:text-ink" : ""} ${c.headClass ?? ""}`}
               >
                 <span className={`inline-flex items-center gap-1 ${on ? "text-neon" : ""}`}>
                   {c.header}
                   {on && (sort.desc ? <ArrowDown size={10} /> : <ArrowUp size={10} />)}
                 </span>
+                {resizable && (
+                  <span
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={`Ancho de la columna ${c.id}`}
+                    onPointerDown={(e) => startResize(e, c.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={() => {
+                      setWidths((w) => {
+                        const { [c.id]: _gone, ...rest } = w;
+                        void _gone;
+                        try {
+                          localStorage.setItem(COLS_KEY + resizable, JSON.stringify(rest));
+                        } catch {
+                          /* sin almacenamiento */
+                        }
+                        return rest;
+                      });
+                    }}
+                    title="Arrastra para ensanchar · doble clic para el ancho de siempre"
+                    className="absolute top-0 -right-1 bottom-0 z-20 w-2 cursor-col-resize hover:bg-neon/30"
+                  />
+                )}
               </th>
             );
           })}
@@ -158,6 +248,16 @@ export function DataTable<T>({
               <tr
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 tabIndex={onRowClick ? 0 : undefined}
+                data-focused={focusKey === rowKey(row, i) ? "true" : undefined}
+                data-selected={selected?.(row) ? "true" : undefined}
+                onFocus={onRowClick ? () => setFocusKey(rowKey(row, i)) : undefined}
+                onBlur={
+                  onRowClick
+                    ? (e) => {
+                        if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node | null)) setFocusKey(null);
+                      }
+                    : undefined
+                }
                 onKeyDown={
                   onRowClick
                     ? (e) => {
@@ -165,12 +265,12 @@ export function DataTable<T>({
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           onRowClick(row);
-                        } else if (e.key === "ArrowDown") moveFocus(e, 1);
-                        else if (e.key === "ArrowUp") moveFocus(e, -1);
+                        } else if (e.key === "ArrowDown" || e.key === "j") moveFocus(e, 1, followFocus);
+                        else if (e.key === "ArrowUp" || e.key === "k") moveFocus(e, -1, followFocus);
                       }
                     : undefined
                 }
-                className={`border-t border-line/60 ${alignTop ? "align-top" : ""} ${onRowClick ? "cursor-pointer hover:bg-panel-2/60" : ""} ${rowClass?.(row) ?? ""}`}
+                className={`border-t border-line/60 ${alignTop ? "align-top" : ""} ${onRowClick ? "cursor-pointer hover:bg-panel-2/60" : ""} ${fresh.has(rowKey(row, i)) ? "row-in" : ""} ${rowClass?.(row) ?? ""}`}
               >
                 {columns.map((c) => (
                   <td
@@ -211,5 +311,6 @@ export function DataTable<T>({
         )}
       </tbody>
     </table>
+    </div>
   );
 }

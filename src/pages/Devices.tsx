@@ -31,10 +31,13 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Modal } from "../components/ui";
+import { Button, Card } from "../components/ui";
 import { logQuietly, lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
 import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
 import { DataTable } from "../components/DataTable";
+import { Drawer } from "../components/Drawer";
+import { Copyable } from "../components/Copyable";
+import { HoverCard } from "../components/HoverCard";
 
 const ipNum = (ip: string) => ip.split(".").reduce((a, o) => a * 256 + Number(o), 0);
 
@@ -259,6 +262,12 @@ export function Devices() {
     return d ? ` (${title(d)})` : "";
   };
   const shown = detail ? (all.find((d) => d.ip === detail.ip) ?? detail) : null;
+  // El dispositivo de antes o de después en la lista, para pasar de uno a otro sin cerrar el panel.
+  const neighbour = (dir: -1 | 1) => {
+    const i = devices.findIndex((d) => d.ip === shown?.ip);
+    const n = i >= 0 ? devices[i + dir] : undefined;
+    return n ? () => setDetail(n) : undefined;
+  };
 
   const actions = (d: LanDevice, always = false) => (
     <span className={`inline-flex gap-2 ${always ? "" : "opacity-0 group-hover:opacity-100"}`}>
@@ -365,6 +374,10 @@ export function Devices() {
             rows={devices}
             rowKey={(d) => d.ip}
             onRowClick={(d) => editing !== d.ip && setDetail(d)}
+            followFocus
+            selected={(d) => shown?.ip === d.ip}
+            sticky
+            resizable="devices"
             rowClass={() => "group"}
             columns={[
               {
@@ -405,7 +418,24 @@ export function Devices() {
                   ) : (
                     <>
                       <div className="flex items-center gap-2">
-                        <span className="text-ink">{title(d)}</span>
+                        <HoverCard
+                          card={
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <b className="truncate text-sm text-ink">{title(d)}</b>
+                                <span className="font-mono text-dim">{d.ip}</span>
+                              </div>
+                              <div className="text-dim">{[d.manufacturer || d.vendor, d.model, d.os].filter(Boolean).join(" · ") || KINDS[kindKey(d)].label}</div>
+                              <div className="text-mute">
+                                {d.ms === null ? "No responde al ping" : `Responde en ${d.ms} ms`}
+                                {d.ports.length > 0 && ` · ${d.ports.length} ${d.ports.length === 1 ? "puerto abierto" : "puertos abiertos"}`}
+                              </div>
+                              <div className="text-mute">{d.firstSeen ? `Visto por primera vez el ${new Date(d.firstSeen * 1000).toLocaleDateString("es", { dateStyle: "medium" })}` : "Aún sin identificar a fondo"}</div>
+                            </div>
+                          }
+                        >
+                          <span className="text-ink">{title(d)}</span>
+                        </HoverCard>
                         {d.gateway && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">router</span>}
                         {d.thisPc && <span className="rounded bg-panel-2 px-1.5 text-[11px] text-dim">este equipo</span>}
                         {d.new && <span className="rounded bg-warn/15 px-1.5 text-[11px] text-warn">nuevo</span>}
@@ -434,8 +464,8 @@ export function Devices() {
                   );
                 },
               },
-              { id: "ip", header: "IP", sortBy: (d) => d.ip, cell: (d) => d.ip, className: "font-mono text-xs text-ink" },
-              { id: "mac", header: "MAC", sortBy: (d) => d.mac, cell: (d) => d.mac || "—", className: "font-mono text-[11px] text-dim" },
+              { id: "ip", header: "IP", sortBy: (d) => d.ip, cell: (d) => <Copyable value={d.ip}>{d.ip}</Copyable>, className: "font-mono text-xs text-ink" },
+              { id: "mac", header: "MAC", sortBy: (d) => d.mac, cell: (d) => (d.mac ? <Copyable value={d.mac}>{d.mac}</Copyable> : "—"), className: "font-mono text-[11px] text-dim" },
               {
                 id: "vendor",
                 header: "Fabricante",
@@ -491,7 +521,14 @@ export function Devices() {
       )}
 
       {shown && (
-        <Modal title={title(shown)} onClose={() => setDetail(null)} width="w-[560px]">
+        <Drawer
+          title={title(shown)}
+          subtitle={shown.ip}
+          onClose={() => setDetail(null)}
+          onPrev={neighbour(-1)}
+          onNext={neighbour(1)}
+          width={480}
+        >
           <DeviceDetail
             d={shown}
             office={
@@ -513,7 +550,7 @@ export function Devices() {
               setAlias(shown.alias);
             }}
           />
-        </Modal>
+        </Drawer>
       )}
     </div>
   );
@@ -545,7 +582,7 @@ function DeviceDetail({ d, actions, office, onRename }: { d: LanDevice; actions:
           .map(([k, v]) => (
             <div key={k} className="contents">
               <dt className="text-dim">{k}</dt>
-              <dd className="text-ink select-text">{v}</dd>
+              <dd className="text-ink select-text">{k === "IP" || k === "MAC" || k === "Modelo" ? <Copyable value={v.replace(/ \(privada\/aleatoria\)$/, "")}>{v}</Copyable> : v}</dd>
             </div>
           ))}
       </dl>

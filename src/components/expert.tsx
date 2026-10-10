@@ -109,7 +109,7 @@ export function AutorunsCard({ isAdmin }: { isAdmin: boolean }) {
             <EmptyState title={filter === "concern" ? "Nada llama la atención" : "Nada en este grupo"}>Todo lo que arranca está firmado, existe y no sale de carpetas temporales.</EmptyState>
           ) : (
             <div className="pane-lg overflow-auto">
-              <DataTable columns={cols} rows={rows} rowKey={(a) => a.id} size="xs" sticky alignTop />
+              <DataTable columns={cols} rows={rows} rowKey={(a) => a.id} size="xs" sticky alignTop resizable="autoruns" />
             </div>
           )}
         </>

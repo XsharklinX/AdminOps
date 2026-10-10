@@ -1,5 +1,5 @@
 import { ChevronDown, Loader2, Play, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TaskStatus } from "./TaskStatus";
 import { ChangePreview } from "./ChangePreview";
 import type { Risk, TweakStatus, TweakView } from "../lib/api";
@@ -18,20 +18,45 @@ const STATUS: Partial<Record<TweakStatus, { label: string; cls: string }>> = {
   unknown: { label: "Estado desconocido", cls: "text-warn" },
 };
 
-export function Switch({ on, disabled, onClick }: { on: boolean; disabled?: boolean; onClick: () => void }) {
+/**
+ * Interruptor de un ajuste de Windows. Cambia en cuanto se pulsa (con un pequeño
+ * rebote) y Windows lo confirma por detrás: `busy` mientras tanto. Si al terminar
+ * el ajuste no cambió, vuelve a su sitio y se sacude.
+ */
+export function Switch({ on, disabled, onClick, busy = false }: { on: boolean; disabled?: boolean; onClick: () => void; busy?: boolean }) {
+  const [want, setWant] = useState<boolean | null>(null);
+  const [shake, setShake] = useState(false);
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && !busy) {
+      // Terminó: lo que se ve vuelve a ser lo que dice Windows.
+      if (want !== null && want !== on) {
+        setShake(true);
+        window.setTimeout(() => setShake(false), 320);
+      }
+      setWant(null);
+    }
+    wasBusy.current = busy;
+  }, [busy, on, want]);
+  const shown = want ?? on;
   return (
     <button
       role="switch"
-      aria-checked={on}
+      aria-checked={shown}
+      aria-busy={busy || undefined}
       disabled={disabled}
-      onClick={onClick}
+      onClick={() => {
+        if (busy) return;
+        setWant(!on);
+        onClick();
+      }}
       className={`relative h-6 w-11 shrink-0 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
-        on ? "border-neon/60 bg-neon/20" : "border-line-2 bg-void"
-      }`}
+        shown ? "border-neon/60 bg-neon/20" : "border-line-2 bg-void"
+      } ${busy && want !== null ? "opacity-80" : ""} ${shake ? "shake" : ""}`}
     >
       <span
-        className={`absolute top-0.5 size-4.5 rounded-full transition-all ${
-          on ? "left-[22px] bg-neon" : "left-0.5 bg-mute"
+        className={`absolute top-0.5 size-4.5 rounded-full transition-[left,background-color] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          shown ? "left-[22px] bg-neon" : "left-0.5 bg-mute"
         }`}
       />
     </button>
@@ -126,7 +151,7 @@ export function TweakCard({
               Ejecutar
             </button>
           ) : (
-            <Switch on={on} disabled={busy || blocked} onClick={onToggle} />
+            <Switch on={on} disabled={blocked} busy={busy} onClick={onToggle} />
           )}
         </div>
       </div>

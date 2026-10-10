@@ -121,6 +121,9 @@ export function Appearance() {
         </p>
       </Card>
       <Card title="Detalles del aspecto">
+        <Row title="Consejos mientras esperas" sub="Debajo de las tareas largas, un consejo corto sobre algo que AdminOps sabe hacer.">
+          <Toggle checked={prefs.tips} onChange={(v) => setPrefs({ tips: v })} />
+        </Row>
         <Row title="Estados con forma" sub="Bien es un círculo, aviso un triángulo y problema un cuadrado, además del color: se distinguen con daltonismo o con poca luz.">
           <Toggle checked={prefs.stateShapes} onChange={(v) => setPrefs({ stateShapes: v })} />
         </Row>

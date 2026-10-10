@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Eye, EyeOff, GripVertical, LayoutDashboard, RotateCcw } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useFlip } from "../lib/reorder";
 import { arrange, dropOn, PANEL_BLOCKS, shift, spanOf, WIDTHS, type PanelBlock } from "../lib/panelLayout";
 import { setPrefs, usePrefs } from "../lib/prefs";
 import { Button, iconBtn } from "./ui";
@@ -17,6 +18,8 @@ export function PanelGrid({ blocks }: { blocks: Record<PanelBlock, ReactNode> })
   const [dragging, setDragging] = useState<PanelBlock | null>(null);
   const [over, setOver] = useState<PanelBlock | null>(null);
   const order = arrange(prefs.order);
+  const grid = useRef<HTMLDivElement>(null);
+  useFlip(grid, `${order.join()}|${editing}|${prefs.hidden.join()}`);
   const hidden = prefs.hidden;
   const widths = prefs.widths;
   const save = (next: { order?: PanelBlock[]; hidden?: string[]; widths?: Record<string, number> }) =>
@@ -39,7 +42,7 @@ export function PanelGrid({ blocks }: { blocks: Record<PanelBlock, ReactNode> })
           </Button>
         </div>
       )}
-      <div className="grid grid-flow-dense gap-4 lg:grid-cols-6">
+      <div ref={grid} className="grid grid-flow-dense gap-4 lg:grid-cols-6">
         {order.map((id, i) => {
           const off = hidden.includes(id);
           if (off && !editing) return null;
@@ -48,7 +51,7 @@ export function PanelGrid({ blocks }: { blocks: Record<PanelBlock, ReactNode> })
           if (!editing) {
             // Una tarjeta que ahora no tiene nada que enseñar no deja hueco.
             return (
-              <div key={id} className={`@container flex min-w-0 flex-col gap-5 empty:hidden [&>section]:h-full ${SPAN[span]}`}>
+              <div key={id} data-flip={id} className={`@container flex min-w-0 flex-col gap-5 empty:hidden [&>section]:h-full ${SPAN[span]}`}>
                 {blocks[id]}
               </div>
             );
@@ -56,7 +59,14 @@ export function PanelGrid({ blocks }: { blocks: Record<PanelBlock, ReactNode> })
           return (
             <div
               key={id}
+              data-flip={id}
               draggable
+              onKeyDown={(e) => {
+                // Alt+← / Alt+→ (o ↑ ↓) mueven la tarjeta enfocada.
+                if (!e.altKey || !e.key.startsWith("Arrow")) return;
+                e.preventDefault();
+                save({ order: shift(order, id, e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1) });
+              }}
               onDragStart={(e) => {
                 setDragging(id);
                 e.dataTransfer.effectAllowed = "move";

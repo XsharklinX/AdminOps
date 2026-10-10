@@ -163,6 +163,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
   const table = (rows: PrinterInfo[], empty?: string) => (
     <DataTable
       padded
+      resizable="printers"
       rows={rows}
       rowKey={(p) => p.name}
       columns={columns}

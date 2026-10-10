@@ -301,21 +301,40 @@ export const softBtn =
 export const ToggleLabelCtx = createContext<string | undefined>(undefined);
 
 /** Interruptor: para lo que se enciende o se apaga. Para elegir entre varias cosas, un desplegable. */
-export function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
+export function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (v: boolean) => unknown; disabled?: boolean; label?: string }) {
   const fromRow = useContext(ToggleLabelCtx);
+  // Si el cambio tarda (devuelve una promesa), el interruptor ya enseña el nuevo valor y, si falla, vuelve y se sacude.
+  const [pending, setPending] = useState<boolean | null>(null);
+  const [shake, setShake] = useState(false);
+  const shown = pending ?? checked;
+  const click = () => {
+    const next = !shown;
+    const r = onChange(next);
+    if (!(r instanceof Promise)) return;
+    setPending(next);
+    r.then(
+      () => setPending(null),
+      () => {
+        setPending(null);
+        setShake(true);
+        window.setTimeout(() => setShake(false), 320);
+      },
+    );
+  };
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={checked}
+      aria-checked={shown}
+      aria-busy={pending !== null || undefined}
       aria-label={label ?? fromRow}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onClick={click}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-neon/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? "bg-neon" : "bg-line-2"
-      }`}
+        shown ? "bg-neon" : "bg-line-2"
+      } ${pending !== null ? "opacity-80" : ""} ${shake ? "shake" : ""}`}
     >
-      <span className={`absolute size-4 rounded-full shadow transition-[left] ${checked ? "left-[18px] bg-white" : "left-0.5 bg-dim"}`} />
+      <span className={`absolute size-4 rounded-full shadow transition-[left] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${shown ? "left-[18px] bg-white" : "left-0.5 bg-dim"}`} />
     </button>
   );
 }

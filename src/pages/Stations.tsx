@@ -4,6 +4,8 @@ import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Modal } from "../components/ui";
 import { logQuietly, libraryApi, officeApi, remoteApi, stationsApi, type Station, type StationAction, type StationActionResult, type StationList } from "../lib/api";
 import { DataTable } from "../components/DataTable";
+import { Copyable } from "../components/Copyable";
+import { HoverCard } from "../components/HoverCard";
 
 const ACTION_LABEL: Record<StationAction, string> = {
   restart: "Reiniciar",
@@ -308,8 +310,33 @@ export function Stations() {
                     sortBy: (r) => r.host,
                     cell: (r) => (
                       <>
-                        <span className="block text-sm text-ink">{r.host}</span>
-                        <span className="font-mono text-[11px] text-mute">{r.ip}</span>
+                        <HoverCard
+                          className="block"
+                          card={
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <b className="truncate text-sm text-ink">{r.host}</b>
+                                {r.online ? <span className="text-ok">{r.ms != null ? `${r.ms} ms` : "Responde"}</span> : <span className="text-bad">No responde</span>}
+                              </div>
+                              {r.remote ? (
+                                <>
+                                  <div className="text-dim">{r.remote.os} · {r.remote.user || "nadie conectado"}</div>
+                                  <div className="text-mute">
+                                    {r.remote.bootDays != null && `Encendido hace ${Math.floor(r.remote.bootDays)} d`}
+                                    {r.remote.freeGb != null && r.remote.totalGb != null && ` · ${Math.round(r.remote.freeGb)} de ${Math.round(r.remote.totalGb)} GB libres`}
+                                  </div>
+                                  {r.remote.antivirus && <div className={r.remote.avOk === false ? "text-warn" : "text-mute"}>Antivirus: {r.remote.antivirus}</div>}
+                                </>
+                              ) : (
+                                <div className="text-mute">{r.remoteError || "Sin revisión a fondo todavía"}</div>
+                              )}
+                              {r.warnings.length > 0 && <div className="text-warn">{r.warnings.slice(0, 3).join(" · ")}</div>}
+                            </div>
+                          }
+                        >
+                          <span className="block text-sm text-ink">{r.host}</span>
+                        </HoverCard>
+                        <Copyable value={r.ip} className="font-mono text-[11px] text-mute">{r.ip}</Copyable>
                       </>
                     ),
                   },

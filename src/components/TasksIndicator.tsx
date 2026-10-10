@@ -6,6 +6,8 @@ import { useToast } from "./feedback";
 import type { PageId } from "./Sidebar";
 import { humanDuration, pageOfTask, percentOf, remainingSeconds, type Sample } from "../lib/taskEta";
 import { playSound } from "../lib/sounds";
+import { tipAt } from "../lib/tips";
+import { usePrefs } from "../lib/prefs";
 
 interface Running {
   task: string;
@@ -14,7 +16,12 @@ interface Running {
   started: number;
   /** Porcentajes leídos de los mensajes, para calcular lo que falta. */
   samples: Sample[];
+  /** Etapas ya terminadas (las últimas), con el mensaje con el que acabaron. */
+  steps: string[];
 }
+
+/** El mensaje sin cifras ni porcentajes: dos mensajes con el mismo tronco son la misma etapa. */
+const stem = (m: string) => m.replace(/\d+([.,]\d+)?\s?(%|[a-zA-Z]{1,3}\/s)?/g, "#").replace(/\s+/g, " ").trim();
 
 interface Done {
   task: string;
@@ -37,11 +44,14 @@ export function TasksIndicator({ onNavigate }: { onNavigate?: (page: PageId, sec
   const [open, setOpen] = useState(false);
   const [, tick] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const tips = usePrefs().tips;
+  // Cada vez que se abre, el primer consejo es otro.
+  const tipStart = useRef(Math.floor(Math.random() * 100));
 
   useEffect(() => {
     const offs = [
       listen<{ task: string; name: string }>("task-started", ({ payload }) =>
-        setRunning((r) => ({ ...r, [payload.task]: { task: payload.task, name: payload.name, message: r[payload.task]?.message ?? "", started: r[payload.task]?.started ?? Date.now(), samples: r[payload.task]?.samples ?? [] } })),
+        setRunning((r) => ({ ...r, [payload.task]: { task: payload.task, name: payload.name, message: r[payload.task]?.message ?? "", started: r[payload.task]?.started ?? Date.now(), samples: r[payload.task]?.samples ?? [], steps: r[payload.task]?.steps ?? [] } })),
       ),
       listen<{ task: string; message: string }>("task-progress", ({ payload }) =>
         setRunning((r) => {
@@ -49,7 +59,9 @@ export function TasksIndicator({ onNavigate }: { onNavigate?: (page: PageId, sec
           if (!cur) return r;
           const pct = percentOf(payload.message);
           const samples = pct === null ? cur.samples : [...cur.samples.filter((x) => x.pct <= pct), { at: Date.now(), pct }].slice(-60);
-          return { ...r, [payload.task]: { ...cur, message: payload.message, samples } };
+          // Cuando el mensaje cambia de etapa, la anterior queda hecha.
+          const steps = cur.message && stem(cur.message) !== stem(payload.message) ? [...cur.steps, cur.message].slice(-3) : cur.steps;
+          return { ...r, [payload.task]: { ...cur, message: payload.message, samples, steps } };
         }),
       ),
       listen<{ task: string; name: string; seconds: number; cancelled: boolean }>("task-finished", ({ payload }) => {
@@ -98,7 +110,7 @@ export function TasksIndicator({ onNavigate }: { onNavigate?: (page: PageId, sec
         {list.length ? `${list.length} ${list.length === 1 ? "tarea" : "tareas"}` : "Tareas"}
       </button>
       {open && (
-        <div className="absolute top-full right-0 z-40 mt-2 w-96 rounded-xl border border-line-2 bg-panel p-3 shadow-2xl">
+        <div className="absolute top-full right-0 z-40 mt-2 w-96 rounded-xl border border-line-2 bg-panel p-3 shadow-elev-3">
           {list.length > 0 && (
             <>
               <p className="mb-1.5 text-[11px] font-medium tracking-wide text-mute uppercase">En curso</p>
@@ -112,12 +124,22 @@ export function TasksIndicator({ onNavigate }: { onNavigate?: (page: PageId, sec
                       <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-neon" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm text-ink">{t.name}</span>
-                        <span className="block truncate text-xs text-dim">{t.message || "Trabajando…"}</span>
-                        {pct !== null && (
-                          <span className="mt-1 block h-1 overflow-hidden rounded-full bg-line">
-                            <span className="block h-full rounded-full bg-neon transition-[width] duration-500" style={{ width: `${pct}%` }} />
+                        {t.steps.map((s) => (
+                          <span key={s} className="flex items-center gap-1.5 truncate text-xs text-mute">
+                            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden className="shrink-0 text-ok">
+                              <path className="step-check" d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            <span className="truncate">{s}</span>
                           </span>
-                        )}
+                        ))}
+                        <span className="flex items-center gap-1.5 truncate text-xs text-dim">
+                          {t.steps.length > 0 && <span className="step-now size-[7px] shrink-0 rounded-full bg-neon" />}
+                          <span className="truncate">{t.message || "Trabajando…"}</span>
+                        </span>
+                        <span className="mt-1 block h-1 overflow-hidden rounded-full bg-line">
+                          {/* Con porcentaje, lo que llevas; sin él, una trama que se mueve: sigue trabajando. */}
+                          <span className="bar-stripes block h-full rounded-full bg-neon transition-[width] duration-500" style={{ width: pct !== null ? `${pct}%` : "40%" }} />
+                        </span>
                         <span className="mt-0.5 flex justify-between font-mono text-[11px] text-mute">
                           <span>
                             {human(elapsed)}
@@ -164,7 +186,16 @@ export function TasksIndicator({ onNavigate }: { onNavigate?: (page: PageId, sec
               </ul>
             </>
           )}
-          <p className="mt-2 border-t border-line pt-2 text-[11px] text-mute">Puedes seguir trabajando en otras páginas mientras terminan.</p>
+          <p className="mt-2 border-t border-line pt-2 text-[11px] text-mute">
+            {tips && list.length > 0 && Date.now() - list[0].started > 5000 ? (
+              <span key={tipAt(Math.floor((Date.now() - list[0].started) / 1000), tipStart.current)} className="tip-in block">
+                <b className="font-medium text-dim">Sabías que… </b>
+                {tipAt(Math.floor((Date.now() - list[0].started) / 1000), tipStart.current)}
+              </span>
+            ) : (
+              "Puedes seguir trabajando en otras páginas mientras terminan."
+            )}
+          </p>
         </div>
       )}
     </div>

@@ -119,10 +119,12 @@ export interface Prefs {
   aura: boolean;
   /** Los puntos de estado llevan forma (círculo, triángulo, cuadrado) además de color. */
   stateShapes: boolean;
+  /** Un consejo breve debajo de las tareas largas. */
+  tips: boolean;
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true, sounds: false, soundVolume: 0.5, celebrate: true, demo: false, aura: true, stateShapes: true };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true, sounds: false, soundVolume: 0.5, celebrate: true, demo: false, aura: true, stateShapes: true, tips: true };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -162,6 +164,7 @@ export function getPrefs(): Prefs {
   p.demo = p.demo === true;
   p.aura = p.aura !== false;
   p.stateShapes = p.stateShapes !== false;
+  p.tips = p.tips !== false;
   if (!p.shortcuts || typeof p.shortcuts !== "object") p.shortcuts = {};
   p.sidebar = { ...DEFAULT_SIDEBAR, ...(p.sidebar && typeof p.sidebar === "object" ? p.sidebar : {}) };
   if (!Array.isArray(p.sidebar.favorites)) p.sidebar.favorites = [];

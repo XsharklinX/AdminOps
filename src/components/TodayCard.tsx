@@ -13,6 +13,7 @@ import { CASE_CHANGED_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { usePageActive } from "../lib/pageActive";
 import { usePrefs } from "../lib/prefs";
+import { useAnimatedList } from "../lib/useAnimatedList";
 import { useToast } from "./feedback";
 import { inputClass } from "./ui";
 
@@ -89,8 +90,6 @@ export function TodayCard() {
       void offB.then((f) => f());
     };
   }, [active, load, prefs.mode]);
-
-  if (prefs.mode === "user") return null;
 
   const run = (p: Promise<unknown>, ok?: string) =>
     p.then(() => {
@@ -180,6 +179,9 @@ export function TodayCard() {
   }
 
   items.sort((a, b) => a.rank - b.rank);
+  const rows = useAnimatedList(items, (i) => i.key);
+
+  if (prefs.mode === "user") return null;
 
   return (
     <section className="rounded-xl border border-line bg-panel">
@@ -200,8 +202,8 @@ export function TodayCard() {
         <p className="px-5 pb-4 text-xs text-mute">Ni casos, ni seguimientos, ni visitas para hoy. Lo que apuntes con «Seguimiento» o con la nota de llamada (Ctrl+Alt+N) aparecerá aquí cuando toque.</p>
       ) : (
         <ul className="space-y-1.5 px-3 pb-3">
-          {items.map((it) => (
-            <li key={it.key} className="flex items-center gap-3 overflow-hidden rounded-lg border border-line bg-panel-2 pr-2">
+          {rows.map(({ item: it, state }) => (
+            <li key={it.key} className={`flex items-center gap-3 overflow-hidden rounded-lg border border-line bg-panel-2 pr-2 ${state === "leave" ? "row-out" : state === "enter" ? "row-in" : ""}`}>
               <span className={`w-1 self-stretch ${{ bad: "bg-bad", warn: "bg-warn", neon: "bg-neon", mute: "bg-line-2" }[it.tone]}`} />
               <span className="w-24 shrink-0 font-mono text-[10.5px] tracking-wide text-mute uppercase">{it.source}</span>
               <button onClick={it.onOpen} disabled={!it.onOpen} className="min-w-0 flex-1 py-2 text-left disabled:cursor-default">

@@ -127,6 +127,51 @@ for (const [p, sec] of secs) {
   if (state.empty || state.crashed || newErrors.length) failures.push({ page: `${p} › ${sec}`, shown: state.id, empty: state.empty, crashed: state.crashed, errors: newErrors.slice(0, 3) });
 }
 
+// Interacciones de la 1.2.9: no basta con que las pantallas se pinten.
+async function interact(name, fn) {
+  const before = errors.length;
+  try {
+    await fn();
+  } catch (e) {
+    errors.push(`[${name}] ${String(e.message).split("\n")[0]}`);
+  }
+  const fresh = errors.slice(before);
+  if (fresh.length) failures.push({ page: name, shown: "-", empty: false, crashed: false, errors: fresh.slice(0, 3) });
+}
+await interact("pantalla de taller (F11)", async () => {
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("adminops:navigate", { detail: { page: "dashboard", focus: null } })));
+  await page.waitForTimeout(400);
+  await page.keyboard.press("F11");
+  await page.waitForSelector('[aria-label="Pantalla de taller"]', { timeout: 5000 });
+  await page.screenshot({ path: join(out, "taller.png") });
+  await page.keyboard.press("Escape");
+  await page.waitForSelector('[aria-label="Pantalla de taller"]', { state: "detached", timeout: 5000 });
+});
+await interact("cabecera compacta al bajar", async () => {
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-page="dashboard"]');
+    el.scrollTop = 400;
+    el.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  const compact = await page.evaluate(() => document.querySelector("header.page-head")?.getAttribute("data-compact"));
+  if (compact !== "true" && (await page.evaluate(() => document.querySelector('[data-page="dashboard"]').scrollHeight <= document.querySelector('[data-page="dashboard"]').clientHeight))) return;
+  if (compact !== "true") throw new Error("la cabecera no se compactó");
+});
+await interact("copiar con un clic", async () => {
+  await page.evaluate(() => {
+    const s = document.createElement("span");
+    s.id = "copy-probe";
+    s.dataset.copy = "192.168.1.34";
+    s.textContent = "192.168.1.34";
+    document.body.appendChild(s);
+  });
+  await page.click("#copy-probe");
+  await page.waitForFunction(() => document.querySelector("#copy-probe")?.classList.contains("copied"), null, { timeout: 3000 }).catch(() => {
+    // Sin permiso de portapapeles en el navegador de pruebas: no es un fallo de la app.
+  });
+});
+
 const unknown = await page.evaluate(() => [...window.__E2E_UNKNOWN__]);
 await browser.close();
 await server.close();

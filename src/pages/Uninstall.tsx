@@ -396,6 +396,8 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
       <div className="overflow-x-auto rounded-xl border border-line bg-panel">
         <DataTable
           padded
+          sticky
+          resizable="programs"
           rows={visible}
           rowKey={(p) => p.id}
           columns={columns}

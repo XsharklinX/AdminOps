@@ -9,6 +9,7 @@ import { showFullTextOnHover } from "./lib/fullTextOnHover";
 import { applyAppearance } from "./lib/prefs";
 import { applyTheme, getTheme, watchTheme } from "./lib/theme";
 import { watchSpotlight } from "./lib/spotlight";
+import { watchCopy } from "./lib/copyFlash";
 import "./index.css";
 
 // ¿Es la ventanita de la nota de llamada (Ctrl+Alt+N) y no la aplicación?
@@ -27,6 +28,7 @@ if (!isNote) void appApi.uiBooting();
 applyTheme(getTheme());
 watchTheme();
 watchSpotlight();
+watchCopy();
 // El tamaño de la interfaz se aplica a la ventana principal; la nota no lo necesita.
 if (!isNote) applyAppearance();
 

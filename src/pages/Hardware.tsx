@@ -29,6 +29,7 @@ import { tempColor, useSensors } from "../hooks/useSensors";
 import { hwApi, type Inventory, type MemoryTest, type SmartDisk } from "../lib/api";
 import { bytes } from "../lib/format";
 import { DataTable } from "../components/DataTable";
+import { Copyable } from "../components/Copyable";
 
 const ageOf = (iso: string | null) => {
   if (!iso) return null;
@@ -151,7 +152,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
             <Row label="Arquitectura">{inv.architecture}</Row>
             <Row label="Número de serie">
               <span className="inline-flex items-center gap-2 font-mono text-xs">
-                {showSerial ? inv.serial || "—" : "••••••••"}
+                {showSerial ? inv.serial ? <Copyable value={inv.serial}>{inv.serial}</Copyable> : "—" : "••••••••"}
                 <button onClick={() => setShowSerial(!showSerial)} className="text-mute hover:text-ink">
                   {showSerial ? <EyeOff size={12} /> : <Eye size={12} />}
                 </button>

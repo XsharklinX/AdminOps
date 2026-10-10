@@ -125,7 +125,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
         const blocked = i.needsAdmin && !isAdmin;
         return (
           <span className="inline-flex" title={blocked ? "Requiere administrador" : undefined}>
-            <Switch on={i.enabled} disabled={blocked || busy === i.id} onClick={() => void toggle(i)} />
+            <Switch on={i.enabled} disabled={blocked} busy={busy === i.id} onClick={() => void toggle(i)} />
           </span>
         );
       },
@@ -165,6 +165,8 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
       <div className="overflow-x-auto rounded-xl border border-line bg-panel">
         <DataTable
           padded
+          sticky
+          resizable="startup"
           rows={visible}
           rowKey={(i) => i.id}
           rowClass={(i) => (i.enabled ? "" : "opacity-60")}

@@ -112,7 +112,7 @@ export function MachineSheetCard({ autoLoad = false }: { autoLoad?: boolean }) {
             {rows(sheet).map(([k, v]) => (
               <div key={k} className="flex gap-3 border-b border-line/40 py-1">
                 <span className="w-36 shrink-0 text-xs text-mute">{k}</span>
-                <span className={`min-w-0 flex-1 break-words select-text ${k === "Licencia de Windows" && v !== "Activado" ? "text-warn" : "text-ink"}`}>{v || "—"}</span>
+                <span data-copy={v ? v : undefined} title={v ? "Clic para copiar" : undefined} className={`min-w-0 flex-1 break-words ${v ? "" : "select-text"} ${k === "Licencia de Windows" && v !== "Activado" ? "text-warn" : "text-ink"}`}>{v || "—"}</span>
               </div>
             ))}
           </div>

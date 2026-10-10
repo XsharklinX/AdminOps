@@ -1,5 +1,7 @@
 import { RotateCw } from "lucide-react";
 import { SlideMark } from "./components/SlideMark";
+import { WorkshopScreen } from "./components/WorkshopScreen";
+import { useNarrow } from "./lib/useNarrow";
 import { listen } from "@tauri-apps/api/event";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PaletteAction } from "./components/CommandPalette";
@@ -342,6 +344,7 @@ export default function App() {
     setRecent((r) => [page, ...r.filter((x) => x !== page)].slice(0, 10));
   }, [page]);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [workshop, setWorkshop] = useState(false);
   // Texto con el que se abre Ctrl+K (desde el clic derecho o un error).
   const [paletteQuery, setPaletteQuery] = useState("");
   useEffect(() => {
@@ -494,6 +497,9 @@ export default function App() {
         e.preventDefault();
         setPaletteQuery("");
         setPaletteOpen((o) => !o);
+      } else if (e.key === "F11" && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        setWorkshop((w) => !w);
       } else if (e.ctrlKey && e.key.toLowerCase() === "l" && lockRef.current) {
         e.preventDefault();
         setLocked(true);
@@ -573,6 +579,7 @@ export default function App() {
           return `Paquete creado: ${path}`;
         },
       },
+      { id: "workshop", title: "Pantalla de taller", subtitle: "Cifras enormes del equipo y de lo que se está haciendo (F11)", keywords: "monitor grande pantalla completa temperatura progreso clonar estres", run: () => setWorkshop(true) },
       { id: "help-guide", title: "Guía de AdminOps", subtitle: "Qué hace cada pantalla y cómo se usa", keywords: "ayuda manual glosario como usar documentacion", run: () => openHelp("guide") },
       { id: "help-tour", title: "Ver el recorrido de novedades", subtitle: "Lo nuevo de esta versión, señalado en la pantalla", keywords: "recorrido tour novedades guia nuevo que hay", run: () => startTour() },
       { id: "help-news", title: "Novedades de cada versión", subtitle: "Lo que se ha añadido desde la primera", keywords: "cambios version changelog nuevo", run: () => openHelp("news") },
@@ -669,7 +676,8 @@ export default function App() {
   const nav = NAV.find((n) => n.id === page)!;
   const area = areaOf(page);
   // Con la barra de solo áreas, las pantallas del área van como pestañas bajo el título.
-  const showTabs = prefs.sidebar.mode === "mini";
+  const narrow = useNarrow();
+  const showTabs = prefs.sidebar.mode === "mini" || narrow;
   const tabs = showTabs ? (visibleAreas(page).find((a) => a.pages.includes(page))?.pages ?? []) : [];
   // La ruta de arriba: área › pantalla › sección.
   const section = sectionLabel(page, sections[page] ?? sectionsOf(page)[0]?.id);
@@ -802,7 +810,12 @@ export default function App() {
             </div>
             <div className="flex items-center gap-2">
             {page === "dashboard" ? (
-              <span className="text-xs text-mute">En vivo · se actualiza cada {prefs.refreshMs / 1000} s</span>
+              <span className="flex items-center gap-3 text-xs text-mute">
+                En vivo · se actualiza cada {prefs.refreshMs / 1000} s
+                <button onClick={() => setWorkshop(true)} className="rounded-md border border-line-2 px-2 py-1 text-dim transition-colors hover:text-ink" title="Cifras enormes para dejar en un monitor (F11)">
+                  Pantalla de taller
+                </button>
+              </span>
             ) : (
               page !== "settings" && (
                 <button
@@ -848,6 +861,7 @@ export default function App() {
         {helpOpen && <HelpCenter version={appInfo?.version ?? ""} />}
         {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} onNavigate={navigate} onSection={goTo} badges={machine.badges} actions={actions} initialQuery={paletteQuery} />}
       </Suspense>
+      {workshop && <WorkshopScreen onClose={() => setWorkshop(false)} host={machine.ctx?.computerName ?? ""} />}
       <BootBar />
       <Tour version={appInfo?.version ?? ""} />
       <CelebrateLayer />

@@ -1,3 +1,4 @@
+import { useAnimatedList } from "../lib/useAnimatedList";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "./feedback";
 import { solutionForFinding } from "../lib/solutionsCatalog";
@@ -166,13 +167,15 @@ export function ActionPlan({
       .sort((a, b) => ORDER[a.level] - ORDER[b.level]);
   }, [findings, diagnosedAt, systemDisk, extra, onNavigate, toast]);
 
+  const shown = all ? items : items.slice(0, 7);
+  const rows = useAnimatedList(shown, (i) => i.key);
+
   if (!items.length) return <p className="flex items-center gap-2.5 py-5 text-sm text-dim"><span className="size-2 rounded-full bg-ok" /> Nada pendiente: el equipo está al día.</p>;
 
-  const shown = all ? items : items.slice(0, 7);
   return (
     <div>
-      {shown.map((it) => (
-        <div key={it.key} className="flex items-center gap-3.5 border-b border-line py-3">
+      {rows.map(({ item: it, state }) => (
+        <div key={it.key} className={`flex items-center gap-3.5 border-b border-line py-3 ${state === "leave" ? "row-out" : state === "enter" ? "row-in" : ""}`}>
           <span className={`size-2 shrink-0 rounded-full ${DOT[it.level]}`} />
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm">{it.title}</div>
