@@ -69,6 +69,7 @@ fn default_name(key: &str) -> &'static str {
         "uninstall" => "Desinstalar",
         "space" => "Análisis de espacio",
         "speedtest" => "Prueba de velocidad",
+        "rescue" => "Pendrive de rescate",
         _ => "Tarea",
     }
 }

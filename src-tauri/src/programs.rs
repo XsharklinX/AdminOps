@@ -33,9 +33,9 @@ const SHARED: &[&str] = &[
 pub struct Program {
     /// hive|vista|clave: identifica la entrada del registro.
     id: String,
-    name: String,
-    publisher: Option<String>,
-    version: Option<String>,
+    pub(crate) name: String,
+    pub(crate) publisher: Option<String>,
+    pub(crate) version: Option<String>,
     /// AAAA-MM-DD
     installed: Option<String>,
     /// Bytes (estimación del propio instalador).

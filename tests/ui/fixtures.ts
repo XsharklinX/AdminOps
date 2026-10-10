@@ -60,6 +60,8 @@ export const FIXTURES: Record<string, unknown> = {
     withoutDump: 0,
     verifier: [],
   },
+  vulnerable_programs: { checked: 120, dbDate: "septiembre de 2025", hits: [{ name: "7-Zip 19.00 (x64)", version: "19.00", fixed: "24.09", cve: "CVE-2025-0411", exploited: true, what: "Un archivo comprimido puede saltarse el aviso.", winget: "7zip.7zip", eol: false }, { name: "Microsoft Office 2013", version: "15.0", fixed: "", cve: "", exploited: false, what: "Ya no tiene soporte.", winget: "", eol: true }] },
+  rescue_status: { adk: false, winpe: false, kitsRoot: "", usb: [{ number: 2, name: "Kingston DataTraveler", size: 16_000_000_000, letters: ["E"], system: false }] },
   perf_insights: { samples: 600, hours: 10, leaks: [{ name: "Teams.exe", fromMb: 400, toMb: 3100, hours: 6, at: 1_728_000_000, series: [] }], saturatedMinutes: 12, diskHogs: [{ name: "SearchIndexer.exe", minutes: 10, avgKbs: 30000 }], peak: { hour: 17, cpu: 80, busy: 60, names: ["backup.exe"] } },
   event_digest: [{ provider: "disk", id: 7, log: "System", count: 3, last: 1_728_000_000, weight: "matter", title: "Sectores dañados en un disco", meaning: "El disco no pudo leer un bloque.", todo: "Copia de seguridad ya.", page: "space", sample: "El dispositivo tiene un bloque defectuoso." }],
   security_audit: { score: 82, checks: [{ id: "fw", label: "Cortafuegos", status: "ok", detail: "Activo en los tres perfiles", weight: 10, fix: null }], vulnerable: [] },

@@ -40,6 +40,14 @@ pub struct Remote {
     pub update_days: Option<f64>,
     /// Por dónde se leyó: WinRM | DCOM.
     pub via: String,
+    /// Salud de los discos según Windows: ok · warn · bad · «» (no se pudo leer).
+    pub disk_health: String,
+    /// Antivirus que dice el Centro de seguridad («Microsoft Defender»…).
+    pub antivirus: String,
+    /// Activo y al día (None: no se sabe, p. ej. en servidores).
+    pub av_ok: Option<bool>,
+    /// Pantallazos azules en los últimos 30 días.
+    pub bsods: Option<u32>,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -85,7 +93,14 @@ try {
   $d = Get-CimInstance -CimSession $s -ClassName Win32_LogicalDisk -Filter "DeviceID='$($os.SystemDrive)'"
   $last = $null
   try { $last = Get-CimInstance -CimSession $s -ClassName Win32_QuickFixEngineering | Where-Object { $_.InstalledOn } | Sort-Object InstalledOn -Descending | Select-Object -First 1 } catch { }
+  $health = ''
+  try { $pd = @(Get-CimInstance -CimSession $s -Namespace root\Microsoft\Windows\Storage -ClassName MSFT_PhysicalDisk); $worst = ($pd | Measure-Object HealthStatus -Maximum).Maximum; $health = switch ([int]$worst) { 0 { 'ok' } 1 { 'warn' } default { 'bad' } } } catch { }
+  $av = ''; $avOk = $null
+  try { $p = Get-CimInstance -CimSession $s -Namespace root\SecurityCenter2 -ClassName AntiVirusProduct | Select-Object -First 1; if ($p) { $av = "$($p.displayName)"; $st = [int]$p.productState; $avOk = (($st -band 0x1000) -ne 0) -and (($st -band 0x10) -eq 0) } } catch { }
+  $bsod = $null
+  try { $since = [Management.ManagementDateTimeConverter]::ToDmtfDateTime((Get-Date).AddDays(-30)); $bsod = @(Get-CimInstance -CimSession $s -ClassName Win32_NTLogEvent -Filter "Logfile='System' AND EventCode=1001 AND SourceName='BugCheck' AND TimeWritten > '$since'").Count } catch { }
   [pscustomobject]@{
+    diskHealth = $health; antivirus = $av; avOk = $avOk; bsods = $bsod
     os = "$($os.Caption)"; user = "$($cs.UserName)"; via = $via
     bootDays = ((Get-Date) - $os.LastBootUpTime).TotalDays
     freeGb = if ($d) { $d.FreeSpace / 1GB } else { $null }; totalGb = if ($d) { $d.Size / 1GB } else { $null }
@@ -125,6 +140,17 @@ pub fn warnings(r: &Remote) -> Vec<String> {
     }
     if r.update_days.is_some_and(|d| d > 45.0) {
         w.push(format!("{:.0} días sin actualizaciones", r.update_days.unwrap_or(0.0)));
+    }
+    match r.disk_health.as_str() {
+        "bad" => w.push("Un disco está fallando".into()),
+        "warn" => w.push("Un disco da avisos de salud".into()),
+        _ => {}
+    }
+    if r.av_ok == Some(false) {
+        w.push(format!("Antivirus apagado o caducado{}", if r.antivirus.is_empty() { String::new() } else { format!(" ({})", r.antivirus) }));
+    }
+    if let Some(n) = r.bsods.filter(|n| *n > 0) {
+        w.push(format!("{n} pantallazo(s) azul(es) en 30 días"));
     }
     w
 }
@@ -208,6 +234,10 @@ pub enum StationAction {
     Gpupdate,
     /// Mensaje en pantalla a quien esté conectado.
     Message,
+    /// Reinicia la cola de impresión (desatasca trabajos).
+    Spooler,
+    /// Actualiza las firmas de Microsoft Defender.
+    Defender,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -241,6 +271,14 @@ fn action_script(action: StationAction) -> &'static str {
 $code = Invoke-Command -ComputerName $target -ScriptBlock { gpupdate.exe /target:computer /force /wait:0 | Out-Null; $LASTEXITCODE }
 [pscustomobject]@{ code = [int]$code } | ConvertTo-Json -Compress
 "#,
+        StationAction::Spooler => r#"
+$code = Invoke-Command -ComputerName $target -ScriptBlock { try { Restart-Service Spooler -Force -ErrorAction Stop; 0 } catch { 1 } }
+[pscustomobject]@{ code = [int]$code } | ConvertTo-Json -Compress
+"#,
+        StationAction::Defender => r#"
+$code = Invoke-Command -ComputerName $target -ScriptBlock { try { Update-MpSignature -ErrorAction Stop; 0 } catch { 1 } }
+[pscustomobject]@{ code = [int]$code } | ConvertTo-Json -Compress
+"#,
     }
 }
 
@@ -251,6 +289,7 @@ fn explain_code(action: StationAction, code: i64) -> String {
         (_, 5) => "Sin permiso: hace falta un usuario administrador de ese equipo.".into(),
         (_, 53) | (_, 1722) | (_, 1726) => "No se pudo contactar (apagado, o el firewall bloquea la administración remota).".into(),
         (StationAction::Message, _) => "No se pudo mostrar el mensaje (el equipo no admite mensajes remotos o nadie tiene sesión).".into(),
+        (StationAction::Spooler | StationAction::Defender, 1) => "Windows no pudo hacerlo en ese equipo (servicio deshabilitado o sin Defender).".into(),
         _ => format!("Windows devolvió el código {code}."),
     }
 }
@@ -274,6 +313,8 @@ fn run_action(host: &str, action: StationAction, text: &str) -> ActionResult {
                     StationAction::CancelRestart => "Reinicio cancelado.".into(),
                     StationAction::Gpupdate => "Directivas actualizadas.".into(),
                     StationAction::Message => "Mensaje enviado.".into(),
+                    StationAction::Spooler => "Cola de impresión reiniciada.".into(),
+                    StationAction::Defender => "Firmas de Defender actualizadas.".into(),
                 },
             ),
             code => (false, explain_code(action, code)),
@@ -325,6 +366,8 @@ pub fn station_action(
         StationAction::CancelRestart => "Cancelar reinicio de",
         StationAction::Gpupdate => "Actualizar directivas en",
         StationAction::Message => "Mensaje a",
+        StationAction::Spooler => "Reiniciar la cola de impresión en",
+        StationAction::Defender => "Actualizar Defender en",
     };
     let failed = out.iter().filter(|r| !r.ok).count();
     let summary: Result<(), String> = if failed == 0 { Ok(()) } else { Err(format!("{failed} de {} fallaron", out.len())) };
@@ -372,6 +415,10 @@ mod tests {
         let r = Remote { free_gb: Some(4.0), total_gb: Some(240.0), boot_days: Some(30.0), update_days: Some(90.0), ..Default::default() };
         assert_eq!(warnings(&r).len(), 3);
         assert!(warnings(&Remote { free_gb: Some(100.0), total_gb: Some(240.0), boot_days: Some(1.0), update_days: Some(5.0), ..Default::default() }).is_empty());
+        let w = warnings(&Remote { disk_health: "bad".into(), av_ok: Some(false), antivirus: "Avast".into(), bsods: Some(3), ..Default::default() });
+        assert!(w.iter().any(|x| x.contains("disco está fallando")));
+        assert!(w.iter().any(|x| x.contains("Avast")));
+        assert!(w.iter().any(|x| x.contains("3 pantallazo")));
     }
 
     /// Equipo real: `cargo test stations_real -- --ignored --nocapture`

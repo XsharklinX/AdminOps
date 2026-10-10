@@ -108,6 +108,8 @@ mod perfinsight;
 mod eventdigest;
 mod learned;
 mod escalate;
+mod rescue;
+mod vulndb;
 
 use tauri::Manager;
 
@@ -443,6 +445,9 @@ pub fn run() {
             learned::learned_record,
             learned::learned_stats,
             escalate::escalation_pack,
+            vulndb::vulnerable_programs,
+            rescue::rescue_status,
+            rescue::rescue_create,
             uxio::save_text_file,
             uxio::open_text_file,
             errcodes::error_codes,

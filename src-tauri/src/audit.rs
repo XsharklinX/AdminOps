@@ -18,6 +18,7 @@ const BLOCKED: &[&str] = &[
     "apply_tweak",
     "revert_tweak",
     "revert_entry",
+    "rescue_create",
     "run_action",
     "fix_finding",
     "apply_profile",
@@ -296,7 +297,7 @@ const SAFE: &[&str] = &[
     "partition_layout", "partition_backup", "partition_backups", "partition_find_lost",
     "carve_scan", "carve_found", "carve_preview", "disk_clone_live", "disk_clone_last",
     // el caso en tres tonos (solo redacta texto)
-    "case_tones", "life_report", "parts_advice", "media_in_use", "describe_file", "reveal_path", "open_dropped_pdf", "compose_mail", "tweak_preview", "error_lookup", "error_codes", "mail_domain_check", "autoruns_list", "crash_report", "stress_run", "stress_live", "stress_history", "perf_insights", "event_digest", "learned_record", "learned_stats", "escalation_pack", "save_text_file", "open_text_file", "alert_rules_get", "alert_rules_templates", "alert_rules_save", "alert_rules_reading", "backups_get", "backups_status", "backups_defaults", "backups_save", "backups_check",
+    "case_tones", "life_report", "parts_advice", "media_in_use", "describe_file", "reveal_path", "open_dropped_pdf", "compose_mail", "tweak_preview", "error_lookup", "error_codes", "mail_domain_check", "autoruns_list", "crash_report", "stress_run", "stress_live", "stress_history", "perf_insights", "event_digest", "learned_record", "learned_stats", "escalation_pack", "save_text_file", "open_text_file", "vulnerable_programs", "rescue_status", "alert_rules_get", "alert_rules_templates", "alert_rules_save", "alert_rules_reading", "backups_get", "backups_status", "backups_defaults", "backups_save", "backups_check",
     // etiquetas con QR (crean un PDF en la carpeta de informes)
     "label_qr", "label_sheet",
     // workflow

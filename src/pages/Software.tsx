@@ -5,6 +5,7 @@ import { TaskStatus } from "../components/TaskStatus";
 import { logQuietly, toolsApi, type SoftwareUpdate } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { softBtn } from "../components/ui";
+import { VulnerableCard } from "../components/bigbets";
 
 type Result = { id: string; name: string; ok: boolean; message: string };
 
@@ -88,6 +89,9 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="mx-auto max-w-(--page-max) p-6">
+      <div className="mb-6">
+        <VulnerableCard />
+      </div>
       <div className="mb-4 flex items-center gap-3">
         <p className="text-sm text-dim">
           {updates === null ? (

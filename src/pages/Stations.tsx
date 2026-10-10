@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, Download, Loader2, MessageSquare, Monitor, MonitorPlay, Play, RefreshCcw, RotateCw, Save, ScanSearch, Trash2, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, Printer, ShieldCheck, Download, Loader2, MessageSquare, Monitor, MonitorPlay, Play, RefreshCcw, RotateCw, Save, ScanSearch, Trash2, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Modal } from "../components/ui";
@@ -10,6 +10,8 @@ const ACTION_LABEL: Record<StationAction, string> = {
   cancelRestart: "Cancelar reinicio",
   gpupdate: "Actualizar directivas",
   message: "Enviar mensaje",
+  spooler: "Reiniciar la cola de impresión",
+  defender: "Actualizar Defender",
 };
 
 /** Más ventanas de Escritorio remoto que esto a la vez es inmanejable. */
@@ -250,6 +252,12 @@ export function Stations() {
                 <Button kind="ghost" onClick={() => act("gpupdate")} disabled={!!acting}>
                   {acting === "gpupdate" ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />} Actualizar directivas
                 </Button>
+                <Button kind="ghost" onClick={() => act("spooler")} disabled={!!acting}>
+                  {acting === "spooler" ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />} Desatascar impresión
+                </Button>
+                <Button kind="ghost" onClick={() => act("defender")} disabled={!!acting}>
+                  {acting === "defender" ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Actualizar Defender
+                </Button>
                 <Button kind="ghost" onClick={() => setAsking("message")} disabled={!!acting}>
                   {acting === "message" ? <Loader2 size={12} className="animate-spin" /> : <MessageSquare size={12} />} Mensaje
                 </Button>
@@ -348,6 +356,19 @@ export function Stations() {
                   { id: "free", header: "Libre", align: "right", sortBy: (r) => r.remote?.freeGb, cell: (r) => (r.remote?.freeGb != null ? `${r.remote.freeGb.toFixed(0)} GB` : "—"), className: "font-mono text-dim" },
                   { id: "boot", header: "Sin reiniciar", align: "right", sortBy: (r) => r.remote?.bootDays, cell: (r) => days(r.remote?.bootDays), className: "font-mono text-dim" },
                   { id: "update", header: "Sin actualizar", align: "right", sortBy: (r) => r.remote?.updateDays, cell: (r) => days(r.remote?.updateDays), className: "font-mono text-dim" },
+                  {
+                    id: "disks",
+                    header: "Discos",
+                    sortBy: (r) => ({ bad: 0, warn: 1, ok: 2 })[r.remote?.diskHealth ?? ""] ?? 3,
+                    cell: (r) => (!r.remote?.diskHealth ? "—" : r.remote.diskHealth === "ok" ? <span className="text-ok">Bien</span> : r.remote.diskHealth === "warn" ? <span className="text-warn">Avisos</span> : <span className="text-bad">Fallando</span>),
+                  },
+                  {
+                    id: "av",
+                    header: "Antivirus",
+                    sortBy: (r) => (r.remote?.avOk === false ? 0 : 1),
+                    cell: (r) => (r.remote?.avOk == null ? <span className="text-mute">{r.remote?.antivirus || "—"}</span> : <span className={r.remote.avOk ? "text-ok" : "text-bad"} title={r.remote.antivirus}>{r.remote.avOk ? "Activo" : "Apagado o caducado"}</span>),
+                  },
+                  { id: "bsod", header: "Pantallazos", align: "right", sortBy: (r) => r.remote?.bsods ?? -1, cell: (r) => (r.remote?.bsods == null ? "—" : r.remote.bsods === 0 ? "0" : <span className="text-bad">{r.remote.bsods}</span>), className: "font-mono" },
                   { id: "warnings", header: "Avisos", sortBy: (r) => r.warnings.length, cell: (r) => r.warnings.join(" · "), className: "text-warn" },
                   {
                     id: "actions",

@@ -115,3 +115,44 @@ export const expertApi = {
   insights: () => invoke<PerfInsights>("perf_insights"),
   events: (days: number) => invoke<EventGroup[]>("event_digest", { days }),
 };
+
+// ---------- Apuestas grandes (1.2.8) ----------
+
+export interface VulnHit {
+  name: string;
+  version: string;
+  fixed: string;
+  cve: string;
+  exploited: boolean;
+  what: string;
+  winget: string;
+  eol: boolean;
+}
+
+export interface VulnReport {
+  hits: VulnHit[];
+  checked: number;
+  dbDate: string;
+}
+
+export interface UsbDisk {
+  number: number;
+  name: string;
+  size: number;
+  letters: string[];
+  system: boolean;
+}
+
+export interface RescueStatus {
+  adk: boolean;
+  winpe: boolean;
+  kitsRoot: string;
+  usb: UsbDisk[];
+}
+
+export const bigApi = {
+  vulnerable: () => invoke<VulnReport>("vulnerable_programs"),
+  rescueStatus: () => invoke<RescueStatus>("rescue_status"),
+  /** Borra el pendrive y crea el de rescate. Tarea «rescue». */
+  rescueCreate: (number: number) => invoke<string>("rescue_create", { number }),
+};

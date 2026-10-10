@@ -98,12 +98,25 @@ export interface Station {
   online: boolean;
   ms: number | null;
   ports: number[];
-  remote: { os: string; user: string; bootDays: number | null; freeGb: number | null; totalGb: number | null; updateDays: number | null; via: string } | null;
+  remote: {
+    os: string;
+    user: string;
+    bootDays: number | null;
+    freeGb: number | null;
+    totalGb: number | null;
+    updateDays: number | null;
+    via: string;
+    /** ok · warn · bad · "" */
+    diskHealth: string;
+    antivirus: string;
+    avOk: boolean | null;
+    bsods: number | null;
+  } | null;
   remoteError: string;
   warnings: string[];
 }
 
-export type StationAction = "restart" | "cancelRestart" | "gpupdate" | "message";
+export type StationAction = "restart" | "cancelRestart" | "gpupdate" | "message" | "spooler" | "defender";
 
 export interface StationActionResult {
   host: string;
