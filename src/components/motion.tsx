@@ -97,7 +97,7 @@ export function SkeletonTiles({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden>
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="rounded-xl border border-line bg-panel px-3 py-3">
+        <div key={i} className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-3">
           <div className="skeleton h-5 w-16" />
           <div className="skeleton mt-2 h-2.5 w-24" />
         </div>

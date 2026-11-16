@@ -48,13 +48,13 @@ export function Card({
       ref={ref}
       id={id}
       data-setting={title}
-      className={`group/card scroll-mt-6 rounded-xl border border-line bg-panel p-4 shadow-elev-1 transition-[border-color,box-shadow] duration-500 ${
+      className={`group/card scroll-mt-6 rounded-2xl border border-line/70 bg-panel p-5 shadow-elev-1 transition-[border-color,box-shadow] duration-500 ${
         collapsed ? "py-3" : ""
       } ${className}`}
     >
       {title && (
-        <header className={`flex items-center justify-between ${collapsed ? "" : "mb-3"}`}>
-          <h2 className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+        <header className={`flex items-center justify-between ${collapsed ? "" : "mb-4"}`}>
+          <h2 className="flex items-center gap-2 text-[14px] font-semibold tracking-tight text-ink">
             {icon && <span className="text-mute">{icon}</span>}
             {title}
           </h2>
@@ -297,6 +297,28 @@ export const smallBtn =
 export const softBtn =
   "inline-flex items-center justify-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/20 disabled:pointer-events-none disabled:opacity-40";
 
+/**
+ * Una frase que dice qué hace esto y, debajo de «Cómo funciona», el resto. Para
+ * no abrir cada tarjeta con un párrafo: quien ya lo sabe no lo tiene que leer.
+ */
+export function Explain({ short, children, className = "" }: { short: ReactNode; children?: ReactNode; className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`text-[13px] text-dim ${className}`}>
+      <p className="flex flex-wrap items-baseline gap-x-2">
+        <span>{short}</span>
+        {children && (
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="inline-flex items-center gap-0.5 text-xs text-neon hover:underline">
+            Cómo funciona
+            <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+        )}
+      </p>
+      {children && open && <div className="mt-1.5 max-w-[80ch] rounded-lg bg-panel-2/60 px-3 py-2 text-xs leading-relaxed text-dim">{children}</div>}
+    </div>
+  );
+}
+
 /** El nombre del ajuste de la fila (para los lectores de pantalla del interruptor). */
 export const ToggleLabelCtx = createContext<string | undefined>(undefined);
 
@@ -455,14 +477,14 @@ function PageSkeleton({ text }: { text: string }) {
       </p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden>
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl border border-line bg-panel px-3 py-3">
+          <div key={i} className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-3">
             <div className={`h-5 w-16 ${bar}`} />
             <div className={`mt-2 h-2.5 w-24 ${bar}`} />
           </div>
         ))}
       </div>
       {[0, 1].map((c) => (
-        <div key={c} className="space-y-2.5 rounded-xl border border-line bg-panel p-4" aria-hidden>
+        <div key={c} className="space-y-2.5 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4" aria-hidden>
           <div className={`h-3 w-40 ${bar}`} />
           {[92, 78, 85, 64].map((w, i) => (
             <div key={i} className={`h-2.5 ${bar}`} style={{ width: `${w - c * 10}%` }} />

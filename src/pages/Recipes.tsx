@@ -123,7 +123,7 @@ export function Recipes({ isAdmin }: { isAdmin: boolean }) {
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((r) => (
-            <div key={r.id} className="flex flex-col rounded-xl border border-line bg-panel p-4">
+            <div key={r.id} className="flex flex-col rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
               <div className="flex items-start gap-2">
                 <LaptopMinimalCheck size={16} className="mt-0.5 text-neon" />
                 <div className="min-w-0 flex-1">

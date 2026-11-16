@@ -13,6 +13,10 @@ import { UserHome } from "../components/UserHome";
 import { summarize as summarizeForText, summaryText, type UserInput } from "../lib/userHome";
 import { bytes, duration, loadColor, rate, ago } from "../lib/format";
 import { FirstSteps } from "../components/FirstSteps";
+import { NightCard } from "../components/NightCard";
+import { PartsMap } from "../components/PartsMap";
+import { partsMap } from "../lib/partsMap";
+import { useMachineState } from "../lib/machineState";
 import { PanelGrid } from "../components/PanelGrid";
 import { Slowdown } from "../components/Slowdown";
 import type { PanelBlock } from "../lib/panelLayout";
@@ -80,6 +84,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: string | null) => void }) {
   const { metrics: m, history, error } = useLiveMetrics(getPrefs().refreshMs);
   const { sensors } = useSensors(5000);
+  const machine = useMachineState();
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [latest, setLatest] = useState<Latest>(null);
   const [loaded, setLoaded] = useState(false);
@@ -170,12 +175,15 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
   const cpuTemp = sensors?.cpuTemp;
   const gpuTemp = sensors?.gpus.find((g) => g.temperature != null)?.temperature ?? null;
 
+  // Lo más grave, con nombre: el veredicto dice qué pasa, no solo cuántas cosas.
+  const worst = [...findings.filter((f) => f.severity === "bad"), ...findings.filter((f) => f.severity === "warn")].slice(0, 2);
   const verdict = !latest
-    ? { dot: "bg-mute", text: "Este equipo aún no se ha analizado", sub: "Un diagnóstico revisa discos, estabilidad, drivers, seguridad y actualizaciones en menos de un minuto." }
+    ? { dot: "bg-mute", tone: "", text: "Este equipo aún no se ha analizado", sub: "Un diagnóstico revisa discos, estabilidad, drivers, seguridad y actualizaciones en menos de un minuto." }
     : bad + warn === 0
-      ? { dot: "bg-ok", text: "Todo en orden", sub: `Diagnóstico ${ago(latest.timestamp)} sin problemas.` }
+      ? { dot: "bg-ok", tone: "tone-ok", text: "Todo en orden", sub: `Diagnóstico ${ago(latest.timestamp)} sin problemas.` }
       : {
           dot: bad ? "bg-bad" : "bg-warn",
+          tone: bad ? "tone-bad" : "tone-warn",
           text: [bad && `${bad} ${bad === 1 ? "problema" : "problemas"}`, warn && `${warn} ${warn === 1 ? "aviso" : "avisos"}`].filter(Boolean).join(" y "),
           sub: `Según el diagnóstico ${ago(latest.timestamp)}.`,
         };
@@ -279,6 +287,23 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         </Section>
     ),
     slow: <Slowdown metrics={m} onProcesses={() => onNavigate("processes")} />,
+    // Sin diagnóstico no hay de qué colorear las piezas: la tarjeta no sale.
+    parts: latest ? (
+      <PartsMap
+        parts={partsMap({
+          findings: latest.findings,
+          disks: latest.disks,
+          gpus: latest.gpus,
+          cpu: info?.cpuBrand ?? null,
+          ramBytes: m.memoryTotal,
+          windows: latest.windows,
+          securityScore: latest.securityScore,
+          online: machine.net ? machine.net.online : null,
+          hasBattery: false,
+        })}
+        onNavigate={onNavigate}
+      />
+    ) : null,
     machine: (
         <Section title="Este equipo" action={<LinkButton onClick={() => onNavigate("hardware")}>Hardware</LinkButton>}>
           <Row label="Modelo">{latest?.model ?? info?.hostName ?? "—"}</Row>
@@ -364,12 +389,22 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     <div className="mx-auto flex max-w-(--page-max) flex-col gap-5 px-8 py-6">
       {userMode && <UserHome input={userInput} busy={busy === "fix" ? "fix" : reviewing ? "review" : null} onFix={userFix} onTellTechnician={tellTechnician} onReview={() => void review()} />}
       {/* Veredicto */}
-      <Card className="relative isolate flex flex-wrap items-center gap-x-5 gap-y-3 overflow-hidden px-6 py-5">
+      <Card className={`relative isolate flex flex-wrap items-center gap-x-6 gap-y-4 overflow-hidden px-7 py-6 ${verdict.tone}`}>
         {prefs.aura && <span aria-hidden className="aura" style={{ background: `radial-gradient(ellipse 60% 140% at 4% 0%, color-mix(in srgb, ${AURA[verdict.dot] ?? "var(--color-mute)"} 24%, transparent), transparent 70%)` }} />}
-        <span className={`size-3 shrink-0 rounded-full ${verdict.dot}`} />
+        <VerdictRing bad={bad} warn={warn} ok={findings.length - bad - warn} analyzed={!!latest} />
         <div className="min-w-60 flex-1">
-          <div className="text-xl font-semibold tracking-tight">{verdict.text}</div>
-          <div className="mt-0.5 truncate text-[13px] text-dim">
+          <div className="text-[26px] leading-tight font-semibold tracking-tight">{verdict.text}</div>
+          {worst.length > 0 && (
+            <ul className="mt-1.5 flex flex-col gap-0.5">
+              {worst.map((f) => (
+                <li key={f.title} className="flex min-w-0 items-center gap-2 text-[13.5px] text-ink">
+                  <span className={`size-1.5 shrink-0 rounded-full ${f.severity === "bad" ? "bg-bad" : "bg-warn"}`} />
+                  <span className="truncate">{f.title}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-1 truncate text-[12.5px] text-dim">
             {verdict.sub}
             {latest?.securityScore != null && (
               <>
@@ -401,8 +436,36 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         </div>
       </Card>
 
+      <NightCard />
       <PanelGrid blocks={blocks} />
     </div>
+  );
+}
+
+/**
+ * El reparto del último diagnóstico en un anillo: rojo lo urgente, ámbar lo que
+ * conviene, verde lo que está bien. Sin análisis, un anillo gris.
+ */
+function VerdictRing({ bad, warn, ok, analyzed }: { bad: number; warn: number; ok: number; analyzed: boolean }) {
+  const total = Math.max(1, bad + warn + ok);
+  const a = (bad / total) * 100;
+  const b = a + (warn / total) * 100;
+  const ring = analyzed
+    ? `conic-gradient(var(--color-bad) 0 ${a}%, var(--color-warn) ${a}% ${b}%, var(--color-ok) ${b}% 100%)`
+    : "conic-gradient(var(--color-line-2) 0 100%)";
+  return (
+    <span className="grid size-[68px] shrink-0 place-items-center rounded-full" style={{ background: ring }} aria-hidden>
+      <span className="grid size-[54px] place-items-center rounded-full bg-panel text-center leading-none">
+        {analyzed ? (
+          <span className="font-mono text-[15px] font-semibold tabular text-ink">
+            {bad + warn}
+            <span className="block pt-0.5 font-sans text-[9.5px] font-normal text-mute">{bad + warn === 1 ? "aviso" : "avisos"}</span>
+          </span>
+        ) : (
+          <span className="text-[10px] text-mute">sin datos</span>
+        )}
+      </span>
+    </span>
   );
 }
 

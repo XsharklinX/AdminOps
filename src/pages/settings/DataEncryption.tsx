@@ -2,7 +2,7 @@
 import { Check, ClipboardCopy, Download, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
-import { Button, Card, Modal, inputClass, smallBtn } from "../../components/ui";
+import { Button, Card, Explain, inputClass, Modal, smallBtn } from "../../components/ui";
 import { dataCryptApi, knowledgeApi, lockApi, logQuietly, type DataCryptStatus, type LockStatus } from "../../lib/api";
 
 export function DataEncryption() {
@@ -69,9 +69,9 @@ export function DataEncryption() {
   if (!st || !lock) return null;
   return (
     <Card title="Cifrar mis datos" icon={<ShieldCheck size={14} />}>
-      <p className="mb-3 text-xs text-dim">
-        Clientes, contactos, notas, casos, seguimientos, agenda y lo que sabes de cada equipo se guardan cifrados (AES-256). Si se pierde el pendrive o roban el equipo, no se puede leer nada sin tu PIN o contraseña. Los ajustes y la pantalla de bloqueo quedan en claro; los informes PDF no se cifran.
-      </p>
+      <Explain short="Clientes, contactos, notas, casos, seguimientos, agenda y lo que sabes de cada equipo se guardan cifrados (AES-256)." className="mb-3">
+        Si se pierde el pendrive o roban el equipo, no se puede leer nada sin tu PIN o contraseña. Los ajustes y la pantalla de bloqueo quedan en claro; los informes PDF no se cifran.
+      </Explain>
       {!st.available ? (
         <p className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-dim">
           <TriangleAlert size={14} className="shrink-0 text-warn" /> Primero activa el bloqueo con PIN o contraseña, arriba: con él se abre la clave de los datos.

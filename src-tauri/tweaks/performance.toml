@@ -179,3 +179,102 @@ $plan = if ($Previous) { $Previous } else { '381b4222-f694-41f0-9685-ff5bb260df2
 powercfg.exe /setactive $plan
 if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
 '''
+
+[[tweak]]
+id = "performance.disk-link-power"
+name = "Sin ahorro de energía en el enlace de los discos (SATA)"
+description = "El enlace entre la placa y el disco ya no se duerme para ahorrar. Es una causa habitual de errores de escritura y de «operación reintentada» (suceso 153) con discos sanos."
+category = "performance"
+risk = "low"
+admin = true
+note = "Gasta un poco más de batería en portátiles. Si los errores no paran después, la causa es otra: el cable, el driver de la controladora o el propio disco."
+
+[tweak.script]
+detect = '''
+$q = (powercfg.exe /q SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 0b2d69d7-a2a1-449c-9680-f91c70521c60) -join "`n"
+$v = [regex]::Matches($q, '0x[0-9a-fA-F]{8}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) }
+"$(($v.Count -ge 2) -and ($v[-2] -eq 0) -and ($v[-1] -eq 0))"
+'''
+apply = '''
+$q = (powercfg.exe /q SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 0b2d69d7-a2a1-449c-9680-f91c70521c60) -join "`n"
+$v = [regex]::Matches($q, '0x[0-9a-fA-F]{8}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) }
+$prev = if ($v.Count -ge 2) { "$($v[-2]),$($v[-1])" } else { '' }
+powercfg.exe /setacvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 0b2d69d7-a2a1-449c-9680-f91c70521c60 0
+if ($LASTEXITCODE) { throw 'Este equipo no tiene ese ajuste de energía.' }
+powercfg.exe /setdcvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 0b2d69d7-a2a1-449c-9680-f91c70521c60 0 | Out-Null
+powercfg.exe /setactive SCHEME_CURRENT
+$prev
+'''
+revert = '''
+$ac, $dc = if ($Previous -match '^(\d+),(\d+)$') { $Matches[1], $Matches[2] } else { throw 'No se guardó cómo estaba antes: cámbialo en Panel de control → Opciones de energía → Cambiar la configuración avanzada.' }
+powercfg.exe /setacvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 0b2d69d7-a2a1-449c-9680-f91c70521c60 $ac
+powercfg.exe /setdcvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 0b2d69d7-a2a1-449c-9680-f91c70521c60 $dc | Out-Null
+powercfg.exe /setactive SCHEME_CURRENT
+if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
+'''
+
+[[tweak]]
+id = "performance.usb-suspend"
+name = "Sin suspensión selectiva de los USB"
+description = "Windows deja de apagar los puertos USB que cree sin uso. Evita que un disco o un pendrive USB se desconecte solo en mitad de una copia."
+category = "performance"
+risk = "low"
+admin = true
+note = "Gasta algo más de batería en portátiles."
+
+[tweak.script]
+detect = '''
+$q = (powercfg.exe /q SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226) -join "`n"
+$v = [regex]::Matches($q, '0x[0-9a-fA-F]{8}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) }
+"$(($v.Count -ge 2) -and ($v[-2] -eq 0) -and ($v[-1] -eq 0))"
+'''
+apply = '''
+$q = (powercfg.exe /q SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226) -join "`n"
+$v = [regex]::Matches($q, '0x[0-9a-fA-F]{8}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) }
+$prev = if ($v.Count -ge 2) { "$($v[-2]),$($v[-1])" } else { '' }
+powercfg.exe /setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+if ($LASTEXITCODE) { throw 'Este equipo no tiene ese ajuste de energía.' }
+powercfg.exe /setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 | Out-Null
+powercfg.exe /setactive SCHEME_CURRENT
+$prev
+'''
+revert = '''
+$ac, $dc = if ($Previous -match '^(\d+),(\d+)$') { $Matches[1], $Matches[2] } else { throw 'No se guardó cómo estaba antes: cámbialo en Panel de control → Opciones de energía → Cambiar la configuración avanzada.' }
+powercfg.exe /setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 $ac
+powercfg.exe /setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 $dc | Out-Null
+powercfg.exe /setactive SCHEME_CURRENT
+if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
+'''
+
+[[tweak]]
+id = "performance.disk-idle"
+name = "No apagar los discos tras un rato sin uso"
+description = "Los discos ya no se paran a los minutos sin usarse. Evita errores y esperas al despertarlos, sobre todo con discos mecánicos viejos o en cajas USB."
+category = "performance"
+risk = "low"
+admin = true
+note = "En portátiles con disco mecánico gasta algo más de batería."
+
+[tweak.script]
+detect = '''
+$q = (powercfg.exe /q SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e) -join "`n"
+$v = [regex]::Matches($q, '0x[0-9a-fA-F]{8}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) }
+"$(($v.Count -ge 2) -and ($v[-2] -eq 0) -and ($v[-1] -eq 0))"
+'''
+apply = '''
+$q = (powercfg.exe /q SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e) -join "`n"
+$v = [regex]::Matches($q, '0x[0-9a-fA-F]{8}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) }
+$prev = if ($v.Count -ge 2) { "$($v[-2]),$($v[-1])" } else { '' }
+powercfg.exe /setacvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e 0
+if ($LASTEXITCODE) { throw 'Este equipo no tiene ese ajuste de energía.' }
+powercfg.exe /setdcvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e 0 | Out-Null
+powercfg.exe /setactive SCHEME_CURRENT
+$prev
+'''
+revert = '''
+$ac, $dc = if ($Previous -match '^(\d+),(\d+)$') { $Matches[1], $Matches[2] } else { throw 'No se guardó cómo estaba antes: cámbialo en Panel de control → Opciones de energía → Cambiar la configuración avanzada.' }
+powercfg.exe /setacvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e $ac
+powercfg.exe /setdcvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e $dc | Out-Null
+powercfg.exe /setactive SCHEME_CURRENT
+if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
+'''

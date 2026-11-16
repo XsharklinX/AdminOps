@@ -1,7 +1,7 @@
 // Ajustes → Apariencia.
 import { useState } from "react";
 import { Volume2 } from "lucide-react";
-import { Card, Toggle, inputClass, smallBtn } from "../../components/ui";
+import { Card, Explain, inputClass, smallBtn, Toggle } from "../../components/ui";
 import { type Accent, ACCENTS, previewAccent, setPrefs, usePrefs, ZOOMS } from "../../lib/prefs";
 import { getSchedule, getTheme, getThemeMode, setSchedule, setThemeMode, type ThemeMode } from "../../lib/theme";
 import { playSound } from "../../lib/sounds";
@@ -113,12 +113,9 @@ export function Appearance() {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] text-mute">
-          Se usa en la selección, los botones principales y los enlaces. Pasa el
-          ratón por uno para verlo en toda la app sin guardarlo. Los estados
-          (bien, aviso, error) no cambian. «Alto contraste» además marca más los
-          bordes y los textos secundarios.
-        </p>
+        <Explain short="Se usa en la selección, los botones principales y los enlaces." className="mt-2">
+          Pasa el ratón por uno para verlo en toda la app sin guardarlo. Los estados (bien, aviso, error) no cambian. «Alto contraste» además marca más los bordes y los textos secundarios.
+        </Explain>
       </Card>
       <Card title="Detalles del aspecto">
         <Row title="Consejos mientras esperas" sub="Debajo de las tareas largas, un consejo corto sobre algo que AdminOps sabe hacer.">

@@ -221,6 +221,8 @@ export interface RescueResult {
 }
 
 export const disksApi = {
+  /** Errores de Windows de los últimos días, por disco y por tipo. */
+  errorHistory: (days = 30) => invoke<import("../diskAssist").DiskErrors[]>("disk_error_history", { days }),
   status: () => invoke<DiskReport[]>("disks_status"),
   /** Comprueba el sistema de archivos sin cambiar nada. */
   check: (letter: string) => invoke<DiskCheck>("disk_check", { letter }),

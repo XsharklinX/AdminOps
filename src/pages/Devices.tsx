@@ -31,7 +31,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card } from "../components/ui";
+import { Button, Card, Explain } from "../components/ui";
 import { logQuietly, lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
 import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
 import { DataTable } from "../components/DataTable";
@@ -340,10 +340,9 @@ export function Devices() {
           <div className="flex items-center gap-2 text-sm font-medium text-ink">
             <TriangleAlert size={15} className="text-warn" /> IP duplicadas en los últimos 30 días
           </div>
-          <p className="mt-1 text-xs text-dim">
-            Windows detectó otro dispositivo usando la misma IP que este equipo. Provoca cortes de red intermitentes. Solución: dejar que el router asigne
-            las IP (DHCP) o reservar una IP fija para cada equipo en el router.
-          </p>
+          <Explain short="Windows detectó otro dispositivo usando la misma IP que este equipo." className="mt-1">
+            Provoca cortes de red intermitentes. Solución: dejar que el router asigne las IP (DHCP) o reservar una IP fija para cada equipo en el router.
+          </Explain>
           <ul className="mt-2 space-y-0.5">
             {conflicts.slice(0, 5).map((c, i) => (
               <li key={i} className="font-mono text-xs text-ink">
@@ -498,10 +497,9 @@ export function Devices() {
               { id: "actions", header: "", align: "right", headClass: "w-24", stopClick: true, cell: (d) => actions(d) },
             ]}
           />
-          <p className="mt-3 text-[11px] text-mute">
-            Haz clic en un dispositivo para ver todo lo que se sabe de él. Los móviles y algunos equipos no responden al ping pero aparecen igualmente. Ponle
-            nombre a los tuyos para reconocer rápido uno desconocido.
-          </p>
+          <Explain short="Haz clic en un dispositivo para ver todo lo que se sabe de él." className="mt-3">
+            Los móviles y algunos equipos no responden al ping pero aparecen igualmente. Ponle nombre a los tuyos para reconocer rápido uno desconocido.
+          </Explain>
           {clients.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-line/60 pt-3">
               <span className="text-xs text-dim">Guardar esta lista en la ficha de</span>

@@ -1,3 +1,4 @@
+import { StartupGain } from "../components/StartupGain";
 import { FileWarning, RefreshCw, Search } from "lucide-react";
 import { AutorunsCard } from "../components/expert";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -135,6 +136,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="mx-auto max-w-(--page-max) p-6">
       <BootCard />
+      <StartupGain items={items} isAdmin={isAdmin} onChanged={() => void load()} />
       <div className="mb-4 flex items-center gap-3">
         <p className="text-sm text-dim">
           <span className="font-mono text-neon">{enabled}</span> de {items.length} arrancan con Windows
@@ -162,7 +164,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+      <div className="overflow-x-auto rounded-2xl border border-line/70 bg-panel shadow-elev-1">
         <DataTable
           padded
           sticky

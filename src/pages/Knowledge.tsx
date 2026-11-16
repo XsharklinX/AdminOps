@@ -889,7 +889,7 @@ function Templates({ openId }: { openId: string | null }) {
               {items.map((t) => (
                 <div
                   key={t.id}
-                  className="group flex items-start gap-2 rounded-xl border border-line bg-panel px-3.5 py-2.5"
+                  className="group flex items-start gap-2 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3.5 py-2.5"
                 >
                   <FileText size={14} className="mt-0.5 shrink-0 text-neon" />
                   <button
@@ -1037,7 +1037,7 @@ function Notes() {
           .map((g) => (
             <section
               key={`${g.scope}${g.label}`}
-              className="rounded-xl border border-line bg-panel px-4 py-3"
+              className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-4 py-3"
             >
               <h3 className="mb-1.5 flex items-center gap-1.5 text-sm text-ink">
                 {g.scope === "machine" ? (

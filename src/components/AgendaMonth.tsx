@@ -51,7 +51,7 @@ export function MonthView({
   const title = month.toLocaleDateString("es", { month: "long", year: "numeric" });
 
   return (
-    <div className="rounded-xl border border-line bg-panel">
+    <div className="rounded-2xl border border-line/70 bg-panel shadow-elev-1">
       <header className="flex items-center gap-2 px-4 py-3">
         <button onClick={() => onMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="rounded-md p-1 text-mute hover:bg-panel-2 hover:text-ink" title="Mes anterior">
           <ChevronLeft size={16} />

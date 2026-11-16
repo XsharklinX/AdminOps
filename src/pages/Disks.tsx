@@ -4,15 +4,18 @@
 // conexión o el índice de archivos), porque de eso depende qué hacer. Lo que
 // pierde datos va antes que lo que se arregla: con un disco que falla, lo
 // primero es copiar lo que aún se lee, y eso está aquí mismo.
-import { Activity, CheckCircle2, ClipboardCopy, CircleAlert, FolderInput, FolderOutput, HardDrive, Loader2, RefreshCw, ScanSearch, Usb, Wrench, XCircle } from "lucide-react";
-import { useState } from "react";
+import { Activity, CheckCircle2, ChevronDown, ClipboardCopy, CircleAlert, FolderInput, FolderOutput, HardDrive, Loader2, RefreshCw, ScanSearch, Usb, Wrench, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { BitLockerChip, DiskTrend, RemovableActions, SpeedTest } from "../components/DiskExtras";
 import { DiskDeep, DiskWatchCard, ScoreCard } from "../components/DiskDeep";
 import { CloneCard } from "../components/DiskRescue";
+import { DiskAssistant, DiskErrorStrip } from "../components/DiskAssistant";
+import type { DiskErrors } from "../lib/diskAssist";
+import { logQuietly } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Loading, smallBtn } from "../components/ui";
+import { Button, Card, Explain, Loading, smallBtn } from "../components/ui";
 import { disksApi, type DiskCheck, type DiskReport, type DiskVolume, type RescueResult } from "../lib/api";
 import { withoutUserPaths } from "../lib/errors";
 import { bytes } from "../lib/format";
@@ -36,6 +39,17 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
   // Cuándo se leyó lo que se ve (al abrir, lo de la última vez mientras se lee de nuevo).
   const [at, setAt] = useState<number | null>(null);
   const technician = usePrefs().mode !== "user";
+  // Errores de Windows por disco (30 días): para la gráfica de cada ficha y el asistente.
+  const [errors, setErrors] = useState<DiskErrors[] | null>(null);
+  const [assist, setAssist] = useState<DiskReport | null>(null);
+  useEffect(() => {
+    disksApi.errorHistory(30).then(setErrors).catch((e) => {
+      setErrors([]);
+      logQuietly("Disks")(e);
+    });
+  }, []);
+  const errsOf = (n: number) => errors?.find((e) => e.disk === n);
+  const controllerResets = errors?.find((e) => e.disk === null)?.byKind.controller ?? 0;
 
   const load = (vigente: () => boolean = () => true) => {
     setLoading(true);
@@ -53,10 +67,10 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-0 flex-1 text-xs text-dim">
-          Qué le pasa a cada disco y qué hacer. Si Windows te dice «Reparar disco» o hay archivos que no se copian, empieza por el veredicto: no es lo mismo un
-          índice de archivos dañado (se repara) que un disco que se estropea (se copia lo que se pueda y se cambia).
-        </p>
+        <Explain short="Qué le pasa a cada disco y qué hacer con él." className="min-w-0 flex-1">
+          Si Windows te dice «Reparar disco» o hay archivos que no se copian, empieza por el veredicto: no es lo mismo un índice de archivos dañado (se repara) que
+          un disco que se estropea (se copia lo que se pueda y se cambia).
+        </Explain>
         <FreshNote at={at} refreshing={loading && disks !== null} />
         <Button kind="ghost" onClick={() => load()} disabled={loading}>
           {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Actualizar
@@ -72,8 +86,17 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
       ) : disks === null ? (
         <Loading text="Leyendo los discos… (con discos grandes o externos tarda unos segundos)" />
       ) : (
-        disks.map((d) => <DiskCard key={d.number} d={d} isAdmin={isAdmin} onChanged={() => load()} />)
+        <>
+          {/* Lo primero, cómo está cada disco; el detalle de cada uno, debajo. */}
+          <DiskOverview disks={disks} />
+          {disks.map((d) => (
+            <DiskCard key={d.number} d={d} isAdmin={isAdmin} onChanged={() => load()} errs={errors === null ? undefined : (errsOf(d.number) ?? null)} onAssist={() => setAssist(d)} />
+          ))}
+          {assist && <DiskAssistant d={assist} errs={errsOf(assist.number)} controllerResets={controllerResets} onClose={() => setAssist(null)} />}
+        </>
       )}
+
+      <h2 className="pt-2 text-[13px] font-semibold tracking-wide text-mute uppercase">Herramientas</h2>
 
       <Rescue isAdmin={isAdmin} />
       {technician && <CloneCard isAdmin={isAdmin} />}
@@ -112,8 +135,55 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; onChanged: () => void }) {
+/** Una ficha corta por disco: su veredicto en grande, su nota y lo esencial. Pulsarla lleva a su detalle. */
+function DiskOverview({ disks }: { disks: DiskReport[] }) {
+  if (disks.length === 0) return <p className="text-sm text-mute">Windows no enseña ningún disco.</p>;
+  const order = { bad: 0, warn: 1, ok: 2 } as const;
+  const sorted = [...disks].sort((a, b) => order[a.verdict.level] - order[b.verdict.level]);
+  const word = { ok: "Bien", warn: "Vigilar", bad: "Cambiar pronto" } as const;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {sorted.map((d) => {
+        const t = TONE[d.verdict.level];
+        const external = d.bus.toUpperCase() === "USB";
+        return (
+          <button
+            key={d.number}
+            type="button"
+            onClick={() => document.getElementById(`disk-${d.number}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className={`flex min-w-0 flex-col gap-2 rounded-2xl border border-line/70 bg-panel p-5 text-left shadow-elev-1 transition-[filter] hover:brightness-110 ${d.verdict.level === "ok" ? "" : `tone-${d.verdict.level}`}`}
+          >
+            <span className="truncate text-[11px] tracking-wide text-mute uppercase">
+              {external ? "Externo" : `Disco ${d.number}`} · {d.media !== "Unspecified" ? d.media : d.bus} · {bytes(d.size)}
+            </span>
+            <span className={`text-xl font-semibold tracking-tight ${t.text}`}>{word[d.verdict.level]}</span>
+            <span className="truncate text-[13px] text-ink">{d.model || `Disco ${d.number}`}</span>
+            <span className="line-clamp-2 text-xs text-dim">{d.verdict.level === "ok" ? d.verdict.text : d.verdict.title}</span>
+            <span className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
+              <Fact value={String(d.score.total)} label="nota" tone={t.text} />
+              {known(d.temperature) && d.temperature > 0 && <Fact value={`${d.temperature} °C`} label="temperatura" />}
+              {d.score.lifeYears !== null && <Fact value={d.score.lifeYears >= 10 ? "+10 años" : `${d.score.lifeYears.toFixed(1)} años`} label="vida estimada" />}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Fact({ value, label, tone = "text-ink" }: { value: string; label: string; tone?: string }) {
+  return (
+    <span className="flex flex-col">
+      <span className={`font-mono text-[15px] font-semibold tabular ${tone}`}>{value}</span>
+      <span className="text-[10.5px] text-mute">{label}</span>
+    </span>
+  );
+}
+
+function DiskCard({ d, isAdmin, onChanged, errs, onAssist }: { d: DiskReport; isAdmin: boolean; onChanged: () => void; errs: DiskErrors | null | undefined; onAssist: () => void }) {
   const technician = usePrefs().mode !== "user";
+  // Un disco sano no necesita su detalle a la vista: se pliega y se abre al pulsar.
+  const [open, setOpen] = useState(d.verdict.level !== "ok");
   const toast = useToast();
   const copyText = (text: string, ok: string) => void navigator.clipboard.writeText(text).then(() => toast("ok", ok), () => toast("error", "No se pudo copiar."));
   const t = TONE[d.verdict.level];
@@ -130,7 +200,7 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
   if (known(d.readErrors)) facts.push(`${d.readErrors} errores de lectura`);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-line bg-panel">
+    <section id={`disk-${d.number}`} className="scroll-mt-4 overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">
       <header className="flex flex-wrap items-center gap-3 px-4 py-3">
         <Icon size={18} className="shrink-0 text-mute" />
         <div className="min-w-0 flex-1">
@@ -142,7 +212,13 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
         <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${t.box} ${t.text}`}>
           <t.Icon size={12} /> {d.verdict.level === "ok" ? "Sano" : d.verdict.level === "warn" ? "Con avisos" : "Fallando"}
         </span>
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex items-center gap-1 text-xs text-mute hover:text-ink">
+          {open ? "Ocultar detalle" : "Ver detalle"}
+          <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
       </header>
+      {open && (
+      <>
 
       {d.verdict.level !== "ok" && (
         <div className={`mx-4 mb-3 rounded-lg border p-3 ${t.box}`}>
@@ -167,6 +243,7 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
           <ClipboardCopy size={12} /> Copiar para el cliente
         </button>
       </div>
+      {errs !== undefined && <DiskErrorStrip errs={errs ?? undefined} onAssist={onAssist} />}
       <ScoreCard score={d.score} technician={technician} />
       <DiskTrend d={d} />
       <SpeedTest d={d} />
@@ -178,6 +255,8 @@ function DiskCard({ d, isAdmin, onChanged }: { d: DiskReport; isAdmin: boolean; 
             <VolumeRow key={v.letter} v={v} failing={d.verdict.level === "bad"} removable={external || d.bus.toUpperCase() === "SD"} diskSize={d.size} isAdmin={isAdmin} onChanged={onChanged} />
           ))}
         </ul>
+      )}
+      </>
       )}
     </section>
   );
@@ -330,11 +409,10 @@ function Rescue({ isAdmin }: { isAdmin: boolean }) {
   );
 
   return (
-    <Card title="Rescatar archivos" icon={<FolderOutput size={14} />}>
-      <p className="mb-3 text-xs text-dim">
-        Para un disco que da errores o del que «hay archivos que no se pasan»: copia a otro disco todo lo que aún se puede leer, salta enseguida lo ilegible (en vez
-        de quedarse colgado) y al final dice qué archivos se quedaron. Lo que ya estaba copiado en el destino no se vuelve a copiar.
-      </p>
+    <Card id="disk-rescue" title="Rescatar archivos" icon={<FolderOutput size={14} />}>
+      <Explain short="Para un disco que da errores o del que «hay archivos que no se pasan»." className="mb-3">
+        Copia a otro disco todo lo que aún se puede leer, salta enseguida lo ilegible (en vez de quedarse colgado) y al final dice qué archivos se quedaron. Lo que ya estaba copiado en el destino no se vuelve a copiar.
+      </Explain>
       <div className="flex flex-wrap items-end gap-3">
         {folder("Copiar desde (el disco con problemas)", source, setSource, <FolderOutput size={14} />)}
         {folder("Hacia (otro disco, con espacio)", dest, setDest, <FolderInput size={14} />)}

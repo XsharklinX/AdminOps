@@ -148,7 +148,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
             </Button>
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-xl border border-line bg-panel">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">
             {visible.length === 0 ? (
               <EmptyLine>{query ? `Nadie coincide con «${query}».` : "Ninguna cuenta con ese filtro."}</EmptyLine>
             ) : (
@@ -327,7 +327,7 @@ function UserCard({
         </div>
       ))}
 
-      <section className="rounded-xl border border-line bg-panel p-4">
+      <section className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
         <div className="flex flex-wrap items-center gap-3">
           {u.builtin ? (
             <span className="grid size-12 shrink-0 place-items-center rounded-full border border-line bg-void/60 text-dim">

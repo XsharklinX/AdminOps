@@ -289,3 +289,39 @@ if ($busy) { throw "Sesión abierta: $($busy -join ', '). Cierra su sesión y re
 if ($fixed) { "Perfil reparado: $($fixed -join ', '). El usuario ya puede volver a iniciar sesión." }
 else { 'No se encontró ningún perfil dañado.' }
 '''
+
+[[tweak]]
+id = "repair.defender-signatures"
+name = "Actualizar las firmas de Microsoft Defender"
+description = "Descarga las últimas definiciones del antivirus de Windows, sin esperar a Windows Update."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+timeout = 600
+note = "Necesita Internet. Con otro antivirus activo, Defender está en reposo y no hace falta."
+
+[tweak.script]
+run = '''
+Update-MpSignature -ErrorAction Stop
+$s = Get-MpComputerStatus
+"Firmas al día: versión $($s.AntivirusSignatureVersion), del $($s.AntivirusSignatureLastUpdated.ToString('d'))."
+'''
+
+[[tweak]]
+id = "repair.defender-realtime"
+name = "Activar la protección en tiempo real de Defender"
+description = "Vuelve a encender la protección en tiempo real cuando no hay otro antivirus."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+note = "Si una directiva de la empresa la apaga, Windows no deja encenderla: lo dirá."
+
+[tweak.script]
+run = '''
+Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop
+Start-Sleep -Seconds 2
+if ((Get-MpComputerStatus).RealTimeProtectionEnabled) { 'Protección en tiempo real activada.' }
+else { throw 'Windows no la ha encendido: puede que una directiva de la empresa o la protección contra alteraciones lo impida. Actívala en Seguridad de Windows.' }
+'''

@@ -14,6 +14,7 @@ const alert = (id: string, level: WindowsAlert["level"], time: number, read = fa
   explanation: "",
   advice: "",
   page: null,
+  fix: null,
   count: 1,
   read,
 });

@@ -6,7 +6,7 @@
 import { CloudUpload, FolderOpen, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
-import { Button, Card, inputClass } from "../../components/ui";
+import { Button, Card, Explain, inputClass } from "../../components/ui";
 import { logQuietly, autoBackupApi, disksApi, type AutoBackupInfo } from "../../lib/api";
 import { withoutUserPaths } from "../../lib/errors";
 import { fullDate } from "../../lib/format";
@@ -76,10 +76,9 @@ export function AutoBackup() {
 
   return (
     <Card title="Copia automática" icon={<CloudUpload size={14} />}>
-      <p className="text-xs text-dim">
-        Una copia cifrada de tus datos (ajustes, clientes, contactos, agenda, portales) cada pocos días, en una carpeta de OneDrive o en otro disco. Si pierdes el
-        pendrive, la recuperas en Seguridad de tus datos → Restaurar.
-      </p>
+      <Explain short="Una copia cifrada de tus datos (ajustes, clientes, contactos, agenda, portales) cada pocos días, en una carpeta de OneDrive o en otro disco.">
+        Si pierdes el pendrive, la recuperas en Seguridad de tus datos → Restaurar.
+      </Explain>
 
       {info.enabled && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">

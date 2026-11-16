@@ -75,6 +75,14 @@ export interface WindowsAlert {
   page: string | null;
   count: number;
   read: boolean;
+  /** Lo que lo arregla, si AdminOps puede hacerlo. */
+  fix: AlertFix | null;
+}
+
+export interface AlertFix {
+  label: string;
+  kind: string;
+  id: string;
 }
 
 /** Un aviso silenciado en este equipo. */
@@ -90,6 +98,8 @@ export const alertsApi = {
   markRead: () => invoke<void>("mark_windows_alerts_read"),
   clear: () => invoke<void>("clear_windows_alerts"),
   dismiss: (id: string) => invoke<void>("dismiss_windows_alert", { id }),
+  /** Arregla el aviso (por su clave): limpia, repara o reinicia lo que toque. */
+  fix: (key: string) => invoke<string>("fix_windows_alert", { key }),
   mute: (id: string) => invoke<void>("mute_windows_alert", { id }),
   unmute: (key: string) => invoke<void>("unmute_windows_alert", { key }),
   muted: () => invoke<MutedAlert[]>("muted_windows_alerts"),

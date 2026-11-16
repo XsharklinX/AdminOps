@@ -4,7 +4,7 @@ import { CheckCircle2, Download, HardDrive, Sparkles, Upload } from "lucide-reac
 import { useEffect, useState } from "react";
 import { NAV } from "../../components/Sidebar";
 import { useToast } from "../../components/feedback";
-import { Button, Card, inputClass, Toggle } from "../../components/ui";
+import { Button, Card, Explain, inputClass, Toggle } from "../../components/ui";
 import { openOnboarding } from "../../lib/navigate";
 import { appcareApi, configApi, logQuietly, type Settings, storageApi, type StorageInfo } from "../../lib/api";
 import { exportPrefs, importPrefs, setPrefs, usePrefs } from "../../lib/prefs";
@@ -257,10 +257,9 @@ function WhereStored({ portable }: { portable: boolean }) {
     <Card title={portable ? "Tus datos viajan con AdminOps" : "Dónde se guardan tus datos"}>
       <p className="mb-2 text-sm text-dim">{reason}</p>
       {portable && (
-        <p className="mb-3 text-xs text-dim">
-          Para actualizar, vuelve a pasar el instalador sobre la misma carpeta: los datos no se tocan (el instalador solo cambia los archivos del programa). Lo tuyo
-          se configura una vez y te acompaña; lo de cada equipo se separa por su nombre.
-        </p>
+        <Explain short="Para actualizar, vuelve a pasar el instalador sobre la misma carpeta." className="mb-3">
+          Los datos no se tocan (el instalador solo cambia los archivos del programa). Lo tuyo se configura una vez y te acompaña; lo de cada equipo se separa por su nombre.
+        </Explain>
       )}
       {portable && info && (
         <div className="mb-3 rounded-lg border border-line bg-panel-2 p-3">
@@ -300,11 +299,9 @@ function WhereStored({ portable }: { portable: boolean }) {
       )}
       {!portable && info && (
         <div className="mb-3 rounded-lg border border-line bg-panel-2 p-3">
-          <p className="text-xs text-dim">
-            Si llevas AdminOps en un pendrive (instalado en él o el portable), tus datos van con él: instálalo en el pendrive y lo detecta solo. Para usar la carpeta
-            del programa en cualquier otra unidad (un disco externo), actívalo aquí: al volver a abrir AdminOps se traen tus datos de este equipo y las contraseñas
-            se cifran con la clave de esa carpeta.
-          </p>
+          <Explain short="Si llevas AdminOps en un pendrive (instalado en él o el portable), tus datos van con él.">
+            Instálalo en el pendrive y lo detecta solo. Para usar la carpeta del programa en cualquier otra unidad (un disco externo), actívalo aquí: al volver a abrir AdminOps se traen tus datos de este equipo y las contraseñas se cifran con la clave de esa carpeta.
+          </Explain>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button kind="ghost" onClick={() => void makePortable()} disabled={!info.canSwitch || asked}>
               <HardDrive size={14} /> Guardar todo en la carpeta del programa
@@ -333,10 +330,9 @@ function WhereStored({ portable }: { portable: boolean }) {
         </div>
       </div>
       {portable && (
-        <p className="mt-3 text-xs text-mute">
-          Las contraseñas guardadas van cifradas con una clave de la propia carpeta: funcionan en cualquier equipo, pero quien se lleve el pendrive entero podría
-          leerlas. Activa el bloqueo con PIN en Seguridad y haz de vez en cuando una copia cifrada (aquí abajo): si pierdes el pendrive, lo pierdes todo.
-        </p>
+        <Explain short="Las contraseñas guardadas van cifradas con una clave de la propia carpeta." className="mt-3">
+          Funcionan en cualquier equipo, pero quien se lleve el pendrive entero podría leerlas. Activa el bloqueo con PIN en Seguridad y haz de vez en cuando una copia cifrada (aquí abajo): si pierdes el pendrive, lo pierdes todo.
+        </Explain>
       )}
     </Card>
   );

@@ -30,6 +30,14 @@ export interface Finding {
   actions: FindingAction[];
   /** Identifica el problema sin sus cifras: lo que se guarda al marcarlo «Ya lo sé». */
   key: string;
+  /** De dónde sale: cada suceso con su fecha. Ausente en análisis antiguos. */
+  proof?: Proof[];
+}
+
+/** Una prueba de un hallazgo: cuándo y qué pasó. */
+export interface Proof {
+  when: string;
+  what: string;
 }
 
 /** Un hallazgo que el técnico da por sabido en este equipo. */
@@ -157,7 +165,27 @@ export interface SnapshotInfo {
   warn: number;
 }
 
+/** Un problema de este equipo con su historia (problems.rs). */
+export interface Problem {
+  key: string;
+  title: string;
+  area: string;
+  severity: "bad" | "warn";
+  firstSeen: number;
+  lastSeen: number;
+  resolvedAt: number | null;
+  fixes: string[];
+  events: ProblemEvent[];
+}
+
+export interface ProblemEvent {
+  at: number;
+  kind: "detected" | "resolved" | "reopened";
+}
+
 export const diagApi = {
+  /** Problemas de este equipo: abiertos y resueltos (60 días), con su historia. */
+  problems: () => invoke<Problem[]>("problems_list"),
   /** `force`: vuelve a consultar hardware y winget en vez de reutilizar lo de hace unos minutos. */
   /** `quick`: solo lo que se lee en segundos (no se guarda ni se compara). */
   run: (force = false, quick = false) => invoke<Diagnostics>("run_diagnostics", { force, quick }),

@@ -9,6 +9,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { QuitButton } from "./components/QuitButton";
+import { MoreMenu } from "./components/MoreMenu";
 import { OpenTabs } from "./components/OpenTabs";
 import { PageFind } from "./components/PageFind";
 import { LockScreen } from "./components/LockScreen";
@@ -27,8 +28,8 @@ import { isModestMachine, machineSummary } from "./lib/machine";
 import { NAVIGATE_EVENT, ONBOARDING_EVENT } from "./lib/navigate";
 import { appStarted, appStartMs, codeLoaded, onPerfChange, pageLoads, pageOpened, pagePainted } from "./lib/perf";
 import { Dashboard } from "./pages/Dashboard";
-import { AuditBanner, AuditToggle } from "./components/AuditMode";
-import { PrivacyBanner, PrivacyToggle } from "./components/PrivacyMode";
+import { AuditBanner } from "./components/AuditMode";
+import { PrivacyBanner } from "./components/PrivacyMode";
 import { PageHelp } from "./components/PageHelp";
 import { TasksIndicator } from "./components/TasksIndicator";
 import { CaseBar, NewCaseButton } from "./components/CaseBar";
@@ -738,8 +739,7 @@ export default function App() {
             <NewCaseButton hidden={false} />
             <UndoLast />
             <TasksIndicator onNavigate={goTo} />
-            <PrivacyToggle />
-            <AuditToggle />
+            <MoreMenu onWorkshop={() => setWorkshop(true)} />
             <QuitButton />
             <AlertCenter onNavigate={(p, s) => goTo(p, s ?? null)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
           </>
@@ -764,70 +764,58 @@ export default function App() {
           <CaseBar onOpenChange={setCaseDialog} />
           {prefs.pageTabs && openTabs.length > 1 && <OpenTabs tabs={openTabs} current={page} onPick={(p) => navigate(p)} onClose={closeTab} />}
           <ResumeRibbon current={page} onGo={goTo} />
-          <header data-compact={compact} className={`page-head flex items-end justify-between border-b border-line px-8 ${compact ? "pt-2 pb-2" : "pt-4 pb-4"}`}>
-            <div className="min-w-0">
-              {/* Dónde estás: área › pantalla › sección. Cada parte lleva a su sitio. Al bajar en la pantalla se esconde y la cabecera se queda en una línea. */}
-              <nav aria-label="Dónde estás" className={`flex min-w-0 flex-wrap items-center gap-1 overflow-hidden text-xs text-mute transition-[max-height,opacity,margin] duration-200 ${compact ? "mb-0 max-h-0 opacity-0" : "mb-1 max-h-12 opacity-100"}`}>
-                {area && (
-                  <>
-                    <button onClick={() => openArea(area)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
-                      {area.label}
-                    </button>
-                    <span aria-hidden>›</span>
-                  </>
-                )}
-                {section ? (
-                  <>
-                    <button onClick={() => goTo(page, sectionsOf(page)[0]?.id ?? null)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
-                      {pageLabel(nav.id)}
-                    </button>
-                    <span aria-hidden>›</span>
-                    <span className="px-1 text-dim">{section}</span>
-                  </>
-                ) : (
-                  <span className="px-1 text-dim">{pageLabel(nav.id)}</span>
-                )}
-              </nav>
-              <h1 className={`flex items-center gap-2 font-semibold tracking-tight transition-[font-size] duration-200 ${compact ? "text-base" : "text-[22px]"}`}>
-                <span className="truncate">{section ?? pageLabel(nav.id)}</span>
-                <PageHelp text={nav.help} />
-              </h1>
-              {showTabs && tabs.length > 1 && (
-                <div ref={areaTabsRef} className="no-scrollbar relative isolate mt-3 -mb-4 flex gap-1 overflow-x-auto">
-                  <SlideMark within={areaTabsRef} kind="underline" />
-                  {tabs.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => navigate(t)}
-                      aria-current={t === page ? "page" : undefined}
-                      className={`-mb-px shrink-0 border-b-2 border-transparent px-3 py-1.5 text-[13px] transition-colors ${t === page ? "font-medium text-ink" : "text-dim hover:text-ink"}`}
-                    >
-                      {pageLabel(t)}
-                    </button>
-                  ))}
-                </div>
+          <header data-compact={compact} className="page-head flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-8 py-3">
+            {/* Una línea: la pantalla, de dónde cuelga (cada parte lleva a su sitio) y sus botones. */}
+            <h1 className="flex min-w-0 items-center gap-2 text-[19px] font-semibold tracking-tight">
+              <span className="truncate">{section ?? pageLabel(nav.id)}</span>
+              <PageHelp text={nav.help} />
+            </h1>
+            <nav aria-label="Dónde estás" className="flex min-w-0 items-center gap-1 overflow-hidden text-xs whitespace-nowrap text-mute">
+              {area && (
+                <button onClick={() => openArea(area)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
+                  {area.label}
+                </button>
+              )}
+              {section && (
+                <>
+                  <span aria-hidden>›</span>
+                  <button onClick={() => goTo(page, sectionsOf(page)[0]?.id ?? null)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
+                    {pageLabel(nav.id)}
+                  </button>
+                </>
+              )}
+            </nav>
+            <div className="ml-auto flex items-center gap-2">
+              {page === "dashboard" ? (
+                <span className="text-xs text-mute">En vivo · cada {prefs.refreshMs / 1000} s</span>
+              ) : (
+                page !== "settings" && (
+                  <button
+                    onClick={() => setReloads((r) => ({ ...r, [page]: (r[page] ?? 0) + 1 }))}
+                    className="ico-spin flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink"
+                    title="Vuelve a cargar esta página desde cero (F5)"
+                  >
+                    <RotateCw size={13} /> Recargar
+                  </button>
+                )
               )}
             </div>
-            <div className="flex items-center gap-2">
-            {page === "dashboard" ? (
-              <span className="flex items-center gap-3 text-xs text-mute">
-                En vivo · se actualiza cada {prefs.refreshMs / 1000} s
-                <button onClick={() => setWorkshop(true)} className="rounded-md border border-line-2 px-2 py-1 text-dim transition-colors hover:text-ink" title="Cifras enormes para dejar en un monitor (F11)">
-                  Pantalla de taller
-                </button>
-              </span>
-            ) : (
-              page !== "settings" && (
-                <button
-                  onClick={() => setReloads((r) => ({ ...r, [page]: (r[page] ?? 0) + 1 }))}
-                  className="ico-spin flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink"
-                  title="Vuelve a cargar esta página desde cero (F5)"
-                >
-                  <RotateCw size={13} /> Recargar
-                </button>
-              )
+            {/* Con la barra en «solo áreas», las pantallas del área van debajo, como pestañas. */}
+            {showTabs && tabs.length > 1 && (
+              <div ref={areaTabsRef} className="no-scrollbar relative isolate -mb-3 flex basis-full gap-1 overflow-x-auto">
+                <SlideMark within={areaTabsRef} kind="underline" />
+                {tabs.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => navigate(t)}
+                    aria-current={t === page ? "page" : undefined}
+                    className={`-mb-px shrink-0 border-b-2 border-transparent px-3 py-1.5 text-[13px] transition-colors ${t === page ? "font-medium text-ink" : "text-dim hover:text-ink"}`}
+                  >
+                    {pageLabel(t)}
+                  </button>
+                ))}
+              </div>
             )}
-            </div>
           </header>
           <QuickRead page={page} badges={machine.badges} onGo={(sec) => goTo(page, sec)} />
           <div className="relative min-h-0 flex-1">

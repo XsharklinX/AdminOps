@@ -2,7 +2,7 @@ import { Eye, EyeOff, GripVertical, Plus, RotateCcw, Star, Trash2 } from "lucide
 import { useState } from "react";
 import { useConfirm } from "../../components/feedback";
 import { AREA_ICONS, effectiveAreas, NAV, navLabel, type PageId } from "../../components/Sidebar";
-import { Button, Card, Toggle } from "../../components/ui";
+import { Button, Card, Explain, Toggle } from "../../components/ui";
 import { DEFAULT_SIDEBAR, setPrefs, setSidebar, usePrefs, type NavArea, type SidebarPrefs } from "../../lib/prefs";
 
 const defaultLabel = (p: PageId) => NAV.find((n) => n.id === p)?.label ?? p;
@@ -109,11 +109,9 @@ export function NavEditor() {
       <div className="col-span-12 space-y-3 lg:col-span-7">
         <Card title="Estructura">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="min-w-0 flex-1 text-xs text-dim">
-              Arrastra las secciones y las páginas (por el asa ⋮⋮) para ordenarlas o moverlas de sección. Pulsa el icono de una sección para cambiarlo y escribe
-              encima de cualquier nombre para renombrarlo. ★ fija la pantalla arriba de la barra (las secciones se fijan con la chincheta, en la propia barra); el ojo
-              la oculta de la barra (sigue en «Todo» y en Ctrl+K).
-            </p>
+            <Explain short="Arrastra las secciones y las páginas (por el asa ⋮⋮) para ordenarlas o moverlas de sección." className="min-w-0 flex-1">
+              Pulsa el icono de una sección para cambiarlo y escribe encima de cualquier nombre para renombrarlo. ★ fija la pantalla arriba de la barra (las secciones se fijan con la chincheta, en la propia barra); el ojo la oculta de la barra (sigue en «Todo» y en Ctrl+K).
+            </Explain>
             <Button kind="ghost" onClick={() => save([...areas, { id: `custom-${Date.now().toString(36)}`, label: "Mi sección", icon: "Star", pages: [] }])}>
               <Plus size={14} /> Nueva sección
             </Button>

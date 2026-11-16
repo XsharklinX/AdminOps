@@ -347,7 +347,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {results && (
-        <div className="mb-4 rounded-xl border border-line bg-panel p-4">
+        <div className="mb-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-medium">Resultado</h3>
             <button onClick={() => setResults(null)} className="text-mute hover:text-ink">

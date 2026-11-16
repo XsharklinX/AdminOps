@@ -124,7 +124,7 @@ export interface Prefs {
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: true, sounds: false, soundVolume: 0.5, celebrate: true, demo: false, aura: true, stateShapes: true, tips: true };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: false, sounds: false, soundVolume: 0.5, celebrate: true, demo: false, aura: true, stateShapes: true, tips: true };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -157,6 +157,13 @@ export function getPrefs(): Prefs {
   if (!ACCENTS[p.accent]) p.accent = "blue";
   if (!ZOOMS.some((z) => z.value === p.zoom)) p.zoom = 1;
   if (p.pageWidth !== "limited") p.pageWidth = "full";
+  // Rediseño de la navegación (1.2.10): la tira de pantallas abiertas se apaga una
+  // vez para todos. Quien la quiera la vuelve a encender en Ajustes → Navegación.
+  const raw2 = p as Prefs & { navV2?: boolean };
+  if (!raw2.navV2) {
+    p.pageTabs = false;
+    raw2.navV2 = true;
+  }
   if (![1000, 2000, 5000].includes(p.refreshMs)) p.refreshMs = 2000;
   if (typeof p.soundVolume !== "number" || !(p.soundVolume >= 0 && p.soundVolume <= 1)) p.soundVolume = 0.5;
   p.sounds = p.sounds === true;

@@ -448,6 +448,19 @@ administrador**. Con el **portable** en un USB, repite lo marcado con 🔌 en un
 - [ ] Dejar el Panel abierto un minuto: el uso de CPU de AdminOps se mantiene bajo (la lista de procesos ya solo se relee cada 6 s).
 - [ ] En el registro técnico aparece «N núcleos · ~N GB» al arrancar.
 
+## Rediseño y auditoría (1.2.10)
+- [ ] Barra lateral: cada área abre su primera pantalla y las pestañas salen en la cabecera, en una sola línea con el título.
+- [ ] Menú «⋯» de arriba: modo privado, modo auditoría y pantalla de taller (F11) funcionan; con un modo puesto, el «⋯» lleva un punto.
+- [ ] Panel: el veredicto nombra los dos problemas peores; «El equipo, pieza a pieza» colorea las piezas y un clic lleva a arreglarlo.
+- [ ] Discos con un disco que tenga errores en el Visor de eventos (o un USB que se desconecta): sale en su disco, con el tipo correcto; el Asistente del disco da un plan con sentido.
+- [ ] Discos → arreglos de escritura: aplicar los tres ajustes de energía, comprobar con `powercfg /q` que el valor queda a 0 y deshacerlos (vuelve al valor de antes).
+- [ ] Diagnóstico: aplicar un arreglo; debe decir si funcionó y, si no, proponer el siguiente. «Ver pruebas» enseña fechas y sucesos reales.
+- [ ] Diagnóstico dos veces seguidas tras arreglar algo: el problema pasa a «Resuelto» en Problemas abiertos; si vuelve a salir, «Ha vuelto».
+- [ ] Trabajos de noche: poner la reparación de Windows a una hora cercana, dejar el equipo sin tocar; no debe dormirse y por la mañana el Panel enseña el resultado. En modo auditoría, la reparación no corre.
+- [ ] Inicio de Windows → «Lo que se gana»: salen programas con su retraso; quitar dos y reiniciar; al volver, la tarjeta enseña antes → ahora.
+- [ ] Llenar el disco por debajo del aviso: el aviso trae «Liberar espacio» en el centro de avisos y en la notificación de Windows; en modo auditoría lo rechaza.
+- [ ] Un error cualquiera (p. ej. borrar algo en uso): el aviso rojo se queda hasta cerrarlo y ofrece la salida adecuada.
+
 ## Texto y espacio
 - [ ] En una página con pestañas (Impresoras, Actualizaciones, Mi red…), pasar el ratón por el «?» de la derecha: sale el texto entero, dentro de la ventana, sin recortar. Con clic se queda abierto; clic fuera lo cierra.
 - [ ] En una tabla con nombres largos (Procesos, Aplicaciones, Contactos), pasar el ratón por un texto cortado con «…»: se ve entero en un globo. Donde no está cortado, no aparece globo.

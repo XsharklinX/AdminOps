@@ -249,7 +249,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
           const canRevert = p.items.some((i) => i.hasBackup);
           const isBusy = busy === p.id;
           return (
-            <article key={p.id} className="flex flex-col rounded-xl border border-line bg-panel p-5">
+            <article key={p.id} className="flex flex-col rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-5">
               <div className="mb-3 flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-panel-2 text-dim">
                   <Icon size={20} />

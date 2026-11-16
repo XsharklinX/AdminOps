@@ -411,7 +411,7 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
         <Card title="Sus equipos" icon={<Monitor size={14} />}>
           {p.signedInOn.length === 0 ? (
             <p className="text-xs text-mute">
-              No se sabe en qué equipo está. Comprueba los puestos <strong>a fondo</strong> (Administración → Puestos) y aparecerá aquí el equipo donde tenga la sesión abierta.
+              No se sabe en qué equipo está. Comprueba los puestos <strong>a fondo</strong> (Gestión → Puestos) y aparecerá aquí el equipo donde tenga la sesión abierta.
             </p>
           ) : (
             <ul className="space-y-2">

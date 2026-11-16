@@ -13,7 +13,7 @@ export function AppPreview() {
   const bar = (w: string, accent = false) => <div className={`h-1.5 rounded-full ${accent ? "bg-neon" : "bg-line-2"}`} style={{ width: w }} />;
 
   return (
-    <div className="rounded-xl border border-line bg-panel p-3">
+    <div className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-3">
       <div className="mb-2 flex items-baseline justify-between text-xs">
         <span className="font-medium text-ink">Así se verá</span>
         <span className="text-mute">{ZOOMS.find((z) => z.value === prefs.zoom)?.label ?? "Normal"}</span>

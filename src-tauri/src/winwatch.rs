@@ -48,7 +48,49 @@ pub struct Alert {
     pub page: Option<String>,
     pub count: u32,
     pub read: bool,
+    /// Lo que lo arregla, si AdminOps puede hacerlo (botón en la campana y en la notificación).
+    #[serde(default)]
+    pub fix: Option<AlertFix>,
 }
+
+/// Un arreglo de un aviso: una acción del catálogo (`tweak`) o de Solucionar problemas (`trouble`).
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertFix {
+    pub label: String,
+    pub kind: String,
+    pub id: String,
+}
+
+/// Qué arregla cada tipo de aviso, cuando hay un arreglo de verdad (no solo «revísalo»).
+pub fn fix_for(key: &str) -> Option<AlertFix> {
+    let f = |label: &str, kind: &str, id: &str| Some(AlertFix { label: label.into(), kind: kind.into(), id: id.into() });
+    match key.split(':').next().unwrap_or("") {
+        "lowdisk" => f("Liberar temporales", "tweak", "cleanup.user-temp"),
+        "display4101" => f("Reiniciar el driver de la gráfica", "trouble", "display.reset"),
+        "ipconflict" => f("Renovar la conexión", "trouble", "net.quick"),
+        "wu" => f("Reparar Windows Update", "tweak", "repair.windows-update"),
+        "defender" => f("Analizar ahora", "tweak", "repair.defender-scan"),
+        _ => None,
+    }
+}
+
+/// Ejecuta el arreglo de un aviso. Lo usan la campana (por la interfaz) y la notificación de Windows.
+pub fn run_fix(app: &tauri::AppHandle, fix: &AlertFix) -> Result<String, String> {
+    // Desde la notificación no se pasa por la puerta de las órdenes: el modo auditoría se mira aquí.
+    if crate::audit::audit_mode() {
+        return Err(crate::audit::MESSAGE.into());
+    }
+    match fix.kind.as_str() {
+        "tweak" => crate::tweaks::run_action(app.clone(), fix.id.clone(), app.state())
+            .map(|op| serde_json::to_value(&op).ok().and_then(|v| v["message"].as_str().map(str::to_string)).unwrap_or_else(|| "Hecho.".into())),
+        "trouble" => crate::troubleshoot::troubleshoot_fix(app.state(), fix.id.clone()),
+        _ => Err("Arreglo desconocido.".into()),
+    }
+}
+
+/// Arreglos ofrecidos en notificaciones, por su ficha (la notificación solo lleva letras y números).
+static PENDING_FIX: Mutex<Vec<(String, AlertFix)>> = Mutex::new(Vec::new());
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -166,8 +208,8 @@ fn to_alert(e: &RawEvent) -> Option<Alert> {
             "Un disco tiene sectores dañados".into(),
             disk_name(e),
             "El disco no pudo leer o escribir una zona de su superficie. Es síntoma de que se está estropeando y puede perder datos.",
-            "Haz una copia de seguridad cuanto antes y revisa la salud del disco en Hardware (SMART). Plantéate cambiarlo.",
-            Some("hardware"),
+            "Haz una copia de seguridad cuanto antes. En Discos → Salud y reparación, el asistente del disco dice qué falla y qué hacer.",
+            Some("space"),
         ),
         ("disk", 51) | ("disk", 153) => a(
             "warn",
@@ -175,8 +217,8 @@ fn to_alert(e: &RawEvent) -> Option<Alert> {
             "Un disco tarda en responder o da errores de lectura".into(),
             disk_name(e),
             "Windows tuvo que repetir operaciones con el disco. Causas habituales: cable SATA flojo, disco que empieza a fallar o USB externo con poca alimentación.",
-            "Revisa la salud del disco en Hardware y, en un equipo de sobremesa, el cable SATA. Si es un USB, conéctalo directo al equipo.",
-            Some("hardware"),
+            "En Discos → Salud y reparación, el asistente del disco dice si es el disco, el cable o el ahorro de energía, y lo arregla.",
+            Some("space"),
         ),
         ("Ntfs" | "Microsoft-Windows-Ntfs", 55 | 98) => a(
             "warn",
@@ -339,6 +381,9 @@ fn merge(store: &mut Store, fresh: Vec<Alert>) -> Vec<Alert> {
         if store.muted.iter().any(|m| m.key == a.key) {
             continue;
         }
+        if a.fix.is_none() {
+            a.fix = fix_for(&a.key);
+        }
         if let Some(existing) = store.alerts.iter_mut().find(|x| x.key == a.key && a.time.saturating_sub(x.time) < 6 * 3600) {
             existing.count += 1;
             existing.time = existing.time.max(a.time);
@@ -464,11 +509,54 @@ fn notify(app: &tauri::AppHandle, a: &Alert) {
         return;
     }
     let body = if a.detail.is_empty() { a.explanation.clone() } else { format!("{} · {}", a.detail, a.explanation) };
+    // Con arreglo, la notificación lleva su botón: se arregla sin abrir AdminOps.
+    if let Some(fix) = &a.fix {
+        let token: String = format!("{:x}{}", now(), a.key.len()).chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        {
+            let mut p = PENDING_FIX.lock().unwrap_or_else(|e| e.into_inner());
+            p.push((token.clone(), fix.clone()));
+            let len = p.len();
+            if len > 20 {
+                p.drain(..len - 20);
+            }
+        }
+        let handle = app.clone();
+        let label = fix.label.clone();
+        if crate::toast::show(app, &a.title, &body, &[(label.as_str(), format!("fix:{token}"))], move |arg| on_notification(&handle, arg.as_deref())) {
+            use tauri::Emitter;
+            let _ = app.emit("alert-notified", &a.key);
+            return;
+        }
+    }
     let _ = app.notification().builder().title(&a.title).body(body.chars().take(240).collect::<String>()).show();
     // Windows no avisa de si se pulsa el aviso, pero al pulsarlo pone AdminOps
     // delante: la interfaz abre entonces este aviso (ver App.tsx).
     use tauri::Emitter;
     let _ = app.emit("alert-notified", &a.key);
+}
+
+/// Lo que se pulsó en una notificación con arreglo: el botón lo arregla; el aviso en sí abre AdminOps.
+fn on_notification(app: &tauri::AppHandle, arg: Option<&str>) {
+    use tauri_plugin_notification::NotificationExt;
+    if let Some(("fix", tok)) = arg.and_then(crate::toast::parse_action) {
+        let fix = PENDING_FIX.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(t, _)| t == tok).map(|(_, f)| f.clone());
+        if let Some(fix) = fix {
+            let (title, body) = match run_fix(app, &fix) {
+                Ok(m) => (format!("Hecho: {}", fix.label), m),
+                Err(e) => (format!("No se pudo: {}", fix.label), e),
+            };
+            let _ = app.notification().builder().title(title).body(body.chars().take(240).collect::<String>()).show();
+            return;
+        }
+    }
+    crate::tray::show_main(app);
+}
+
+/// Arregla un aviso de la campana.
+#[tauri::command(async)]
+pub fn fix_windows_alert(app: tauri::AppHandle, key: String) -> Result<String, String> {
+    let fix = fix_for(&key).ok_or("Este aviso no tiene un arreglo automático.")?;
+    run_fix(&app, &fix)
 }
 
 /// Una pasada: eventos nuevos desde la última vez y espacio libre.
@@ -703,6 +791,20 @@ mod tests {
         assert_eq!(s.alerts[0].count, 2);
         // Pasadas 6 h, es un aviso nuevo.
         assert_eq!(merge(&mut s, vec![crash(2000 + 7 * 3600)]).len(), 1);
+    }
+
+    #[test]
+    fn alerts_that_can_be_fixed_say_how() {
+        assert_eq!(fix_for("lowdisk").map(|f| f.id), Some("cleanup.user-temp".into()));
+        assert_eq!(fix_for("wu:0x80070643").map(|f| f.id), Some("repair.windows-update".into()));
+        assert_eq!(fix_for("display4101").map(|f| f.kind), Some("trouble".into()));
+        // Lo que no tiene arreglo automático no inventa uno.
+        assert_eq!(fix_for("bsod"), None);
+        assert_eq!(fix_for("crash:x.exe"), None);
+        let mut s = Store::default();
+        let low = Alert { key: "lowdisk".into(), time: 1, count: 1, ..Default::default() };
+        merge(&mut s, vec![low]);
+        assert_eq!(s.alerts[0].fix.as_ref().map(|f| f.label.as_str()), Some("Liberar temporales"));
     }
 
     #[test]

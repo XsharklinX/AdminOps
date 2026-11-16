@@ -169,7 +169,7 @@ function Chapter({ id, onNext }: { id: string; onNext: (id: string) => void }) {
 
 function Topic({ t, chapter }: { t: GuideTopic; chapter?: string }) {
   return (
-    <article id={chapter ? undefined : `help-${t.id}`} className="scroll-mt-4 rounded-xl border border-line bg-panel-2/30 p-4">
+    <article id={chapter ? undefined : `help-${t.id}`} className="scroll-mt-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1-2/30 p-4">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           {chapter && <div className="text-[10px] tracking-wide text-mute uppercase">{chapter}</div>}

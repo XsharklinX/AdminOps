@@ -3,6 +3,7 @@ mod bootlog;
 mod comms;
 mod context;
 mod perfhistory;
+mod problems;
 mod apps;
 mod boottime;
 mod diagnostics;
@@ -16,12 +17,14 @@ mod metrics;
 mod migrate;
 mod minimon;
 mod network;
+mod nightjobs;
 mod cases;
 mod followups;
 mod snmp;
 mod storage;
 mod company;
 mod webview_orphans;
+mod diskerrors;
 mod disks;
 mod disktools;
 mod casetones;
@@ -273,6 +276,8 @@ pub fn run() {
             alertrulesio::start(app.handle().clone());
             // Historial de rendimiento de 7 días: una muestra por minuto mientras AdminOps está abierta.
             perfhistory::start(app.handle().clone());
+            // Lo apuntado para la noche (superficie de un disco, reparar Windows…).
+            nightjobs::start(app.handle().clone());
             appbackup::start(app.handle().clone());
             // Nota de llamada con Ctrl+Alt+N, aunque AdminOps esté minimizado.
             quicknote::start(app.handle().clone());
@@ -388,6 +393,14 @@ pub fn run() {
             hardware::memory_test_result,
             hardware::smart::smart_status,
             disks::disks_status,
+            diskerrors::disk_error_history,
+            problems::problems_list,
+            nightjobs::night_jobs,
+            nightjobs::night_job_add,
+            nightjobs::night_job_remove,
+            nightjobs::night_set_time,
+            nightjobs::night_run_now,
+            nightjobs::night_seen,
             disks::disk_check,
             disks::disk_repair,
             disks::disk_surface_scan,
@@ -701,6 +714,7 @@ pub fn run() {
             winwatch::mark_windows_alerts_read,
             winwatch::clear_windows_alerts,
             winwatch::dismiss_windows_alert,
+            winwatch::fix_windows_alert,
             winwatch::mute_windows_alert,
             winwatch::unmute_windows_alert,
             winwatch::muted_windows_alerts,

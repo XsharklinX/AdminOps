@@ -22,7 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Modal, Loading } from "../components/ui";
+import { Button, Card, Explain, Loading, Modal } from "../components/ui";
 import { TweaksPage } from "./TweaksPage";
 import { securityApi, toolboxApi, toolsApi, type BitlockerVolume, type SecurityAudit, type SecurityCheck, type SuspiciousItem } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -313,10 +313,9 @@ function SuspiciousCard({ isAdmin }: { isAdmin: boolean }) {
       {scanning ? (
         <p className="text-sm text-mute">Revisando tareas programadas, servicios, inicio y el archivo hosts (comprueba firmas digitales, puede tardar)…</p>
       ) : items === null ? (
-        <p className="text-sm text-mute">
-          Busca lo que suele dejar el malware: programas sin firmar en carpetas temporales, PowerShell oculto, descargas por script y el archivo hosts
-          redirigiendo antivirus o Windows Update. No sustituye a un antivirus.
-        </p>
+        <Explain short="Busca lo que suele dejar el malware.">
+          Programas sin firmar en carpetas temporales, PowerShell oculto, descargas por script y el archivo hosts redirigiendo antivirus o Windows Update. No sustituye a un antivirus.
+        </Explain>
       ) : items.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-ok">
           <CircleCheck size={14} /> No se encontró nada sospechoso.

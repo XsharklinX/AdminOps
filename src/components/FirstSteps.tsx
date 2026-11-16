@@ -21,6 +21,7 @@ interface Step {
 
 export function FirstSteps() {
   const prefs = usePrefs();
+  const [open, setOpen] = useState(false);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [hidden, setHidden] = useState(() => {
     try {
@@ -67,10 +68,14 @@ export function FirstSteps() {
   };
 
   return (
-    <section className="rounded-xl border border-neon/30 bg-panel">
-      <header className="flex flex-wrap items-center gap-2 px-5 pt-4 pb-2">
-        <Rocket size={15} className="text-neon" />
-        <h2 className="text-sm font-semibold text-ink">Primeros pasos</h2>
+    <section className="rounded-2xl border border-neon/30 bg-panel shadow-elev-1">
+      {/* Plegado de fábrica: una línea con el avance; los pasos, al pulsarla. */}
+      <header className={`flex flex-wrap items-center gap-2 px-5 ${open ? "pt-4 pb-2" : "py-3"}`}>
+        <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex items-center gap-2 rounded-md text-left">
+          <Rocket size={15} className="text-neon" />
+          <h2 className="text-sm font-semibold text-ink">Primeros pasos</h2>
+          <ChevronRight size={14} className={`text-mute transition-transform ${open ? "rotate-90" : ""}`} />
+        </button>
         <span className="text-xs text-mute">
           {done} de {steps.length}
         </span>
@@ -84,6 +89,7 @@ export function FirstSteps() {
           <X size={14} />
         </button>
       </header>
+      {open && (
       <ul className="grid gap-1 px-3 pb-3 sm:grid-cols-2 lg:grid-cols-5">
         {steps.map((s) => (
           <li key={s.id}>
@@ -101,6 +107,7 @@ export function FirstSteps() {
           </li>
         ))}
       </ul>
+      )}
       {imp.dialog}
     </section>
   );

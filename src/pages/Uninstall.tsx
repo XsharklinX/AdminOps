@@ -393,7 +393,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+      <div className="overflow-x-auto rounded-2xl border border-line/70 bg-panel shadow-elev-1">
         <DataTable
           padded
           sticky

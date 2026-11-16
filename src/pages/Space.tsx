@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, smallBtn } from "../components/ui";
+import { Button, Card, Explain, smallBtn } from "../components/ui";
 import { api, appApi, logQuietly, toolsApi, tweaksApi, type Duplicates, type Freeable, type SpaceEntry, type SpaceFolder, type SpaceView } from "../lib/api";
 import { bytes, ago, friendlyPath } from "../lib/format";
 import { crumbsOf, type FolderSort, kindColor, kindLabel, kindShares, LOOSE, looseSize, matchesText, parentOf, percent, sortEntries } from "../lib/spaceView";
@@ -684,10 +684,9 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
           >
             {dups === null ? (
               <div className="flex flex-wrap items-center gap-3">
-                <p className="min-w-60 flex-1 text-[13px] text-dim">
-                  El mismo archivo guardado varias veces: copias a mano, descargas repetidas, fotos pasadas dos veces. Busca en lo analizado, entre archivos de 1 MB o más. No mira
-                  dentro de Windows ni de la papelera, y no lee lo que solo está en la nube.
-                </p>
+                <Explain short="El mismo archivo guardado varias veces." className="min-w-60 flex-1">
+                  Copias a mano, descargas repetidas, fotos pasadas dos veces. Busca en lo analizado, entre archivos de 1 MB o más. No mira dentro de Windows ni de la papelera, y no lee lo que solo está en la nube.
+                </Explain>
                 <Button kind="secondary" onClick={findDups}>
                   <CopyCheck size={14} /> Buscar duplicados
                 </Button>

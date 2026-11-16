@@ -10,10 +10,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 static ON: AtomicBool = AtomicBool::new(false);
 
-pub const MESSAGE: &str = "Modo auditoría activo: AdminOps no hace cambios en este equipo. Desactívalo en la barra superior para continuar.";
+pub const MESSAGE: &str = "Modo auditoría activo: AdminOps no hace cambios en este equipo. Desactívalo en el menú «⋯» de la barra de arriba para continuar.";
 
 /// Comandos que cambian el equipo (sistema, programas, usuarios, red, archivos).
 const BLOCKED: &[&str] = &[
+    // Trabajos de noche: empezar ya ejecuta reparaciones.
+    "night_run_now",
+    // Arreglar un aviso de la campana: limpia, repara o reinicia algo.
+    "fix_windows_alert",
     // Ajustes, reparaciones y perfiles
     "apply_tweak",
     "revert_tweak",
@@ -183,7 +187,7 @@ const SAFE: &[&str] = &[
     // hardware::sensors
     "read_sensors", "battery_history", "open_third_party_notices",
     // hardware::smart
-    "smart_status", "disks_status", "disk_check", "disk_pick_folder", "bitlocker_local_key", "disk_speed_test", "autobackup_info", "autobackup_set", "autobackup_run_now", "storage_info", "storage_make_portable", "storage_set_browser_on_usb", "company_export", "company_import_preview", "company_import_apply",
+    "smart_status", "disks_status", "disk_error_history", "problems_list", "night_jobs", "night_job_add", "night_job_remove", "night_set_time", "night_seen", "disk_check", "disk_pick_folder", "bitlocker_local_key", "disk_speed_test", "autobackup_info", "autobackup_set", "autobackup_run_now", "storage_info", "storage_make_portable", "storage_set_browser_on_usb", "company_export", "company_import_preview", "company_import_apply",
     // keys
     "try_shortcut",
     // library

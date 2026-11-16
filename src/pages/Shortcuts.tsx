@@ -196,7 +196,7 @@ export function Shortcuts() {
       )}
 
       {results ? (
-        <div className="overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">
           <div className="divide-y divide-line/60">{results.map(({ s, group: g }, i) => row(s, `r${i}`, g.title))}</div>
           {results.length === 0 && <EmptyLine>Nada coincide con «{query}».</EmptyLine>}
         </div>
@@ -222,7 +222,7 @@ export function Shortcuts() {
               <h2 className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-warn/80">
                 <Star size={10} fill="currentColor" /> Mis atajos
               </h2>
-              <div className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line bg-panel">{favItems.map(({ s, group: g }, i) => row(s, `fav${i}`, g.title))}</div>
+              <div className="divide-y divide-line/60 overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">{favItems.map(({ s, group: g }, i) => row(s, `fav${i}`, g.title))}</div>
             </section>
           )}
 
@@ -230,7 +230,7 @@ export function Shortcuts() {
             <section key={g.id} className="mb-5">
               <h2 className="text-[11px] font-semibold text-dim">{g.title}</h2>
               <p className="mb-2 text-xs text-mute">{g.intro}</p>
-              <div className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line bg-panel">{g.items.map((s, i) => row(s, `${g.id}${i}`))}</div>
+              <div className="divide-y divide-line/60 overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">{g.items.map((s, i) => row(s, `${g.id}${i}`))}</div>
             </section>
           ))}
         </>

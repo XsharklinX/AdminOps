@@ -41,7 +41,7 @@ export function ReportPreview({ options }: { options: ReportOptions }) {
   }, [key, again]);
 
   return (
-    <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel xl:sticky xl:top-4" aria-label="Vista previa del informe">
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1 xl:sticky xl:top-4" aria-label="Vista previa del informe">
       <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <Eye size={14} className="text-mute" />
         <h2 className="text-[13px] font-semibold text-ink">Vista previa</h2>

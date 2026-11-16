@@ -75,7 +75,7 @@ export function TopBar({
         <span className="text-left leading-tight">
           <span className="block text-[13.5px] font-semibold tracking-tight text-ink">AdminOps</span>
           <span className="flex items-center gap-1 text-[10.5px] text-mute">
-            {appInfo ? `v${appInfo.version}` : "…"}
+            v{appInfo?.version ?? (typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "")}
             {appInfo?.portable && (
               <span className="rounded border border-line-2 px-1 text-[10px]" title="Modo portable: los datos se guardan junto a AdminOps.exe, no en este equipo">
                 portable

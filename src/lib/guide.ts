@@ -69,7 +69,7 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "moving",
         title: "Moverse por la aplicación",
-        what: "A la izquierda, la columna de áreas (Inicio, Este equipo, Red, Programas, Administración, Soporte). Al lado, las pantallas del área elegida y, debajo de cada una, sus secciones: lo que hay dentro se ve sin abrir nada. Arriba, el equipo en una línea: nombre, dominio, permisos, Internet, disco y avisos; cada dato lleva a donde se mira o se arregla.",
+        what: "A la izquierda, la columna de áreas (Inicio, Este equipo, Red, Programas, Gestión, Soporte). Al lado, las pantallas del área elegida y, debajo de cada una, sus secciones: lo que hay dentro se ve sin abrir nada. Arriba, el equipo en una línea: nombre, dominio, permisos, Internet, disco y avisos; cada dato lleva a donde se mira o se arregla.",
         how: [
           "«Todo» (arriba en la columna de áreas, o Ctrl+K o F1) enseña el programa entero en una pantalla, por áreas. Escribiendo, busca cualquier cosa: una sección («dominio», «AD»), un problema («no imprime»), una herramienta, un ajuste o un contacto.",
           "Encima del título se ve dónde estás: área › pantalla › sección. Cada parte se puede pulsar.",
@@ -479,7 +479,7 @@ export const GUIDE: GuideChapter[] = [
   },
   {
     id: "admin",
-    title: "Administración",
+    title: "Gestión",
     intro: "Usuarios, cuentas, lo que la oficina comparte y cómo llegar a otros equipos.",
     topics: [
       {

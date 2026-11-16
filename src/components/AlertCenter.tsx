@@ -7,7 +7,7 @@ import { type AlertFilter, countByLevel, filterAlerts, groupByDay, LEVEL_LABEL, 
 import { clearActivity, markActivitySeen, resultPage, took, useActivity } from "../lib/activity";
 import { useToast } from "./feedback";
 import type { PageId } from "./Sidebar";
-import { Button, iconBtn, Modal } from "./ui";
+import { Button, Explain, iconBtn, Modal } from "./ui";
 import { ago as when, shortDate, timeOfDay } from "../lib/format";
 
 const DOT = { bad: "bg-bad", warn: "bg-warn", info: "bg-mute" } as Record<string, string>;
@@ -31,6 +31,8 @@ export function AlertCenter({
   const [filter, setFilter] = useState<AlertFilter>("all");
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [showMuted, setShowMuted] = useState(false);
+  // Arreglo en curso desde la campana (clave del aviso).
+  const [fixing, setFixing] = useState<string | null>(null);
   // Avisos del equipo, o lo que AdminOps ha terminado en esta sesión.
   const [tab, setTab] = useState<"alerts" | "activity">("alerts");
   const activity = useActivity();
@@ -207,10 +209,9 @@ export function AlertCenter({
         >
           {tab === "activity" &&
             (activity.length === 0 ? (
-              <p className="py-6 text-center text-sm text-mute">
-                Todavía no ha terminado nada. Aquí queda lo que AdminOps acaba mientras miras otra cosa: análisis, copias, instalaciones… con lo que tardó y dónde ver
-                el resultado. Solo de esta sesión.
-              </p>
+              <Explain short="Todavía no ha terminado nada.">
+                Aquí queda lo que AdminOps acaba mientras miras otra cosa: análisis, copias, instalaciones… con lo que tardó y dónde ver el resultado. Solo de esta sesión.
+              </Explain>
             ) : (
               <ul className="space-y-2">
                 {activity.map((a) => {
@@ -351,6 +352,26 @@ export function AlertCenter({
                                 <span className="text-mute">Qué hacer: </span>
                                 {a.advice}
                               </p>
+                              {a.fix && (
+                                <button
+                                  onClick={() => {
+                                    setFixing(a.key);
+                                    alertsApi
+                                      .fix(a.key)
+                                      .then((m) => {
+                                        toast("ok", `${a.fix!.label}: ${m}`);
+                                        dismiss(a);
+                                      })
+                                      .catch((e) => toast("error", `${a.fix!.label}: ${e}`))
+                                      .finally(() => setFixing(null));
+                                  }}
+                                  disabled={fixing !== null}
+                                  className="mt-1.5 mr-3 inline-flex items-center gap-1.5 rounded-md bg-neon px-2.5 py-1 text-xs font-medium text-on-neon disabled:opacity-50"
+                                >
+                                  {fixing === a.key && <RotateCw size={11} className="animate-spin" />}
+                                  {a.fix.label}
+                                </button>
+                              )}
                               {a.page && (
                                 <button
                                   onClick={() => {

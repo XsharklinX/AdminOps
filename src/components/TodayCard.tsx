@@ -184,7 +184,7 @@ export function TodayCard() {
   if (prefs.mode === "user") return null;
 
   return (
-    <section className="rounded-xl border border-line bg-panel">
+    <section className="rounded-2xl border border-line/70 bg-panel shadow-elev-1">
       <header className="flex items-center gap-2 px-5 pt-4 pb-3">
         <CalendarCheck size={15} className="text-neon" />
         <h2 className="text-sm font-semibold text-ink">Hoy</h2>

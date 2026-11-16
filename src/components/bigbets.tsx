@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "./feedback";
 import { TypedConfirm } from "./DiskPartitions";
 import { TaskStatus } from "./TaskStatus";
-import { Button, Card, ErrorState, Loading, smallBtn } from "./ui";
+import { Button, Card, ErrorState, Explain, Loading, smallBtn } from "./ui";
 import { appsApi, bigApi, toolsApi, type RescueStatus, type VulnReport } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -149,9 +149,9 @@ export function RescueUsbCard({ isAdmin }: { isAdmin: boolean }) {
   const ready = !!st && st.adk && st.winpe;
   return (
     <Card title="Pendrive de rescate arrancable" icon={<LifeBuoy size={14} />} right={<button className={smallBtn} onClick={load} title="Volver a mirar los pendrives"><RefreshCw size={12} /></button>}>
-      <p className="mb-3 text-xs text-dim">
-        Para el equipo que no arranca: un Windows mínimo (WinPE) en un pendrive con el menú de rescate de AdminOps. Copiar los datos de un usuario a otro disco, ver la salud de los discos, reparar el arranque, pasar chkdsk, desactivar Driver Verifier o quitar el driver que provoca el pantallazo, sin arrancar el Windows dañado.
-      </p>
+      <Explain short="Para el equipo que no arranca." className="mb-3">
+        Un Windows mínimo (WinPE) en un pendrive con el menú de rescate de AdminOps. Copiar los datos de un usuario a otro disco, ver la salud de los discos, reparar el arranque, pasar chkdsk, desactivar Driver Verifier o quitar el driver que provoca el pantallazo, sin arrancar el Windows dañado.
+      </Explain>
       {error ? (
         <ErrorState message={error} onRetry={load} where="Pendrive de rescate" />
       ) : !st ? (

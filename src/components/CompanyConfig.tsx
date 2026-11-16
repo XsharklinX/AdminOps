@@ -4,7 +4,7 @@
 import { Building2, Download, Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "./feedback";
-import { Button, Card, Modal } from "./ui";
+import { Button, Card, Explain, Modal } from "./ui";
 import { companyApi, type CompanyPreview } from "../lib/api";
 
 /** Botón + diálogo para importar (también lo usa Primeros pasos). */
@@ -115,10 +115,9 @@ export function CompanyConfig() {
 
   return (
     <Card title="Configuración de empresa" icon={<Building2 size={14} />}>
-      <p className="text-xs text-dim">
-        Para que otro técnico empiece con todo listo: los datos de la empresa (logo, condiciones, precios, tipos de visita), los portales y el dominio, en un
-        archivo. No lleva contraseñas ni sesiones: cada técnico entra con su cuenta.
-      </p>
+      <Explain short="Para que otro técnico empiece con todo listo.">
+        Los datos de la empresa (logo, condiciones, precios, tipos de visita), los portales y el dominio, en un archivo. No lleva contraseñas ni sesiones: cada técnico entra con su cuenta.
+      </Explain>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button kind="ghost" onClick={() => void exp()} disabled={busy}>
           {busy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Exportar

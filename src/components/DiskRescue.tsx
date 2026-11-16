@@ -8,7 +8,7 @@ import { useToast } from "./feedback";
 import { SurfaceMap } from "./DiskDeep";
 import { TypedConfirm } from "./DiskPartitions";
 import { TaskStatus } from "./TaskStatus";
-import { Button, Card, inputClass } from "./ui";
+import { Button, Card, Explain, inputClass } from "./ui";
 import { appApi, carveApi, carveTask, cloneApi, disksApi, type CarveItem, type CarveSource, type CloneLive, type CloneResult, type DiskReport, type RecoverSummary } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -340,12 +340,11 @@ export function CloneCard({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
-    <Card title="Clonar o hacer una imagen de un disco que falla" icon={<Camera size={14} />}>
+    <Card id="disk-clone" title="Clonar o hacer una imagen de un disco que falla" icon={<Camera size={14} />}>
       <div className="space-y-3 p-4">
-        <p className="text-xs leading-relaxed text-dim">
-          Con un disco que falla, lo primero es copiarlo entero, y de forma que no lo empeore: primero copia todo lo que se lee de corrido, salta lo que da error, vuelve a ello con calma y al final intenta sector a sector. Lo que no se pueda leer
-          queda a ceros y apuntado. El origen solo se lee, y se puede parar y seguir otro día. Después puedes sacar los archivos de la copia sin seguir forzando el disco enfermo.
-        </p>
+        <Explain short="Con un disco que falla, lo primero es copiarlo entero, y de forma que no lo empeore.">
+          Primero copia todo lo que se lee de corrido, salta lo que da error, vuelve a ello con calma y al final intenta sector a sector. Lo que no se pueda leer queda a ceros y apuntado. El origen solo se lee, y se puede parar y seguir otro día. Después puedes sacar los archivos de la copia sin seguir forzando el disco enfermo.
+        </Explain>
         {!isAdmin && <p className="text-xs text-warn">Leer un disco entero necesita administrador.</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-xs text-dim">

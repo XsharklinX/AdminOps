@@ -189,14 +189,14 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-panel">{table(real, "No hay impresoras físicas instaladas.")}</div>
+      <div className="overflow-x-auto rounded-2xl border border-line/70 bg-panel shadow-elev-1">{table(real, "No hay impresoras físicas instaladas.")}</div>
 
       <NetworkPrinters isAdmin={isAdmin} />
 
       {virtual.length > 0 && (
         <>
           <h2 className="mt-5 mb-2 text-[11px] font-semibold text-dim">Impresoras virtuales</h2>
-          <div className="overflow-x-auto rounded-xl border border-line bg-panel opacity-80">{table(virtual)}</div>
+          <div className="overflow-x-auto rounded-2xl border border-line/70 bg-panel shadow-elev-1 opacity-80">{table(virtual)}</div>
         </>
       )}
       <p className="mt-3 text-xs text-mute">
@@ -295,7 +295,7 @@ function NetworkPrinters({ isAdmin }: { isAdmin: boolean }) {
 
   const nuevas = (found ?? []).filter((f) => !f.installed);
   return (
-    <section className="mt-4 rounded-xl border border-line bg-panel">
+    <section className="mt-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1">
       <div className="flex flex-wrap items-center gap-3 px-4 py-3">
         <Search size={16} className="text-neon" />
         <div className="min-w-0 flex-1">

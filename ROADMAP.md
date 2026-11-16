@@ -107,6 +107,61 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
+### Tanda 1.3 — plan en PROGRESS.md (elegida el 2026-11-16, sin empezar)
+
+Junta la v1.2.11 de abajo, 12 ideas de «Un día con AdminOps» (A2, B1, B2, B3, C1, C2, C3, D1, D2, F1,
+G1, G2) y reconocer y actualizar drivers de impresoras y escáneres RICOH y EPSON. Orden y detalle en
+`PROGRESS.md`.
+
+### v1.2.11 — Rapidez y fluidez (elegidas el 2026-11-16, sin empezar)
+
+Elegidas por el autor sobre el artifact «AdminOps más rápido» (12 de 14; N2 «Equipo de referencia» y
+N4 «El ticket te lleva a la pantalla», **no**: no volver a proponerlas). Medido en 1.2.10 antes de
+empezar: `Merged.js` 782 KB (todas las pestañas en un trozo), `index.js` 598 KB, 21 `setInterval` de
+pantalla que no miran si la ventana se ve, `cachedRead` solo en 5 pantallas.
+
+- [ ] **R1** Cada pestaña carga solo lo suyo (partir `Merged`).
+- [ ] **R2** Quieta cuando no la miras (pausar los temporizadores con la ventana oculta).
+- [ ] **R3** Cada pantalla de consulta abre con la última lectura y su hora (`cachedRead`).
+- [ ] **R4** Precargar código y primera lectura al pasar el ratón (solo consultas, una a la vez).
+- [ ] **R5** Abrir AdminOps antes (primer pintado con menos código).
+- [ ] **F1** Listas largas sin «Mostrar más» (lista virtual).
+- [ ] **F2** Las últimas pantallas siguen vivas al volver.
+- [ ] **N1** ¿Qué cambió? (en este equipo desde la última vez).
+- [ ] **N3** Pregúntale al equipo.
+- [ ] **N5** Arreglos rápidos desde la bandeja (`tray.rs`).
+- [ ] **N6** Salir sin dejar rastro.
+- [ ] **P1** Prueba de rapidez en cada versión (falla si algo crece más de un 15 %).
+
+### v1.2.10 — Rediseño «Tarjetas con aire» y auditoría de errores (hecho, build local en `release\v1.2.10\`, sin probar en hardware real)
+
+Elegidas por el autor sobre los artifacts del rediseño (8 cambios) y de la auditoría (12 de 13 ideas;
+la 11 no). **Verificado**: `tsc`, `eslint`, `vitest`, `cargo clippy --all-targets -D warnings`,
+`cargo test --lib` y la prueba de pantallas con Playwright. **Sin verificar en un equipo real**: los
+tres ajustes de energía nuevos (`powercfg` con los GUID de enlace del disco, suspensión USB y apagado
+del disco), la lectura de los sucesos de error por disco (`diskerrors.rs`), los trabajos de noche
+(`nightjobs.rs`: que el equipo no se duerma y que corran a la hora), el botón de la notificación de
+Windows y la medida del arranque tras quitar programas.
+
+- **Navegación**: barra lateral por áreas («Administración» → «Gestión»), pestañas en la cabecera,
+  `MoreMenu` («⋯») con modo privado, auditoría y pantalla de taller; `PageTabs` solo con la barra
+  plegada o ventana estrecha (migración `navV2` en `prefs.ts`).
+- **Estilo**: paleta nueva en `index.css`, `Card` con más aire, `Explain` («Cómo funciona ▾») en 27
+  pantallas, esperas con esqueleto en el Diagnóstico.
+- **Panel**: veredicto con `VerdictRing`, `PartsMap` (bloque `parts`), `NightCard`; primeros pasos
+  plegados.
+- **Discos**: `DiskOverview`, tarjetas plegables, `diskerrors.rs` (`disk_error_history`),
+  `DiskAssistant` + `lib/diskAssist.ts`; ajustes `performance.disk-link-power`, `performance.usb-suspend`,
+  `performance.disk-idle`; `repair.defender-signatures` y `repair.defender-realtime`.
+- **Diagnóstico**: `Finding.proof` (Ver pruebas), comprobación tras cada arreglo y escalera
+  (`lib/fixLadder.ts`), `problems.rs` + `ProblemsBoard` (problemas abiertos y su historia).
+- **Trabajos de noche**: `nightjobs.rs` (superficie, DISM+SFC, prueba larga SMART; `SetThreadExecutionState`;
+  la reparación no corre en modo auditoría).
+- **Avisos**: `Alert.fix` y `fix_windows_alert` (comprueba el modo auditoría también desde la
+  notificación); errores con salida en `feedback.tsx`.
+- **Inicio**: `lib/startupGain.ts` + `StartupGain` (estimación con los sucesos 101–110 y medida tras
+  el reinicio).
+
 ### v1.2.9 — Aspecto, fluidez, informes de revista y seguridad (hecho, build local pendiente, sin probar en hardware real)
 
 Elegidas por el autor sobre el artifact «Mejoras visuales y de seguridad» (31 ideas). **Verificado**:

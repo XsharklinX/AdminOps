@@ -33,7 +33,7 @@ describe("barra lateral", () => {
       ["equipo", "Este equipo"],
       ["red", "Red"],
       ["programas", "Programas"],
-      ["admin", "Administración"],
+      ["admin", "Gestión"],
       ["soporte", "Soporte"],
     ]);
     expect(areas.find((a) => a.id === "soporte")!.pages).toEqual(["agenda", "tickets", "inventory", "people", "contacts", "knowledge"]);

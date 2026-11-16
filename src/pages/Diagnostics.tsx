@@ -5,6 +5,7 @@ import {
   ExternalLink,
   BatteryMedium,
   Check,
+  ChevronDown,
   CircleCheck,
   CircleHelp,
   Cpu,
@@ -19,6 +20,8 @@ import {
 } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { solutionForFinding } from "../lib/solutionsCatalog";
+import { checkKind, nextRung, type Rung } from "../lib/fixLadder";
+import { ProblemsBoard } from "../components/ProblemsBoard";
 import { analyze, analyzeQuick, DIAG_UPDATED, lastDiagnostics, notifyDiagCount } from "../lib/diagRun";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useToast } from "../components/feedback";
@@ -35,6 +38,7 @@ import {
   type DiagChanges,
   type Finding,
   type FindingAction,
+  type Proof,
   type Section,
   type Severity,
   type Tool,
@@ -129,6 +133,72 @@ function Progress({ timings, running, quick }: { timings: Record<string, number>
         );
       })}
     </div>
+  );
+}
+
+/** «Ver pruebas»: de dónde sale el hallazgo, suceso a suceso, sin abrir el Visor de eventos. */
+function ProofList({ proof }: { proof: Proof[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="contents" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-1 rounded-md border border-line-2 px-2 py-0.5 text-[11px] text-dim transition-colors hover:border-neon/50 hover:text-neon"
+      >
+        Ver pruebas ({proof.length})
+        <ChevronDown size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <ul className="basis-full space-y-0.5 rounded-lg bg-panel-2/60 px-3 py-2 font-mono text-[11px] select-text">
+          {proof.map((p, i) => (
+            <li key={`${p.when}-${i}`} className="flex gap-3">
+              <span className="w-24 shrink-0 text-mute">{p.when}</span>
+              <span className="min-w-0 text-ink">{p.what}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
+  );
+}
+
+/** Lo que pasó al comprobar un arreglo: resuelto, comprobando, o sigue con su siguiente escalón. */
+function CheckResult({ c, busy, onNext }: { c: { state: "checking" | "resolved" | "still"; next: Rung | null }; busy: boolean; onNext: (id: string, label: string) => void }) {
+  if (c.state === "checking")
+    return (
+      <span className="flex basis-full items-center gap-1.5 text-[11px] text-neon">
+        <Loader2 size={10} className="animate-spin" /> Comprobando si funcionó…
+      </span>
+    );
+  if (c.state === "resolved")
+    return (
+      <span className="flex basis-full items-center gap-1.5 text-[11px] text-ok">
+        <Check size={11} /> Resuelto: ya no aparece al volver a mirar.
+      </span>
+    );
+  const n = c.next;
+  return (
+    <span className="flex basis-full flex-wrap items-center gap-1.5 rounded-md bg-warn/10 px-2 py-1 text-[11px] text-ink" onClick={(e) => e.stopPropagation()}>
+      <span className="text-warn">Sigue.</span>
+      {n ? (
+        n.kind === "fix" ? (
+          <>
+            Siguiente: {n.label}
+            {n.minutes ? <span className="text-mute">(~{n.minutes} min)</span> : null}
+            <button disabled={busy} onClick={() => onNext(n.id, n.label)} className="rounded border border-neon/50 px-1.5 py-px text-neon hover:bg-neon/10 disabled:opacity-40">
+              Probar
+            </button>
+          </>
+        ) : (
+          <>
+            Siguiente, a mano: <b className="font-medium">{n.label}</b> <span className="text-dim">{n.detail}</span>
+          </>
+        )
+      ) : (
+        <span className="text-dim">No hay otro arreglo automático: «Cómo se arregla» tiene los pasos.</span>
+      )}
+    </span>
   );
 }
 
@@ -333,23 +403,43 @@ export function Diagnostics({
     lastProblems.current = n;
   }, [d, accepted]);
 
+  // Tras arreglar, se vuelve a mirar ese hallazgo: resuelto, o sigue y cuál es el siguiente escalón.
+  const [checks, setChecks] = useState<Record<string, { state: "checking" | "resolved" | "still"; next: Rung | null; tried: string[] }>>({});
+  const verify = useCallback(async (f: Finding, fixId: string) => {
+    const tried = [...(checks[f.key]?.tried ?? []), fixId];
+    setChecks((c) => ({ ...c, [f.key]: { state: "checking", next: null, tried } }));
+    try {
+      const r = checkKind(f.area) === "quick" ? await analyzeQuick() : await analyze(true);
+      const still = r.findings.some((x) => x.key === f.key);
+      setChecks((c) => ({ ...c, [f.key]: { state: still ? "still" : "resolved", next: still ? nextRung(fixId, tried) : null, tried } }));
+      if (!still) toast("ok", `Comprobado: «${f.title}» ya no aparece.`);
+    } catch (e) {
+      setChecks((c) => ({ ...c, [f.key]: { state: "still", next: nextRung(fixId, tried), tried } }));
+      logQuietly("Diagnostics")(e);
+    }
+    // `checks` se lee solo para sumar lo ya probado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]);
+
   const applyFix = useCallback(
-    async (id: string, label: string) => {
+    async (id: string, label: string, f?: Finding) => {
       setFixing(id);
       try {
         toast("ok", `${label}: ${await tweaksApi.fixFinding(id)}`);
         fixedHere.current++;
+        if (f?.key) void verify(f, id);
       } catch (e) {
         toast("error", `${label}: ${e}`);
+        if (f?.key) setChecks((c) => ({ ...c, [f.key]: { state: "still", next: nextRung(id, [...(c[f.key]?.tried ?? []), id]), tried: [...(c[f.key]?.tried ?? []), id] } }));
       } finally {
         setFixing(null);
       }
     },
-    [toast],
+    [toast, verify],
   );
 
-  const act = (a: FindingAction) => {
-    if (a.kind === "fix") void applyFix(a.id, a.label);
+  const act = (a: FindingAction, f?: Finding) => {
+    if (a.kind === "fix") void applyFix(a.id, a.label, f);
     else if (a.kind === "tool") void openTool(a.tool);
     else if (a.page === "diagnostics") {
       if (a.focus) goTo(a.focus);
@@ -484,14 +574,21 @@ export function Diagnostics({
 
   // Sin resultado todavía: se va pintando lo que ya ha llegado.
   const shown = d ?? live;
+  // Aún no ha llegado nada: qué parte va y la silueta de lo que va a salir, no un círculo en el vacío.
   if (!shown)
     return (
-      <div className="grid h-full place-items-center p-8 text-center">
-        <div>
-          <Loader2 size={28} className="mx-auto mb-3 animate-spin text-neon" />
-          <p className="text-sm text-dim">
-            Analizando discos, eventos, drivers y seguridad…
-          </p>
+      <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
+        <p className="text-[15px] font-medium text-ink">Analizando el equipo…</p>
+        <Progress timings={timings} running quick={quickRun} />
+        <div className="grid gap-4 lg:grid-cols-3" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="space-y-2.5 rounded-2xl border border-line/70 bg-panel p-5 shadow-elev-1">
+              <div className="skeleton h-3 w-28" />
+              <div className="skeleton h-6 w-40" />
+              <div className="skeleton h-2.5 w-full" />
+              <div className="skeleton h-2.5 w-4/5" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -527,7 +624,7 @@ export function Diagnostics({
     return (
       <li
         key={`${f.key}-${i}`}
-        onClick={() => f.actions[0] && act(f.actions[0])}
+        onClick={() => f.actions[0] && act(f.actions[0], f)}
         className={`group flex gap-3 rounded-lg px-2 py-2 hover:bg-panel-2 ${f.actions.length ? "cursor-pointer" : ""}`}
         title={f.actions[0]?.label}
       >
@@ -562,7 +659,7 @@ export function Diagnostics({
                 key={a.label}
                 onClick={(e) => {
                   e.stopPropagation();
-                  act(a);
+                  act(a, f);
                 }}
                 disabled={a.kind === "fix" && fixing !== null}
                 className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] transition-colors disabled:opacity-40 ${
@@ -574,6 +671,8 @@ export function Diagnostics({
                 {a.kind === "tool" ? <ExternalLink size={10} /> : a.kind === "page" ? <ArrowRight size={10} /> : null}
               </button>
             ))}
+            {(f.proof?.length ?? 0) > 0 && <ProofList proof={f.proof!} />}
+            {checks[f.key] && <CheckResult c={checks[f.key]} busy={fixing !== null} onNext={(id, label) => void applyFix(id, label, f)} />}
             {f.key && !shown.quick && (
               <button
                 onClick={(e) => {
@@ -636,7 +735,7 @@ export function Diagnostics({
       </div>
 
       {/* Hallazgos, por lo que hay que hacer con ellos */}
-      <section className="mb-4 rounded-xl border border-line bg-panel p-4">
+      <section className="mb-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
         <div className="mb-3 flex flex-wrap gap-3">
           {(["bad", "warn", "info"] as Severity[]).map((s) => {
             const S = SEV[s];
@@ -657,6 +756,7 @@ export function Diagnostics({
           )}
         </div>
         <Progress timings={timings} running={running} quick={quickRun} />
+        <ProblemsBoard refresh={d?.timestamp ?? 0} />
         {shown.quick && !running && (
           <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
             Análisis rápido: una primera mirada. No se guarda ni cuenta para el Panel o el informe.

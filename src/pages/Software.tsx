@@ -136,7 +136,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
       {error && <p className="mb-3 rounded-lg border border-bad/30 bg-bad/5 px-3.5 py-2 text-sm text-bad">{error}</p>}
 
       {results && (
-        <div className="mb-4 rounded-xl border border-line bg-panel p-4">
+        <div className="mb-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
           <h3 className="mb-2 text-sm font-medium">Resultado</h3>
           <ul className="space-y-1 text-xs">
             {results.map((r) => (
@@ -157,7 +157,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
           <Loader2 size={14} className="animate-spin" /> Puede tardar unos segundos mientras winget actualiza su catálogo.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">
           {visible.map((u, i) => (
             <label key={u.id} className={`flex cursor-pointer items-center gap-3 px-4 py-2 ${i ? "border-t border-line/60" : ""} hover:bg-panel-2`}>
               <input

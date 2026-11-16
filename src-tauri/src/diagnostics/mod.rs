@@ -77,6 +77,26 @@ pub struct Finding {
     /// 8 % que al 7 %): es lo que se guarda al marcarlo como «Ya lo sé».
     #[serde(default)]
     pub key: String,
+    /// De dónde sale: cada suceso con su fecha («Ver pruebas»). Vacío si no hay detalle.
+    #[serde(default)]
+    pub proof: Vec<Proof>,
+}
+
+/// Una prueba de un hallazgo: cuándo y qué.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Proof {
+    pub when: String,
+    pub what: String,
+}
+
+/// Fecha de Windows («2026-10-14T09:12:33…») en corto: «14/10 09:12».
+fn short_time(iso: &str) -> String {
+    let d = iso.get(..10).unwrap_or(iso);
+    let t = iso.get(11..16).unwrap_or("");
+    let mut parts = d.split('-');
+    let (_, m, day) = (parts.next(), parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+    format!("{day}/{m} {t}").trim().to_string()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -321,16 +341,21 @@ fn gb(b: u64) -> String {
 }
 
 fn finding(severity: Severity, area: &str, title: String, detail: Option<String>) -> Finding {
-    Finding { severity, area: area.into(), title, detail, actions: vec![], key: String::new() }
+    Finding { severity, area: area.into(), title, detail, actions: vec![], key: String::new(), proof: vec![] }
 }
 
 trait WithActions {
     fn with(self, actions: Vec<Action>) -> Self;
+    fn proof(self, proof: Vec<Proof>) -> Self;
 }
 
 impl WithActions for Finding {
     fn with(mut self, actions: Vec<Action>) -> Self {
         self.actions = actions;
+        self
+    }
+    fn proof(mut self, proof: Vec<Proof>) -> Self {
+        self.proof = proof;
         self
     }
 }
@@ -456,7 +481,24 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                     fix("Comprobar archivos (SFC)", "repair.sfc", false),
                     page("Ver reparaciones", "troubleshoot", Some("repairs")),
                     tool("Monitor de confiabilidad", Tool::Reliability),
-                ]),
+                ])
+                .proof({
+                    let dumps: Vec<&collect::Dump> = s.minidumps.iter().flatten().collect();
+                    s.bugchecks
+                        .iter()
+                        .take(12)
+                        .map(|b| {
+                            // El volcado del mismo momento (mismo día y hora), si lo hay.
+                            let culprit = dumps
+                                .iter()
+                                .find(|d| d.time.get(..13) == b.time.get(..13))
+                                .and_then(|d| d.analysis.as_ref())
+                                .and_then(|a| a.culprit.clone());
+                            let name = b.name.clone().unwrap_or_else(|| b.code.clone());
+                            Proof { when: short_time(&b.time), what: culprit.map_or(name.clone(), |c| format!("{name} · {c}")) }
+                        })
+                        .collect()
+                }),
             );
         }
         let unexpected = s.unexpected_shutdowns.len().saturating_sub(s.bugchecks.len());
@@ -468,7 +510,8 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                     format!("{unexpected} apagados inesperados en {} días", s.days),
                     Some("Cortes de corriente, botón de encendido mantenido o fuente/temperatura.".into()),
                 )
-                .with(vec![boots_detail(), tool("Visor de eventos", Tool::EventViewer)]),
+                .with(vec![boots_detail(), tool("Visor de eventos", Tool::EventViewer)])
+                .proof(s.unexpected_shutdowns.iter().take(12).map(|t| Proof { when: short_time(t), what: "Apagado sin cerrar Windows".into() }).collect()),
             );
         }
         // Errores de disco que Windows apunta en su registro, digan lo que digan los
@@ -476,16 +519,27 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
         // son graves; reintentos y errores de la controladora (11, 51, 153), un aviso.
         let events = |ids: &[u32]| s.disk_errors.iter().filter(|e| ids.contains(&e.id)).map(|e| e.count).sum::<u32>();
         let (grave, leve) = (events(&[7, 55]), events(&[11, 51, 153]));
-        let health = || page("Salud y reparación", "space", Some("health"));
+        let what = |id: u32| match id {
+            7 => "bloque dañado",
+            55 => "sistema de archivos corrupto",
+            11 => "error de la controladora",
+            51 => "error al paginar",
+            153 => "operación reintentada",
+            _ => "error de disco",
+        };
+        let disk_proof: Vec<Proof> = s.disk_errors.iter().map(|e| Proof { when: format!("último {}", short_time(&e.last)), what: format!("{} × {} (suceso {})", e.count, what(e.id), e.id) }).collect();
+        // El asistente de Salud y reparación dice en qué disco, de qué tipo y qué hacer.
+        let health = || page("Ver en qué disco y qué hacer", "space", Some("health"));
         if grave > 0 {
             f.push(
                 finding(
                     Bad,
                     "Discos",
                     format!("Windows ha apuntado {grave} errores graves de disco en {} días", s.days),
-                    Some("Bloques dañados o sistema de archivos corrupto. Copia de seguridad cuanto antes y revisar el disco, aunque sus propios datos digan que está bien.".into()),
+                    Some("Bloques dañados o sistema de archivos corrupto. Copia de seguridad cuanto antes. En Salud y reparación, cada disco dice cuántos son suyos y de qué tipo, y su asistente da el plan.".into()),
                 )
-                .with(vec![health(), tool("Visor de eventos", Tool::EventViewer)]),
+                .with(vec![health(), tool("Visor de eventos", Tool::EventViewer)])
+                .proof(disk_proof.clone()),
             );
         } else if leve >= 5 {
             f.push(
@@ -495,13 +549,15 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                     format!("{leve} errores de lectura o escritura en disco en {} días", s.days),
                     Some("Operaciones que Windows tuvo que reintentar o que la controladora dio por fallidas. Suele ser el cable, el puerto o un disco USB que se desconecta; si se repite, el disco.".into()),
                 )
-                .with(vec![health(), tool("Visor de eventos", Tool::EventViewer)]),
+                .with(vec![health(), tool("Visor de eventos", Tool::EventViewer)])
+                .proof(disk_proof),
             );
         }
         for c in s.crashes.iter().filter(|c| c.count >= 5) {
             f.push(
                 finding(Warn, "Estabilidad", format!("{} se ha cerrado inesperadamente {} veces", c.app, c.count), None)
-                    .with(vec![stability_detail(), tool("Monitor de confiabilidad", Tool::Reliability)]),
+                    .with(vec![stability_detail(), tool("Monitor de confiabilidad", Tool::Reliability)])
+                    .proof(vec![Proof { when: format!("último {}", short_time(&c.last)), what: format!("{} cierres en {} días", c.count, s.days) }]),
             );
         }
         // El valor típico de los últimos arranques, no el último: uno suelto
@@ -515,7 +571,8 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                     format!("El equipo tarda unos {} s en arrancar", ms / 1000),
                     Some(format!("Es lo habitual en sus últimos {n} arranques. Revisar programas de inicio y el tipo de disco.")),
                 )
-                .with(vec![boots_detail(), page("Revisar programas de inicio", "startup", None)]),
+                .with(vec![boots_detail(), page("Revisar programas de inicio", "startup", None)])
+                .proof(s.boot_times.iter().flatten().take(10).map(|b| Proof { when: short_time(&b.time), what: format!("arranque de {} s", b.ms / 1000) }).collect()),
             );
         }
     }
@@ -575,7 +632,7 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
         if s.defender_realtime == Some(false) && !third_party_av {
             f.push(
                 finding(Bad, "Seguridad", "Protección en tiempo real desactivada".into(), Some("No hay otro antivirus activo.".into()))
-                    .with(vec![tool("Seguridad de Windows", Tool::WindowsSecurity)]),
+                    .with(vec![fix("Activarla", "repair.defender-realtime", false), tool("Seguridad de Windows", Tool::WindowsSecurity)]),
             );
         }
         // Firmas y análisis son datos de Defender: con otro antivirus (Sophos, ESET…)
@@ -583,7 +640,7 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
         if let Some(age) = s.signature_age_days.filter(|a| *a >= 7 && !third_party_av) {
             f.push(
                 finding(Warn, "Seguridad", format!("Firmas del antivirus con {age} días de antigüedad"), None)
-                    .with(vec![tool("Seguridad de Windows", Tool::WindowsSecurity)]),
+                    .with(vec![fix("Actualizarlas", "repair.defender-signatures", true), tool("Seguridad de Windows", Tool::WindowsSecurity)]),
             );
         }
         if s.activated == Some(false) {
@@ -661,7 +718,7 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
     if let Some(disks) = &d.smart.data {
         for k in disks {
             if k.predict_failure {
-                f.push(finding(Bad, "Discos", format!("{}: el disco anuncia un fallo inminente (SMART)", k.model), Some("Copia de seguridad YA y reemplazo del disco.".into())).with(vec![hw_detail("smart")]));
+                f.push(finding(Bad, "Discos", format!("{}: el disco anuncia un fallo inminente (SMART)", k.model), Some("Copia de seguridad YA y reemplazo del disco.".into())).with(vec![page("Asistente del disco", "space", Some("health")), hw_detail("smart")]));
             }
             let bad_sectors = k.reallocated.unwrap_or(0) + k.pending.unwrap_or(0) + k.uncorrectable.unwrap_or(0);
             if bad_sectors > 0 {
@@ -675,11 +732,11 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                             k.reallocated.unwrap_or(0), k.pending.unwrap_or(0), k.uncorrectable.unwrap_or(0)
                         )),
                     )
-                    .with(vec![hw_detail("smart")]),
+                    .with(vec![page("Asistente del disco", "space", Some("health")), hw_detail("smart")]),
                 );
             }
             if let Some(crc) = k.crc_errors.filter(|c| *c > 0) {
-                f.push(finding(Warn, "Discos", format!("{}: {crc} errores de transmisión (CRC)", k.model), Some("Casi siempre es el cable SATA o el conector: cambiarlo.".into())).with(vec![hw_detail("smart")]));
+                f.push(finding(Warn, "Discos", format!("{}: {crc} errores de transmisión (CRC)", k.model), Some("Casi siempre es el cable SATA o el conector: cambiarlo. El asistente del disco dice cómo comprobar que quedó bien.".into())).with(vec![page("Asistente del disco", "space", Some("health")), hw_detail("smart")]));
             }
         }
     }
@@ -1055,6 +1112,8 @@ fn to_prune(timestamps: &[u64], now: u64, keep: Option<u64>) -> Vec<u64> {
 }
 
 fn save_snapshot(app: &tauri::AppHandle, d: &Diagnostics) {
+    // Cada análisis completo pone al día los problemas abiertos de este equipo.
+    crate::problems::record(app, d);
     let dir = snapshots_dir(app);
     let _ = std::fs::create_dir_all(&dir);
     if let Ok(json) = serde_json::to_string(d) {
@@ -1430,7 +1489,7 @@ mod tests {
     use super::*;
 
     fn f(sev: Severity, area: &str, title: &str) -> Finding {
-        Finding { severity: sev, area: area.into(), title: title.into(), detail: None, actions: vec![], key: String::new() }
+        Finding { severity: sev, area: area.into(), title: title.into(), detail: None, actions: vec![], key: String::new(), proof: vec![] }
     }
 
     fn diag(ts: u64, findings: Vec<Finding>) -> Diagnostics {

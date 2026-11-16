@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast, useConfirm } from "../components/feedback";
 import { BillingEditor, SendReportModal, SignaturePad, TemplatePicker } from "../components/service";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, ErrorState, inputClass, Loading } from "../components/ui";
+import { Button, Card, ErrorState, Explain, inputClass, Loading } from "../components/ui";
 import { VisitChanges } from "../components/VisitChanges";
 import { logQuietly, contactsApi, diagApi, tweaksApi, workApi, type ActiveSession, type Client, type Contact, type JournalEntry, type Settings, type Solution } from "../lib/api";
 import { usePageActive } from "../lib/pageActive";
@@ -209,10 +209,9 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
         {solution && <SolutionEditor initial={solution} tags={[]} onClose={() => setSolution(null)} onSaved={() => setFinished(null)} />}
         {sending && report && <SendReportModal path={report.path} client={report.client} onClose={() => setSending(false)} />}
         <Card title="Nueva sesión de servicio" icon={<ClipboardCheck size={14} />}>
-          <p className="mb-4 text-sm text-dim">
-            Al empezar se guarda un diagnóstico del equipo tal como llega. Trabaja con normalidad (ajustes, limpieza, reparaciones…) y al finalizar
-            se genera el informe con la comparación, el trabajo realizado, el presupuesto o recibo y la firma del cliente, archivado en su ficha.
-          </p>
+          <Explain short="Al empezar se guarda un diagnóstico del equipo tal como llega." className="mb-4">
+            Trabaja con normalidad (ajustes, limpieza, reparaciones…) y al finalizar se genera el informe con la comparación, el trabajo realizado, el presupuesto o recibo y la firma del cliente, archivado en su ficha.
+          </Explain>
           <label className="mb-1 block text-xs text-dim">Cliente</label>
           <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={`mb-3 ${inputClass}`}>
             <option value="">— Cliente nuevo —</option>
@@ -292,7 +291,7 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
 
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-line bg-panel px-5 py-3">
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-5 py-3">
         <span className="size-2.5 animate-pulse rounded-full bg-ok" />
         <div className="min-w-0 flex-1">
           <div className="font-medium text-ink">{session.clientName}</div>

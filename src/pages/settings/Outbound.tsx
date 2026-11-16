@@ -1,7 +1,7 @@
 // Ajustes → Seguridad → Qué sale de este equipo.
 import { Globe } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, Toggle } from "../../components/ui";
+import { Card, Explain, Toggle } from "../../components/ui";
 import { outboundApi, type OutboundService } from "../../lib/api";
 import { ago } from "../../lib/format";
 import { type SettingsProps } from "./shared";
@@ -17,9 +17,9 @@ export function Outbound({ s, set }: SettingsProps) {
   const toggle = (id: string, on: boolean) => set({ netOff: on ? off.filter((x) => x !== id) : [...off, id] });
   return (
     <Card title="Qué sale de este equipo" icon={<Globe size={14} />}>
-      <p className="mb-3 text-xs text-dim">
-        Los pocos sitios con los que AdminOps habla por su cuenta, qué se les envía y cuándo. Todo lo demás está bloqueado: la ventana solo puede cargar lo suyo. Apaga lo que no quieras y AdminOps sigue funcionando sin Internet.
-      </p>
+      <Explain short="Los pocos sitios con los que AdminOps habla por su cuenta, qué se les envía y cuándo." className="mb-3">
+        Todo lo demás está bloqueado: la ventana solo puede cargar lo suyo. Apaga lo que no quieras y AdminOps sigue funcionando sin Internet.
+      </Explain>
       {list === null ? null : (
         <ul className="divide-y divide-line/60 rounded-lg border border-line">
           {list.map((x) => {

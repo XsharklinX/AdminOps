@@ -336,7 +336,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
       )}
 
       {/* Sin Card: su «contain: paint» recortaría los menús desplegables. */}
-      <section className="col-span-12 rounded-xl border border-line bg-panel p-4">
+      <section className="col-span-12 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
         <header className="mb-3 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
             <UserRound size={14} className="text-neon" /> Contactos

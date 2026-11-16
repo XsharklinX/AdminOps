@@ -4,7 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { tweaksApi } from "../lib/api";
 import { Overlay } from "./ui";
 import { notifyJournalChange } from "../lib/journalEvents";
-import { supportDetails } from "../lib/errors";
+import { explainError, supportDetails, type Explained } from "../lib/errors";
+import { goToPage } from "../lib/navigate";
+import { api } from "../lib/api";
 import { playSound } from "../lib/sounds";
 
 // ---------- Toasts ----------
@@ -16,8 +18,19 @@ interface Toast {
   text: string;
   /** Cambio del diario que se puede deshacer desde el propio aviso. */
   undo?: { entry: number; title: string };
-  /** Cuánto dura a la vista (ms). */
+  /** Cuánto dura a la vista (ms). 0: hasta que se cierra. */
   ms: number;
+  /** En los errores: por qué suele pasar, qué probar y qué puede hacer AdminOps. */
+  explained?: Explained;
+}
+
+/** El botón de salida de un error, si AdminOps puede hacer algo por ti. */
+export function errorExit(text: string, ex: Explained): { label: string; run: () => void } | null {
+  if (/en uso por otro programa|being used by another process|est[aá] abierto/i.test(text)) return { label: "Ver qué programas están abiertos", run: () => goToPage("processes") };
+  if (ex.fix === "admin") return { label: "Reiniciar AdminOps como administrador", run: () => void api.relaunchAsAdmin() };
+  if (ex.fix === "space") return { label: "Liberar espacio", run: () => goToPage("space", "space") };
+  if (ex.fix === "network") return { label: "Comprobar la conexión", run: () => goToPage("troubleshoot", "internet") };
+  return null;
 }
 
 /** Lo que dura un aviso con «Deshacer»: lo que tarda en vaciarse su barrita. */
@@ -62,9 +75,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const add = useCallback(
     (kind: ToastKind, text: string, undo?: Toast["undo"]) => {
       const id = Date.now() + Math.random();
-      const ms = undo ? UNDO_MS : kind === "error" ? 8000 : 3000;
-      setToasts((t) => [...t.slice(-3), { id, kind, text, undo, ms }]);
-      arm(id, ms);
+      // Un error no se va solo: hay que leerlo y, si se puede, actuar.
+      const explained = kind === "error" ? explainError(text) : undefined;
+      const ms = undo ? UNDO_MS : kind === "error" ? 0 : 3000;
+      setToasts((t) => [...t.slice(-3), { id, kind, text, undo, ms, explained }]);
+      if (ms) arm(id, ms);
       if (kind === "error") void playSound("error");
     },
     [arm],
@@ -72,6 +87,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const hold = (id: number) => {
     const t = timers.current.get(id);
+    if (!t) return;
     if (!t) return;
     window.clearTimeout(t.timer);
     t.left = Math.max(800, t.left - (Date.now() - t.since));
@@ -146,10 +162,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               data-toast={t.kind}
               onMouseEnter={() => hold(t.id)}
               onMouseLeave={() => resume(t.id)}
-              className={`${t.undo ? "pointer-events-auto" : ""} relative flex items-start gap-2.5 overflow-hidden rounded-lg border border-line-2 bg-panel-2/95 px-3.5 py-3 text-sm shadow-2xl ${paused === t.id ? "toast-paused" : ""}`}
+              className={`${t.undo || t.kind === "error" ? "pointer-events-auto" : ""} relative flex items-start gap-2.5 overflow-hidden rounded-lg border border-line-2 bg-panel-2/95 px-3.5 py-3 text-sm shadow-2xl ${paused === t.id ? "toast-paused" : ""}`}
             >
               <Icon size={16} className={`mt-0.5 shrink-0 ${color[t.kind]}`} />
-              <p className="max-h-32 min-w-0 flex-1 overflow-y-auto text-ink [overflow-wrap:anywhere]">{t.text}</p>
+              <div className="min-w-0 flex-1">
+                <p className="max-h-32 overflow-y-auto text-ink [overflow-wrap:anywhere]">{t.text}</p>
+                {t.explained && <ErrorHelp t={t} onDone={() => drop(t.id)} />}
+              </div>
               {t.kind === "error" && (
                 <button
                   onClick={() =>
@@ -183,6 +202,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         })}
       </div>
     </ToastCtx.Provider>
+  );
+}
+
+/** Debajo del error: por qué suele pasar, lo primero que probar y el botón de salida. */
+function ErrorHelp({ t, onDone }: { t: Toast; onDone: () => void }) {
+  const ex = t.explained!;
+  const exit = errorExit(t.text, ex);
+  const known = !/no reconoce/.test(ex.why);
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {known && <p className="text-xs text-dim">{ex.why}</p>}
+      {ex.tries[0] && <p className="text-xs text-dim">Prueba: {ex.tries[0]}</p>}
+      {exit && (
+        <button
+          onClick={() => {
+            exit.run();
+            onDone();
+          }}
+          className="rounded-md bg-neon px-2.5 py-1 text-xs font-medium text-on-neon"
+        >
+          {exit.label}
+        </button>
+      )}
+    </div>
   );
 }
 

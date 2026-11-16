@@ -18,6 +18,7 @@ export const PANEL_BLOCKS = {
   today: { label: "Pendiente de hoy", span: 6 },
   notes: { label: "Notas de este equipo y esta red", span: 6 },
   live: { label: "En vivo: procesador, memoria, disco y red", span: 6 },
+  parts: { label: "El equipo, pieza a pieza", span: 6 },
   plan: { label: "Qué hacer ahora", span: 4 },
   quick: { label: "Acciones rápidas", span: 2 },
   slow: { label: "Qué frena el equipo ahora", span: 6 },

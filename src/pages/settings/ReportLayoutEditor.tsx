@@ -2,7 +2,7 @@
 // secciones lleva el PDF y en qué orden; la cabecera va siempre arriba y las
 // firmas y condiciones, abajo.
 import { ArrowDown, ArrowUp, LayoutList } from "lucide-react";
-import { Card, inputClass, Toggle } from "../../components/ui";
+import { Card, Explain, inputClass, Toggle } from "../../components/ui";
 import type { ReportLayout, Settings } from "../../lib/api";
 
 /** Las secciones que se pueden quitar o mover, en su orden de fábrica (el mismo que en workflow.rs). */
@@ -45,10 +45,9 @@ export function ReportLayoutEditor({ s, set }: { s: Settings; set: (patch: Parti
 
   return (
     <Card title="Tu plantilla de informe" icon={<LayoutList size={14} />} className="col-span-12">
-      <p className="mb-3 text-xs text-dim">
-        Además de las dos plantillas de fábrica (para el cliente y técnica), puedes tener la tuya: qué secciones lleva el PDF y en qué orden. Al generar un informe aparece como tercera opción. La
-        cabecera va siempre arriba, y las firmas y tus condiciones, abajo.
-      </p>
+      <Explain short="Además de las dos plantillas de fábrica (para el cliente y técnica), puedes tener la tuya." className="mb-3">
+        Qué secciones lleva el PDF y en qué orden. Al generar un informe aparece como tercera opción. La cabecera va siempre arriba, y las firmas y tus condiciones, abajo.
+      </Explain>
       <div className="mb-4 flex flex-wrap items-end gap-4">
         <label className="block">
           <span className="mb-1 block text-xs text-dim">Nombre</span>

@@ -23,7 +23,7 @@ export function QuickDial({ items, actions: a }: { items: Contact[]; actions: Co
           <div
             key={c.id}
             onClick={() => a.open(c)}
-            className="group flex cursor-pointer items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-2.5 transition-colors hover:border-neon/40"
+            className="group flex cursor-pointer items-center gap-2.5 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2.5 transition-colors hover:border-neon/40"
           >
             <Avatar c={c} size={34} />
             <div className="min-w-0 flex-1">

@@ -38,7 +38,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { SheetPanel } from "../components/MachineSheetCard";
-import { Button, inputClass, Loading, Modal, iconBtn } from "../components/ui";
+import { Button, Explain, iconBtn, inputClass, Loading, Modal } from "../components/ui";
 import { lockApi, portalsApi, type Portal, type PortalAction } from "../lib/api";
 import { clearPortalBlocked, clearPortalError, failPortal, lastPortalKey, stowPortal, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
 import { getPrefs, windowRect } from "../lib/prefs";
@@ -651,7 +651,7 @@ function DownloadsMenu({ downloads, onClose }: { downloads: PortalDownload[]; on
   const toast = useToast();
   const run = (p: Promise<void>) => p.catch((e) => toast("error", String(e)));
   return (
-    <div className="mx-auto mt-6 max-w-lg rounded-xl border border-line bg-panel p-4">
+    <div className="mx-auto mt-6 max-w-lg rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
       <div className="mb-3 flex items-center">
         <span className="flex items-center gap-2 text-sm font-medium text-ink">
           <Download size={14} /> Descargas
@@ -760,10 +760,9 @@ function Empty({ kind, onAdd }: { kind: PortalKind; onAdd: (preset?: Portal) => 
       <div className="mx-auto max-w-xl p-10 text-center">
         <MessagesSquare size={36} className="mx-auto mb-4 text-neon" />
         <h2 className="mb-2 text-lg font-semibold">Teams dentro de AdminOps</h2>
-        <p className="mb-5 text-sm text-dim">
-          Chats, equipos y reuniones sin instalar Teams en el equipo del cliente ni salir de la aplicación. Se usa Teams en la web, que es la versión que
-          funciona en cualquier equipo; la cuenta se guarda cifrada y el inicio de sesión se rellena solo.
-        </p>
+        <Explain short="Chats, equipos y reuniones sin instalar Teams en el equipo del cliente ni salir de la aplicación." className="mb-5">
+          Se usa Teams en la web, que es la versión que funciona en cualquier equipo; la cuenta se guarda cifrada y el inicio de sesión se rellena solo.
+        </Explain>
         <div className="flex flex-wrap justify-center gap-2">
           <Button onClick={() => onAdd(preset("work"))}>
             <MessagesSquare size={14} /> Teams del trabajo (Microsoft 365)

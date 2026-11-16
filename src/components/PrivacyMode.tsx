@@ -3,8 +3,8 @@ import { useEffect } from "react";
 import { useToast } from "./feedback";
 import { setPrivacy, usePrivacy } from "../lib/privacy";
 
-/** Botón de la barra superior. Ctrl+Alt+P lo activa y lo desactiva desde cualquier pantalla. */
-export function PrivacyToggle() {
+/** Botón (o fila del menú «⋯» con `row`). Ctrl+Alt+P lo activa y lo desactiva desde cualquier pantalla. */
+export function PrivacyToggle({ row = false }: { row?: boolean }) {
   const on = usePrivacy();
   const toast = useToast();
   useEffect(() => {
@@ -18,6 +18,15 @@ export function PrivacyToggle() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [on, toast]);
+  if (row) {
+    return (
+      <button type="button" role="menuitemcheckbox" aria-checked={on} onClick={() => setPrivacy(!on)} className="menu-row">
+        {on ? <ShieldCheck size={14} className="text-neon" /> : <EyeOff size={14} />}
+        <span className="flex-1">Modo privacidad</span>
+        <kbd className="font-mono text-[10.5px] text-mute">Ctrl+Alt+P</kbd>
+      </button>
+    );
+  }
   return (
     <button
       type="button"

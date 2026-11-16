@@ -1,7 +1,7 @@
 import { KeyRound, Lock, LockOpen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
-import { Button, Card, inputClass, Loading } from "../../components/ui";
+import { Button, Card, Explain, inputClass, Loading } from "../../components/ui";
 import { logQuietly, appApi, lockApi, type LockStatus } from "../../lib/api";
 
 const IDLE = [
@@ -146,11 +146,9 @@ export function LockSettings() {
   return (
     <div className="space-y-4">
       <Card title="Bloqueo de AdminOps" icon={status.enabled ? <Lock size={14} /> : <LockOpen size={14} />}>
-        <p className="mb-4 text-sm text-dim">
-          Pide un PIN o una contraseña al abrir AdminOps y, si quieres, tras un tiempo sin usarla. Útil si el equipo lo usan otras personas o lo dejas en
-          casa de un cliente. Bloquea la aplicación; para cifrar también los datos usa «Cifrar mis datos», más abajo (y la Caja fuerte para carpetas enteras). Si lo olvidas, se desbloquea con la contraseña de
-          Windows de esta cuenta.
-        </p>
+        <Explain short="Pide un PIN o una contraseña al abrir AdminOps y, si quieres, tras un tiempo sin usarla." className="mb-4">
+          Útil si el equipo lo usan otras personas o lo dejas en casa de un cliente. Bloquea la aplicación; para cifrar también los datos usa «Cifrar mis datos», más abajo (y la Caja fuerte para carpetas enteras). Si lo olvidas, se desbloquea con la contraseña de Windows de esta cuenta.
+        </Explain>
         {portable && (
           <p className="mb-4 rounded-lg border border-neon/30 bg-neon/5 px-3 py-2 text-xs text-dim">
             <b className="text-ink">En el pendrive, el PIN también protege tus contraseñas guardadas</b> (portales y routers): si pierdes el pendrive,

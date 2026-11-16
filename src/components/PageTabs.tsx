@@ -2,6 +2,8 @@ import { useRef, type ReactNode } from "react";
 import { SlideMark } from "./SlideMark";
 import { PageActiveContext, usePageActive } from "../lib/pageActive";
 import { PageHelp } from "./PageHelp";
+import { usePrefs } from "../lib/prefs";
+import { useNarrow } from "../lib/useNarrow";
 
 export interface PageTab<T extends string> {
   id: T;
@@ -14,6 +16,11 @@ export interface PageTab<T extends string> {
 /** Pestañas dentro de una página que agrupa varias vistas (Actualizaciones, Mi red…). */
 export function PageTabs<T extends string>({ tabs, value, onChange }: { tabs: PageTab<T>[]; value: T; onChange: (t: T) => void }) {
   const row = useRef<HTMLDivElement>(null);
+  // Con el árbol de la barra lateral a la vista, estas pestañas repetían lo
+  // mismo justo al lado: solo salen con la barra en «solo áreas» o la ventana estrecha.
+  const narrow = useNarrow();
+  const treeVisible = usePrefs().sidebar.mode !== "mini" && !narrow;
+  if (treeVisible) return null;
   return (
     <div ref={row} className="no-scrollbar relative isolate mx-auto flex w-full max-w-(--page-max) shrink-0 gap-1 overflow-x-auto border-b border-line px-6 pt-4">
       <SlideMark within={row} kind="underline" />

@@ -356,7 +356,7 @@ const DEFAULT_AREAS: Omit<Area, "icon">[] = [
   { id: "equipo", label: "Este equipo", iconName: "Monitor", pages: ["machine", "tweaks", "processes", "space", "data"] },
   { id: "red", label: "Red", iconName: "Wifi", pages: ["router"] },
   { id: "programas", label: "Programas", iconName: "Package", pages: ["apps"] },
-  { id: "admin", label: "Administración", iconName: "Building2", pages: ["stations", "users", "printers", "remote", "recipes"] },
+  { id: "admin", label: "Gestión", iconName: "Building2", pages: ["stations", "users", "printers", "remote", "recipes"] },
   { id: "soporte", label: "Soporte", iconName: "Headset", pages: ["agenda", "tickets", "inventory", "people", "contacts", "knowledge"] },
 ];
 
@@ -670,7 +670,7 @@ export function Sidebar({
     </nav>
   );
 
-  if (mini) return <aside className={`flex shrink-0 border-line ${sb.position === "right" ? "border-l" : "border-r"}`}>{rail}</aside>;
+  if (mini || active === "settings") return <aside className={`flex shrink-0 border-line ${sb.position === "right" ? "border-l" : "border-r"}`}>{rail}</aside>;
 
   const recentPages = sb.recents > 0 ? recent.filter((p) => !OUTSIDE_AREAS.includes(p)).slice(0, sb.recents) : [];
   const widthPx = resize.width ?? sb.widthPx ?? WIDTH_PX[sb.width];

@@ -1,7 +1,7 @@
 import { Building2, CheckCircle2, Circle, ExternalLink, KeyRound, Loader2, LogOut, Mail, RefreshCw, Search, ShieldAlert, Trash2, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, inputClass, Loading } from "../components/ui";
+import { Button, Card, Explain, inputClass, Loading } from "../components/ui";
 import { WindowsTools } from "../components/WindowsTools";
 import { accountsApi, troubleshootApi, usersApi, type AccountsStatus } from "../lib/api";
 import { NeedsAdmin } from "../components/AdminBanner";
@@ -179,10 +179,9 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
 
       {s.sessionKind === "microsoft" && (
         <Card title="Pasar esta cuenta de Microsoft a local" icon={<Users size={14} />} className="col-span-12">
-          <p className="text-sm text-dim">
-            Windows solo deja convertirla desde Configuración (pide la contraseña actual): «Tu información → Iniciar sesión con una cuenta local». Los archivos se conservan. Si no
-            se sabe la contraseña, crea un administrador local en Usuarios y cierra la sesión.
-          </p>
+          <Explain short="Windows solo deja convertirla desde Configuración (pide la contraseña actual).">
+            «Tu información → Iniciar sesión con una cuenta local». Los archivos se conservan. Si no se sabe la contraseña, crea un administrador local en Usuarios y cierra la sesión.
+          </Explain>
           <div className="mt-3 flex gap-2">
             <Button kind="ghost" onClick={() => settings("yourinfo")}>
               <ExternalLink size={13} /> Abrir «Tu información»

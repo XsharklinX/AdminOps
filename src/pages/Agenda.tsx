@@ -558,7 +558,7 @@ function QuickAdd({ ref, onAdded }: { ref: React.RefObject<QuickAddHandle | null
 
   const select = "rounded-md border border-line bg-void/60 px-2 py-2 text-xs text-ink outline-none focus:border-neon/50";
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-2">
       <div className="flex shrink-0 rounded-md border border-line p-0.5" role="radiogroup" aria-label="Qué es">
         {(Object.keys(KINDS) as AgendaKind[]).map((k) => {
           const { Icon, label, text: color } = KINDS[k];
@@ -725,7 +725,7 @@ function EntryRow({
   const k = KINDS[kindOf(v)];
   const place = v.place || client?.address;
   return (
-    <li className="group relative flex items-start gap-3 overflow-hidden rounded-xl border border-line bg-panel py-3 pr-3 pl-4 transition-colors hover:border-line-2">
+    <li className="group relative flex items-start gap-3 overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1 py-3 pr-3 pl-4 transition-colors hover:border-line-2">
       <span className={`absolute inset-y-0 left-0 w-1 ${k.bar}`} />
       <div className="w-14 shrink-0 text-center">
         <div className="font-mono text-base text-ink">{time(v.start)}</div>

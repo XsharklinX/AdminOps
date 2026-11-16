@@ -240,7 +240,7 @@ pub fn evaluate(i: &Input, c: &Costs) -> Report {
     let upgrade_total: f64 = upgrades.iter().map(|u| u.cost).sum();
 
     // Lo que no se arregla: procesador y edad, y Windows 11 si lo bloquea la máquina.
-    let hard_limit = cpu_s <= 40 || age_s <= 20 || (i.windows10 && !blockers.is_empty() && (cpu_s <= 40 || i.tpm_ready == Some(false)));
+    let hard_limit = cpu_s <= 40 || age_s <= 20 || (i.windows10 && !blockers.is_empty() && i.tpm_ready == Some(false));
     let decision = if hard_limit || (upgrade_total > c.new_pc * 0.5 && !upgrades.is_empty()) {
         "replace"
     } else if !upgrades.is_empty() || (i.windows10 && blockers.is_empty()) {

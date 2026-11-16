@@ -1,7 +1,7 @@
 import { BatteryWarning, Loader2, Power, RefreshCw, RotateCcw, Trash2, Wifi, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "./feedback";
-import { Button, Card } from "./ui";
+import { Button, Card, Explain } from "./ui";
 import { wifiApi, type WifiState } from "../lib/api";
 
 const TONE: Record<string, string> = {
@@ -139,10 +139,9 @@ export function WifiControl({ isAdmin }: { isAdmin: boolean }) {
           </div>
 
           {broken && broken.problem !== 22 && (
-            <p className="text-xs text-mute">
-              Si el error vuelve tras reiniciar la tarjeta: descarga el driver más reciente de la web del fabricante del portátil o de la tarjeta, desactiva el ahorro de
-              energía y, si sigue, apaga el equipo del todo (no reiniciar) durante un minuto. Un fallo que va y viene también puede ser la tarjeta o su antena.
-            </p>
+            <Explain short="Si el error vuelve tras reiniciar la tarjeta.">
+              Descarga el driver más reciente de la web del fabricante del portátil o de la tarjeta, desactiva el ahorro de energía y, si sigue, apaga el equipo del todo (no reiniciar) durante un minuto. Un fallo que va y viene también puede ser la tarjeta o su antena.
+            </Explain>
           )}
         </div>
       )}

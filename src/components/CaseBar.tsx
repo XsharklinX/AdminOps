@@ -27,7 +27,7 @@ export function NewCaseButton({ hidden }: { hidden: boolean }) {
     <button
       onClick={() => window.dispatchEvent(new CustomEvent(OPEN_CASE_EVENT, { detail: {} }))}
       data-tour="case"
-      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink"
+      className="mr-1 flex h-8 items-center gap-1.5 rounded-lg bg-neon px-3 text-xs font-semibold text-on-neon shadow-sm transition-[filter] hover:brightness-110"
       title="Abrir un caso: lo que hagas queda apuntado y la resolución se redacta sola"
     >
       <TicketPlus size={13} /> Nuevo caso

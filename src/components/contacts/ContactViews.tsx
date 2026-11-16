@@ -203,7 +203,7 @@ export function TableView({
     }
   };
   return (
-    <div className="overflow-x-auto rounded-xl border border-line bg-panel p-3">
+    <div className="overflow-x-auto rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-3">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-[11px] text-mute">
@@ -252,7 +252,7 @@ export function TableView({
 
 export function DirectoryView({ items, selected, selecting, onSelect, onOpen, actions: a }: ViewProps) {
   return (
-    <div className="grid grid-cols-1 gap-x-6 rounded-xl border border-line bg-panel px-3 py-2 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-x-6 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2 lg:grid-cols-2">
       {items.map((c) => (
         <div key={c.id} id={`contact-${c.id}`} onClick={() => onOpen(c)} className="group flex cursor-pointer items-center gap-2 border-b border-line/40 py-1.5 hover:bg-panel-2">
           <Check c={c} selected={selected} selecting={selecting} onSelect={onSelect} />

@@ -366,7 +366,7 @@ export function CommandPalette({
     const Icon = a.icon;
     const nSections = a.pages.reduce((t, p) => t + sectionsOf(p).length, 0);
     return (
-      <section key={a.id} className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-line bg-panel">
+      <section key={a.id} className="mb-3 break-inside-avoid overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">
         <header className="flex items-center gap-2.5 border-b border-line px-3.5 py-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel-2 text-ink">
             <Icon size={16} strokeWidth={1.7} />
@@ -506,7 +506,7 @@ export function CommandPalette({
                     const a = areaOfPage(page);
                     const Icon = a?.icon ?? Pin;
                     return (
-                      <button key={k} onClick={() => go(page, section)} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-2 text-left transition-colors hover:border-neon/60">
+                      <button key={k} onClick={() => go(page, section)} className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2 text-left transition-colors hover:border-neon/60">
                         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-neon/10 text-neon">
                           <Icon size={15} strokeWidth={1.8} />
                         </span>
@@ -535,7 +535,7 @@ export function CommandPalette({
                           openComm(page);
                         } else go(page);
                       }}
-                      className="flex items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-2 text-left transition-colors hover:border-neon/60"
+                      className="flex items-center gap-2.5 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2 text-left transition-colors hover:border-neon/60"
                     >
                       <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel-2 text-ink">
                         <Icon size={15} strokeWidth={1.7} />

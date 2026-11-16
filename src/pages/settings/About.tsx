@@ -3,7 +3,7 @@ import { BadgeCheck, BookOpen, Bug, ClipboardCopy, Scale, Sparkles, Trash2, User
 import { useEffect, useState } from "react";
 import logo from "../../assets/logo.svg";
 import { useToast } from "../../components/feedback";
-import { Button, Card, inputClass, Modal } from "../../components/ui";
+import { Button, Card, Explain, inputClass, Modal } from "../../components/ui";
 import { appApi, type AppInfo, errorLogApi, type ErrorGroup, lockApi, type LockStatus, logQuietly } from "../../lib/api";
 import { type AppMode, setPrefs, usePrefs } from "../../lib/prefs";
 import { openHelp } from "../../lib/help";
@@ -74,12 +74,9 @@ export function About({ appInfo }: { appInfo: AppInfo | null }) {
         >
           Crear paquete de soporte
         </Button>
-        <p className="mt-1.5 text-[11px] text-mute">
-          Un .zip con el registro de actividad, el último diagnóstico y la
-          versión. «Reportar un problema» lo prepara y lo adjunta al correo
-          por ti. Puede contener el nombre del equipo y del usuario: revísalo
-          antes de compartirlo.
-        </p>
+        <Explain short="Un .zip con el registro de actividad, el último diagnóstico y la versión." className="mt-1.5">
+          «Reportar un problema» lo prepara y lo adjunta al correo por ti. Puede contener el nombre del equipo y del usuario: revísalo antes de compartirlo.
+        </Explain>
       </div>
       <div className="mt-4 border-t border-line/60 pt-3 text-xs text-dim">
         <div className="mb-1 font-medium text-ink">Atajos de AdminOps</div>

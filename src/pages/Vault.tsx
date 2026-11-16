@@ -3,7 +3,7 @@ import { Copy, Eye, EyeOff, FolderLock, FolderOpen, HardDrive, KeyRound, Lock, L
 import { useCallback, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass, Modal, Loading } from "../components/ui";
+import { Button, Card, Explain, inputClass, Loading, Modal } from "../components/ui";
 import { logQuietly, vaultApi, type VaultStatus, type VaultSupport } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -475,10 +475,9 @@ function EncryptedFolder() {
   const pick = "min-w-0 flex-1 truncate rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-dim";
   return (
     <Card title="Carpeta cifrada" icon={<FolderLock size={14} />} className="col-span-12">
-      <p className="mb-4 text-sm text-dim">
-        Guarda una carpeta en un archivo .zip cifrado con AES-256 y contraseña. Funciona en cualquier Windows (también Home) y sirve para enviarla o
-        guardarla en un USB. Se abre con 7-Zip, WinRAR o AdminOps (el Explorador de Windows no admite este cifrado).
-      </p>
+      <Explain short="Guarda una carpeta en un archivo .zip cifrado con AES-256 y contraseña." className="mb-4">
+        Funciona en cualquier Windows (también Home) y sirve para enviarla o guardarla en un USB. Se abre con 7-Zip, WinRAR o AdminOps (el Explorador de Windows no admite este cifrado).
+      </Explain>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="space-y-3">
           <h4 className="text-xs font-medium text-dim">Cifrar una carpeta</h4>

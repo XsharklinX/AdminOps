@@ -7,7 +7,7 @@ import { DataTable, type Column } from "./DataTable";
 import { FindingList } from "./FindingList";
 import { TimeChart } from "./TimeChart";
 import { TypedConfirm } from "./DiskPartitions";
-import { Button, Card, EmptyState, ErrorState, Loading, smallBtn } from "./ui";
+import { Button, Card, EmptyState, ErrorState, Explain, Loading, smallBtn } from "./ui";
 import type { PageId } from "./Sidebar";
 import { appApi, expertApi, troubleshootApi, tweaksApi, type Autorun, type CrashReport, type EventGroup, type PerfInsights, type StressResult, type TroubleFinding, type TroubleFix } from "../lib/api";
 import { fullDate, shortDate } from "../lib/format";
@@ -86,10 +86,9 @@ export function AutorunsCard({ isAdmin }: { isAdmin: boolean }) {
   );
   return (
     <Card title="Todo lo que arranca con Windows" icon={<ListTree size={14} />} right={list && <button className={smallBtn} onClick={load}>Volver a leer</button>}>
-      <p className="mb-3 text-xs text-dim">
-        Todos los sitios por donde algo puede arrancar solo, como Autoruns: registro, carpetas de Inicio, tareas, servicios y drivers que no son de Microsoft, inicio de sesión, «depuradores», AppInit,
-        Explorador y WMI. Desactivar no borra nada y se puede deshacer desde el Historial.
-      </p>
+      <Explain short="Todos los sitios por donde algo puede arrancar solo, como Autoruns." className="mb-3">
+        Registro, carpetas de Inicio, tareas, servicios y drivers que no son de Microsoft, inicio de sesión, «depuradores», AppInit, Explorador y WMI. Desactivar no borra nada y se puede deshacer desde el Historial.
+      </Explain>
       {!list && !error && !loading && (
         <Button onClick={load}>
           <Play size={14} /> Revisarlo todo (un minuto)

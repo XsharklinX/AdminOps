@@ -14,7 +14,7 @@ const DOT: Record<Tone, string> = { ok: "bg-ok", warn: "bg-warn", neutral: "bg-m
 
 function Tile({ label, tone, value, note, action, onGo }: { label: string; tone: Tone; value: ReactNode; note?: ReactNode; action: string; onGo: () => void }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-line bg-panel p-4">
+    <div className="flex min-w-0 flex-col gap-1 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
       <span className="text-xs text-mute">{label}</span>
       <span className="flex items-center gap-2 text-[15px] font-medium text-ink">
         <span className={`size-2 shrink-0 rounded-full ${DOT[tone]}`} />

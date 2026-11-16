@@ -740,7 +740,7 @@ mod tests {
     #[test]
     fn cover_and_one_page() {
         use crate::diagnostics::{Finding, Severity, Volume};
-        let finding = |sev, title: &str| Finding { severity: sev, area: "Discos".into(), title: title.into(), detail: None, actions: vec![], key: String::new() };
+        let finding = |sev, title: &str| Finding { severity: sev, area: "Discos".into(), title: title.into(), detail: None, actions: vec![], key: String::new(), proof: vec![] };
         let cur = Diagnostics {
             host: "PC-01".into(),
             volumes: vec![Volume { mount: "C:\\".into(), total: 500 << 30, free: 30 << 30 }],

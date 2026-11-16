@@ -5,7 +5,7 @@ import { Copy, Play, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TimeChart } from "../components/TimeChart";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, ErrorState, Loading, Tile } from "../components/ui";
+import { Button, Card, ErrorState, Explain, Loading, Tile } from "../components/ui";
 import { netwatchApi, type Outage, type WatchStatus } from "../lib/api";
 import { dateTime } from "../lib/format";
 import { usePageActive } from "../lib/pageActive";
@@ -97,9 +97,9 @@ export function NetWatch() {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-60 flex-1 text-sm text-dim">
-          Déjalo en marcha mientras pasa lo de «se me corta a ratos»: cada 5 segundos hace un ping al router y a Internet, y apunta cada corte con su hora, cuánto duró y de quién era la culpa. Solo funciona con AdminOps abierta.
-        </p>
+        <Explain short="Déjalo en marcha mientras pasa lo de «se me corta a ratos»." className="min-w-60 flex-1">
+          Cada 5 segundos hace un ping al router y a Internet, y apunta cada corte con su hora, cuánto duró y de quién era la culpa. Solo funciona con AdminOps abierta.
+        </Explain>
         <Button kind={s.running ? "danger" : "primary"} onClick={() => void toggle()}>
           {s.running ? <Square size={13} /> : <Play size={14} />} {s.running ? "Detener" : "Poner en marcha"}
         </Button>

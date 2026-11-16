@@ -21,10 +21,22 @@ function useAudit(): [boolean, (on: boolean) => Promise<void>] {
   return [on, set];
 }
 
-/** Botón de la barra superior. */
-export function AuditToggle() {
+/** Botón de la barra superior (o fila del menú «⋯» con `row`). */
+export function AuditToggle({ row = false }: { row?: boolean }) {
   const [on, set] = useAudit();
   const toast = useToast();
+  const flip = () =>
+    set(!on)
+      .then(() => toast("info", on ? "Modo auditoría desactivado: AdminOps vuelve a poder hacer cambios." : "Modo auditoría: AdminOps solo mira, no cambia nada del equipo."))
+      .catch((e) => toast("error", String(e)));
+  if (row) {
+    return (
+      <button type="button" role="menuitemcheckbox" aria-checked={on} onClick={() => void flip()} className="menu-row">
+        {on ? <Eye size={14} className="text-warn" /> : <EyeOff size={14} />}
+        <span className="flex-1">Solo mirar (no cambiar nada)</span>
+      </button>
+    );
+  }
   return (
     <button
       onClick={() =>

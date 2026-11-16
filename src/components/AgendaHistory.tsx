@@ -122,7 +122,7 @@ export function AgendaHistory({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-xl border border-line bg-panel px-3 py-2.5">
+          <div key={s.label} className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2.5">
             <div className={`font-mono text-xl leading-none font-semibold ${s.warn && s.value !== "0" ? "text-warn" : "text-ink"}`}>{s.value}</div>
             <div className="mt-1 text-[11px] text-mute">{s.label}</div>
           </div>
@@ -178,7 +178,7 @@ export function AgendaHistory({
                   {done.some((i) => i.minutes) && ` · ${hours(done.reduce((n, i) => n + i.minutes, 0))}`}
                 </span>
               </h3>
-              <ul className="divide-y divide-line/60 rounded-xl border border-line bg-panel">
+              <ul className="divide-y divide-line/60 rounded-2xl border border-line/70 bg-panel shadow-elev-1">
                 {items.map((i) => {
                   const meta = i.kind === "followup" ? { Icon: Clock, text: "text-mute", label: "Seguimiento" } : KIND[i.kind];
                   return (

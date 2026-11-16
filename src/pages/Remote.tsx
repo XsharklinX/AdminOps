@@ -177,7 +177,7 @@ export function Remote({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="@container mx-auto max-w-(--page-max) space-y-4 p-6">
       {/* Conexión rápida: un nombre y a conectar; lo demás, a un clic. */}
-      <section className="rounded-xl border border-line bg-panel p-4">
+      <section className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
         <form
           className="flex flex-wrap items-center gap-2"
           onSubmit={(e) => {

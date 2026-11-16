@@ -7,10 +7,12 @@ import { RELEASES } from "./changelog";
 /** En qué versión cambió cada pantalla o sección (clave de `navKey`). Se añade al publicar. */
 export const NEW_IN: Record<string, string> = {
   "space:space": "1.2.3",
-  dashboard: "1.2.4",
+  "space:health": "1.2.10",
+  "tweaks:startup": "1.2.10",
+  "machine:diagnostics": "1.2.10",
+  dashboard: "1.2.10",
   settings: "1.2.9",
   "machine:hardware": "1.2.8",
-  "space:health": "1.2.7",
   "space:partitions": "1.2.7",
   "data:backups": "1.2.7",
   "data:recover": "1.2.7",

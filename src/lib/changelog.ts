@@ -18,6 +18,26 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.10",
+    title: "Rediseño con aire y arreglos que se comprueban solos",
+    added: [
+      "Rediseño: navegación en dos niveles (la barra lateral elige el área y las pestañas, en la cabecera), barra de arriba ordenada con el menú «⋯» (modo privado, modo auditoría y pantalla de taller), paleta oscura nueva con tarjetas más espaciadas y letra con jerarquía. Cada pantalla abre con una línea de explicación y «Cómo funciona ▾» en vez de párrafos largos, y las esperas enseñan la forma de lo que va a salir.",
+      "Panel: empieza por el veredicto con un anillo de lo que está bien, por vigilar y mal, y nombra lo dos peores. Nuevo bloque «El equipo, pieza a pieza»: cada pieza con el color de lo peor que tiene; un clic dice qué le pasa y lleva a arreglarlo.",
+      "Discos: un resumen por disco (bien, vigilar o cambiar pronto, temperatura y vida) y los errores de los últimos 30 días de cada disco, separados por tipo (superficie, reintentos, conexión, controlador, sistema de archivos). «Asistente del disco»: qué falla, el plan por orden y un veredicto.",
+      "Arreglos nuevos para errores de escritura: enlace del disco sin ahorro de energía, USB sin suspensión selectiva y disco que no se apaga solo (se deshacen). Y en Antivirus: actualizar firmas y encender la protección en tiempo real.",
+      "Cada arreglo del Diagnóstico comprueba después si funcionó (vuelve a mirar solo esa parte) y, si no, propone el siguiente paso de la escalera. «Ver pruebas»: los sucesos de Windows en los que se basa cada problema (pantallazos azules con su culpable, apagados, errores de disco, cierres, arranques lentos).",
+      "Problemas abiertos: el Diagnóstico recuerda cada problema entre análisis (abierto, resuelto, vuelto a salir) con su historia y lo que se intentó.",
+      "Trabajos de noche: revisar la superficie de un disco, reparar Windows (DISM y SFC) o la prueba larga del disco a la hora que digas; el equipo no se duerme mientras tanto y por la mañana el Panel enseña el resultado.",
+      "Inicio de Windows → «Lo que se gana»: cuánto retrasa cada programa el arranque según Windows, el arranque estimado si los quitas y, tras reiniciar, lo que se ganó de verdad (para copiar al ticket).",
+      "Avisos con su arreglo: espacio bajo, pantalla que se reinicia, IP repetida, Windows Update y Defender traen un botón para arreglarlo (también en la notificación). Los errores ya no se borran solos y dicen qué hacer (cerrar procesos, abrir como administrador, liberar espacio, revisar la red).",
+    ],
+    fixed: [
+      "La versión de la barra de arriba salía vacía en algunas ventanas.",
+      "La tira de pantallas abiertas se apagaba sola solo en algunos modos; ahora sale solo con la barra plegada o la ventana estrecha.",
+      "El área «Administración» pasa a llamarse «Gestión» para no confundirla con los permisos de administrador.",
+    ],
+  },
+  {
     version: "1.2.9",
     title: "Más cuidada, más fluida, con informes de revista y más segura",
     added: [

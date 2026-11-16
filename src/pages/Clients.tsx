@@ -171,7 +171,7 @@ export function Clients() {
               </button>
             </p>
           )}
-          <div className="overflow-hidden rounded-xl border border-line bg-panel">
+          <div className="overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">
             {visible.map((c, i) => {
               const n = nextOf(c);
               return (
@@ -222,7 +222,7 @@ export function Clients() {
           ) : (
             <>
               {form.id && (
-                <section className="rounded-xl border border-line bg-panel p-4">
+                <section className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
                   <div className="flex flex-wrap items-center gap-3">
                     <Avatar c={{ name: form.name, favorite: false }} size={48} />
                     <div className="min-w-0 flex-1">
@@ -313,7 +313,7 @@ export function Clients() {
 
               {form.id && tab === "summary" && (
                 <>
-                  {form.notes.trim() && <p className="rounded-xl border border-line bg-panel px-4 py-3 text-sm whitespace-pre-line text-dim">{form.notes}</p>}
+                  {form.notes.trim() && <p className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-4 py-3 text-sm whitespace-pre-line text-dim">{form.notes}</p>}
                   {(next !== null || warranties.length > 0) && (
                     <Card title="Mantenimiento y garantías" icon={<ShieldCheck size={14} />}>
                       {next !== null && (
