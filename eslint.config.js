@@ -15,7 +15,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri", "node_modules", "release", "installer", "docs", "public", "eslint.config.js", "tests/ui/out", "tests/sandbox"] },
+  { ignores: ["dist", "src-tauri", "node_modules", "release", "installer", "docs", "public", "eslint.config.js", "tests/ui/out", "tests/exe/out", "tests/sandbox"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -51,7 +51,7 @@ export default tseslint.config(
   },
   {
     // Las pruebas de la interfaz en marcha: un script de Node que maneja un navegador.
-    files: ["tests/ui/**/*.{mjs,ts}", "scripts/**/*.{mjs,ts}"],
+    files: ["tests/ui/**/*.{mjs,ts}", "tests/exe/**/*.mjs", "tests/perf/**/*.mjs", "scripts/**/*.{mjs,ts}"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

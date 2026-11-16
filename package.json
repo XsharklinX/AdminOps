@@ -13,6 +13,8 @@
     "build:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
     "setversion": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/version.ps1",
     "test:ui": "node tests/ui/smoke.mjs",
+    "test:exe": "node tests/exe/exe.mjs",
+    "test:perf": "node tests/perf/budget.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "prepare": "node scripts/install-hooks.mjs"
   },

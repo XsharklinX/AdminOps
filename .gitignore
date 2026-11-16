@@ -36,3 +36,4 @@ src-tauri/target-ci/
 installer/target/
 installer/gen/
 tests/ui/out/
+tests/exe/out/
