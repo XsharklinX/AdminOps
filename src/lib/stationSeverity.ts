@@ -33,8 +33,12 @@ export function severityOf(s: Station): { severity: Severity; reason: string } {
       return { severity: "space", reason: `poco disco: ${r.freeGb.toFixed(1).replace(".", ",")} GB libres` };
     }
     if (r.bsods != null && r.bsods > 0) return { severity: "other", reason: `${r.bsods} pantallazo(s) azul(es) en 30 días` };
+    if (s.warnings.length > 0) return { severity: "other", reason: s.warnings[0] };
+    // Revisado a fondo y sin nada: bien.
+    return { severity: "ok", reason: "bien" };
   }
   if (s.warnings.length > 0) return { severity: "other", reason: s.warnings[0] };
+  // Responde, pero no se pudo mirar por dentro (o fue la comprobación rápida): nunca «Bien».
   return { severity: "other", reason: "sin revisar" };
 }
 
