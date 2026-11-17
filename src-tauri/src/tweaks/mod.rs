@@ -71,8 +71,13 @@ impl TweakState {
         }
     }
 
-    fn find(&self, id: &str) -> Result<&Tweak, String> {
+    pub(crate) fn find(&self, id: &str) -> Result<&Tweak, String> {
         self.catalog.iter().find(|t| t.id == id).ok_or_else(|| format!("Ajuste desconocido: {id}"))
+    }
+
+    /// Para los arreglos de la bandeja: decide si hace falta administrador antes de ejecutar.
+    pub fn tweak_needs_admin(&self, id: &str) -> bool {
+        self.find(id).map(|t| t.needs_admin()).unwrap_or(false)
     }
 
     fn check_can_modify(&self, t: &Tweak) -> Result<(), String> {

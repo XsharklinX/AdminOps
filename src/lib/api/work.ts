@@ -22,6 +22,8 @@ export interface Settings {
   notifyAlerts: "all" | "bad" | "none";
   closeMinimizes: boolean;
   trayIcon: boolean;
+  /** Arreglos rápidos que salen en el menú del icono junto al reloj. */
+  trayFixes: string[];
   visitTypes: VisitType[];
   currency: string;
   taxName: string;
@@ -364,6 +366,16 @@ export const workApi = {
   quit: () => invoke<void>("quit_app"),
   /** La ventanita siempre encima con procesador, memoria, temperatura y red. */
   miniMonitor: () => invoke<void>("open_mini_monitor"),
+  /** Ejecuta un arreglo rápido desde la bandeja (o la mini). */
+  trayRunFix: (id: string) => invoke<void>("tray_run_fix", { id }),
+  /** Lista de arreglos disponibles en la bandeja. */
+  trayFixesAvailable: () => invoke<{ id: string; label: string }[]>("tray_fixes_available"),
+  /** Lo que quedaría de AdminOps en este equipo en modo portable. */
+  portableLeftovers: () => invoke<{ kind: string; label: string; detail?: string }[]>("portable_leftovers"),
+  /** Quita lo que AdminOps ha dejado en el equipo en modo portable. */
+  portableCleanup: (keepNightJobs: boolean) => invoke<{ ok: boolean; removed: string[]; failed: { label: string; error: string }[] }>("portable_cleanup", { keepNightJobs }),
+  /** Abre AdminOps en miniatura (Ctrl+Alt+A). */
+  miniAdminOps: () => invoke<void>("open_adminops_mini"),
   clients: () => invoke<Client[]>("list_clients"),
   saveClient: (client: Partial<Client> & { name: string }) =>
     invoke<Client>("save_client", {

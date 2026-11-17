@@ -68,6 +68,8 @@ pub struct Settings {
     pub close_minimizes: bool,
     /// Icono junto al reloj, con lo habitual a un clic derecho.
     pub tray_icon: bool,
+    /// Arreglos rápidos que salen en el menú del icono junto al reloj.
+    pub tray_fixes: Vec<String>,
     /// Tipos de visita con su checklist (mantenimiento, equipo nuevo…).
     pub visit_types: Vec<VisitType>,
     /// La plantilla de informe propia: qué secciones lleva y en qué orden.
@@ -229,6 +231,7 @@ impl Default for Settings {
             notify_alerts: "all".into(),
             close_minimizes: false,
             tray_icon: false,
+            tray_fixes: vec![],
             visit_types: default_visit_types(),
             report_layout: ReportLayout::default(),
             report_no_cover: false,
@@ -288,9 +291,14 @@ pub fn save_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), St
     if !["risky", "always", "never"].contains(&settings.restore_points.as_str()) {
         return Err("Opción de puntos de restauración no válida.".into());
     }
+    let allowed_fixes: std::collections::HashSet<String> = crate::tray::fixes_available_ids();
+    if settings.tray_fixes.iter().any(|id| !allowed_fixes.contains(id)) {
+        return Err("Hay arreglos de la bandeja que no existen.".into());
+    }
     crate::tweaks::set_restore_point_policy(&settings.restore_points);
     crate::window_state::set_close_minimizes(settings.close_minimizes);
     crate::tray::set_visible(&app, settings.tray_icon);
+    crate::tray::refresh(&app);
     crate::paths::write_json(&settings_path(&app), &settings)
 }
 

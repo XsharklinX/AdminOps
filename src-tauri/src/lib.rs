@@ -15,6 +15,7 @@ mod keys;
 mod maintenance;
 mod metrics;
 mod migrate;
+mod mini;
 mod minimon;
 mod network;
 mod nightjobs;
@@ -58,6 +59,7 @@ mod discovery;
 mod quicknote;
 mod paths;
 mod people;
+mod portable_exit;
 mod portals;
 mod printers;
 mod printvendor;
@@ -169,7 +171,8 @@ pub fn run() {
         std::env::set_var("ADMINOPS_ORPHANS", orphans.to_string());
     }
     if let Some(dir) = boottime::step("Carpeta de datos de WebView2", || paths::portable_webview_dir().or_else(paths::installed_webview_dir)) {
-        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", dir);
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &dir);
+        portable_exit::set_webview_dir(dir);
     }
 
     let context = boottime::step("Configuración de la ventana", || tauri::generate_context!());
@@ -231,6 +234,7 @@ pub fn run() {
                 tauri::WindowEvent::Destroyed => {
                     log::info!("Ventana destruida a los {} ms", boottime::since_start_ms());
                     minimon::close(window.app_handle());
+                    mini::close(window.app_handle());
                 }
                 _ => {}
             }
@@ -296,6 +300,8 @@ pub fn run() {
             appbackup::start(app.handle().clone());
             // Nota de llamada con Ctrl+Alt+N, aunque AdminOps esté minimizado.
             quicknote::start(app.handle().clone());
+            // AdminOps en miniatura con Ctrl+Alt+A.
+            mini::start(app.handle().clone());
             if std::env::args().any(|a| a == "--auditoria") {
                 audit::set(true);
             }
@@ -378,6 +384,8 @@ pub fn run() {
             quicknote::close_quick_note,
             quicknote::open_screen_clip,
             quicknote::redact_clipboard_image,
+            mini::open_adminops_mini,
+            mini::close_adminops_mini,
             portals::portal_nav,
             portals::portal_open_window,
             portals::portal_open_external,
@@ -696,6 +704,10 @@ pub fn run() {
             window_state::ui_booting,
             window_state::quit_app,
             minimon::open_mini_monitor,
+            tray::tray_run_fix,
+            tray::tray_fixes_available,
+            portable_exit::portable_leftovers,
+            portable_exit::portable_cleanup,
             appcare::autostart_enabled,
             appcare::set_autostart,
             appcare::data_usage,

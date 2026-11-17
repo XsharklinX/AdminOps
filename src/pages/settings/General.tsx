@@ -78,6 +78,7 @@ export function StartWindow({ s, set }: SettingsProps) {
         >
           <Toggle checked={s.trayIcon} onChange={(v) => set({ trayIcon: v })} />
         </Row>
+        {s.trayIcon && <TrayFixes s={s} set={set} />}
         <Row title="Actualización del Panel" sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo.">
           <select value={prefs.refreshMs} onChange={(e) => setPrefs({ refreshMs: Number(e.target.value) })} className={selectClass}>
             <option value={1000}>Cada segundo</option>
@@ -91,6 +92,48 @@ export function StartWindow({ s, set }: SettingsProps) {
           <Toggle checked={prefs.demo} onChange={setDemo} />
         </Row>
       </Card>
+    </div>
+  );
+}
+
+const TRAY_FIXES = [
+  { id: "repair.print-queue", label: "Vaciar cola de impresión" },
+  { id: "repair.network-renew", label: "Renovar la IP" },
+  { id: "repair.explorer", label: "Reiniciar Explorador" },
+  { id: "cleanup.user-temp", label: "Limpiar temporales" },
+  { id: "cleanup.dns-cache", label: "Vaciar caché DNS" },
+];
+
+/** Arreglos rápidos del icono junto al reloj. */
+function TrayFixes({ s, set }: SettingsProps) {
+  const effective = new Set(s.trayFixes?.length ? s.trayFixes : TRAY_FIXES.slice(0, 4).map((f) => f.id));
+  const toggle = (id: string) => {
+    let current = new Set(s.trayFixes ?? []);
+    // Al tocar por primera vez, partimos de los cuatro por defecto (igual que en la bandeja).
+    if (s.trayFixes === undefined || s.trayFixes.length === 0) {
+      current = new Set(TRAY_FIXES.slice(0, 4).map((f) => f.id));
+    }
+    if (current.has(id)) current.delete(id);
+    else current.add(id);
+    set({ trayFixes: Array.from(current) });
+  };
+  return (
+    <div className="mt-3 rounded-lg border border-line bg-panel-2 p-3">
+      <p className="mb-2 text-sm text-ink">Arreglos rápidos en el menú del icono</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {TRAY_FIXES.map((f) => (
+          <label key={f.id} className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={effective.has(f.id)}
+              onChange={() => toggle(f.id)}
+              className="accent-[var(--color-neon)]"
+            />
+            {f.label}
+          </label>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-dim">Los activados aparecen al hacer clic derecho en el icono junto al reloj. El modo auditoría los bloquea igual que en la app.</p>
     </div>
   );
 }

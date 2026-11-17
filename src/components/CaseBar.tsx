@@ -7,10 +7,10 @@
 import { knowledgeApi } from "../lib/api";
 import { SYMPTOMS } from "../lib/symptoms";
 import { lastSymptom } from "../lib/lastSymptom";
-import { ClipboardCheck, Copy, Crop, Loader2, Pencil, Send, TicketPlus, Trash2, X } from "lucide-react";
+import { ClipboardCheck, Copy, Crop, Loader2, Pencil, PictureInPicture, Send, TicketPlus, Trash2, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
-import { logQuietly, casesApi, noteApi, portalsApi, type Case, type CaseTones, type ClipRedacted } from "../lib/api";
+import { logQuietly, casesApi, noteApi, portalsApi, workApi, type Case, type CaseTones, type ClipRedacted } from "../lib/api";
 import { CASE_CHANGED_EVENT, caseChanged, elapsed, OPEN_CASE_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { lastPortalKey } from "../lib/portalState";
@@ -148,6 +148,13 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
             title="Recorte de pantalla: se tapan solas las rutas, el usuario y el equipo, y queda en el portapapeles para pegarlo en el ticket"
           >
             <Crop size={13} />
+          </button>
+          <button
+            onClick={() => void workApi.miniAdminOps().catch(logQuietly("CaseBar"))}
+            className="rounded-md p-1 text-mute hover:bg-panel-2 hover:text-ink"
+            title="AdminOps en miniatura"
+          >
+            <PictureInPicture size={13} />
           </button>
           <button onClick={() => setDialog({ kind: "edit", prefill: current })} className="rounded-md p-1 text-mute hover:bg-panel-2 hover:text-ink" title="Editar el caso">
             <Pencil size={13} />

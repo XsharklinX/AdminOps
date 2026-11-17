@@ -4,6 +4,7 @@ import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { QuickNote } from "./components/QuickNote";
 import { MiniMonitor } from "./components/MiniMonitor";
+import { AdminOpsMini } from "./components/AdminOpsMini";
 import { appApi } from "./lib/api";
 import { showFullTextOnHover } from "./lib/fullTextOnHover";
 import { applyAppearance } from "./lib/prefs";
@@ -14,10 +15,11 @@ import "./index.css";
 
 // ¿Es la ventanita de la nota de llamada (Ctrl+Alt+N) y no la aplicación?
 // Lo marca el programa al crearla (quicknote.rs).
-const flags = window as unknown as { __ADMINOPS_NOTE__?: boolean; __ADMINOPS_MONITOR__?: boolean };
+const flags = window as unknown as { __ADMINOPS_NOTE__?: boolean; __ADMINOPS_MONITOR__?: boolean; __ADMINOPS_MINI__?: boolean };
 const isMonitor = flags.__ADMINOPS_MONITOR__ === true;
-// Para el arranque, la nota y el mini monitor son lo mismo: una ventanita, no la aplicación.
-const isNote = flags.__ADMINOPS_NOTE__ === true || isMonitor;
+const isMini = flags.__ADMINOPS_MINI__ === true;
+// Para el arranque, la nota, el mini monitor y la mini son lo mismo: una ventanita, no la aplicación.
+const isNote = flags.__ADMINOPS_NOTE__ === true || isMonitor || isMini;
 
 // Lo primero de todo: decirle al programa que el código ya se está ejecutando.
 // En un equipo viejo pueden pasar diez segundos largos de aquí a la primera
@@ -44,7 +46,7 @@ window.addEventListener("unhandledrejection", (e) => appApi.logError(`Promesa si
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ErrorBoundary>{isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
+    <ErrorBoundary>{isMini ? <AdminOpsMini /> : isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
   </React.StrictMode>,
 );
 
