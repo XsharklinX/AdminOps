@@ -257,7 +257,9 @@ const SAFE: &[&str] = &[
     // space
     "scan_space", "cancel_space_scan", "space_freeable", "space_folder", "space_files", "space_kind_files", "space_duplicates", "reveal_in_explorer",
     // stations
-    "check_stations",
+    "check_stations", "check_stations_stream", "review_station",
+    // ¿Qué cambió? y Pregúntale al equipo: solo leen (la foto diaria es un dato propio de AdminOps).
+    "whatchanged_info", "whatchanged_snapshot", "whatchanged_since", "ask_pc",
     // support
     "support_package",
     // Prepara un correo (lo envía el técnico) y enseña los términos: no cambian el equipo.

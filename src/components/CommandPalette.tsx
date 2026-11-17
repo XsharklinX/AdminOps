@@ -1,4 +1,4 @@
-import { AppWindow, BookOpen, Bug, CornerDownLeft, FileText, Lightbulb, ListTree, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, Zap } from "lucide-react";
+import { AppWindow, BookOpen, Bug, CornerDownLeft, FileText, Lightbulb, ListTree, Loader2, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, allowedInMode, isPageId, navLabel, pageLabel, visibleAreas, type Area, type PageId } from "./Sidebar";
 import type { Badge } from "../lib/machineState";
@@ -16,6 +16,7 @@ import { openHelp, openHelpTopic } from "../lib/help";
 import { GLOSSARY as TERMS } from "../lib/glossary";
 import { openComm } from "../lib/comms";
 import { didYouMean, fuzzyHas, tokens } from "../lib/palette";
+import { loadRecent, execute, useQuickEntries, type QuickEntry, type QuickResult, type Recent } from "../lib/quickActions";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -38,6 +39,8 @@ interface Entry {
   subtitle?: string;
   search: string;
   run: () => void | Promise<unknown>;
+  /** Acción de Ctrl+K que hace algo: se ejecuta dentro de la caja, con su confirmación. */
+  quick?: QuickEntry;
 }
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -164,6 +167,12 @@ export function CommandPalette({
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [templates, setTemplates] = useState<TextTemplate[]>([]);
+  // Acciones que se hacen desde la caja: la que espera la segunda Intro, la que corre y su resultado.
+  const [armed, setArmed] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [outcome, setOutcome] = useState<QuickResult | null>(null);
+  const [recent, setRecent] = useState<Recent[]>(loadRecent);
+  const quick = useQuickEntries(query, open);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -315,9 +324,11 @@ export function CommandPalette({
       const top = codeHit.map((er) => entries.find((e) => e.key === `error:${er.code}`) ?? { key: `error:${er.code}`, kind: "error" as const, title: `${er.code} · ${er.name}`, subtitle: `${er.what} Qué hacer: ${er.todo}`, search: "", run: () => undefined });
       found = [...top, ...found.filter((e) => !top.some((t) => t.key === e.key))];
     }
-    if (!smart) return found;
-    return (smart.sure ? [...smart.entries, ...found] : [...found, ...smart.entries]).slice(0, 40);
-  }, [entries, query, smart, codeHit]);
+    // Las acciones que hacen algo, primero: son lo que se ha pedido con la frase.
+    const doing: Entry[] = quick.map((x) => ({ key: x.key, kind: "action", title: x.title, subtitle: x.subtitle, search: "", run: () => undefined, quick: x }));
+    if (!smart) return [...doing, ...found];
+    return [...doing, ...(smart.sure ? [...smart.entries, ...found] : [...found, ...smart.entries])].slice(0, 40);
+  }, [entries, query, smart, codeHit, quick]);
 
   // Palabras que conoce Ctrl+K, para «¿Quisiste decir…?» cuando no encuentra nada.
   const vocabulary = useMemo(() => {
@@ -327,15 +338,51 @@ export function CommandPalette({
   }, [entries]);
   const suggestion = useMemo(() => (query.trim() && results.length === 0 ? didYouMean(norm(query.trim()), vocabulary) : null), [query, results.length, vocabulary]);
 
-  useEffect(() => setIndex(0), [query]);
+  useEffect(() => {
+    setIndex(0);
+    setArmed(null);
+    setOutcome(null);
+  }, [query]);
   useEffect(() => {
     list.current?.querySelector(`[data-i="${index}"]`)?.scrollIntoView({ block: "nearest" });
   }, [index]);
 
   if (!open) return null;
 
+  const runQuick = async (x: QuickEntry) => {
+    if (running) return;
+    // Lo que cambia algo pide Intro dos veces, sin salir de la caja.
+    if (x.changes && armed !== x.key) {
+      setArmed(x.key);
+      return;
+    }
+    setArmed(null);
+    setRunning(true);
+    const r = await execute(x);
+    setRunning(false);
+    setOutcome(r);
+    setRecent(loadRecent());
+  };
+
+  const undoQuick = async () => {
+    const u = outcome?.undo;
+    if (!u || running) return;
+    setRunning(true);
+    try {
+      setOutcome({ ok: true, text: await u() });
+    } catch (err) {
+      setOutcome({ ok: false, text: `No se pudo deshacer: ${err}` });
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const pick = (e: Entry | undefined) => {
     if (!e) return;
+    if (e.quick) {
+      void runQuick(e.quick);
+      return;
+    }
     onClose();
     const r = e.run();
     if (r instanceof Promise) r.then((m) => typeof m === "string" && m && toast("ok", m)).catch((err) => toast("error", `${e.title}: ${err}`));
@@ -448,11 +495,14 @@ export function CommandPalette({
                 } else if (e.key === "Enter") {
                   e.preventDefault();
                   pick(results[index]);
+                } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && outcome?.undo) {
+                  e.preventDefault();
+                  void undoQuick();
                 } else if (e.key === "Escape") {
                   onClose();
                 }
               }}
-              placeholder="Qué quieres hacer: dominio, no imprime, liberar espacio, un equipo, una persona, una IP…"
+              placeholder="Qué quieres hacer: dominio, no imprime, desbloquear maria, reiniciar PC-CONTA-03, cola recepción…"
               className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-mute"
               aria-label="Buscar en todo AdminOps"
             />
@@ -465,6 +515,16 @@ export function CommandPalette({
 
         {query.trim() ? (
           <div ref={list} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            {(running || outcome) && (
+              <div
+                role="status"
+                className={`mb-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${running ? "border-line text-dim" : outcome?.ok ? "border-ok/40 bg-ok/10 text-ink" : "border-bad/40 bg-bad/10 text-ink"}`}
+              >
+                {running ? <Loader2 size={14} className="animate-spin" /> : null}
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{running ? "Haciéndolo…" : outcome?.text}</span>
+                {!running && outcome?.ok && outcome.undo && <kbd className="shrink-0 rounded border border-line-2 px-1 font-mono text-[11px] text-dim">Ctrl+Z deshacer</kbd>}
+              </div>
+            )}
             {results.map((e, i) => (
               <button
                 key={e.key}
@@ -476,12 +536,27 @@ export function CommandPalette({
                 <span className={`grid size-7 shrink-0 place-items-center rounded-md ${i === index ? "bg-neon/15" : "bg-panel-2"}`}>{icon(e.kind)}</span>
                 <span className="min-w-0 flex-1">
                   <span className={`block truncate text-sm ${i === index ? "text-ink" : "text-ink"} font-medium`}>{e.title}</span>
-                  {e.subtitle && <span className="block truncate text-[11.5px] text-mute">{e.subtitle}</span>}
+                  {e.quick && armed === e.key ? (
+                    <span className="block truncate text-[11.5px] text-warn">Pulsa Intro otra vez para confirmar · Esc cancela</span>
+                  ) : (
+                    e.subtitle && <span className="block truncate text-[11.5px] text-mute">{e.subtitle}</span>
+                  )}
                 </span>
                 <span className="shrink-0 text-[11px] tracking-wide text-mute">{KIND_LABEL[e.kind]}</span>
-                {i === index && <span className="shrink-0 font-mono text-[10.5px] text-neon">Intro ↵</span>}
+                {i === index && <span className="shrink-0 font-mono text-[10.5px] text-neon">{e.quick?.changes ? (armed === e.key ? "Intro ↵ confirmar" : "Intro ↵↵") : "Intro ↵"}</span>}
               </button>
             ))}
+            {outcome && !running && recent.length > 0 && (
+              <div className="mt-2 border-t border-line pt-2">
+                <div className="mb-1 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">Hace poco</div>
+                {recent.map((r) => (
+                  <button key={`${r.query}|${r.label}`} onClick={() => setQuery(r.query)} className="flex w-full items-center gap-2 rounded-md px-3 py-1 text-left text-xs text-dim hover:bg-panel-2 hover:text-ink">
+                    <span className="min-w-0 flex-1 truncate">{r.label}</span>
+                    <span className="shrink-0 font-mono text-[10.5px] text-mute">{r.query}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {results.length === 0 && (
               <EmptyLine>
                 Nada coincide con «{query}».{" "}
@@ -497,6 +572,27 @@ export function CommandPalette({
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {recent.length > 0 && (
+              <>
+                <div className="mb-2 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">Hace poco</div>
+                <div className="mb-5 flex flex-wrap gap-2">
+                  {recent.map((r) => (
+                    <button
+                      key={`${r.query}|${r.label}`}
+                      onClick={() => {
+                        setQuery(r.query);
+                        input.current?.focus();
+                      }}
+                      className="flex max-w-full items-center gap-2 rounded-xl border border-line/70 bg-panel px-3 py-1.5 text-left text-xs text-dim transition-colors hover:border-neon/60 hover:text-ink"
+                      title={`Volver a escribir «${r.query}»`}
+                    >
+                      <Zap size={12} className="shrink-0 text-neon" />
+                      <span className="truncate">{r.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {pins.length > 0 && (
               <>
                 <div className="mb-2 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">Fijados</div>

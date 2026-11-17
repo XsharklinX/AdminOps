@@ -98,6 +98,8 @@ mod officemap;
 mod sheet;
 mod shellopen;
 mod stations;
+mod whatchanged;
+mod askpc;
 mod secrets;
 mod smoke;
 mod timeline;
@@ -277,6 +279,8 @@ pub fn run() {
             alertrulesio::start(app.handle().clone());
             // Historial de rendimiento de 7 días: una muestra por minuto mientras AdminOps está abierta.
             perfhistory::start(app.handle().clone());
+            // Una foto al día del equipo para «¿Qué cambió?».
+            whatchanged::start(app.handle().clone());
             // Lo apuntado para la noche (superficie de un disco, reparar Windows…).
             nightjobs::start(app.handle().clone());
             appbackup::start(app.handle().clone());
@@ -799,6 +803,12 @@ pub fn run() {
             officemap::refresh_device_ips,
             officemap::watch_status,
             stations::check_stations,
+            stations::check_stations_stream,
+            stations::review_station,
+            whatchanged::whatchanged_info,
+            whatchanged::whatchanged_snapshot,
+            whatchanged::whatchanged_since,
+            askpc::ask_pc,
             stations::station_action,
             sheet::machine_sheet,
             sheet::open_warranty,

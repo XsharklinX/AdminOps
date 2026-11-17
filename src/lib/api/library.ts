@@ -111,12 +111,35 @@ export interface Station {
     antivirus: string;
     avOk: boolean | null;
     bsods: number | null;
+    pendingReboot?: boolean | null;
   } | null;
   remoteError: string;
   warnings: string[];
 }
 
-export type StationAction = "restart" | "cancelRestart" | "gpupdate" | "message" | "spooler" | "defender";
+export type StationAction = "restart" | "cancelRestart" | "gpupdate" | "message" | "spooler" | "defender" | "clearQueue" | "freeSpace";
+
+/** Un equipo que acaba de terminar en una comprobación en marcha (evento «stations-progress»). */
+export interface StationProgress {
+  run: string;
+  done: number;
+  total: number;
+  station: Station;
+}
+
+export interface ReviewIssue {
+  level: "bad" | "warn" | "ok";
+  text: string;
+  fix: StationAction | null;
+}
+
+export interface StationReview {
+  station: Station;
+  memUsedPct: number | null;
+  errors: number | null;
+  printJobs: number | null;
+  issues: ReviewIssue[];
+}
 
 export interface StationActionResult {
   host: string;
@@ -126,6 +149,10 @@ export interface StationActionResult {
 
 export const stationsApi = {
   check: (hosts: string[], deep: boolean) => invoke<Station[]>("check_stations", { hosts, deep }),
+  /** Igual, pero cada equipo sale por el evento «stations-progress» (con el mismo «run») en cuanto termina. */
+  checkStream: (hosts: string[], deep: boolean, run: string) => invoke<Station[]>("check_stations_stream", { hosts, deep, run }),
+  /** Lee a distancia el equipo de una persona: espacio, memoria, días encendido, errores y cola de impresión. */
+  review: (host: string) => invoke<StationReview>("review_station", { host }),
   /** Reiniciar (con aviso), cancelar el reinicio, actualizar directivas o enviar un mensaje a varios puestos. */
   act: (hosts: string[], action: StationAction, text?: string) => invoke<StationActionResult[]>("station_action", { hosts, action, text }),
 };

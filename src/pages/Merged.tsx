@@ -10,6 +10,8 @@ import {
   EyeOff,
   FileText,
   Gauge,
+  GitCompare,
+  MessageCircleQuestion,
   Globe,
   Activity,
   Building2,
@@ -46,6 +48,8 @@ import type { PageId } from "../components/Sidebar";
 import { onSectionRequest, reportSection, usePageId } from "../lib/sectionState";
 import { Devices } from "./Devices";
 import { Accounts } from "./Accounts";
+import { AskPc } from "../components/AskPc";
+import { WhatChanged } from "../components/WhatChanged";
 import { Diagnostics } from "./Diagnostics";
 import { Hardware } from "./Hardware";
 import { History } from "./History";
@@ -765,7 +769,7 @@ export function PrintersAndShares({
   );
 }
 
-type MachineTab = "diagnostics" | "hardware" | "performance" | "security" | "boots" | "peripherals" | "history";
+type MachineTab = "diagnostics" | "hardware" | "performance" | "security" | "boots" | "peripherals" | "history" | "changed" | "ask";
 const MACHINE: PageTab<MachineTab>[] = [
   {
     id: "diagnostics",
@@ -809,6 +813,18 @@ const MACHINE: PageTab<MachineTab>[] = [
     icon: <HistoryIcon size={14} />,
     help: "Todo lo que ha pasado en este equipo: cambios, avisos, actualizaciones, drivers y apagados, con «Deshacer» y los puntos de restauración.",
   },
+  {
+    id: "changed",
+    label: "¿Qué cambió?",
+    icon: <GitCompare size={14} />,
+    help: "«Desde el martes va mal»: qué programas, drivers, actualizaciones, servicios, inicio y ajustes de energía son distintos desde la fecha que elijas, con su arreglo.",
+  },
+  {
+    id: "ask",
+    label: "Pregúntale al equipo",
+    icon: <MessageCircleQuestion size={14} />,
+    help: "Preguntas fijas (¿por qué se reinició anoche?, ¿por qué va lento?, ¿quién instaló esto?, ¿por qué no imprime?) con la respuesta en una frase y las pruebas debajo.",
+  },
 ];
 
 /**
@@ -848,6 +864,8 @@ export function MachineState({
         if (t === "performance") return <PerfHistory />;
         if (t === "boots") return <Boots isAdmin={isAdmin} />;
         if (t === "peripherals") return <Peripherals />;
+        if (t === "changed") return <WhatChanged />;
+        if (t === "ask") return <AskPc />;
         return <History isAdmin={isAdmin} onNavigate={onNavigate} />;
       }}
     />

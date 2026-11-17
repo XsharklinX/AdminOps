@@ -1,3 +1,5 @@
+import { editDistance, tolerance } from "./palette";
+
 // Qué es lo que alguien acaba de escribir en Ctrl+K.
 //
 // «PC-CONTA-03», «maria.perez», «4512», «192.168.10.45», «impresora recepción»
@@ -42,4 +44,68 @@ export function recognize(raw: string): Recognized | null {
   if (SAM.test(v)) return { kind: "person", value: v.split("\\").pop() ?? v, sure: true };
   if (FULL_NAME.test(v)) return { kind: "person", value: v, sure: false };
   return null;
+}
+
+// ---------- Frases que hacen algo ----------
+//
+// «desbloquear maria», «reiniciar PC-CONTA-03», «cola recepción», «laps legal-04»,
+// «liberar espacio». Se escriben como se hablan: perdonan erratas y tildes que
+// faltan. Esto solo entiende la frase; lo que se hace (los mismos comandos que
+// los botones de cada pantalla) está en lib/quickActions.ts.
+
+export type ActionKind = "unlock" | "restart" | "queue" | "laps" | "space";
+
+export interface ActionIntent {
+  action: ActionKind;
+  /** Lo que sigue al verbo, tal como se escribió (el nombre de la persona, del equipo o de la impresora). */
+  arg: string;
+}
+
+const VERBS: Record<ActionKind, string[]> = {
+  unlock: ["desbloquear", "desbloquea", "desbloqueo", "unlock"],
+  restart: ["reiniciar", "reinicia", "reboot", "restart"],
+  queue: ["cola", "colas", "vaciar", "vacia"],
+  laps: ["laps"],
+  space: ["liberar", "libera"],
+};
+
+/** Palabras de enlace que se saltan entre el verbo y el nombre. */
+const LINK = new Set(["a", "al", "de", "del", "la", "el", "los", "las", "en", "equipo", "pc", "impresora", "cuenta", "usuario", "usuaria"]);
+
+const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** ¿`w` es (casi) alguna de estas palabras? Con erratas de una o dos letras según el largo. */
+function isWord(w: string, list: string[]): boolean {
+  const t = tolerance(w);
+  return list.some((v) => v === w || (t > 0 && editDistance(w, v, t) <= t));
+}
+
+const HOST = /^[a-z0-9][a-z0-9._-]{1,62}$/i;
+
+export function parseAction(raw: string): ActionIntent | null {
+  const words = raw.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0 || raw.length > 80) return null;
+  const first = strip(words[0]);
+  let action = (Object.keys(VERBS) as ActionKind[]).find((k) => isWord(first, VERBS[k]));
+  if (!action) return null;
+  let rest = words.slice(1);
+  // «vaciar cola recepción» y «vaciar la cola de recepción»: «vaciar» solo vale si habla de la cola.
+  if (first.startsWith("vaci")) {
+    const i = rest.findIndex((w) => isWord(strip(w), ["cola", "colas"]));
+    if (i < 0 || i > 1) return null;
+    rest = rest.slice(i + 1);
+    action = "queue";
+  } else if (action === "queue") {
+    // «cola» sin nada más no es una acción: es una búsqueda.
+  }
+  while (rest.length && LINK.has(strip(rest[0]))) rest = rest.slice(1);
+  if (action === "space") {
+    // «liberar espacio» (o «liberar» a secas); «liberar la cuenta de x» no es esto.
+    const ok = rest.length === 0 || (rest.length === 1 && isWord(strip(rest[0]), ["espacio", "disco"]));
+    return ok ? { action, arg: "" } : null;
+  }
+  const arg = rest.join(" ").trim();
+  if (arg.length < 2) return null;
+  if ((action === "restart" || action === "laps") && !HOST.test(arg)) return null;
+  return { action, arg };
 }
