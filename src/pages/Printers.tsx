@@ -1,9 +1,15 @@
-import { CheckCircle2, CircleAlert, ExternalLink, FileCheck2, Loader2, Printer, RefreshCw, Search, Star, Stethoscope, Trash2, Wrench, X, XCircle } from "lucide-react";
+import { CheckCircle2, CircleAlert, ExternalLink, FileCheck2, HardDriveDownload, Loader2, Printer, RefreshCw, Search, Star, Stethoscope, Trash2, Wrench, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, ErrorState, IconButton, Loading, iconBtn } from "../components/ui";
 import { DataTable, type Column } from "../components/DataTable";
-import { printersApi, tweaksApi, type FoundPrinter, type PrinterCheck, type PrinterInfo, type PrinterSupply } from "../lib/api";
+import { printersApi, tweaksApi, vendorApi, type FoundPrinter, type PrinterCheck, type PrinterInfo, type PrinterSupply, type VendorKey, type VendorPrinter, type VendorPrinterInventory } from "../lib/api";
+import { goToPage } from "../lib/navigate";
+import { BatchPanel } from "../components/printers/BatchPanel";
+import { DriverDrawer, type DriverTarget } from "../components/printers/DriverDrawer";
+import { NotInstalled } from "../components/printers/NotInstalled";
+import { BrandBadge, DriverChip } from "../components/printers/Parts";
+import { batchTargets, connectionText, offersBatch, pagesText, VENDOR_NAME } from "../components/printers/logic";
 
 const STATUS: Record<number, string> = { 1: "Otro", 2: "Desconocido", 3: "Lista", 4: "Imprimiendo", 5: "Calentando", 6: "Detenida", 7: "Sin conexión" };
 
@@ -17,9 +23,24 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
   const { confirm, dialog } = useConfirm();
 
   const [failed, setFailed] = useState<string | null>(null);
+  // Marca, modelo, conexión y estado del driver (RICOH y EPSON): se lee aparte porque
+  // pregunta por la red a cada impresora y tarda más que la lista.
+  const [inv, setInv] = useState<VendorPrinterInventory | null>(null);
+  const [invError, setInvError] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<DriverTarget | null>(null);
+  const [batch, setBatch] = useState<VendorKey | null>(null);
+  const loadInv = useCallback(async () => {
+    try {
+      setInv(await vendorApi.printers());
+      setInvError(null);
+    } catch (e) {
+      setInvError(String(e));
+    }
+  }, []);
   const load = useCallback(async () => {
     setFailed(null);
     setLoading(true);
+    void loadInv();
     try {
       setList(await printersApi.list());
     } catch (e) {
@@ -28,7 +49,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, loadInv]);
 
   useEffect(() => {
     void load();
@@ -83,6 +104,9 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
   if (!list) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Leyendo impresoras…" />;
   const real = list.filter((p) => !p.virtual);
   const virtual = list.filter((p) => p.virtual);
+  const vendorOf = (name: string): VendorPrinter | undefined => inv?.printers.find((v) => v.name === name);
+  const batchVendors = (["ricoh", "epson"] as const).filter((k) => inv && offersBatch(inv.printers, k));
+  const batchBusyNames = batch && inv ? batchTargets(inv.printers, batch).map((p) => p.name) : [];
 
   const columns: Column<PrinterInfo>[] = [
     {
@@ -92,11 +116,14 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
       className: "max-w-0 w-full",
       cell: (p) => {
         const problem = p.error ?? (p.offline ? "Sin conexión" : null);
+        const v = vendorOf(p.name);
+        const detail = v ? [v.snmp?.model || v.model, connectionText(v.connection), v.snmp?.serial && `serie ${v.snmp.serial}`, pagesText(v.snmp?.pages)].filter(Boolean).join(" · ") : "";
         return (
           <div className="flex items-center gap-3 py-1">
             <Printer size={18} className={`shrink-0 ${problem ? "text-warn" : "text-neon"}`} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
+                {v && <BrandBadge vendor={v.vendor} />}
                 <span className="font-medium text-ink">{p.name}</span>
                 {p.default && (
                   <span className="flex items-center gap-1 rounded border border-neon/40 px-1.5 py-px text-[11px] text-neon">
@@ -114,9 +141,33 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
               <div className="truncate text-[11px] text-mute">
                 {STATUS[p.status] ?? "—"} · {p.driver ?? "sin driver"} · {p.port ?? "sin puerto"}
               </div>
+              {detail && (
+                <div className="truncate text-[11px] text-mute" title={detail}>
+                  {detail}
+                </div>
+              )}
             </div>
           </div>
         );
+      },
+    },
+    {
+      id: "driver",
+      header: "Driver",
+      stopClick: true,
+      className: "whitespace-nowrap",
+      cell: (p) => {
+        const v = vendorOf(p.name);
+        const inBatch = batchBusyNames.includes(p.name);
+        if (v && v.vendor !== "otra")
+          return (
+            <DriverChip
+              {...v.state}
+              onClick={inBatch ? undefined : () => setDrawer({ kind: "printer", printer: v })}
+              disabledReason={inBatch ? "Actualizando en lote: espera a que termine." : undefined}
+            />
+          );
+        return inv === null && !invError && !p.virtual ? <Loader2 size={12} className="animate-spin text-mute" aria-label="Leyendo el driver" /> : null;
       },
     },
     {
@@ -137,6 +188,11 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
           <Loader2 size={16} className="ml-auto animate-spin text-neon" />
         ) : (
           <div className="flex items-center justify-end gap-0.5">
+            {vendorOf(p.name) && vendorOf(p.name)?.vendor !== "otra" && (
+              <IconButton label="Driver: ver qué hay y cambiarlo" disabled={busy !== null} onClick={() => setDrawer({ kind: "printer", printer: vendorOf(p.name)! })}>
+                <HardDriveDownload size={15} />
+              </IconButton>
+            )}
             <IconButton label="Vaciar la cola de esta impresora" disabled={!p.jobs || busy !== null} onClick={() => void run(p.name, `Cola de ${p.name} vaciada.`, () => printersApi.clearQueue(p.name))}>
               <XCircle size={15} />
             </IconButton>
@@ -179,7 +235,12 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
           <span className="font-mono text-neon">{real.length}</span> {real.length === 1 ? "impresora" : "impresoras"}
           {real.some((p) => p.jobs) && <span className="text-warn"> · hay trabajos en cola</span>}
         </p>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {batchVendors.map((k) => (
+            <Button key={k} kind="secondary" onClick={() => setBatch(k)} disabled={busy !== null || batch !== null}>
+              <HardDriveDownload size={14} /> Actualizar las {inv ? batchTargets(inv.printers, k).length : ""} {VENDOR_NAME[k]}
+            </Button>
+          ))}
           <Button kind="ghost" onClick={resetSpooler} disabled={!isAdmin || busy !== null} title={isAdmin ? undefined : "Requiere administrador"}>
             {busy === "spooler" ? <Loader2 size={14} className="animate-spin" /> : <Wrench size={14} />} Reiniciar cola de impresión
           </Button>
@@ -188,6 +249,26 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
           </button>
         </div>
       </div>
+
+      {invError && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 text-xs text-warn">
+          <CircleAlert size={13} /> No se pudo leer la marca y el driver de las impresoras: {invError}
+          <button type="button" onClick={() => void loadInv()} className="text-neon hover:underline">
+            Reintentar
+          </button>
+        </p>
+      )}
+      {inv && <NotInstalled devices={inv.notInstalled} isAdmin={isAdmin} onChanged={() => void load()} onOptions={(d) => setDrawer({ kind: "detected", device: d })} />}
+      {batch && inv && (
+        <BatchPanel
+          key={batch}
+          vendor={batch}
+          targets={batchTargets(inv.printers, batch)}
+          isAdmin={isAdmin}
+          onClose={() => setBatch(null)}
+          onDone={() => void loadInv()}
+        />
+      )}
 
       <div className="overflow-x-auto rounded-2xl border border-line/70 bg-panel shadow-elev-1">{table(real, "No hay impresoras físicas instaladas.")}</div>
 
@@ -204,6 +285,16 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
         algunos programas.
       </p>
       {dialog}
+      {drawer && (
+        <DriverDrawer
+          key={drawer.kind === "printer" ? drawer.printer.name : drawer.device.instanceId}
+          target={drawer}
+          isAdmin={isAdmin}
+          onClose={() => setDrawer(null)}
+          onChanged={() => void load()}
+          onGoDrivers={() => goToPage("drivers")}
+        />
+      )}
     </div>
   );
 }

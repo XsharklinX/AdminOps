@@ -21,6 +21,7 @@ import {
   Layers,
   Network as NetworkIcon,
   Printer,
+  ScanLine,
   UserRound,
   Lock,
   Package,
@@ -55,6 +56,8 @@ import { Domain } from "./Domain";
 import { Family } from "./Family";
 import { Install } from "./Install";
 import { Printers } from "./Printers";
+import { Scanners } from "./Scanners";
+import { Drivers } from "./Drivers";
 import { Shares } from "./Shares";
 import { Inventory } from "./Inventory";
 import { Migrate } from "./Migrate";
@@ -726,13 +729,25 @@ export function PeopleAndClients({ focus }: { focus?: string | null }) {
   return <Tabbed tabs={WHO} focus={isTab ? focus : focus ? "people" : null} render={(t, visible) => (t === "people" ? <People focus={!isTab && visible ? (focus ?? null) : null} /> : <Clients />)} />;
 }
 
-type SharedTab = "printers" | "shares";
+type SharedTab = "printers" | "scanners" | "drivers" | "shares";
 const SHARED: PageTab<SharedTab>[] = [
   {
     id: "printers",
     label: "Impresoras",
     icon: <Printer size={14} />,
     help: "Impresoras instaladas, cola de impresión, página de prueba y cuál es la predeterminada.",
+  },
+  {
+    id: "scanners",
+    label: "Escáneres",
+    icon: <ScanLine size={14} />,
+    help: "Escáneres RICOH, PFU (fi y ScanSnap) y EPSON: su driver, si está el programa de escanear, instalarlo desde tu biblioteca y probar que escanean.",
+  },
+  {
+    id: "drivers",
+    label: "Drivers",
+    icon: <Download size={14} />,
+    help: "Tu biblioteca de drivers de impresoras y escáneres RICOH y EPSON (una carpeta o un pendrive), añadir paquetes y bajarlos de la página oficial de la marca.",
   },
   {
     id: "shares",
@@ -757,6 +772,10 @@ export function PrintersAndShares({
       render={(t) =>
         t === "printers" ? (
           <Printers isAdmin={isAdmin} />
+        ) : t === "scanners" ? (
+          <Scanners isAdmin={isAdmin} />
+        ) : t === "drivers" ? (
+          <Drivers isAdmin={isAdmin} />
         ) : (
           <Shares isAdmin={isAdmin} />
         )

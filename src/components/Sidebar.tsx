@@ -106,6 +106,8 @@ export type PageId =
   | "inventory"
   | "data"
   | "shares"
+  | "scanners"
+  | "drivers"
   | "remote"
   | "settings";
 
@@ -279,6 +281,8 @@ export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   accounts: ["users", "accounts"],
   domain: ["users", "domain"],
   shares: ["printers", "shares"],
+  scanners: ["printers", "scanners"],
+  drivers: ["printers", "drivers"],
   // Sesión de servicio
   report: ["session", "report"],
   // Datos del equipo

@@ -164,7 +164,7 @@ pub struct SnmpInfo {
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct PrinterInfo {
+pub struct VendorPrinterInfo {
     pub name: String,
     /// "ricoh" | "epson" | "otra"
     pub vendor: String,
@@ -202,7 +202,7 @@ pub struct DetectedDevice {
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct PrinterInventory {
-    pub printers: Vec<PrinterInfo>,
+    pub printers: Vec<VendorPrinterInfo>,
     pub not_installed: Vec<DetectedDevice>,
     /// Cuándo fue la última búsqueda en Windows Update (segundos desde 1970), si la hubo.
     pub windows_update_at: Option<u64>,
@@ -580,7 +580,7 @@ fn build_printer_inventory(app: &AppHandle, raw: RawInventory) -> PrinterInvento
             inf: drv.and_then(|d| Path::new(&d.inf).file_name()).map(|f| f.to_string_lossy().into_owned()).unwrap_or_default(),
             kind: classify_driver(dev_brand(&device).as_deref(), &p.driver, &device.driver_manufacturer).id().into(),
         };
-        out.push(PrinterInfo {
+        out.push(VendorPrinterInfo {
             name: p.name.clone(),
             vendor: vendor.id().into(),
             brand: device.brand.clone(),

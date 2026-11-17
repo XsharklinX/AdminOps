@@ -68,6 +68,8 @@ export const SECTIONS: Partial<Record<PageId, Section[]>> = {
   ],
   printers: [
     { id: "printers", label: "Impresoras", keywords: "imprimir no imprime cola atascada toner escaner" },
+    { id: "scanners", label: "Escáneres", keywords: "escanear no escanea ricoh epson fi scansnap paperstream epson scan wia twain" },
+    { id: "drivers", label: "Drivers", keywords: "driver controlador biblioteca ricoh epson actualizar impresora pendrive" },
     { id: "shares", label: "Carpetas compartidas", keywords: "compartir permisos unidad de red recurso no puede entrar" },
   ],
   recipes: [

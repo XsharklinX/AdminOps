@@ -14,6 +14,8 @@ export function Drawer({
   onNext,
   children,
   width = 440,
+  closeDisabled,
+  closeLabel,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -22,6 +24,8 @@ export function Drawer({
   onNext?: () => void;
   children: ReactNode;
   width?: number;
+  closeDisabled?: boolean;
+  closeLabel?: string;
 }) {
   const close = useRef(onClose);
   useEffect(() => {
@@ -30,11 +34,11 @@ export function Drawer({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Un diálogo abierto encima tiene prioridad: Esc cierra primero ese.
-      if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector('[role="dialog"]')) close.current();
+      if (e.key === "Escape" && !e.defaultPrevented && !closeDisabled && !document.querySelector('[role="dialog"]')) close.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [closeDisabled]);
   return createPortal(
     <aside
       aria-label={typeof title === "string" ? title : "Detalle"}
@@ -56,7 +60,10 @@ export function Drawer({
             <ChevronDown size={15} />
           </button>
         )}
-        <button className={iconBtn} onClick={onClose} title="Cerrar (Esc)" aria-label="Cerrar">
+        {closeDisabled && closeLabel && (
+          <span className="self-center text-[11px] text-mute">{closeLabel}</span>
+        )}
+        <button className={iconBtn} onClick={onClose} disabled={closeDisabled} title={closeLabel ?? "Cerrar (Esc)"} aria-label="Cerrar">
           <X size={15} />
         </button>
       </header>
