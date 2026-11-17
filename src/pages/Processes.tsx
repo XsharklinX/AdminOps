@@ -1,10 +1,11 @@
-import { usePageActive } from "../lib/pageActive";
+import { usePolling } from "../hooks/usePolling";
 import { ArrowDown, ArrowUp, ChevronRight, Cpu, FolderOpen, Layers, Lock, MemoryStick, Pause, Play, Search, ShieldAlert, Skull, TriangleAlert, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { EmptyLine, ErrorState, Loading } from "../components/ui";
 import { toolsApi, type ProcessView } from "../lib/api";
 import { bytes } from "../lib/format";
+import { useRowWindow } from "../lib/rowWindow";
 import { groupProcesses, isSystemProcess, killable, type ProcessGroup } from "../lib/processGroups";
 
 type SortKey = "name" | "pid" | "cpu" | "memory" | "disk";
@@ -31,7 +32,6 @@ function Shield({ protection }: { protection: ProcessView["protection"] }) {
 }
 
 export function Processes({ isAdmin }: { isAdmin: boolean }) {
-  const active = usePageActive();
   const [procs, setProcs] = useState<ProcessView[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -78,10 +78,8 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     void load();
-    if (paused || !active) return;
-    const t = window.setInterval(load, 2000);
-    return () => window.clearInterval(t);
-  }, [load, paused, active]);
+  }, [load]);
+  usePolling(load, 2000, { enabled: !paused });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -111,6 +109,11 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
     () => order(groupProcesses(filtered), (g) => (sort.key === "name" ? g.key : sort.key === "pid" ? g.procs.length : g[sort.key])),
     [filtered, order, sort.key],
   );
+
+  // Lista larga: solo se pintan las filas a la vista (con grupos abiertos, todas, que su alto varía).
+  const body = useRef<HTMLTableSectionElement>(null);
+  const count = grouped ? groups.length : list.length;
+  const win = useRowWindow(body, count, count > 80 && (!grouped || open.size === 0));
 
   /** Lo que más pesa ahora mismo, de todo el equipo (no solo de lo filtrado). */
   const heaviest = useMemo(() => {
@@ -315,9 +318,10 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
               {header("disk", "Disco", true)}
             </tr>
           </thead>
-          <tbody className="font-mono text-xs tabular">
+          <tbody ref={body} className="font-mono text-xs tabular">
+            {win.top > 0 && <tr data-spacer="1" aria-hidden style={{ height: win.top }} />}
             {grouped
-              ? groups.flatMap((g) => {
+              ? groups.slice(win.start, win.end).flatMap((g) => {
                   const single = g.procs.length === 1;
                   const expanded = open.has(g.key);
                   const row = (
@@ -363,7 +367,8 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
                   );
                   return expanded && !single ? [row, ...g.procs.map((p) => procRow(p, true))] : [row];
                 })
-              : list.map((p) => procRow(p))}
+              : list.slice(win.start, win.end).map((p) => procRow(p))}
+            {win.bottom > 0 && <tr data-spacer="1" aria-hidden style={{ height: win.bottom }} />}
           </tbody>
         </table>
         {filtered.length === 0 && <EmptyLine>{query ? `Ningún proceso coincide con «${query}».` : "Ningún proceso con ese filtro."}</EmptyLine>}

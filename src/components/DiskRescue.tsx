@@ -4,6 +4,7 @@
 import { useDropped } from "../lib/dropped";
 import { Camera, ChevronDown, ChevronRight, CopyCheck, FileSearch, FolderOutput, Loader2, Play, Square } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { useToast } from "./feedback";
 import { SurfaceMap } from "./DiskDeep";
 import { TypedConfirm } from "./DiskPartitions";
@@ -308,13 +309,10 @@ export function CloneCard({ isAdmin }: { isAdmin: boolean }) {
       .then(setLast)
       .catch(() => undefined);
   }, [src]);
+  usePolling(() => (src === null ? undefined : cloneApi.live(src).then((l) => l && setLive(l)).catch(() => undefined)), 1000, { enabled: !!busy && src !== null });
   useEffect(() => {
     if (!busy || src === null) return;
-    const t = window.setInterval(() => void cloneApi.live(src).then((l) => l && setLive(l)).catch(() => undefined), 1000);
-    return () => {
-      window.clearInterval(t);
-      setLive(null);
-    };
+    return () => setLive(null);
   }, [busy, src]);
 
   const others = disks.filter((d) => d.number !== src && !d.system);

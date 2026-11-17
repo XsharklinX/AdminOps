@@ -1,6 +1,5 @@
 import { RotateCw } from "lucide-react";
 import { SlideMark } from "./components/SlideMark";
-import { WorkshopScreen } from "./components/WorkshopScreen";
 import { useNarrow } from "./lib/useNarrow";
 import { listen } from "@tauri-apps/api/event";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,7 +18,7 @@ import { CommOpener } from "./components/CommOpener";
 import { useMachineState } from "./lib/machineState";
 import { sectionLabel, sectionsOf } from "./lib/sections";
 import { PageIdContext, requestSection, useCurrentSections } from "./lib/sectionState";
-import { casesApi, knowledgeApi, logQuietly, api, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { casesApi, knowledgeApi, logQuietly, api, programsApi, securityApi, updateApi, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { analyze, analyzeQuick } from "./lib/diagRun";
@@ -46,7 +45,8 @@ import { BootBar } from "./components/BootBar";
 import { QuickRead } from "./components/QuickRead";
 import { ResumeRibbon, rememberPlace } from "./components/ResumeRibbon";
 import { trackBoot } from "./lib/boot";
-import { setPrefetcher } from "./lib/prefetch";
+import { MAX_ALIVE, busyPages, touchAlive, trimAlive } from "./lib/alive";
+import { setPrefetcher, setPrefetchRead } from "./lib/prefetch";
 import { PALETTE_EVENT } from "./lib/palette";
 import { startTour, tourFor } from "./lib/tour";
 import { Tour } from "./components/Tour";
@@ -66,11 +66,59 @@ const PAGE_CODE: Partial<Record<PageId, () => Promise<unknown>>> = {
   agenda: () => import("./pages/Agenda"),
   repair: () => import("./pages/TweaksPage"),
 };
+/** Código de la pestaña que se abre (para que, tras la página, ya esté también su pestaña). */
+const TAB_CODE: Partial<Record<PageId, () => Promise<unknown>>> = {
+  apps: () => import("./pages/Software"),
+  software: () => import("./pages/Software"),
+  winupdate: () => import("./pages/WindowsUpdate"),
+  install: () => import("./pages/Install"),
+  uninstall: () => import("./pages/Uninstall"),
+  bloatware: () => import("./pages/Bloatware"),
+  tweaks: () => import("./pages/TweaksPage"),
+  startup: () => import("./pages/Startup"),
+  profiles: () => import("./pages/Profiles"),
+  recipes: () => import("./pages/Recipes"),
+  machine: () => import("./pages/Diagnostics"),
+  diagnostics: () => import("./pages/Diagnostics"),
+  hardware: () => import("./pages/Hardware"),
+  security: () => import("./pages/Security"),
+  history: () => import("./pages/History"),
+  router: () => import("./pages/Router"),
+  devices: () => import("./pages/Devices"),
+  network: () => import("./pages/Network"),
+  nettools: () => import("./pages/NetTools"),
+  tools: () => import("./pages/Tools"),
+  shortcuts: () => import("./pages/Shortcuts"),
+  session: () => import("./pages/Session"),
+  report: () => import("./pages/Report"),
+  data: () => import("./pages/Migrate"),
+  migrate: () => import("./pages/Migrate"),
+  vault: () => import("./pages/Vault"),
+  wipe: () => import("./pages/Wipe"),
+  recover: () => import("./pages/Recover"),
+  family: () => import("./pages/Family"),
+  space: () => import("./pages/Space"),
+  people: () => import("./pages/People"),
+  clients: () => import("./pages/Clients"),
+  inventory: () => import("./pages/Inventory"),
+  stations: () => import("./pages/Stations"),
+  printers: () => import("./pages/Printers"),
+  shares: () => import("./pages/Shares"),
+  users: () => import("./pages/Users"),
+  accounts: () => import("./pages/Accounts"),
+  domain: () => import("./pages/Domain"),
+};
 setPrefetcher((p) => {
   const page = resolvePage(p)[0];
   if (page === "dashboard") return;
   void (PAGE_CODE[page] ?? (() => import("./pages/Merged")))().catch(() => {});
+  void TAB_CODE[p]?.().catch(() => {});
 });
+// Pantallas de solo consulta: su primera lectura también se adelanta (queda en la memoria de lecturas).
+setPrefetchRead("startup", "startup", systemApi.listStartup);
+setPrefetchRead("uninstall", "programs", programsApi.list);
+setPrefetchRead("security", "security-audit", securityApi.audit);
+setPrefetchRead("winupdate", "winupdate-history", updateApi.history);
 
 // Solo el Panel se carga al abrir la app; el resto de páginas, al visitarlas.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cada página tiene sus propias props
@@ -89,6 +137,7 @@ function PaintMark({ page }: { page: string }) {
   return null;
 }
 // Ventanas que se abren poco: se cargan al usarlas.
+const WorkshopScreen = lazyPage("WorkshopScreen", () => import("./components/WorkshopScreen"));
 const About = lazyPage("About", () => import("./components/About"));
 const HelpCenter = lazyPage("HelpCenter", () => import("./components/HelpCenter"));
 const CommandPalette = lazyPage("CommandPalette", () => import("./components/CommandPalette"));
@@ -143,7 +192,6 @@ const DO_NOW: [string, string, string, string][] = [
   ["icons", "repair.icon-cache", "Reconstruir la caché de iconos", "iconos en blanco mal"],
 ];
 
-const MAX_ALIVE = 12;
 /** Si la interfaz tardó más que esto en empezar, el arranque fue lento y no se precarga nada. */
 const SLOW_START_MS = 5000;
 
@@ -405,8 +453,10 @@ export default function App() {
   const [alive, setAlive] = useState<PageId[]>([page]);
   const [reloads, setReloads] = useState<Partial<Record<PageId, number>>>({});
   aliveRef.current = alive;
+  // La pantalla de la derecha de la vista dividida no se descarta aunque sea de las más viejas.
+  const splitKeep = useRef<PageId | null>(null);
   useEffect(() => {
-    setAlive((a) => (a[0] === page ? a : [page, ...a.filter((x) => x !== page)].slice(0, MAX_ALIVE)));
+    setAlive((a) => (a[0] === page ? a : touchAlive(a, page, MAX_ALIVE, splitKeep.current, busyPages() as PageId[])));
     setOpened((t) => (t.includes(page) ? t : [...t, page]));
   }, [page]);
   // Pestañas: las pantallas vivas, en el orden en que se abrieron.
@@ -431,9 +481,10 @@ export default function App() {
   const [findOpen, setFindOpen] = useState(false);
   // La pantalla dividida está puesta si se está en un portal y hay página para el lado.
   const splitOn = split !== null && SPLIT_LEFT.includes(page) && allowedInMode(split, prefs.mode);
+  splitKeep.current = splitOn ? split : null;
   // La página de la derecha tiene que estar montada, aunque no sea la actual.
   useEffect(() => {
-    if (splitOn && split) setAlive((a) => (a.includes(split) ? a : [...a, split].slice(-MAX_ALIVE)));
+    if (splitOn && split) setAlive((a) => (a.includes(split) ? a : trimAlive([...a, split], MAX_ALIVE, split, busyPages() as PageId[])));
   }, [splitOn, split]);
   // Bloqueo con PIN o contraseña: null mientras se consulta (no se enseña nada hasta saberlo).
   const [lock, setLock] = useState<LockStatus | null>(null);
@@ -558,7 +609,9 @@ export default function App() {
             .catch(logQuietly("App"));
       })
       .catch(logQuietly("App"));
-    trackBoot("sesión de servicio", workApi.session()).then((s) => setSessionActive(!!s)).catch(logQuietly("App"));
+    // La visita en curso no hace falta para pintar: después de lo esencial.
+    const late = window.setTimeout(() => trackBoot("sesión de servicio", workApi.session()).then((s) => setSessionActive(!!s)).catch(logQuietly("App")), 1500);
+    return () => window.clearTimeout(late);
   }, []);
 
   const actions = useMemo<PaletteAction[]>(
@@ -849,7 +902,11 @@ export default function App() {
         {helpOpen && <HelpCenter version={appInfo?.version ?? ""} />}
         {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} onNavigate={navigate} onSection={goTo} badges={machine.badges} actions={actions} initialQuery={paletteQuery} />}
       </Suspense>
-      {workshop && <WorkshopScreen onClose={() => setWorkshop(false)} host={machine.ctx?.computerName ?? ""} />}
+      {workshop && (
+        <Suspense fallback={null}>
+          <WorkshopScreen onClose={() => setWorkshop(false)} host={machine.ctx?.computerName ?? ""} />
+        </Suspense>
+      )}
       <BootBar />
       <Tour version={appInfo?.version ?? ""} />
       <CelebrateLayer />

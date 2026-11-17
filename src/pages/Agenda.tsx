@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { useConfirm, useToast } from "../components/feedback";
 import { AgendaHistory } from "../components/AgendaHistory";
 import { MonthView, daysBetween } from "../components/AgendaMonth";
@@ -639,10 +640,7 @@ function WeekStrip({ days, selected, onSelect }: { days: [number, { visits: Visi
 
 function NextUp({ visits }: { visits: Visit[] }) {
   const [now, setNow] = useState(() => Date.now() / 1000);
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now() / 1000), 30_000);
-    return () => window.clearInterval(t);
-  }, []);
+  usePolling(() => setNow(Date.now() / 1000), 30_000);
   const next = visits.find((v) => v.start + v.minutes * 60 > now);
   const enCurso = next && next.start <= now;
   const falta = next ? Math.round((next.start - now) / 60) : 0;

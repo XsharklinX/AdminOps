@@ -1,7 +1,9 @@
 import { listen } from "@tauri-apps/api/event";
 import { ArrowRight, CheckCircle2, ListChecks, Loader2, Square, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { appApi } from "../lib/api";
+import { markBusy } from "../lib/alive";
 import { useToast } from "./feedback";
 import type { PageId } from "./Sidebar";
 import { humanDuration, pageOfTask, percentOf, remainingSeconds, type Sample } from "../lib/taskEta";
@@ -81,12 +83,28 @@ export function TasksIndicator({ onNavigate }: { onNavigate?: (page: PageId, sec
 
   const list = Object.values(running).sort((a, b) => a.started - b.started);
 
-  // Reloj mientras hay tareas y el panel está abierto.
+  // Actualiza el registro de páginas ocupadas para que alive.ts no las expulse.
+  const previousRunning = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!open || !list.length) return;
-    const t = window.setInterval(() => tick((n) => n + 1), 1000);
-    return () => window.clearInterval(t);
-  }, [open, list.length]);
+    const current = new Set(Object.keys(running));
+    const prev = previousRunning.current;
+    current.forEach((task) => {
+      if (!prev.has(task)) {
+        const where = pageOfTask(task);
+        if (where) markBusy(where[0], true);
+      }
+    });
+    prev.forEach((task) => {
+      if (!current.has(task)) {
+        const where = pageOfTask(task);
+        if (where) markBusy(where[0], false);
+      }
+    });
+    previousRunning.current = current;
+  }, [running]);
+
+  // Reloj mientras hay tareas y el panel está abierto.
+  usePolling(() => tick((n) => n + 1), 1000, { enabled: open && list.length > 0 });
 
   useEffect(() => {
     if (!open) return;

@@ -15,6 +15,7 @@ import { CASE_CHANGED_EVENT, caseChanged, elapsed, OPEN_CASE_EVENT } from "../li
 import { goToPage } from "../lib/navigate";
 import { lastPortalKey } from "../lib/portalState";
 import { usePrefs } from "../lib/prefs";
+import { usePolling } from "../hooks/usePolling";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { useToast } from "./feedback";
 import { Button, inputClass, Modal } from "./ui";
@@ -103,31 +104,27 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
   // Los diálogos tapan los portales (sus vistas van por encima de la interfaz).
   useEffect(() => onOpenChange?.(dialog !== null), [dialog, onOpenChange]);
 
-  // Reloj del caso y acciones apuntadas, solo mientras hay uno abierto.
-  useLiveEffect(
-    (vigente) => {
-      if (!current) return;
-      const tick = window.setInterval(() => setNow(Date.now() / 1000), 1000);
-      const leer = () =>
-        void casesApi
-          .actions()
-          .then((a) => {
-            if (!vigente()) return;
-            setCount(a.length);
-            setLast(a.length ? a[a.length - 1].title : null);
-          })
-          .catch(logQuietly("CaseBar"));
-      leer();
-      const poll = window.setInterval(leer, 10_000);
-      window.addEventListener("focus", leer);
-      return () => {
-        window.clearInterval(tick);
-        window.clearInterval(poll);
-        window.removeEventListener("focus", leer);
-      };
-    },
-    [current],
+  // Reloj del caso y acciones apuntadas, solo mientras hay uno abierto y la ventana se ve.
+  const readActions = useCallback(
+    () =>
+      casesApi
+        .actions()
+        .then((a) => {
+          setCount(a.length);
+          setLast(a.length ? a[a.length - 1].title : null);
+        })
+        .catch(logQuietly("CaseBar")),
+    [],
   );
+  useEffect(() => {
+    if (!current) return;
+    void readActions();
+    const leer = () => void readActions();
+    window.addEventListener("focus", leer);
+    return () => window.removeEventListener("focus", leer);
+  }, [current, readActions]);
+  usePolling(() => setNow(Date.now() / 1000), 1000, { enabled: !!current });
+  usePolling(readActions, 10_000, { enabled: !!current });
 
   if (prefs.mode === "user") return null;
 

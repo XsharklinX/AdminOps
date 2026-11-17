@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowRight, CalendarClock, Loader2, MonitorCog, RefreshCw, Stethoscope, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useGrowOnScroll } from "../lib/growOnScroll";
 import { Card, EmptyLine } from "./ui";
 import { isPageId, pageLabel, type PageId } from "./Sidebar";
 import { timelineApi, type TimelineEvent } from "../lib/api";
@@ -49,6 +50,8 @@ export function Timeline({ onNavigate }: { onNavigate?: (p: PageId) => void }) {
   }, [load]);
 
   const shown = useMemo(() => (events ?? []).filter((e) => kinds.has(e.kind) && (boots || !isBoot(e))), [events, kinds, boots]);
+  // Al llegar al final de lo pintado, se pintan más (sin botón).
+  const more = useGrowOnScroll(shown.length, limit, () => setLimit((l) => l + PAGE));
   const groups = useMemo(() => {
     const out: { day: string; items: TimelineEvent[] }[] = [];
     for (const e of shown.slice(0, limit)) {
@@ -149,9 +152,9 @@ export function Timeline({ onNavigate }: { onNavigate?: (p: PageId) => void }) {
             </div>
           ))}
           {shown.length > limit && (
-            <button onClick={() => setLimit((l) => l + PAGE)} className="w-full py-2 text-xs text-neon hover:underline">
-              Mostrar más ({shown.length - limit} restantes)
-            </button>
+            <div ref={more} className="py-2 text-center text-xs text-mute">
+              Cargando más… ({shown.length - limit} restantes)
+            </div>
           )}
         </div>
       )}

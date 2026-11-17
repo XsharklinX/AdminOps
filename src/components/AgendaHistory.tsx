@@ -2,6 +2,7 @@
 // búsqueda, filtros y totales por mes: qué se hizo, cuándo y cuánto tiempo.
 import { Briefcase, Check, Clock, CopyPlus, ListTodo, Phone, RotateCcw, Search, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useGrowOnScroll } from "../lib/growOnScroll";
 import type { Followup, Visit } from "../lib/api";
 import { iconBtn } from "./ui";
 
@@ -108,6 +109,7 @@ export function AgendaHistory({
     { label: "Sin marcar", value: String(all.filter((i) => i.state === "missed").length), warn: true },
   ];
 
+  const more = useGrowOnScroll(shown.length, limit, () => setLimit((l) => l + 150));
   const groups: [number, Item[]][] = [];
   for (const i of shown.slice(0, limit)) {
     const k = monthKey(i.at);
@@ -236,9 +238,9 @@ export function AgendaHistory({
         })
       )}
       {shown.length > limit && (
-        <button onClick={() => setLimit(limit + 150)} className="text-xs text-neon hover:underline">
-          Ver más antiguas ({shown.length - limit})
-        </button>
+        <div ref={more} className="py-2 text-center text-xs text-mute">
+          Cargando más antiguas… ({shown.length - limit})
+        </div>
       )}
     </div>
   );

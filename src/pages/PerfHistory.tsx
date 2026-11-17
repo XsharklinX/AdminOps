@@ -8,7 +8,7 @@ import { Card, EmptyState, ErrorState, iconBtn, Loading, smallBtn, Tile } from "
 import { insightApi, logQuietly, timelineApi, workApi, type Sample, type TimelineEvent } from "../lib/api";
 import { blame, describeStep, findStepUps, relevant } from "../lib/perfCorrelate";
 import { dateTime } from "../lib/format";
-import { usePageActive } from "../lib/pageActive";
+import { usePolling } from "../hooks/usePolling";
 
 const RANGES = [
   { id: "6h", label: "6 horas", secs: 6 * 3600 },
@@ -24,7 +24,6 @@ export function PerfHistory() {
   const [failed, setFailed] = useState<string | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [range, setRange] = useState<(typeof RANGES)[number]["id"]>("24h");
-  const active = usePageActive();
 
   const load = useCallback(() => {
     insightApi
@@ -36,12 +35,7 @@ export function PerfHistory() {
       .catch((e) => setFailed(String(e)));
   }, []);
   // Una muestra nueva cada minuto: se vuelve a leer mientras se mira.
-  useEffect(() => {
-    if (!active) return;
-    load();
-    const t = window.setInterval(load, 60_000);
-    return () => window.clearInterval(t);
-  }, [active, load]);
+  usePolling(load, 60_000, { immediate: true });
 
   // Lo que pasó en el equipo (instalaciones, cambios, actualizaciones) para ponerlo sobre la gráfica.
   useEffect(() => {

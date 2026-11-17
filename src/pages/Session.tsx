@@ -6,7 +6,7 @@ import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, ErrorState, Explain, inputClass, Loading } from "../components/ui";
 import { VisitChanges } from "../components/VisitChanges";
 import { logQuietly, contactsApi, diagApi, tweaksApi, workApi, type ActiveSession, type Client, type Contact, type JournalEntry, type Settings, type Solution } from "../lib/api";
-import { usePageActive } from "../lib/pageActive";
+import { usePolling } from "../hooks/usePolling";
 import { autoDone } from "../lib/visits";
 import { SolutionEditor } from "./Knowledge";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -31,7 +31,6 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [solution, setSolution] = useState<Solution | null>(null);
   const [finished, setFinished] = useState<{ problem: string; notes: string; work: string[] } | null>(null);
-  const active = usePageActive();
   const [busy, setBusy] = useState<"start" | "finish" | null>(null);
   const [work, setWork] = useState<JournalEntry[]>([]);
   const [report, setReport] = useState<{ path: string; client: Client | null } | null>(null);
@@ -93,15 +92,14 @@ export function Session({ onSessionChange, focus }: { onSessionChange: (active: 
   );
 
   // Mientras la página está a la vista: reloj y checklist automática al día.
-  useEffect(() => {
-    if (!active) return;
-    void load();
-    const t = window.setInterval(() => {
+  usePolling(
+    () => {
       tick((n) => n + 1);
       void load();
-    }, 30000);
-    return () => window.clearInterval(t);
-  }, [active, load]);
+    },
+    30000,
+    { immediate: true },
+  );
 
   const start = async () => {
     setBusy("start");

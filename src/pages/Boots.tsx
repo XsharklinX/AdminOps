@@ -4,6 +4,8 @@
 import { CrashCulprits } from "../components/expert";
 import { RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { FreshNote } from "../components/FreshNote";
+import { readCached } from "../lib/cachedRead";
 import { NeedsAdmin } from "../components/AdminBanner";
 import { Card, ErrorState, iconBtn, Loading, Tile } from "../components/ui";
 import { insightApi, type BootLog } from "../lib/api";
@@ -26,14 +28,16 @@ export function Boots({ isAdmin }: { isAdmin: boolean }) {
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [at, setAt] = useState<number | null>(null);
+
   const load = useCallback(() => {
     setBusy(true);
-    insightApi
-      .bootHistory()
-      .then((l) => {
-        setLog(l);
-        setFailed(null);
-      })
+    // Lo de la última vez al momento; lo nuevo, en cuanto Windows conteste.
+    readCached("boots", insightApi.bootHistory, (l, _fresh, when) => {
+      setLog(l);
+      setAt(when);
+      setFailed(null);
+    })
       .catch((e) => setFailed(String(e)))
       .finally(() => setBusy(false));
   }, []);
@@ -62,9 +66,11 @@ export function Boots({ isAdmin }: { isAdmin: boolean }) {
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
         <p className="min-w-60 flex-1 text-sm text-dim">Lo que dice el registro de Windows de los últimos 60 días: cuándo arrancó, cuándo se apagó mal y los pantallazos azules, con qué suele haber detrás.</p>
+        <FreshNote at={at} refreshing={busy && log !== null} error={failed} />
         <button onClick={load} disabled={busy} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">
           <RotateCw size={14} className={busy ? "animate-spin" : ""} />
         </button>
+        {failed && <p className="basis-full text-xs text-bad">{failed}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
