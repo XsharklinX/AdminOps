@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 // Pantallas que siguen vivas al cambiar de una a otra: las últimas MAX_ALIVE
 // conservan su estado (filtros, selección, scroll); las demás se desmontan y
 // al volver se abren de nuevo (con la última lectura de `cachedRead` y su hora).
@@ -44,4 +46,17 @@ export function isBusy(page: string): boolean {
 /** Lista de páginas que actualmente tienen tareas en marcha. */
 export function busyPages(): readonly string[] {
   return Array.from(busyCounts.keys());
+}
+
+/**
+ * Mantiene viva `page` mientras `active` sea cierto: una operación a medias
+ * (bisección, un driver recién cambiado esperando «¿Salió bien?», un lote con
+ * sus «Deshacer») no puede perderse porque se visiten otras tres pantallas.
+ */
+export function useKeepAlive(page: string, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    markBusy(page, true);
+    return () => markBusy(page, false);
+  }, [page, active]);
 }

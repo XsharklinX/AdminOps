@@ -5,6 +5,7 @@
 import { CheckCircle2, ClipboardCopy, Loader2, RotateCcw, Undo2, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "../feedback";
+import { useKeepAlive } from "../../lib/alive";
 import { Button, smallBtn } from "../ui";
 import { onVendorEvent, vendorApi, type VendorKey, type VendorPrinter, type VendorStepEvent } from "../../lib/api";
 import { ActionError, BrandBadge } from "./Parts";
@@ -32,6 +33,7 @@ export function BatchPanel({
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  useKeepAlive("printers", running || finished);
   const [stopNote, setStopNote] = useState<string | null>(null);
   const [live, setLive] = useState<{ printer: string; text: string } | null>(null);
   const stop = useRef(false);

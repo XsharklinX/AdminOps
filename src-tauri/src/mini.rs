@@ -23,7 +23,7 @@ pub fn open(app: &tauri::AppHandle) -> Result<(), String> {
     }
     let mut b = tauri::WebviewWindowBuilder::new(app, LABEL, tauri::WebviewUrl::App("index.html".into()))
         .title("AdminOps · mini")
-        .inner_size(200.0, 260.0)
+        .inner_size(MINI_W, MINI_H)
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
@@ -31,8 +31,8 @@ pub fn open(app: &tauri::AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .skip_taskbar(true)
         .theme(Some(tauri::Theme::Dark))
-        // Esquina inferior derecha, con margen para no pegarse al borde.
-        .position(get_mini_x(app) - 216.0, get_mini_y(app) - 276.0)
+        // Esquina inferior derecha, por encima de la barra de tareas.
+        .position(mini_x(app), mini_y(app))
         .disable_drag_drop_handler()
         .initialization_script("window.__ADMINOPS_MINI__ = true;");
     if let Some(args) = app.config().app.windows.first().and_then(|w| w.additional_browser_args.clone()) {
@@ -64,12 +64,34 @@ pub fn toggle(app: &tauri::AppHandle) -> Result<(), String> {
     }
 }
 
-fn get_mini_x(app: &tauri::AppHandle) -> f64 {
-    app.primary_monitor().ok().flatten().map(|m| m.size().width as f64).unwrap_or(1920.0)
+/// Pantalla principal en píxeles LÓGICOS (origen, ancho, alto). `.position()` del
+/// constructor trabaja en lógicos y `Monitor::size()` da físicos: con el escalado
+/// de Windows al 125 % o más, sin dividir, la mini quedaba fuera de la pantalla.
+fn screen_logical(app: &tauri::AppHandle) -> (f64, f64, f64, f64) {
+    match app.primary_monitor().ok().flatten() {
+        Some(m) => {
+            let k = m.scale_factor().max(0.5);
+            let (p, s) = (m.position(), m.size());
+            (p.x as f64 / k, p.y as f64 / k, s.width as f64 / k, s.height as f64 / k)
+        }
+        None => (0.0, 0.0, 1280.0, 720.0),
+    }
 }
 
-fn get_mini_y(app: &tauri::AppHandle) -> f64 {
-    app.primary_monitor().ok().flatten().map(|m| m.size().height as f64).unwrap_or(1080.0)
+/// Ancho y alto de la mini, y el margen con el borde y con la barra de tareas.
+const MINI_W: f64 = 200.0;
+const MINI_H: f64 = 260.0;
+const MARGIN: f64 = 16.0;
+const TASKBAR: f64 = 56.0;
+
+fn mini_x(app: &tauri::AppHandle) -> f64 {
+    let (x, _, w, _) = screen_logical(app);
+    (x + w - MINI_W - MARGIN).max(x)
+}
+
+fn mini_y(app: &tauri::AppHandle) -> f64 {
+    let (_, y, _, h) = screen_logical(app);
+    (y + h - MINI_H - MARGIN - TASKBAR).max(y)
 }
 
 /// Abrir la mini desde la propia aplicación (menú "⋯" o barra del caso).

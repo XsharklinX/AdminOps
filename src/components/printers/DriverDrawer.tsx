@@ -4,6 +4,7 @@
 import { CheckCircle2, Download, Loader2, Search, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "../Drawer";
+import { useKeepAlive } from "../../lib/alive";
 import { useToast } from "../feedback";
 import { Button, ErrorState, softBtn } from "../ui";
 import {
@@ -78,6 +79,8 @@ export function DriverDrawer({
   const [installed, setInstalled] = useState<PrinterInstallResult | null>(null);
   const [verdict, setVerdict] = useState<"ok" | "undone" | null>(null);
   const [undoing, setUndoing] = useState(false);
+  // Su «Deshacer» solo vive aquí: la pantalla no se descarta hasta que se responda.
+  useKeepAlive("printers", phase === "running" || undoing || (!!result && verdict === null));
   const changed = useRef(false);
   const [steps, clearSteps] = useVendorSteps(name, true, table);
 

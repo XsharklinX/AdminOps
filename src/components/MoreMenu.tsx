@@ -1,4 +1,4 @@
-import { Monitor, MoreHorizontal, PictureInPicture } from "lucide-react";
+import { LogOut, Monitor, MoreHorizontal, PictureInPicture } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { auditApi, logQuietly, workApi } from "../lib/api";
 import { usePrivacy } from "../lib/privacy";
@@ -10,7 +10,7 @@ import { PrivacyToggle } from "./PrivacyMode";
  * solo mirar, pantalla de taller). Antes eran botones de texto que pesaban lo
  * mismo que «Nuevo caso». Con algún modo activo, el botón lleva un punto.
  */
-export function MoreMenu({ onWorkshop }: { onWorkshop: () => void }) {
+export function MoreMenu({ onWorkshop, portable = false }: { onWorkshop: () => void; portable?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const privacy = usePrivacy();
@@ -80,6 +80,20 @@ export function MoreMenu({ onWorkshop }: { onWorkshop: () => void }) {
           <span className="flex-1">AdminOps en miniatura</span>
           <kbd className="font-mono text-[10.5px] text-mute">Ctrl+Alt+A</kbd>
         </button>
+        {portable && (
+          <button
+            type="button"
+            role="menuitem"
+            className="menu-row"
+            onClick={() => {
+              setOpen(false);
+              window.dispatchEvent(new Event("adminops:portable-exit"));
+            }}
+          >
+            <LogOut size={14} />
+            <span className="flex-1">Salir sin dejar rastro</span>
+          </button>
+        )}
       </div>
     </div>
   );

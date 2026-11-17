@@ -106,13 +106,11 @@ const TRAY_FIXES = [
 
 /** Arreglos rápidos del icono junto al reloj. */
 function TrayFixes({ s, set }: SettingsProps) {
-  const effective = new Set(s.trayFixes?.length ? s.trayFixes : TRAY_FIXES.slice(0, 4).map((f) => f.id));
+  // Sin configurar salen los cuatro de fábrica (igual que en la bandeja); una lista vacía es «ninguno».
+  const defaults = TRAY_FIXES.slice(0, 4).map((f) => f.id);
+  const effective = new Set(s.trayFixes ?? defaults);
   const toggle = (id: string) => {
-    let current = new Set(s.trayFixes ?? []);
-    // Al tocar por primera vez, partimos de los cuatro por defecto (igual que en la bandeja).
-    if (s.trayFixes === undefined || s.trayFixes.length === 0) {
-      current = new Set(TRAY_FIXES.slice(0, 4).map((f) => f.id));
-    }
+    const current = new Set(effective);
     if (current.has(id)) current.delete(id);
     else current.add(id);
     set({ trayFixes: Array.from(current) });

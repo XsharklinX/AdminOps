@@ -5,7 +5,8 @@
   "windows": [
     "main",
     "note",
-    "monitor"
+    "monitor",
+    "mini"
   ],
   "permissions": [
     "core:default"

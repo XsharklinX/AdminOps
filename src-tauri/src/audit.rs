@@ -124,7 +124,6 @@ const BLOCKED: &[&str] = &[
     // Arreglos rápidos desde la bandeja (cambian el equipo).
     "tray_run_fix",
     // Salir sin dejar rastro en modo portable.
-    "portable_cleanup",
     // Impresoras
     "clear_printer_queue",
     "set_default_printer",
@@ -236,7 +235,7 @@ const SAFE: &[&str] = &[
     "open_quick_note", "close_quick_note", "open_screen_clip", "redact_clipboard_image",
     "open_adminops_mini", "close_adminops_mini",
     // bandeja: lista de arreglos (lectura) y lo que queda en modo portable (lectura)
-    "tray_fixes_available", "portable_leftovers",
+    "tray_fixes_available", "portable_leftovers", "portable_cleanup",
     // cases
     "case_current", "case_open", "case_update", "case_actions", "case_draft", "case_close", "case_discard", "cases_for_person",
     // people

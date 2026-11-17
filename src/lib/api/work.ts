@@ -23,7 +23,8 @@ export interface Settings {
   closeMinimizes: boolean;
   trayIcon: boolean;
   /** Arreglos rápidos que salen en el menú del icono junto al reloj. */
-  trayFixes: string[];
+  /** null: sin configurar (salen los de fábrica); [] = ninguno. */
+  trayFixes: string[] | null;
   visitTypes: VisitType[];
   currency: string;
   taxName: string;

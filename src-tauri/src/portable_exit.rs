@@ -91,24 +91,6 @@ fn own_temp_dirs() -> Vec<PathBuf> {
     out
 }
 
-/// La carpeta de WebView2 que se puede quitar: solo si está en el pendrive
-/// o en la carpeta temporal propia; nunca `%LOCALAPPDATA%\AdminOps\WebView`.
-fn tracked_webview_dir() -> Option<PathBuf> {
-    let path = WEBVIEW_DIR.lock().ok().and_then(|d| d.clone())?;
-    // Carpetas del pendrive portable: sí.
-    if let Some(root) = crate::paths::portable_data_root() {
-        if path.starts_with(root) {
-            return Some(path);
-        }
-    }
-    // Carpeta temporal propia: sí.
-    let temp_webview = std::env::temp_dir().join("AdminOps").join("WebView");
-    if path == temp_webview {
-        return Some(path);
-    }
-    None
-}
-
 fn tracked_lhm_dir() -> Option<PathBuf> {
     LHM_DIR.lock().ok().and_then(|d| d.clone())
 }
@@ -118,13 +100,6 @@ pub fn leftovers(_app: &tauri::AppHandle) -> Vec<Leftover> {
         return Vec::new();
     }
     let mut out = Vec::new();
-    if let Some(path) = tracked_webview_dir().filter(|p| p.exists()) {
-        out.push(Leftover {
-            kind: "folder".into(),
-            label: "Caché del navegador interno".into(),
-            detail: Some(crate::escalate::scrub(&path.display().to_string())),
-        });
-    }
     if let Some(path) = tracked_lhm_dir().filter(|p| p.exists()) {
         out.push(Leftover {
             kind: "folder".into(),
@@ -163,16 +138,6 @@ pub fn cleanup(_app: &tauri::AppHandle, _keep_night_jobs: bool) -> Result<Cleanu
         return Err("Solo disponible en modo portable.".into());
     }
     let mut result = CleanupResult { ok: true, removed: Vec::new(), failed: Vec::new() };
-
-    if let Some(path) = tracked_webview_dir().filter(|p| p.exists()) {
-        match remove_dir(&path) {
-            Ok(()) => result.removed.push("Caché del navegador interno".into()),
-            Err(e) => {
-                result.ok = false;
-                result.failed.push(FailedItem { label: "Caché del navegador interno".into(), error: e });
-            }
-        }
-    }
 
     if let Some(path) = tracked_lhm_dir().filter(|p| p.exists()) {
         match remove_dir(&path) {

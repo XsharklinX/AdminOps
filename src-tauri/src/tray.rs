@@ -17,7 +17,8 @@ static VISIBLE: AtomicBool = AtomicBool::new(false);
 static TOLD: AtomicBool = AtomicBool::new(false);
 
 /// Arreglos rápidos disponibles en la bandeja. El id es el del catálogo,
-/// salvo «repair.network-renew» que aquí significa «repair.network-reset».
+/// salvo «repair.network-renew», que aquí significa «repair.ip-renew»: solo
+/// renueva la IP (nunca el «Restablecer red» completo, que quita la IP fija).
 const FIXES: &[(&str, &str)] = &[
     ("repair.print-queue", "Vaciar cola de impresión"),
     ("repair.network-renew", "Renovar la IP"),
@@ -48,11 +49,11 @@ fn ask_ui(app: &tauri::AppHandle, action: &str) {
 /// Qué arreglos rápidos están activados en Ajustes → General.
 fn enabled_fixes(app: &tauri::AppHandle) -> Vec<String> {
     let settings = crate::workflow::settings(app);
-    if settings.tray_fixes.is_empty() {
-        // De fábrica, los cuatro que pide el encargo.
-        FIXES.iter().take(4).map(|(id, _)| id.to_string()).collect()
-    } else {
-        settings.tray_fixes.into_iter().filter(|id| FIXES.iter().any(|(f, _)| f == id)).collect()
+    match settings.tray_fixes {
+        // Sin configurar: los cuatro de fábrica.
+        None => FIXES.iter().take(4).map(|(id, _)| id.to_string()).collect(),
+        // Elegidos en Ajustes (vacío = ninguno).
+        Some(list) => list.into_iter().filter(|id| FIXES.iter().any(|(f, _)| f == id)).collect(),
     }
 }
 
@@ -104,6 +105,8 @@ fn build(app: &tauri::AppHandle) -> tauri::Result<()> {
             }
             "quit" => {
                 if crate::paths::is_portable() {
+                    // El diálogo de salida vive en la ventana principal: que se vea.
+                    show_main(app);
                     let _ = app.emit("tray-action", "portable-exit");
                 } else {
                     crate::window_state::quit(app);
@@ -111,9 +114,14 @@ fn build(app: &tauri::AppHandle) -> tauri::Result<()> {
             }
             other => {
                 if let Some(id) = other.strip_prefix("fix:") {
-                    if let Err(e) = run_fix_from_tray(app, id) {
-                        log::warn!("{e}");
-                    }
+                    // PowerShell puede tardar (renovar la IP, 10-30 s): fuera del hilo de la
+                    // ventana, o toda la aplicación se queda en «No responde» mientras tanto.
+                    let (app, id) = (app.clone(), id.to_string());
+                    std::thread::spawn(move || {
+                        if let Err(e) = run_fix_from_tray(&app, &id) {
+                            log::warn!("{e}");
+                        }
+                    });
                 } else {
                     ask_ui(app, other);
                 }
@@ -145,7 +153,7 @@ pub fn refresh(app: &tauri::AppHandle) {
 /// Ejecuta un arreglo rápido desde la bandeja y avisa con notificación de Windows.
 fn run_fix_from_tray(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     let catalog_id = match id {
-        "repair.network-renew" => "repair.network-reset",
+        "repair.network-renew" => "repair.ip-renew",
         _ => id,
     };
     let label = FIXES.iter().find(|(f, _)| *f == id).map(|(_, l)| *l).unwrap_or(id);

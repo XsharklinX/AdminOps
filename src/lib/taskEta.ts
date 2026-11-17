@@ -71,6 +71,9 @@ const TASK_PAGE: [string, PageId, string | null][] = [
   ["speedtest", "router", "speed"],
   ["inventory", "inventory", null],
   ["stress", "machine", "hardware"],
+  ["printvendor-scan", "printers", "scanners"],
+  ["printvendor-installer", "printers", "scanners"],
+  ["printvendor-", "printers", null],
 ];
 
 export function pageOfTask(task: string): [PageId, string | null] | null {

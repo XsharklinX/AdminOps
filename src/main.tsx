@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { QuickNote } from "./components/QuickNote";
+import { ToastProvider } from "./components/feedback";
 import { MiniMonitor } from "./components/MiniMonitor";
 import { AdminOpsMini } from "./components/AdminOpsMini";
 import { appApi } from "./lib/api";
@@ -46,7 +47,7 @@ window.addEventListener("unhandledrejection", (e) => appApi.logError(`Promesa si
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ErrorBoundary>{isMini ? <AdminOpsMini /> : isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
+    <ErrorBoundary>{isMini ? <ToastProvider><AdminOpsMini /></ToastProvider> : isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
   </React.StrictMode>,
 );
 

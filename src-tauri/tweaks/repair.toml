@@ -45,6 +45,22 @@ switch ($LASTEXITCODE) {
 '''
 
 [[tweak]]
+id = "repair.ip-renew"
+name = "Renovar la IP"
+description = "Pide una dirección nueva al router o al servidor (DHCP) y vacía la caché de nombres. No toca Winsock ni la pila TCP/IP y no quita una IP fija."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+ipconfig.exe /renew | Out-Null
+ipconfig.exe /flushdns | Out-Null
+'IP renovada y caché de nombres vaciada.'
+'''
+
+[[tweak]]
 id = "repair.network-reset"
 name = "Restablecer red"
 description = "Reinicia Winsock y la pila TCP/IP y renueva la IP. Soluciona 'conectado sin Internet', DNS que no resuelven y restos de VPN o malware."

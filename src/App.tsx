@@ -794,7 +794,7 @@ export default function App() {
             <NewCaseButton hidden={false} />
             <UndoLast />
             <TasksIndicator onNavigate={goTo} />
-            <MoreMenu onWorkshop={() => setWorkshop(true)} />
+            <MoreMenu onWorkshop={() => setWorkshop(true)} portable={!!appInfo?.portable} />
             <QuitButton portable={appInfo?.portable ?? false} />
             <AlertCenter onNavigate={(p, s) => goTo(p, s ?? null)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
           </>
