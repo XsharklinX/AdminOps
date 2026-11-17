@@ -26,6 +26,8 @@ export const SECTIONS: Partial<Record<PageId, Section[]>> = {
     { id: "boots", label: "Arranques y cuelgues", keywords: "pantallazo azul bsod pantalla azul cuelgue reinicio apagon tarda en arrancar bugcheck minidump" },
     { id: "peripherals", label: "Probar periféricos", keywords: "teclado pixel muerto pantalla altavoz sonido microfono no me oyen camara webcam probar" },
     { id: "history", label: "Historial del equipo", keywords: "diario deshacer cambios linea de tiempo eventos" },
+    { id: "changed", label: "¿Qué cambió?", keywords: "desde el martes va mal instalado nuevo driver actualizacion servicio cambio comparar foto diaria" },
+    { id: "ask", label: "Pregúntale al equipo", keywords: "por que se reinicio anoche lento quien instalo no imprime se apago se colgo pregunta" },
   ],
   tweaks: [
     { id: "cleanup", label: "Limpieza", keywords: "temporales basura liberar caché" },

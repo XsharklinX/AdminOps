@@ -98,6 +98,8 @@ mod officemap;
 mod sheet;
 mod shellopen;
 mod stations;
+mod whatchanged;
+mod askpc;
 mod secrets;
 mod smoke;
 mod timeline;
@@ -282,6 +284,8 @@ pub fn run() {
             std::thread::spawn(move || {
                 window_state::wait_until_ready(std::time::Duration::from_secs(20));
                 perfhistory::start(late.clone());
+                // Una foto al día del equipo para «¿Qué cambió?».
+                whatchanged::start(late.clone());
                 nightjobs::start(late);
             });
             appbackup::start(app.handle().clone());
@@ -804,6 +808,12 @@ pub fn run() {
             officemap::refresh_device_ips,
             officemap::watch_status,
             stations::check_stations,
+            stations::check_stations_stream,
+            stations::review_station,
+            whatchanged::whatchanged_info,
+            whatchanged::whatchanged_snapshot,
+            whatchanged::whatchanged_since,
+            askpc::ask_pc,
             stations::station_action,
             sheet::machine_sheet,
             sheet::open_warranty,

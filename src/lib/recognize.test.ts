@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recognize } from "./recognize";
+import { parseAction, recognize } from "./recognize";
 
 describe("reconocer lo que se escribe en Ctrl+K", () => {
   it("equipos", () => {
@@ -39,5 +39,34 @@ describe("reconocer lo que se escribe en Ctrl+K", () => {
     expect(recognize("999.1.1.1")).toBeNull();
     expect(recognize("123456789")).toBeNull();
     expect(recognize("x")).toBeNull();
+  });
+});
+
+describe("frases que hacen algo en Ctrl+K", () => {
+  it("las cuatro del ejemplo", () => {
+    expect(parseAction("desbloquear maria")).toEqual({ action: "unlock", arg: "maria" });
+    expect(parseAction("reiniciar PC-CONTA-03")).toEqual({ action: "restart", arg: "PC-CONTA-03" });
+    expect(parseAction("cola recepción")).toEqual({ action: "queue", arg: "recepción" });
+    expect(parseAction("laps legal-04")).toEqual({ action: "laps", arg: "legal-04" });
+    expect(parseAction("liberar espacio")).toEqual({ action: "space", arg: "" });
+  });
+
+  it("perdona erratas y palabras de enlace", () => {
+    expect(parseAction("desblokear maria perez")?.action).toBe("unlock");
+    expect(parseAction("desbloquear a maria perez")?.arg).toBe("maria perez");
+    expect(parseAction("reinicar pc-conta-03")?.action).toBe("restart");
+    expect(parseAction("vaciar la cola de recepción")).toEqual({ action: "queue", arg: "recepción" });
+    expect(parseAction("libera espacio")?.action).toBe("space");
+  });
+
+  it("no inventa acciones", () => {
+    expect(parseAction("cola")).toBeNull();
+    expect(parseAction("desbloquear")).toBeNull();
+    expect(parseAction("reiniciar el router de la oficina")).toBeNull();
+    expect(parseAction("vaciar papelera")).toBeNull();
+    expect(parseAction("liberar la cuenta de maria")).toBeNull();
+    expect(parseAction("discos")).toBeNull();
+    expect(parseAction("windows update")).toBeNull();
+    expect(parseAction("")).toBeNull();
   });
 });

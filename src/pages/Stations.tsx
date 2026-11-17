@@ -1,8 +1,10 @@
 import { Ban, CheckCircle2, Printer, ShieldCheck, Download, Loader2, MessageSquare, Monitor, MonitorPlay, Play, RefreshCcw, RotateCw, Save, ScanSearch, Trash2, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, inputClass, Modal } from "../components/ui";
-import { logQuietly, libraryApi, officeApi, remoteApi, stationsApi, type Station, type StationAction, type StationActionResult, type StationList } from "../lib/api";
+import { logQuietly, libraryApi, officeApi, remoteApi, stationsApi, type Station, type StationAction, type StationActionResult, type StationList, type StationProgress } from "../lib/api";
+import { failed, SEVERITY_ORDER, SEVERITY_LABEL, severityOf, sortBySeverity, type Severity } from "../lib/stationSeverity";
 import { DataTable } from "../components/DataTable";
 import { Copyable } from "../components/Copyable";
 import { HoverCard } from "../components/HoverCard";
@@ -14,6 +16,19 @@ const ACTION_LABEL: Record<StationAction, string> = {
   message: "Enviar mensaje",
   spooler: "Reiniciar la cola de impresión",
   defender: "Actualizar Defender",
+  clearQueue: "Vaciar la cola de impresión",
+  freeSpace: "Liberar espacio",
+};
+
+const SEVERITY_DOT: Record<Severity, string> = { offline: "bg-bad", disk: "bg-bad", security: "bg-warn", reboot: "bg-warn", space: "bg-warn", other: "bg-warn", ok: "bg-ok" };
+
+/** Pone el resultado de un equipo en la lista: sustituye al anterior del mismo nombre o se añade. */
+const withStation = (list: Station[], s: Station): Station[] => {
+  const i = list.findIndex((x) => x.host.toLowerCase() === s.host.toLowerCase());
+  if (i < 0) return [...list, s];
+  const n = [...list];
+  n[i] = s;
+  return n;
 };
 
 /** Más ventanas de Escritorio remoto que esto a la vez es inmanejable. */
@@ -32,6 +47,10 @@ export function Stations() {
   const [name, setName] = useState("");
   const [results, setResults] = useState<Station[] | null>(null);
   const [busy, setBusy] = useState<"quick" | "deep" | null>(null);
+  // Cuántos equipos han terminado en la comprobación en marcha.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const run = useRef("");
+  const lastDeep = useRef(false);
   const [onlyIssues, setOnlyIssues] = useState(false);
   // Puestos marcados para actuar sobre ellos a la vez.
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -75,20 +94,39 @@ export function Stations() {
     void load();
   };
 
-  const check = async (deep: boolean) => {
-    if (!hosts.length) return toast("error", "Escribe los equipos: nombres o IP, uno por línea.");
+  /** Comprueba los equipos de la lista (o solo `only`) y los va pintando según terminan. */
+  const check = async (deep: boolean, only?: string[]) => {
+    const list = only ?? hosts;
+    if (!list.length) return toast("error", "Escribe los equipos: nombres o IP, uno por línea.");
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    run.current = id;
+    lastDeep.current = deep;
     setBusy(deep ? "deep" : "quick");
-    try {
-      setResults(await stationsApi.check(hosts, deep));
+    setProgress({ done: 0, total: list.length });
+    if (!only) {
+      setResults([]);
       setPicked(new Set());
+    }
+    const off = await listen<StationProgress>("stations-progress", ({ payload }) => {
+      if (payload.run !== run.current) return;
+      setProgress({ done: payload.done, total: payload.total });
+      setResults((prev) => withStation(prev ?? [], payload.station));
+    });
+    try {
+      const final = await stationsApi.checkStream(list, deep, id);
+      setResults((prev) => (only ? final.reduce(withStation, prev ?? []) : final));
     } catch (e) {
       toast("error", String(e));
     } finally {
+      off();
       setBusy(null);
+      setProgress(null);
     }
   };
 
-  const shown = (results ?? []).filter((r) => !onlyIssues || !r.online || r.warnings.length > 0);
+  const sorted = useMemo(() => sortBySeverity(results ?? []), [results]);
+  const toRecheck = useMemo(() => failed(results ?? []), [results]);
+  const shown = sorted.filter((r) => !onlyIssues || !r.online || r.warnings.length > 0);
   const online = (results ?? []).filter((r) => r.online).length;
   const issues = (results ?? []).filter((r) => r.warnings.length > 0).length;
 
@@ -227,7 +265,7 @@ export function Stations() {
 
         {results && (
           <Card
-            title={`Resultado · ${online} de ${results.length} responden${issues ? ` · ${issues} con avisos` : ""}`}
+            title={`${progress ? `Comprobando · ${progress.done} de ${progress.total}` : "Resultado"} · ${online} de ${results.length} responden${issues ? ` · ${issues} con avisos` : ""}`}
             icon={<CheckCircle2 size={14} />}
             right={
               <div className="flex items-center gap-3 text-[11px]">
@@ -240,6 +278,24 @@ export function Stations() {
               </div>
             }
           >
+            {progress && (
+              <div className="mb-3 flex items-center gap-3 text-xs text-dim" role="status">
+                <span className="font-mono tabular-nums">{progress.done} de {progress.total}</span>
+                <div className="h-1 flex-1 overflow-hidden rounded bg-line">
+                  <div className="h-full bg-neon transition-[width]" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+                </div>
+              </div>
+            )}
+            {!busy && toRecheck.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">
+                <Button kind="ghost" onClick={() => void check(lastDeep.current, toRecheck.map((r) => r.host))}>
+                  <RefreshCcw size={12} /> Volver a mirar {toRecheck.length === 1 ? "el que falló" : `los ${toRecheck.length} que fallaron`}
+                </Button>
+                <span className="text-[11px] text-mute">
+                  Orden: {SEVERITY_ORDER.map((k) => SEVERITY_LABEL[k].toLowerCase()).join(" → ")}.
+                </span>
+              </div>
+            )}
             {picked.size > 0 && (
               <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-neon/30 bg-neon/5 px-3 py-2 text-xs">
                 <span className="mr-1 text-ink">
@@ -303,6 +359,20 @@ export function Stations() {
                     header: <input type="checkbox" checked={allPicked} onChange={pickAll} title="Elegir todos" className="accent-[var(--color-neon)]" />,
                     headClass: "w-6",
                     cell: (r) => <input type="checkbox" checked={picked.has(r.host)} onChange={() => togglePick(r.host)} className="mt-1 accent-[var(--color-neon)]" />,
+                  },
+                  {
+                    id: "severity",
+                    header: "Atención",
+                    sortBy: (r) => SEVERITY_ORDER.indexOf(severityOf(r).severity),
+                    cell: (r) => {
+                      const v = severityOf(r);
+                      return (
+                        <span className="flex items-center gap-1.5">
+                          <span className={`size-2 shrink-0 rounded-full ${SEVERITY_DOT[v.severity]}`} />
+                          <span className={v.severity === "ok" ? "text-mute" : "text-ink"}>{v.severity === "ok" ? "Bien" : v.reason ? `${SEVERITY_LABEL[v.severity]}: ${v.reason}` : SEVERITY_LABEL[v.severity]}</span>
+                        </span>
+                      );
+                    },
                   },
                   {
                     id: "host",

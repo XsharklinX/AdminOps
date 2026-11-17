@@ -31,6 +31,7 @@ import { Button, Card, EmptyState, inputClass, Modal } from "../components/ui";
 import { logQuietly, casesApi, contactsApi, officeApi, peopleApi, portalsApi, type Case, type LapsPassword, type Person, type PersonHit, type RecoveryKey } from "../lib/api";
 import { openCase } from "../lib/currentCase";
 import { Avatar } from "../components/contacts/Avatar";
+import { ReviewMachine } from "../components/ReviewMachine";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 const DAY = 86_400;
@@ -427,6 +428,7 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
                     </Button>
                   </div>
                   <MachineSecrets computer={h} />
+                  <ReviewMachine host={h} />
                 </li>
               ))}
             </ul>
