@@ -12,7 +12,7 @@
 
 use serde::Serialize;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 // ---------- BER ----------
 
@@ -377,9 +377,153 @@ pub fn printer_status(ip: IpAddr) -> PrinterStatus {
     PrinterStatus { reachable: true, name, model, pages, supplies, alerts }
 }
 
+// ---------- Modelo, serie y páginas en una sola petición ----------
+
+const OID_DEVICE_DESCR: &str = "1.3.6.1.2.1.25.3.2.1.3.1";
+const OID_SERIAL: &str = "1.3.6.1.2.1.43.5.1.1.17.1";
+const OID_LIFE_COUNT: &str = "1.3.6.1.2.1.43.10.2.1.4.1.1";
+
+/// Lo que cuenta una impresora de sí misma para inventariarla.
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrinterIds {
+    /// hrDeviceDescr: «RICOH IM C3000», «EPSON ET-2820 Series».
+    pub model: String,
+    /// prtGeneralSerialNumber.
+    pub serial: String,
+    /// prtMarkerLifeCount: páginas impresas en toda su vida.
+    pub pages: Option<u64>,
+}
+
+/// Por qué no salió una petición.
+enum Fail {
+    /// Nadie contestó a tiempo.
+    Timeout,
+    /// Contestó con un error (p. ej. SNMP v1 pidiendo un OID que no tiene).
+    Error,
+}
+
+impl Session {
+    /// Sin la prueba previa de `open`: se pregunta directamente lo que se quiere.
+    fn raw(ip: IpAddr, version: i64) -> Option<Session> {
+        let sock = UdpSocket::bind(if ip.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" }).ok()?;
+        Some(Session { sock, to: SocketAddr::new(ip, 161), version, next_id: 0x5044 })
+    }
+
+    /// Como `request`, pero sin pasarse de `deadline`: dos intentos que se reparten el tiempo.
+    fn request_by(&mut self, oids: &[Vec<u32>], deadline: Instant) -> Result<Binds, Fail> {
+        self.next_id += 1;
+        let msg = build_request(self.version, COMMUNITY, 0xA0, self.next_id, oids);
+        let mut buf = [0u8; 4096];
+        for attempt in 0..2 {
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left < Duration::from_millis(30) {
+                break;
+            }
+            self.sock.send_to(&msg, self.to).map_err(|_| Fail::Timeout)?;
+            let window_end = Instant::now() + if attempt == 0 { left / 2 } else { left };
+            loop {
+                let remain = window_end.saturating_duration_since(Instant::now()).max(Duration::from_millis(1));
+                if Instant::now() >= window_end || self.sock.set_read_timeout(Some(remain)).is_err() {
+                    break;
+                }
+                let Ok((n, from)) = self.sock.recv_from(&mut buf) else { break };
+                if from.ip() != self.to.ip() {
+                    continue;
+                }
+                if let Some((id, err, binds)) = parse_response(&buf[..n]) {
+                    if id == self.next_id {
+                        return if err == 0 { Ok(binds) } else { Err(Fail::Error) };
+                    }
+                }
+            }
+        }
+        Err(Fail::Timeout)
+    }
+}
+
+/// Lee modelo, serie y páginas de una impresora de red con una sola petición,
+/// sin tardar más de `total` aunque esté apagada (UDP sin respuesta).
+pub fn printer_ids(ip: IpAddr, total: Duration) -> Option<PrinterIds> {
+    let started = Instant::now();
+    let deadline = started + total;
+    let oids = [parse_oid(OID_DEVICE_DESCR), parse_oid(OID_SERIAL), parse_oid(OID_LIFE_COUNT)];
+    // v2c primero (con 40 % del tiempo) y, si no contesta, v1.
+    for (version, until) in [(1, started + total.mul_f32(0.4)), (0, deadline)] {
+        let mut s = Session::raw(ip, version)?;
+        match s.request_by(&oids, until) {
+            Ok(binds) => return Some(ids_from(&binds)),
+            // v1 contesta con error si falta alguno de los tres: se pregunta uno a uno.
+            Err(Fail::Error) if version == 0 => {
+                let mut ids = PrinterIds::default();
+                for oid in &oids {
+                    if let Ok(b) = s.request_by(std::slice::from_ref(oid), deadline) {
+                        merge_ids(&mut ids, &ids_from(&b));
+                    }
+                }
+                return Some(ids);
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn merge_ids(into: &mut PrinterIds, from: &PrinterIds) {
+    if into.model.is_empty() {
+        into.model = from.model.clone();
+    }
+    if into.serial.is_empty() {
+        into.serial = from.serial.clone();
+    }
+    if into.pages.is_none() {
+        into.pages = from.pages;
+    }
+}
+
+fn ids_from(binds: &[(Vec<u32>, Value)]) -> PrinterIds {
+    let (descr, serial, count) = (parse_oid(OID_DEVICE_DESCR), parse_oid(OID_SERIAL), parse_oid(OID_LIFE_COUNT));
+    let mut ids = PrinterIds::default();
+    for (oid, v) in binds {
+        if *oid == descr {
+            ids.model = v.as_text().unwrap_or_default();
+        } else if *oid == serial {
+            ids.serial = v.as_text().unwrap_or_default();
+        } else if *oid == count {
+            ids.pages = v.as_i64().filter(|p| *p >= 0).map(|p| p as u64);
+        }
+    }
+    ids
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Modelo, serie y páginas salen de una respuesta de tres valores (y un OID que
+    /// la impresora no tiene no rompe el resto).
+    #[test]
+    fn model_serial_and_pages_are_read_from_one_response() {
+        let (a, b, c) = (parse_oid(OID_DEVICE_DESCR), parse_oid(OID_SERIAL), parse_oid(OID_LIFE_COUNT));
+        let bind = |oid: &[u32], value: Vec<u8>| tlv(0x30, &[encode_oid(oid), value].concat());
+        let binds = [bind(&a, tlv(0x04, b"RICOH IM C3000")), bind(&b, tlv(0x04, b"W1234567890")), bind(&c, tlv(0x41, &[0x01, 0x86, 0xA0]))].concat();
+        let pdu = [int(9), int(0), int(0), tlv(0x30, &binds)].concat();
+        let msg = tlv(0x30, &[int(1), tlv(0x04, b"public"), tlv(0xA2, &pdu)].concat());
+        let (_, _, parsed) = parse_response(&msg).unwrap();
+        assert_eq!(ids_from(&parsed), PrinterIds { model: "RICOH IM C3000".into(), serial: "W1234567890".into(), pages: Some(100_000) });
+
+        let only_model = vec![(a, Value::Bytes(b"EPSON ET-2820 Series".to_vec())), (b, Value::Missing), (c, Value::Missing)];
+        assert_eq!(ids_from(&only_model), PrinterIds { model: "EPSON ET-2820 Series".into(), serial: String::new(), pages: None });
+    }
+
+    /// Una dirección que no contesta no retrasa más que el tiempo pedido.
+    #[test]
+    fn a_silent_printer_gives_up_in_time() {
+        // 192.0.2.0/24 (TEST-NET-1) no se encamina nunca: no contesta nadie.
+        let t = Instant::now();
+        assert!(printer_ids("192.0.2.77".parse().unwrap(), Duration::from_millis(600)).is_none());
+        assert!(t.elapsed() < Duration::from_millis(1500), "{:?}", t.elapsed());
+    }
 
     /// OID codificado como en la RFC (1.3.6.1.2.1.1.5.0 → 06 08 2B 06 01 02 01 01 05 00),
     /// y con arcos de varios bytes.

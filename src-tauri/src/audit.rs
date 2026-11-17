@@ -120,6 +120,11 @@ const BLOCKED: &[&str] = &[
     "clear_printer_queue",
     "set_default_printer",
     "remove_printer",
+    // Actualizar el driver de una impresora (y deshacerlo)
+    "printer_driver_update",
+    "printer_driver_undo",
+    "printer_install",
+    "run_vendor_installer",
     // Archivos del equipo
     "vault_create",
     "vault_open",
@@ -232,6 +237,8 @@ const SAFE: &[&str] = &[
     "portal_compose", "portal_teams", "portal_sign_out", "portal_download_open", "portal_download_reveal", "router_portal", "portal_hide",
     // printers
     "list_printers", "print_test_page", "check_printer", "find_network_printers",
+    // printvendor: inventario, biblioteca de drivers (solo copia archivos dentro de los datos de AdminOps), búsqueda en Windows Update (caché propia), página oficial, vigilar Descargas y prueba de escaneo
+    "printer_inventory", "scanner_inventory", "driver_library", "driver_library_add", "set_driver_library_dir", "driver_candidates", "open_vendor_page", "watch_downloads", "scanner_test",
     // processes
     "list_processes", "open_process_location",
     // programs

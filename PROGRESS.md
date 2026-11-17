@@ -16,8 +16,8 @@ el antes y el después.
 
 ## Estado
 - 1.2.10 guardada en el commit 577029e (rama claude/great-mayer-m7kpmy), sin lo de la Fase 1.
-- 2026-11-16: **Fase 1 hecha** (sin commit; David solo pidió el de la 1.2.10). Detalle abajo.
-- Fase 2: David eligió las seis partes (P1–P6); plan de implementación abajo, en curso. Investigado: RICOH (PCL6 Driver for Universal Print 4.42.0.0, jul 2025) y EPSON (Universal Print Driver) solo se bajan desde la página de soporte de cada modelo, sin enlace directo estable; por eso las fuentes son Windows Update → biblioteca local → abrir la página oficial y recoger la descarga de Descargas. Generador de la maqueta: gen3.py en el scratchpad de la sesión 01e269f2. Idea de la sesión anterior: módulo `printvendor.rs` (PnP + colas + Windows Update
+- 2026-11-16: **Fase 1 hecha**, commit 504f5bf. Detalle abajo.
+- Fase 2: David eligió P1–P6. **Encargo A (motor) hecho y revisado, sin commit; sigue el encargo B (interfaz)**. Investigado: RICOH (PCL6 Driver for Universal Print 4.42.0.0, jul 2025) y EPSON (Universal Print Driver) solo se bajan desde la página de soporte de cada modelo, sin enlace directo estable; por eso las fuentes son Windows Update → biblioteca local → abrir la página oficial y recoger la descarga de Descargas. Generador de la maqueta: gen3.py en el scratchpad de la sesión 01e269f2. Idea de la sesión anterior: módulo `printvendor.rs` (PnP + colas + Windows Update
   con ServerSelection=2 + biblioteca de INF + `Set-Printer -DriverName` con deshacer).
 
 ## Orden propuesto (el autor puede cambiarlo)
@@ -65,7 +65,7 @@ Interfaz: `src/pages/Printers.tsx`; pestañas en `src/pages/Merged.tsx` (`Shared
 `printers | shares`); alias en `Sidebar.tsx` (`PAGE_ALIAS`); API en `src/lib/api/install.ts`.
 
 **Encargo A — motor (Rust, módulo nuevo `printvendor.rs`)**
-- [ ] `printer_inventory()`: por cada impresora instalada (no virtual): marca (RICOH/EPSON/otra),
+- [x] `printer_inventory()`: por cada impresora instalada (no virtual): marca (RICOH/EPSON/otra),
       modelo limpio, conexión (USB / red + IP del puerto / WSD), driver (nombre, versión, fecha,
       fabricante, inf de `Get-PrinterDriver`), tipo de driver (fabricante / genérico de Microsoft /
       de otra marca). En las de red, por SNMP: modelo (`hrDeviceDescr` 1.3.6.1.2.1.25.3.2.1.3.1),
@@ -73,34 +73,75 @@ Interfaz: `src/pages/Printers.tsx`; pestañas en `src/pages/Merged.tsx` (`Shared
       1.3.6.1.2.1.43.10.2.1.4.1.1), en paralelo y con tiempo límite corto. Además, los aparatos
       conectados **sin instalar**: PnP con VID 05CA (RICOH) o 04B8 (EPSON), o clase Printer con
       código de problema 28.
-- [ ] `scanner_inventory()`: dispositivos de imagen (clase PnP «Image» / WIA) de RICOH, EPSON y
+- [x] `scanner_inventory()`: dispositivos de imagen (clase PnP «Image» / WIA) de RICOH, EPSON y
       PFU/Fujitsu (fi y ScanSnap, ahora RICOH): driver (`Win32_PnPSignedDriver`: versión y fecha),
       tipo (WIA, TWAIN, PaperStream IP), estado (falta / funciona) y si están instalados los
       programas de escanear (Epson Scan 2, PaperStream Capture/IP, ScanSnap Home; claves Uninstall).
-- [ ] **Biblioteca**: carpeta en `Settings` (por defecto `<datos>/drivers`, viaja en el portable).
+- [x] **Biblioteca**: carpeta en `Settings` (por defecto `<datos>/drivers`, viaja en el portable).
       `driver_library()` recorre la carpeta, lee los `.inf` (`[Version] DriverVer`, `Class`,
       `Provider` y los modelos de las secciones de fabricante), solo x64, y guarda un índice json.
       `driver_library_add(path)`: copia un paquete (carpeta, `.zip`, o `.exe` autoextraíble que se
       pueda abrir como zip; si no se puede abrir, se guarda tal cual como «instalador del fabricante»).
-- [ ] `driver_candidates(device)`: lo que hay para ese modelo en la biblioteca y en Windows Update
+- [x] `driver_candidates(device)`: lo que hay para ese modelo en la biblioteca y en Windows Update
       (búsqueda WUA `IsInstalled=0 and Type='Driver'`, filtrada por ID de hardware o modelo;
       tarda: se hace bajo demanda, con caché de la última búsqueda). Estado final: al día / viejo
       (con la versión nueva y de dónde sale) / genérico / falta / de otra marca / **sin comparar**
       (nunca «al día» si no hay con qué comparar).
-- [ ] `printer_driver_update(printer, candidate)` (BLOCKED, requiere administrador): pasos con
+- [x] `printer_driver_update(printer, candidate)` (BLOCKED, requiere administrador): pasos con
       progreso: 1) copia del driver actual (`pnputil /export-driver` a `drivers_backup_dir`);
       2) instalar (`pnputil /add-driver <inf> /install` o la actualización de Windows Update);
       3) `Add-PrinterDriver` con el nombre de modelo del inf; 4) `Set-Printer -DriverName`
       conservando nombre, puerto, compartida y predeterminada; 5) página de prueba. Devuelve un id de
       deshacer. `printer_driver_undo(id)` (BLOCKED): vuelve al driver anterior (no se desinstala el
       viejo, así deshacer es inmediato). Todo con `tweaks.record`, también los fallos.
-- [ ] `open_vendor_page(brand, model)`: abre la página oficial de soporte (RICOH / EPSON) y copia
+- [x] `open_vendor_page(brand, model)`: abre la página oficial de soporte (RICOH / EPSON) y copia
       el modelo al portapapeles. `watch_downloads(minutes)`: vigila la carpeta Descargas y avisa por
       evento de los paquetes nuevos (`.exe`, `.zip`) con su versión y modelos si se pueden leer.
-- [ ] `scanner_test(device)` (solo lectura del escáner): escaneo de prueba por WIA a un archivo
+- [x] `scanner_test(device)` (solo lectura del escáner): escaneo de prueba por WIA a un archivo
       temporal; devuelve la imagen para enseñarla.
-- [ ] Pruebas de la lógica pura: lectura de `.inf` (DriverVer, modelos), comparación de versiones
+- [x] Pruebas de la lógica pura: lectura de `.inf` (DriverVer, modelos), comparación de versiones
       con 4 números, marca y modelo desde nombre/driver/ID de hardware, estado del driver.
+
+
+**Encargo A HECHO (2026-11-16, sin commit)** — `src-tauri/src/printvendor.rs` + `printvendor/{inf.rs,logic.rs}`,
+`snmp.rs` (`printer_ids`: modelo, serie y páginas en una petición), registrado en `lib.rs` y `audit.rs`.
+Comprobado: `cargo clippy --all-targets -D warnings` limpio, `cargo test --lib` 539 pasan (23 nuevas). La
+lectura (inventarios) se ejecutó en este equipo (5 impresoras, 0 escáneres); lo que cambia el equipo
+**no se ha probado con hardware** (no hay RICOH ni EPSON aquí). Revisor de Go: 8 hallazgos, verificados
+y arreglados (ruta dentro de la biblioteca con `inside_library`; impresora por nombre exacto y `$p |
+Set-Printer`, nunca `-Name`; deshacer guardado antes de cambiar y vuelta automática si falla; sin rutas
+completas hacia la interfaz, `escalate::scrub`; límite de 4 GB; elección exacta del escáner WIA;
+`tweaks.record` también sin administrador).
+
+Para el encargo B (contrato con la interfaz; todo en camelCase):
+- SAFE: `printer_inventory() -> {printers: PrinterInfo[], notInstalled: DetectedDevice[], windowsUpdateAt}`;
+  `PrinterInfo {name, vendor: ricoh|epson|otra, brand, model, connection {kind: usb|red|wsd|servidor|otra, ip, port},
+  driver {name, version, date, manufacturer, inf, kind: fabricante|generico|otraMarca|ninguno}, default, shared,
+  hardwareIds, snmp {model, serial, pages}, state {status: alDia|viejo|generico|falta|otraMarca|sinComparar, label,
+  reason, newVersion, source}, device}` (`device` se devuelve tal cual).
+  `scanner_inventory() -> {scanners: ScannerInfo[] (health funciona|falta, problem, driver, interfaces, state, device),
+  notInstalled, software [{id, name, vendor, installed, version}], windowsUpdateAt}`.
+  `driver_library(rescan?) -> {customDir (usuario tapado), isDefault, exists, scannedAt, drivers: LibDriver[],
+  installers: LibInstaller[] (con id)}`; `driver_library_add(path | "dl:…") -> AddResult`;
+  `set_driver_library_dir(dir?)`; `driver_candidates(device, searchUpdate?) -> {candidates [{id, source
+  biblioteca|windowsUpdate, title, version, date, model, matchedBy, comparable, newer, package}], state,
+  windowsUpdate {searched, fromCache, searchedAt, error, pendingTotal}}`;
+  `open_vendor_page(brand, model) -> {url, copied}`; `watch_downloads(minutes)`; `scanner_test(device) -> {dataUrl, bytes}`.
+- BLOCKED (piden administrador): `printer_driver_update(printer, candidate) -> {undoId, printer, previousDriver,
+  previousVersion, newDriver, newVersion, changed, testPageSent, rebootRequired, message}`;
+  `printer_driver_undo(id) -> string`; `printer_install(device, candidate) -> {printer, createdQueue, driver,
+  rebootRequired, message}`; `run_vendor_installer(id) -> {name, finished, exitCode, rebootRequired, message}`
+  (pide UAC si AdminOps no está elevado; espera 15 min como mucho).
+- Eventos: `printvendor:step {printer, step: backup|install|driver|assign|test|queue|run, index, total, state:
+  running|ok|skipped|error, message}`; `printvendor:download {id "dl:…", name, size, kind exe|zip, readable,
+  version, provider, vendor, models[]}`; `printvendor:watch {state started|ended|stopped, minutes}`.
+  Tareas en la barra (cancelables): `printvendor-wu`, `printvendor-update`, `printvendor-scan`.
+- Datos: biblioteca por defecto en `<datos compartidos>/printvendor/` (config.json, library-index.json);
+  caché de Windows Update en `<datos del equipo>/printvendor/wu-cache.json`; deshacer en undo.json; copias
+  del driver en `drivers_backup_dir/Impresora_<nombre>_<fecha>` (las ve «Restaurar drivers»).
+- Decisiones del oficial a confirmar con David: el driver universal de la propia marca cuenta como «del
+  fabricante», no «genérico»; universal frente a driver de modelo = «sin comparar»; Windows Update acepta la
+  licencia del driver (`AcceptEula`) al instalar.
 
 **Encargo B — interfaz**
 - [ ] Impresoras: marca (insignia RICOH / EPSON), modelo, conexión, serie y páginas; chip del estado

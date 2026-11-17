@@ -48,7 +48,7 @@ ConvertTo-Json -InputObject $r -Compress
 "#;
 
 /// Impresoras de software: PDF, XPS, OneNote y Fax (por su puerto o su driver).
-fn is_virtual(port: &str, driver: &str) -> bool {
+pub(crate) fn is_virtual(port: &str, driver: &str) -> bool {
     let port = port.to_ascii_uppercase();
     let driver = driver.to_ascii_lowercase();
     ["PORTPROMPT:", "NUL:", "SHRFAX:", "XPSPORT:"].iter().any(|p| port.starts_with(p))

@@ -60,6 +60,7 @@ mod paths;
 mod people;
 mod portals;
 mod printers;
+mod printvendor;
 mod processes;
 mod programs;
 mod security;
@@ -551,6 +552,19 @@ pub fn run() {
             printers::print_test_page,
             printers::set_default_printer,
             printers::remove_printer,
+            printvendor::printer_inventory,
+            printvendor::scanner_inventory,
+            printvendor::driver_library,
+            printvendor::driver_library_add,
+            printvendor::set_driver_library_dir,
+            printvendor::driver_candidates,
+            printvendor::printer_driver_update,
+            printvendor::printer_driver_undo,
+            printvendor::open_vendor_page,
+            printvendor::watch_downloads,
+            printvendor::scanner_test,
+            printvendor::printer_install,
+            printvendor::run_vendor_installer,
             maintenance::boot_analysis,
             maintenance::restore_storage,
             maintenance::delete_old_restore_points,
