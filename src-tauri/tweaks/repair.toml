@@ -56,8 +56,13 @@ admin = true
 [tweak.script]
 run = '''
 ipconfig.exe /renew | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'No se pudo renovar la IP (¿IP fija, sin cable o sin servidor DHCP?).' }
 ipconfig.exe /flushdns | Out-Null
+# El código de ipconfig no sirve (da error si cualquier adaptador está desconectado):
+# vale si al menos uno tiene una IP de verdad (no 169.254) y puerta de enlace.
+$ok = @(Get-NetIPConfiguration -ErrorAction SilentlyContinue | Where-Object {
+  $_.IPv4DefaultGateway -and @($_.IPv4Address | Where-Object { $_.IPAddress -notlike '169.254.*' }).Count -gt 0
+}).Count -gt 0
+if (-not $ok) { throw 'No se pudo renovar la IP: ningún adaptador tiene dirección (¿sin cable, sin Wi-Fi o sin servidor DHCP?).' }
 'IP renovada y caché de nombres vaciada.'
 '''
 

@@ -120,16 +120,11 @@ fn build(app: &tauri::AppHandle) -> tauri::Result<()> {
                 if let Some(id) = other.strip_prefix("fix:") {
                     // PowerShell puede tardar (renovar la IP, 10-30 s): fuera del hilo de la
                     // ventana, o toda la aplicación se queda en «No responde» mientras tanto.
-                    // Uno a la vez: un segundo clic mientras corre no lanza otro igual.
-                    if RUNNING_FIX.swap(true, Ordering::SeqCst) {
-                        return;
-                    }
                     let (app, id) = (app.clone(), id.to_string());
                     std::thread::spawn(move || {
                         if let Err(e) = run_fix_from_tray(&app, &id) {
                             log::warn!("{e}");
                         }
-                        RUNNING_FIX.store(false, Ordering::SeqCst);
                     });
                 } else {
                     ask_ui(app, other);
@@ -159,8 +154,26 @@ pub fn refresh(app: &tauri::AppHandle) {
     }
 }
 
-/// Ejecuta un arreglo rápido desde la bandeja y avisa con notificación de Windows.
+/// Suelta el «hay un arreglo en marcha» al salir, pase lo que pase (también si revienta).
+struct FixRunning;
+impl Drop for FixRunning {
+    fn drop(&mut self) {
+        RUNNING_FIX.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Ejecuta un arreglo rápido desde la bandeja (o la mini), uno a la vez.
 fn run_fix_from_tray(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    if RUNNING_FIX.swap(true, Ordering::SeqCst) {
+        let _ = crate::toast::show(app, "AdminOps", "Ya hay un arreglo en marcha: espera a que termine.", &[], move |_| {});
+        return Err("Ya hay un arreglo en marcha: espera a que termine.".into());
+    }
+    let _running = FixRunning;
+    run_fix_now(app, id)
+}
+
+/// El arreglo en sí, con sus avisos.
+fn run_fix_now(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     let catalog_id = match id {
         "repair.network-renew" => "repair.ip-renew",
         _ => id,

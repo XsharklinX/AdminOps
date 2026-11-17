@@ -1,5 +1,5 @@
 // Diálogo «Salir sin dejar rastro» para el modo portable.
-import { AlertCircle, HardDrive, Loader2, RotateCw, Trash2 } from "lucide-react";
+import { AlertCircle, HardDrive, Loader2, RotateCw, Trash2, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { logQuietly, workApi, type AppInfo } from "../lib/api";
 import { Button, Modal } from "./ui";
@@ -32,7 +32,8 @@ export function PortableExit({ appInfo }: { appInfo: AppInfo | null }) {
     setCleanupError(null);
     try {
       const list = await workApi.portableLeftovers();
-      if (!appInfo?.portable || list.length === 0) {
+      // Lo que solo es aviso («info») no se puede quitar: si no hay nada más, se sale sin preguntar.
+      if (!appInfo?.portable || list.every((l) => l.kind === "info")) {
         quit();
         return;
       }
@@ -139,7 +140,7 @@ export function PortableExit({ appInfo }: { appInfo: AppInfo | null }) {
         AdminOps es portable. Al cerrar puede quitar de este equipo lo que ha usado aquí; lo que arreglaste y el diario se quedan en el pendrive.
       </p>
       <div className="mb-4 space-y-2 rounded-lg border border-line bg-panel-2 p-3">
-        {leftovers.map((l, i) => (
+        {leftovers.filter((l) => l.kind !== "info").map((l, i) => (
           <div key={`${l.kind}-${i}`} className="flex items-start gap-2 text-sm text-ink">
             <HardDrive size={14} className="mt-0.5 shrink-0 text-mute" />
             <div>
@@ -149,6 +150,14 @@ export function PortableExit({ appInfo }: { appInfo: AppInfo | null }) {
           </div>
         ))}
       </div>
+      {leftovers
+        .filter((l) => l.kind === "info")
+        .map((l, i) => (
+          <p key={`info-${i}`} className="-mt-2 mb-4 flex items-start gap-2 text-xs text-mute">
+            <Info size={13} className="mt-0.5 shrink-0" />
+            <span>{l.label}</span>
+          </p>
+        ))}
       {leftovers.some((l) => l.kind === "task") && (
         <label className="flex items-start gap-2 text-sm text-ink">
           <input
