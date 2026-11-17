@@ -40,54 +40,56 @@ import {
   X,
   Users,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { Loading } from "../components/ui";
+import { lazyTab } from "../lib/lazyTab";
 import { PageTabs, TabPanels, type PageTab } from "../components/PageTabs";
 import type { PageId } from "../components/Sidebar";
 import { onSectionRequest, reportSection, usePageId } from "../lib/sectionState";
-import { Devices } from "./Devices";
-import { Accounts } from "./Accounts";
-import { Diagnostics } from "./Diagnostics";
-import { Hardware } from "./Hardware";
-import { History } from "./History";
-import { Security } from "./Security";
-import { Bloatware } from "./Bloatware";
-import { Domain } from "./Domain";
-import { Family } from "./Family";
-import { Install } from "./Install";
-import { Printers } from "./Printers";
-import { Shares } from "./Shares";
-import { Inventory } from "./Inventory";
-import { Migrate } from "./Migrate";
-import { Profiles } from "./Profiles";
-import { Recipes } from "./Recipes";
-import { Recover } from "./Recover";
-import { Report } from "./Report";
-import { Session } from "./Session";
-import { People } from "./People";
-import { Clients } from "./Clients";
-import { Disks } from "./Disks";
-import { Backups } from "./Backups";
-import { PartitionsTab } from "../components/DiskPartitions";
-import { Space } from "./Space";
-import { Shortcuts } from "./Shortcuts";
-import { Startup } from "./Startup";
-import { Tools } from "./Tools";
-import { Uninstall } from "./Uninstall";
-import { Vault } from "./Vault";
-import { Wipe } from "./Wipe";
-import { Router } from "./Router";
-import { Network } from "./Network";
-import { NetTools } from "./NetTools";
-import { Software } from "./Software";
-import { Stations } from "./Stations";
-import { Tickets } from "./Tickets";
-import { TweaksPage } from "./TweaksPage";
-import { WindowsUpdate } from "./WindowsUpdate";
-import { Users as UsersPage } from "./Users";
-import { PerfHistory } from "./PerfHistory";
-import { Boots } from "./Boots";
-import { Peripherals } from "./Peripherals";
-import { NetWatch } from "./NetWatch";
+const Devices = lazyTab(() => import("./Devices"), "Devices");
+const Accounts = lazyTab(() => import("./Accounts"), "Accounts");
+const Diagnostics = lazyTab(() => import("./Diagnostics"), "Diagnostics");
+const Hardware = lazyTab(() => import("./Hardware"), "Hardware");
+const History = lazyTab(() => import("./History"), "History");
+const Security = lazyTab(() => import("./Security"), "Security");
+const Bloatware = lazyTab(() => import("./Bloatware"), "Bloatware");
+const Domain = lazyTab(() => import("./Domain"), "Domain");
+const Family = lazyTab(() => import("./Family"), "Family");
+const Install = lazyTab(() => import("./Install"), "Install");
+const Printers = lazyTab(() => import("./Printers"), "Printers");
+const Shares = lazyTab(() => import("./Shares"), "Shares");
+const Inventory = lazyTab(() => import("./Inventory"), "Inventory");
+const Migrate = lazyTab(() => import("./Migrate"), "Migrate");
+const Profiles = lazyTab(() => import("./Profiles"), "Profiles");
+const Recipes = lazyTab(() => import("./Recipes"), "Recipes");
+const Recover = lazyTab(() => import("./Recover"), "Recover");
+const Report = lazyTab(() => import("./Report"), "Report");
+const Session = lazyTab(() => import("./Session"), "Session");
+const People = lazyTab(() => import("./People"), "People");
+const Clients = lazyTab(() => import("./Clients"), "Clients");
+const Disks = lazyTab(() => import("./Disks"), "Disks");
+const Backups = lazyTab(() => import("./Backups"), "Backups");
+const PartitionsTab = lazyTab(() => import("../components/DiskPartitions"), "PartitionsTab");
+const Space = lazyTab(() => import("./Space"), "Space");
+const Shortcuts = lazyTab(() => import("./Shortcuts"), "Shortcuts");
+const Startup = lazyTab(() => import("./Startup"), "Startup");
+const Tools = lazyTab(() => import("./Tools"), "Tools");
+const Uninstall = lazyTab(() => import("./Uninstall"), "Uninstall");
+const Vault = lazyTab(() => import("./Vault"), "Vault");
+const Wipe = lazyTab(() => import("./Wipe"), "Wipe");
+const Router = lazyTab(() => import("./Router"), "Router");
+const Network = lazyTab(() => import("./Network"), "Network");
+const NetTools = lazyTab(() => import("./NetTools"), "NetTools");
+const Software = lazyTab(() => import("./Software"), "Software");
+const Stations = lazyTab(() => import("./Stations"), "Stations");
+const Tickets = lazyTab(() => import("./Tickets"), "Tickets");
+const TweaksPage = lazyTab(() => import("./TweaksPage"), "TweaksPage");
+const WindowsUpdate = lazyTab(() => import("./WindowsUpdate"), "WindowsUpdate");
+const UsersPage = lazyTab(() => import("./Users"), "Users");
+const PerfHistory = lazyTab(() => import("./PerfHistory"), "PerfHistory");
+const Boots = lazyTab(() => import("./Boots"), "Boots");
+const Peripherals = lazyTab(() => import("./Peripherals"), "Peripherals");
+const NetWatch = lazyTab(() => import("./NetWatch"), "NetWatch");
 
 /** Pestaña elegida (o la que pide un enlace) y las ya visitadas, que se mantienen montadas. */
 function useTabs<T extends string>(
@@ -138,7 +140,7 @@ function Tabbed<T extends string>({
       <TabPanels
         value={tab}
         visited={visited}
-        render={(t) => render(t, t === tab)}
+        render={(t) => <Suspense fallback={<Loading page />}>{render(t, t === tab)}</Suspense>}
       />
     </div>
   );
@@ -407,7 +409,9 @@ export function WindowsTweaks({
       </div>
       {query.trim() ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <TweaksPage category={TWEAK_CATS} isAdmin={isAdmin} query={query} />
+          <Suspense fallback={<Loading page />}>
+            <TweaksPage category={TWEAK_CATS} isAdmin={isAdmin} query={query} />
+          </Suspense>
         </div>
       ) : (
         <Tabbed

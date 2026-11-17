@@ -2,6 +2,7 @@
 // Sysinternals, el Visor de eventos y paciencia, hecho en minutos y explicado.
 import { Activity, Bug, Flame, Gauge, HardDrive, ListTree, Loader2, Play, RotateCcw, ScrollText, ShieldAlert, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { useConfirm, useToast } from "./feedback";
 import { DataTable, type Column } from "./DataTable";
 import { FindingList } from "./FindingList";
@@ -242,11 +243,7 @@ export function StressCard() {
   const [live, setLive] = useState<StressResult | null>(null);
   const [history, setHistory] = useState<StressResult[]>([]);
   useEffect(() => void expertApi.stressHistory().then(setHistory, () => undefined), []);
-  useEffect(() => {
-    if (!running) return;
-    const t = window.setInterval(() => void expertApi.stressLive().then((r) => r && setLive(r), () => undefined), 2000);
-    return () => window.clearInterval(t);
-  }, [running]);
+  usePolling(() => expertApi.stressLive().then((r) => r && setLive(r), () => undefined), 2000, { enabled: running });
   const start = async () => {
     setRunning(true);
     setLive(null);

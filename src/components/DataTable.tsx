@@ -2,9 +2,10 @@
 // todas las pantallas. Antes cada página pintaba la suya, cada una a su manera.
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useRowWindow } from "../lib/rowWindow";
 import { SlideMark } from "./SlideMark";
 
-/** Filas que se pintan de golpe; el resto, a medida que se desplaza (listas de miles). */
+/** Filas que se pintan de golpe en una tabla con detalles desplegables; el resto, a medida que se desplaza. Sin detalles, a partir de aquí la lista es virtual: solo se pintan las filas que se ven. */
 export const FIRST_ROWS = 200;
 const MORE_ROWS = 300;
 
@@ -125,37 +126,62 @@ export function DataTable<T>({
   const deferred = useDeferredValue(rows);
   const [limit, setLimit] = useState(FIRST_ROWS);
   const sentinel = useRef<HTMLTableRowElement>(null);
+  const body = useRef<HTMLTableSectionElement>(null);
   const sorted = useMemo(() => {
     const col = sort ? columns.find((c) => c.id === sort.id) : undefined;
     return sort && col?.sortBy ? sortRows(deferred, col.sortBy, sort.desc) : deferred;
     // Las columnas se crean en cada render de la página; lo que importa es por cuál se ordena.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deferred, sort?.id, sort?.desc]);
+  // Fila con el foco del teclado: el resaltado se desliza hasta ella.
+  const wrap = useRef<HTMLDivElement>(null);
+  const [focusKey, setFocusKey] = useState<string | number | null>(null);
+
+  // Lista larga y sin detalles que se abren bajo las filas: solo se pintan las filas a la vista.
+  const virtual = !expanded && sorted.length > FIRST_ROWS;
+  const win = useRowWindow(body, sorted.length, virtual);
   // Con otras filas (otro filtro), se vuelve a empezar por las primeras.
   useEffect(() => setLimit(FIRST_ROWS), [deferred]);
   // Al llegar al final de lo pintado, se pintan más.
   useEffect(() => {
     const el = sentinel.current;
-    if (!el || sorted.length <= limit) return;
+    if (!el || virtual || sorted.length <= limit) return;
     const io = new IntersectionObserver((entries) => entries.some((x) => x.isIntersecting) && setLimit((l) => l + MORE_ROWS), { rootMargin: "600px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [sorted.length, limit]);
-  const visible = sorted.length > limit ? sorted.slice(0, limit) : sorted;
+  }, [sorted.length, limit, virtual]);
+
+  // La fila con el foco se mantiene montada aunque salga del rango visible,
+  // así J/K y el resaltado siguen funcionando al desplazar la lista.
+  const focusIndex = useMemo(() => {
+    if (!virtual || focusKey === null) return -1;
+    return sorted.findIndex((row, i) => rowKey(row, i) === focusKey);
+  }, [virtual, focusKey, sorted, rowKey]);
+
+  const visible = useMemo(() => {
+    if (!virtual) return (sorted.length > limit ? sorted.slice(0, limit) : sorted).map((row, i) => ({ row, index: i }));
+    const indices = new Set<number>();
+    for (let i = win.start; i < win.end; i++) indices.add(i);
+    if (focusIndex >= 0) indices.add(focusIndex);
+    return Array.from(indices)
+      .sort((a, b) => a - b)
+      .map((i) => ({ row: sorted[i], index: i }));
+  }, [virtual, sorted, limit, win.start, win.end, focusIndex]);
+
+  const firstIndex = virtual ? visible[0]?.index ?? 0 : 0;
+  const lastIndex = virtual ? visible[visible.length - 1]?.index ?? sorted.length - 1 : sorted.length - 1;
+  const topSpacer = virtual && firstIndex > 0 ? firstIndex * win.rowPx : 0;
+  const bottomSpacer = virtual ? Math.max(0, sorted.length - lastIndex - 1) * win.rowPx : 0;
 
   // Filas que acaban de llegar (un escaneo que encuentra otro equipo): bajan y se resaltan un instante.
   const known = useRef<Set<string | number> | null>(null);
-  const keys = visible.map((r, i) => rowKey(r, i));
+  const keys = visible.map(({ row, index: i }) => rowKey(row, i));
   const fresh = new Set<string | number>();
   if (known.current && known.current.size > 0) for (const k of keys) if (!known.current.has(k)) fresh.add(k);
-  if (fresh.size > 8) fresh.clear();
+  if (fresh.size > 8 || virtual) fresh.clear();
   useEffect(() => {
     known.current = new Set(keys);
   });
-
-  // Fila con el foco del teclado: el resaltado se desliza hasta ella.
-  const wrap = useRef<HTMLDivElement>(null);
-  const [focusKey, setFocusKey] = useState<string | number | null>(null);
 
   // Ancho de las columnas, si se pueden ensanchar.
   const [widths, setWidths] = useState(() => loadWidths(resizable));
@@ -240,8 +266,9 @@ export function DataTable<T>({
           })}
         </tr>
       </thead>
-      <tbody className={mono ? "font-mono tabular" : undefined}>
-        {visible.map((row, i) => {
+      <tbody ref={body} className={mono ? "font-mono tabular" : undefined}>
+        {virtual && topSpacer > 0 && <tr data-spacer="1" aria-hidden style={{ height: topSpacer }} />}
+        {visible.map(({ row, index: i }) => {
           const detail = expanded?.(row);
           return (
             <Fragment key={rowKey(row, i)}>
@@ -292,7 +319,8 @@ export function DataTable<T>({
             </Fragment>
           );
         })}
-        {sorted.length > limit && (
+        {virtual && bottomSpacer > 0 && <tr data-spacer="1" aria-hidden style={{ height: bottomSpacer }} />}
+        {!virtual && sorted.length > limit && (
           <tr ref={sentinel}>
             <td colSpan={columns.length} className="px-3 py-3 text-center font-sans text-xs text-mute">
               Mostrando {limit.toLocaleString("es-ES")} de {sorted.length.toLocaleString("es-ES")}…{" "}

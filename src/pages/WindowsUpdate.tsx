@@ -1,5 +1,7 @@
 import { CircleCheck, CircleX, Eye, EyeOff, Loader2, Pause, Play, RefreshCw, Search, TriangleAlert, Wrench } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { FreshNote } from "../components/FreshNote";
+import { readCached } from "../lib/cachedRead";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Loading } from "../components/ui";
@@ -26,8 +28,17 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
   const [onlyFailed, setOnlyFailed] = useState(false);
   const toast = useToast();
 
+  const [historyAt, setHistoryAt] = useState<number | null>(null);
+  const [historyBusy, setHistoryBusy] = useState(false);
+
   const load = useCallback(() => {
-    updateApi.history().then(setHistory).catch((e) => setHistoryError(String(e)));
+    setHistoryBusy(true);
+    readCached("winupdate-history", updateApi.history, (h, _fresh, when) => {
+      setHistory(h);
+      setHistoryAt(when);
+    })
+      .catch((e) => setHistoryError(String(e)))
+      .finally(() => setHistoryBusy(false));
     void updateApi.pauseState().then((s) => setPaused(s.pausedUntil));
   }, []);
 
@@ -179,6 +190,7 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
               <input type="checkbox" checked={onlyFailed} onChange={(e) => setOnlyFailed(e.target.checked)} className="accent-[var(--color-neon)]" />
               Solo con errores
             </label>
+            <FreshNote at={historyAt} refreshing={historyBusy} />
             <button onClick={load} className="text-mute hover:text-ink" title="Volver a leer">
               <RefreshCw size={12} />
             </button>

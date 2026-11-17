@@ -2,13 +2,13 @@
 // y de quién era la culpa (router o Internet). El resumen se copia tal cual para
 // el proveedor de Internet.
 import { Copy, Play, Square, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { TimeChart } from "../components/TimeChart";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, ErrorState, Explain, Loading, Tile } from "../components/ui";
 import { netwatchApi, type Outage, type WatchStatus } from "../lib/api";
 import { dateTime } from "../lib/format";
-import { usePageActive } from "../lib/pageActive";
+import { usePolling } from "../hooks/usePolling";
 
 const BLAME = {
   router: { label: "El router", hint: "No contestaba ni el router: cable, Wi-Fi, el propio router o la corriente." },
@@ -44,12 +44,11 @@ export function summaryText(s: WatchStatus, now = Date.now() / 1000): string {
 export function NetWatch() {
   const [s, setS] = useState<WatchStatus | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const active = usePageActive();
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
 
   const load = useCallback(() => {
-    netwatchApi
+    return netwatchApi
       .status()
       .then((x) => {
         setS(x);
@@ -58,12 +57,7 @@ export function NetWatch() {
       .catch((e) => setFailed(String(e)));
   }, []);
   // Mientras se mira y está en marcha, se refresca al ritmo de las comprobaciones.
-  useEffect(() => {
-    if (!active) return;
-    load();
-    const t = window.setInterval(load, 5000);
-    return () => window.clearInterval(t);
-  }, [active, load]);
+  usePolling(load, 5000, { immediate: true });
 
   const stats = useMemo(() => {
     if (!s) return null;
@@ -89,7 +83,7 @@ export function NetWatch() {
   const clear = async () => {
     if (await confirm({ title: "Borrar los cortes apuntados", body: "Se borra la lista de cortes y la gráfica. No cambia nada del equipo.", confirmLabel: "Borrar" })) {
       await netwatchApi.clear().catch((e) => toast("error", String(e)));
-      load();
+      await load();
     }
   };
   const outages = [...s.outages].sort((a, b) => b.start - a.start);

@@ -5,7 +5,8 @@
 import { Term } from "./Term";
 import { termIn } from "../lib/glossary";
 import { Activity, Bell, ChevronDown, ChevronRight, Gauge, Loader2, Play, ScanSearch, Square, TestTube } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
 import { Button, Card, Loading, Toggle } from "./ui";
@@ -288,11 +289,7 @@ function TestsTab({ d }: { d: DiskReport }) {
       .catch(() => undefined);
   }, [d.number, d.model, d.size]);
   // Mientras corre, se pregunta cada pocos segundos cuánto lleva.
-  useEffect(() => {
-    if (test?.state !== "running") return;
-    const t = window.setInterval(refresh, 5000);
-    return () => window.clearInterval(t);
-  }, [test?.state, refresh]);
+  usePolling(refresh, 5000, { enabled: test?.state === "running" });
 
   const start = async (action: "short" | "extended" | "abort") => {
     setBusy(action);
@@ -405,19 +402,18 @@ function SurfaceTab({ d }: { d: DiskReport }) {
       .then(setLast)
       .catch(() => undefined);
   }, [d.number, d.model, d.size]);
-  const timer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!busy) return;
-    const tick = () =>
+  usePolling(
+    () =>
       disksApi
         .scanLive(d.number)
         .then((l) => l && setLive(l))
-        .catch(() => undefined);
-    timer.current = window.setInterval(tick, 1000);
-    return () => {
-      if (timer.current) window.clearInterval(timer.current);
-      setLive(null);
-    };
+        .catch(() => undefined),
+    1000,
+    { enabled: !!busy },
+  );
+  useEffect(() => {
+    if (!busy) return;
+    return () => setLive(null);
   }, [busy, d.number]);
 
   const run = async (mode: "quick" | "full", resume: boolean) => {

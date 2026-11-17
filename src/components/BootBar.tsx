@@ -1,6 +1,7 @@
 // Barrita fina arriba mientras termina de cargarse lo de fondo. Si algo tarda
 // de verdad, se dice qué es, en lugar de dejar al técnico mirando una pantalla quieta.
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { bootPending, onBootChange, slowOnes } from "../lib/boot";
 
 let snapshot = bootPending();
@@ -13,11 +14,7 @@ const subscribe = (cb: () => void) =>
 export function BootBar() {
   const list = useSyncExternalStore(subscribe, () => snapshot);
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!list.length) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [list.length]);
+  usePolling(() => setNow(Date.now()), 1000, { enabled: list.length > 0 });
   if (!list.length) return null;
   const slow = slowOnes(list, now);
   return (

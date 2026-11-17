@@ -1,4 +1,4 @@
-import { prefetchPage } from "../lib/prefetch";
+import { cancelPrefetch, prefetchPage } from "../lib/prefetch";
 import { SlideMark } from "./SlideMark";
 import { useNarrow } from "../lib/useNarrow";
 import { useFlip, useReorder } from "../lib/reorder";
@@ -576,7 +576,7 @@ export function Sidebar({
     const on = sb.favorites.includes(k);
     const target = parseNavKey(k).page;
     return (
-      <div key={k} {...opts.drag} className={`group/line relative ${opts.drag && pinReorder.dragging === k ? "opacity-40" : ""} ${opts.drag && pinReorder.over === k ? "border-t border-neon" : ""}`} onMouseEnter={() => isPageId(target) && prefetchPage(target)}>
+      <div key={k} {...opts.drag} className={`group/line relative ${opts.drag && pinReorder.dragging === k ? "opacity-40" : ""} ${opts.drag && pinReorder.over === k ? "border-t border-neon" : ""}`} onMouseEnter={() => isPageId(target) && prefetchPage(target)} onMouseLeave={cancelPrefetch}>
         <button
           onClick={opts.onClick}
           aria-current={opts.current ? "page" : undefined}

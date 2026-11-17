@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import { useToast } from "./feedback";
 import { Button, Card, inputClass } from "./ui";
 import { logQuietly, contactsApi, lanApi, officeMapApi, type Contact, type DeviceMeta, type LanDevice } from "../lib/api";
+import { usePolling } from "../hooks/usePolling";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
 export const macKey = (mac: string) => mac.trim().toLowerCase().replace(/-/g, ":");
@@ -43,10 +44,9 @@ export function useOfficeMap() {
       .list()
       .then((l) => vigente() && setContacts(l.filter((c) => !c.deleted)))
       .catch(logQuietly("OfficeMap"));
-    // Estado de la vigilancia: se refresca cada minuto mientras la página está abierta.
-    const t = window.setInterval(() => reload(), 60_000);
-    return () => window.clearInterval(t);
   }, [reload, setKey]);
+  // Estado de la vigilancia: se refresca cada minuto mientras la página se ve.
+  usePolling(() => reload(), 60_000);
 
   return { key, setKey, meta, watch, contacts, reload };
 }

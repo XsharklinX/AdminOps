@@ -275,10 +275,15 @@ pub fn run() {
             uxio::watch_drops(app.handle());
             backupio::start(app.handle().clone());
             alertrulesio::start(app.handle().clone());
-            // Historial de rendimiento de 7 días: una muestra por minuto mientras AdminOps está abierta.
-            perfhistory::start(app.handle().clone());
-            // Lo apuntado para la noche (superficie de un disco, reparar Windows…).
-            nightjobs::start(app.handle().clone());
+            // Sin prisa y en orden, cuando la primera pantalla ya está pintada (o a los 20 s):
+            // el historial de rendimiento de 7 días (una muestra por minuto mientras AdminOps está abierta)
+            // y lo apuntado para la noche (superficie de un disco, reparar Windows…).
+            let late = app.handle().clone();
+            std::thread::spawn(move || {
+                window_state::wait_until_ready(std::time::Duration::from_secs(20));
+                perfhistory::start(late.clone());
+                nightjobs::start(late);
+            });
             appbackup::start(app.handle().clone());
             // Nota de llamada con Ctrl+Alt+N, aunque AdminOps esté minimizado.
             quicknote::start(app.handle().clone());

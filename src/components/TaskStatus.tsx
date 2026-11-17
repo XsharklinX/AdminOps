@@ -1,18 +1,19 @@
 import { Loader2, Square } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { useTaskMessage } from "../hooks/useTask";
 import { appApi } from "../lib/api";
 
 /** Segundos transcurridos mientras `active` es true. */
 export function useElapsed(active: boolean) {
   const [secs, setSecs] = useState(0);
+  const start = useRef(Date.now());
   useEffect(() => {
     if (!active) return;
     setSecs(0);
-    const start = Date.now();
-    const t = window.setInterval(() => setSecs(Math.floor((Date.now() - start) / 1000)), 1000);
-    return () => window.clearInterval(t);
+    start.current = Date.now();
   }, [active]);
+  usePolling(() => setSecs(Math.floor((Date.now() - start.current) / 1000)), 1000, { enabled: active });
   return secs;
 }
 

@@ -4,6 +4,8 @@ import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { logQuietly, toolsApi, type SoftwareUpdate } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
+import { FreshNote } from "../components/FreshNote";
+import { readCached, remember } from "../lib/cachedRead";
 import { softBtn } from "../components/ui";
 import { VulnerableCard } from "../components/bigbets";
 
@@ -22,11 +24,23 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
 
   // `refresh`: preguntar a winget aunque haya una lista de hace pocos minutos.
-  const load = useCallback(async (refresh = false) => {
+  const [at, setAt] = useState<number | null>(null);
+  // `fromMemory`: al abrir, la lista de la última vez al momento (no tras actualizar programas).
+  const load = useCallback(async (refresh = false, fromMemory = false) => {
     setLoading(true);
     setError(null);
     try {
-      setUpdates(await toolsApi.softwareUpdates(refresh));
+      if (fromMemory)
+        await readCached("software-updates", () => toolsApi.softwareUpdates(refresh), (u, _fresh, when) => {
+          setUpdates(u);
+          setAt(when);
+        });
+      else {
+        const u = await toolsApi.softwareUpdates(refresh);
+        remember("software-updates", u);
+        setUpdates(u);
+        setAt(Date.now());
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -36,7 +50,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
 
   useLiveEffect(
     (vigente) => {
-      void load();
+      void load(false, true);
       toolsApi.ignoredUpdates().then((i) => vigente() && setIgnored(i)).catch(logQuietly("Software"));
     },
     [load],
@@ -123,6 +137,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
         >
           Seleccionar todo
         </button>
+        <FreshNote at={at} refreshing={loading && updates !== null} />
         <button onClick={() => load(true)} disabled={loading || running} className="rounded-md p-1.5 text-dim hover:bg-panel-2 hover:text-ink" title="Volver a buscar en winget">
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>

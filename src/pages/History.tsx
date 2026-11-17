@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useGrowOnScroll } from "../lib/growOnScroll";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Card, EmptyLine, ErrorState, Loading } from "../components/ui";
@@ -63,6 +64,7 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
 
   const shown = useMemo(() => (entries ?? []).filter((e) => matchesJournal(e, filter, query)), [entries, filter, query]);
   const days = useMemo(() => groupByDay(shown.slice(0, limit)), [shown, limit]);
+  const more = useGrowOnScroll(shown.length, limit, () => setLimit((l) => l + PAGE));
   const undoable = useMemo(() => (entries ?? []).filter((e) => matchesJournal(e, "undoable", "")).length, [entries]);
   const loadPoints = useCallback(async () => {
     if (!isAdmin) return;
@@ -301,9 +303,9 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
                   </section>
                 ))}
                 {shown.length > limit && (
-                  <button onClick={() => setLimit(limit + PAGE)} className="text-xs text-neon hover:underline">
-                    Ver más antiguos ({shown.length - limit})
-                  </button>
+                  <div ref={more} className="py-2 text-center text-xs text-mute">
+                    Cargando más antiguos… ({shown.length - limit})
+                  </div>
                 )}
               </div>
             )}

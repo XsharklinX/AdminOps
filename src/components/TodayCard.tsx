@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { logQuietly, agendaApi, alertsApi, casesApi, followupsApi, tomorrowMorning, type Case, type Followup, type Visit, type WindowsAlert } from "../lib/api";
 import { CASE_CHANGED_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
+import { usePolling } from "../hooks/usePolling";
 import { usePageActive } from "../lib/pageActive";
 import { usePrefs } from "../lib/prefs";
 import { useAnimatedList } from "../lib/useAnimatedList";
@@ -74,16 +75,14 @@ export function TodayCard() {
   }, []);
 
   // Al entrar, al volver a la ventana, cuando otra parte (o la nota) cambia algo, y cada minuto.
+  usePolling(load, 60_000, { immediate: true, enabled: prefs.mode !== "user" });
   useEffect(() => {
     if (!active || prefs.mode === "user") return;
-    load();
-    const t = window.setInterval(load, 60_000);
     window.addEventListener("focus", load);
     window.addEventListener(CASE_CHANGED_EVENT, load);
     const offA = listen("followups-changed", load);
     const offB = listen("case-changed", load);
     return () => {
-      window.clearInterval(t);
       window.removeEventListener("focus", load);
       window.removeEventListener(CASE_CHANGED_EVENT, load);
       void offA.then((f) => f());

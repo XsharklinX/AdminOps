@@ -4,6 +4,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { createPortal } from "react-dom";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
@@ -67,10 +68,7 @@ export function WorkshopScreen({ onClose, host }: { onClose: () => void; host: s
   const { sensors } = useSensors(3000);
   const jobs = useJobs();
   const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
+  usePolling(() => setNow(new Date()), 1000);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "F11") {

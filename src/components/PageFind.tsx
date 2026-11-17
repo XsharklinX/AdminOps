@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { findRanges, step } from "../lib/pageFind";
 
 const ALL = "adminops-find";
@@ -58,11 +59,7 @@ export function PageFind({ page, onClose }: { page: string; onClose: () => void 
     return () => window.clearTimeout(t);
   }, [query, page, search]);
 
-  useEffect(() => {
-    if (!query.trim()) return;
-    const t = window.setInterval(() => search(false), 2000);
-    return () => window.clearInterval(t);
-  }, [query, search]);
+  usePolling(() => search(false), 2000, { enabled: !!query.trim() });
 
   useEffect(() => {
     input.current?.focus();
