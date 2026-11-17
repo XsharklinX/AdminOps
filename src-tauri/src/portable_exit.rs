@@ -100,6 +100,18 @@ pub fn leftovers(_app: &tauri::AppHandle) -> Vec<Leftover> {
         return Vec::new();
     }
     let mut out = Vec::new();
+    // Los datos del navegador interno no se pueden borrar con AdminOps abierto (están en
+    // uso). Si no están en el pendrive, se avisa de que se quedan en este equipo.
+    if let Some(path) = WEBVIEW_DIR.lock().ok().and_then(|d| d.clone()).filter(|p| p.exists()) {
+        let on_usb = crate::paths::portable_data_root().is_some_and(|root| path.starts_with(root));
+        if !on_usb {
+            out.push(Leftover {
+                kind: "info".into(),
+                label: "Datos del navegador interno (sesiones de portales): están en uso y se quedan en este equipo".into(),
+                detail: Some(crate::escalate::scrub(&path.display().to_string())),
+            });
+        }
+    }
     if let Some(path) = tracked_lhm_dir().filter(|p| p.exists()) {
         out.push(Leftover {
             kind: "folder".into(),

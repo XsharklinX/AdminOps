@@ -48,7 +48,7 @@ interface PendingUndo {
   timer: number;
 }
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ children, listenUndo = true }: { children: ReactNode; listenUndo?: boolean }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [undoing, setUndoing] = useState<number | null>(null);
   const pending = useRef<PendingUndo | null>(null);
@@ -115,6 +115,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    // La mini no los enseña: el «Deshacer» de un cambio de la ventana principal vive allí.
+    if (!listenUndo) return;
     const off = listen<{ id: number; title: string }>("undoable-change", ({ payload }) => {
       const p = pending.current;
       if (p) window.clearTimeout(p.timer);
@@ -129,7 +131,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => {
       void off.then((f) => f());
     };
-  }, [add]);
+  }, [add, listenUndo]);
 
   const undo = async (t: Toast) => {
     if (!t.undo) return;

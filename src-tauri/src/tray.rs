@@ -15,6 +15,8 @@ const ID: &str = "adminops";
 static VISIBLE: AtomicBool = AtomicBool::new(false);
 /// Ya se avisó en esta sesión de dónde está AdminOps al esconderla.
 static TOLD: AtomicBool = AtomicBool::new(false);
+/// Hay un arreglo de la bandeja en marcha.
+static RUNNING_FIX: AtomicBool = AtomicBool::new(false);
 
 /// Arreglos rápidos disponibles en la bandeja. El id es el del catálogo,
 /// salvo «repair.network-renew», que aquí significa «repair.ip-renew»: solo
@@ -79,7 +81,9 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>, fixes: &[String]) ->
     for f in &fix_items {
         refs.push(f);
     }
-    refs.push(&sep3);
+    if !fix_items.is_empty() {
+        refs.push(&sep3);
+    }
     refs.push(&quit);
     Menu::with_items(app, &refs)
 }
@@ -116,11 +120,16 @@ fn build(app: &tauri::AppHandle) -> tauri::Result<()> {
                 if let Some(id) = other.strip_prefix("fix:") {
                     // PowerShell puede tardar (renovar la IP, 10-30 s): fuera del hilo de la
                     // ventana, o toda la aplicación se queda en «No responde» mientras tanto.
+                    // Uno a la vez: un segundo clic mientras corre no lanza otro igual.
+                    if RUNNING_FIX.swap(true, Ordering::SeqCst) {
+                        return;
+                    }
                     let (app, id) = (app.clone(), id.to_string());
                     std::thread::spawn(move || {
                         if let Err(e) = run_fix_from_tray(&app, &id) {
                             log::warn!("{e}");
                         }
+                        RUNNING_FIX.store(false, Ordering::SeqCst);
                     });
                 } else {
                     ask_ui(app, other);

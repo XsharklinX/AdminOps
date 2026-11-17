@@ -47,7 +47,7 @@ window.addEventListener("unhandledrejection", (e) => appApi.logError(`Promesa si
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ErrorBoundary>{isMini ? <ToastProvider><AdminOpsMini /></ToastProvider> : isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
+    <ErrorBoundary>{isMini ? <ToastProvider listenUndo={false}><AdminOpsMini /></ToastProvider> : isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
   </React.StrictMode>,
 );
 

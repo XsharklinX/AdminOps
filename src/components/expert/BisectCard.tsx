@@ -29,7 +29,7 @@ export function BisectCard({ entries, onChanged }: { entries: JournalEntry[] | n
   const [phase, setPhase] = useState<Phase>("idle");
   const [failed, setFailed] = useState<string | null>(null);
   // A medias hay cambios deshechos que solo esta tarjeta sabe volver a aplicar.
-  useKeepAlive("machine", state !== null || undone.length > 0);
+  useKeepAlive("machine", state !== null || phase === "moving");
   const [found, setFound] = useState<number | null>(null);
 
   const list = useMemo(() => candidates(entries ?? [], range === "today" ? startOfToday() : Date.now() / 1000 - 7 * 86400), [entries, range]);

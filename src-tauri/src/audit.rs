@@ -123,7 +123,6 @@ const BLOCKED: &[&str] = &[
     "run_share_backup",
     // Arreglos rápidos desde la bandeja (cambian el equipo).
     "tray_run_fix",
-    // Salir sin dejar rastro en modo portable.
     // Impresoras
     "clear_printer_queue",
     "set_default_printer",
