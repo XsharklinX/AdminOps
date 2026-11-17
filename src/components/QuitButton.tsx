@@ -8,7 +8,7 @@ import { useConfirm, useToast } from "./feedback";
  * «Salir», en la barra de arriba. Solo aparece con el ajuste «Al cerrar la
  * ventana, minimizar»: entonces la X ya no cierra y hace falta otra salida.
  */
-export function QuitButton() {
+export function QuitButton({ portable }: { portable?: boolean }) {
   const [show, setShow] = useState(false);
   const { confirm, dialog } = useConfirm();
 
@@ -45,6 +45,10 @@ export function QuitButton() {
     <>
       <button
         onClick={async () => {
+          if (portable) {
+            window.dispatchEvent(new Event("adminops:portable-exit"));
+            return;
+          }
           const ok = await confirm({
             title: "¿Salir de AdminOps?",
             body: <p>Se cierra del todo. Lo que esté a medias (un análisis, una copia) se detiene.</p>,

@@ -9,6 +9,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
 import { AlertCenter } from "./components/AlertCenter";
 import { QuitButton } from "./components/QuitButton";
+import { PortableExit } from "./components/PortableExit";
 import { MoreMenu } from "./components/MoreMenu";
 import { OpenTabs } from "./components/OpenTabs";
 import { PageFind } from "./components/PageFind";
@@ -271,6 +272,7 @@ export default function App() {
     const tray = listen<string>("tray-action", ({ payload }) => {
       if (payload === "alerts") setAlertSignal((n) => n + 1);
       if (payload === "quick-scan") window.dispatchEvent(new Event(TRAY_QUICK_SCAN));
+      if (payload === "portable-exit") window.dispatchEvent(new Event("adminops:portable-exit"));
     });
     const onFocus = () => {
       if (notifiedAt && Date.now() - notifiedAt < 2 * 60_000) {
@@ -740,7 +742,7 @@ export default function App() {
             <UndoLast />
             <TasksIndicator onNavigate={goTo} />
             <MoreMenu onWorkshop={() => setWorkshop(true)} />
-            <QuitButton />
+            <QuitButton portable={appInfo?.portable ?? false} />
             <AlertCenter onNavigate={(p, s) => goTo(p, s ?? null)} onOpenChange={setAlertsOpen} openSignal={alertSignal} />
           </>
         }
@@ -853,6 +855,7 @@ export default function App() {
       <BootBar />
       <Tour version={appInfo?.version ?? ""} />
       <CelebrateLayer />
+      <PortableExit appInfo={appInfo} />
       <ContextMenu />
       <DropLayer onNavigate={goTo} />
       {/* Teams y el Correo: como se haya elegido, o pregunta la primera vez. */}

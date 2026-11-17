@@ -116,6 +116,10 @@ const BLOCKED: &[&str] = &[
     "set_share_backup",
     "remove_share_backup",
     "run_share_backup",
+    // Arreglos rápidos desde la bandeja (cambian el equipo).
+    "tray_run_fix",
+    // Salir sin dejar rastro en modo portable.
+    "portable_cleanup",
     // Impresoras
     "clear_printer_queue",
     "set_default_printer",
@@ -225,6 +229,9 @@ const SAFE: &[&str] = &[
     // followups y nota de llamada (datos y ventanas del propio técnico)
     "list_followups", "add_followup", "set_followup_done", "snooze_followup", "delete_followup",
     "open_quick_note", "close_quick_note", "open_screen_clip", "redact_clipboard_image",
+    "open_adminops_mini", "close_adminops_mini",
+    // bandeja: lista de arreglos (lectura) y lo que queda en modo portable (lectura)
+    "tray_fixes_available", "portable_leftovers",
     // cases
     "case_current", "case_open", "case_update", "case_actions", "case_draft", "case_close", "case_discard", "cases_for_person",
     // people

@@ -89,6 +89,7 @@ fn local_copy(from: &std::path::Path) -> Option<PathBuf> {
             }
         }
     }
+    crate::portable_exit::set_lhm_dir(dst.clone());
     Some(dst)
 }
 

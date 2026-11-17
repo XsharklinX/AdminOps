@@ -1,6 +1,6 @@
-import { Monitor, MoreHorizontal } from "lucide-react";
+import { Monitor, MoreHorizontal, PictureInPicture } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { auditApi, logQuietly } from "../lib/api";
+import { auditApi, logQuietly, workApi } from "../lib/api";
 import { usePrivacy } from "../lib/privacy";
 import { AuditToggle } from "./AuditMode";
 import { PrivacyToggle } from "./PrivacyMode";
@@ -66,6 +66,19 @@ export function MoreMenu({ onWorkshop }: { onWorkshop: () => void }) {
           <Monitor size={14} />
           <span className="flex-1">Pantalla de taller</span>
           <kbd className="font-mono text-[10.5px] text-mute">F11</kbd>
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="menu-row"
+          onClick={() => {
+            setOpen(false);
+            void workApi.miniAdminOps().catch(logQuietly("MoreMenu"));
+          }}
+        >
+          <PictureInPicture size={14} />
+          <span className="flex-1">AdminOps en miniatura</span>
+          <kbd className="font-mono text-[10.5px] text-mute">Ctrl+Alt+A</kbd>
         </button>
       </div>
     </div>

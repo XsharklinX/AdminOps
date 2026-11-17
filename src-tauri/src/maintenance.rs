@@ -307,7 +307,10 @@ pub fn set_maintenance_schedule(app: tauri::AppHandle, schedule: Option<Schedule
                 day = s.day,
                 time = s.time,
             );
-            crate::ps::powershell(&script).map(|_| ()).and_then(|_| crate::paths::write_json(&schedule_path(&app), s))
+            crate::ps::powershell(&script).map(|_| ()).and_then(|_| {
+                crate::portable_exit::mark_maintenance_task_created();
+                crate::paths::write_json(&schedule_path(&app), s)
+            })
         }
     };
     let title = match &schedule {
