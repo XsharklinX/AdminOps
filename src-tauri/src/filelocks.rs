@@ -254,7 +254,7 @@ fn network_holders(path: &str) -> (Vec<NetHolder>, String) {
         "{}{}",
         crate::ps::text_var("p", path.trim_end_matches('\\')),
         r#"
-$rows = @(Get-SmbOpenFile -ErrorAction SilentlyContinue | Where-Object { $_.Path -and ($_.Path -ieq $p -or $_.Path.StartsWith($p + '\', 'OrdinalIgnoreCase')) } | Select-Object -First 40 | ForEach-Object {
+$rows = @(Get-SmbOpenFile -ErrorAction Stop | Where-Object { $_.Path -and ($_.Path -ieq $p -or $_.Path.StartsWith($p + '\', 'OrdinalIgnoreCase')) } | Select-Object -First 40 | ForEach-Object {
   [pscustomobject]@{ fileId = "$($_.FileId)"; user = "$($_.ClientUserName)"; client = "$($_.ClientComputerName)"; path = "$($_.Path)" }
 })
 ConvertTo-Json -InputObject $rows -Compress

@@ -12,6 +12,10 @@
 
 use serde::Serialize;
 
+/// Como mucho 40 megapíxeles para leer una imagen (unos 160 MB en memoria al convertirla).
+#[cfg(windows)]
+const MAX_OCR_PIXELS: u64 = 40_000_000;
+
 /// Una imagen en memoria: BGRA, de arriba abajo, 4 bytes por píxel.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Image {
@@ -320,9 +324,15 @@ fn decode_image(bytes: &[u8]) -> Result<Image, String> {
     writer.DetachStream().map_err(fail)?;
     stream.Seek(0).map_err(fail)?;
     let decoder = BitmapDecoder::CreateAsync(&stream).map_err(fail)?.get().map_err(|_| "Ese archivo no es una imagen que Windows sepa abrir (prueba con PNG o JPG).".to_string())?;
+    // Un JPG de pocos MB puede abrirse a decenas de miles de píxeles de lado: se mira el tamaño
+    // antes de convertirlo, para no agotar la memoria (y para que `size` quepa en u32).
+    let (dw, dh) = (decoder.PixelWidth().map_err(fail)? as u64, decoder.PixelHeight().map_err(fail)? as u64);
+    if dw == 0 || dh == 0 || dw * dh > MAX_OCR_PIXELS {
+        return Err("La imagen es demasiado grande para leerla (más de 40 megapíxeles). Haz un recorte del mensaje y pégalo.".into());
+    }
     let bitmap = decoder.GetSoftwareBitmapConvertedAsync(BitmapPixelFormat::Bgra8, BitmapAlphaMode::Ignore).map_err(fail)?.get().map_err(fail)?;
     let (w, h) = (bitmap.PixelWidth().map_err(fail)? as usize, bitmap.PixelHeight().map_err(fail)? as usize);
-    let size = w * h * 4;
+    let size = w.checked_mul(h).and_then(|p| p.checked_mul(4)).filter(|s| *s as u64 <= MAX_OCR_PIXELS * 4).ok_or("La imagen es demasiado grande para leerla.")?;
     let buffer = Buffer::Create(size as u32).map_err(fail)?;
     buffer.SetLength(size as u32).map_err(fail)?;
     bitmap.CopyToBuffer(&buffer).map_err(fail)?;

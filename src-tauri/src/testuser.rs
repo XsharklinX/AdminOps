@@ -29,6 +29,9 @@ pub struct TestUser {
     pub expires: u64,
     pub has_profile: bool,
     pub signed_in: bool,
+    /// SID de la cuenta: solo para comprobar que es la que creó AdminOps; no viaja a la interfaz.
+    #[serde(skip)]
+    pub sid: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -93,7 +96,7 @@ fn current() -> Result<Option<TestUser>, String> {
 $u = Get-LocalUser | Where-Object { $_.Description -like ($m + '*') } | Select-Object -First 1
 if (-not $u) { 'null'; return }
 $p = Get-CimInstance Win32_UserProfile | Where-Object { $_.SID -eq $u.SID.Value } | Select-Object -First 1
-[pscustomobject]@{ name = $u.Name; description = $u.Description; hasProfile = [bool]$p; signedIn = [bool]($p -and $p.Loaded) } | ConvertTo-Json -Compress
+[pscustomobject]@{ name = $u.Name; description = $u.Description; sid = $u.SID.Value; hasProfile = [bool]$p; signedIn = [bool]($p -and $p.Loaded) } | ConvertTo-Json -Compress
 "#
     );
     let out = crate::ps::powershell(&script)?;
@@ -106,12 +109,14 @@ $p = Get-CimInstance Win32_UserProfile | Where-Object { $_.SID -eq $u.SID.Value 
     struct Raw {
         name: String,
         description: String,
+        #[serde(default)]
+        sid: String,
         has_profile: bool,
         signed_in: bool,
     }
     let r: Raw = serde_json::from_str(t).map_err(|e| format!("Respuesta inesperada de Windows: {e}"))?;
     let expires = parse_description(&r.description).unwrap_or(0);
-    Ok(Some(TestUser { name: r.name, expires, has_profile: r.has_profile, signed_in: r.signed_in }))
+    Ok(Some(TestUser { name: r.name, expires, has_profile: r.has_profile, signed_in: r.signed_in, sid: r.sid }))
 }
 
 /// El usuario de prueba de ahora, si hay uno. Solo mira.
@@ -122,7 +127,7 @@ pub fn test_user_status() -> Result<Option<TestUser>, String> {
 
 /// Crea el usuario de prueba y la tarea que lo borra en 24 h.
 #[tauri::command(async)]
-pub fn create_test_user(tweaks: State<'_, TweakState>) -> Result<CreatedTestUser, String> {
+pub fn create_test_user(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Result<CreatedTestUser, String> {
     need_admin()?;
     if let Some(t) = current()? {
         return Err(format!("Ya hay un usuario de prueba («{}»): bórralo antes de crear otro.", t.name));
@@ -148,35 +153,40 @@ $u = New-LocalUser -Name $n -Password $pw -FullName 'Usuario de prueba' -Descrip
 try {
   Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $u
   $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "' + $cmd + '"')
-  $trigger = New-ScheduledTaskTrigger -Once -At $when
+  # Cada hora hasta que pueda borrarla (si la sesión sigue abierta, la orden sale sin quitar la tarea).
+  $trigger = New-ScheduledTaskTrigger -Once -At $when -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Days 30)
   $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 6 -RestartInterval (New-TimeSpan -Hours 1) -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1)
   Register-ScheduledTask -TaskPath '\AdminOps\' -TaskName 'Borrar usuario de prueba' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Borra el usuario de prueba de AdminOps' -Force | Out-Null
 } catch {
   # Sin la tarea que lo borra no se deja la cuenta: se deshace la creación.
   Remove-LocalUser -SID $u.SID -ErrorAction SilentlyContinue
   throw
 }
-'ok'
+$u.SID.Value
 "#
     );
     // Directo al pool con una descripción propia: el registro nunca ve el script (lleva la contraseña).
-    let result = crate::pspool::query(&script, Some(std::time::Duration::from_secs(90)), "usuario de prueba: crear").map(|_| ()).map_err(|e| friendly(&e));
+    let result = crate::pspool::query(&script, Some(std::time::Duration::from_secs(90)), "usuario de prueba: crear").map_err(|e| friendly(&e));
+    if let Ok(sid) = &result {
+        save_sid(&app, sid.trim());
+    }
+    let result = result.map(|_| ());
     tweaks.record(Op::Run, &format!("Usuario de prueba «{name}» creado (se borra solo en 24 h)"), &result);
     result.map(|_| CreatedTestUser { name, password, expires })
 }
 
 /// Borra el usuario de prueba con su carpeta de perfil y quita la tarea.
 #[tauri::command(async)]
-pub fn delete_test_user(tweaks: State<'_, TweakState>) -> Result<(), String> {
+pub fn delete_test_user(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Result<(), String> {
     need_admin()?;
     let Some(user) = current()? else {
         // Sin cuenta, solo puede quedar la tarea: se quita.
         let _ = crate::ps::powershell(&format!("Unregister-ScheduledTask -TaskPath '{TASK_PATH}' -TaskName '{TASK_NAME}' -Confirm:$false -ErrorAction SilentlyContinue\n'ok'"));
         return Ok(());
     };
-    if !valid_name(&user.name) {
-        return Err("Esa cuenta no la creó AdminOps: bórrala desde Usuarios.".into());
+    if !valid_name(&user.name) || !same_sid(saved_sid(&app).as_deref(), &user.sid) {
+        return Err("Esa cuenta no la creó AdminOps desde este equipo: bórrala desde Usuarios.".into());
     }
     if user.signed_in {
         return Err(format!("«{}» tiene la sesión abierta: ciérrala (o reinicia) y vuelve a pulsar.", user.name));
@@ -185,6 +195,26 @@ pub fn delete_test_user(tweaks: State<'_, TweakState>) -> Result<(), String> {
     let result = crate::ps::powershell(&script).map(|_| ()).map_err(|e| friendly(&e));
     tweaks.record(Op::Run, &format!("Usuario de prueba «{}» borrado con su perfil", user.name), &result);
     result
+}
+
+fn sid_file(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::machine_data_dir(app).join("usuario-de-prueba.json")
+}
+
+fn save_sid(app: &tauri::AppHandle, sid: &str) {
+    if sid.starts_with("S-1-") {
+        let _ = crate::paths::write_json(&sid_file(app), &serde_json::json!({ "sid": sid }));
+    }
+}
+
+fn saved_sid(app: &tauri::AppHandle) -> Option<String> {
+    let v: serde_json::Value = crate::paths::read_json(&sid_file(app));
+    v.get("sid").and_then(|s| s.as_str()).map(str::to_string)
+}
+
+/// ¿Es la cuenta que creó AdminOps? Sin SID guardado o distinto, no se toca.
+pub fn same_sid(saved: Option<&str>, current: &str) -> bool {
+    matches!(saved, Some(s) if !s.is_empty() && s.eq_ignore_ascii_case(current.trim()))
 }
 
 fn friendly(e: &str) -> String {
@@ -201,6 +231,14 @@ fn friendly(e: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn solo_borra_la_cuenta_con_el_sid_guardado() {
+        assert!(same_sid(Some("S-1-5-21-1-2-3-1005"), "S-1-5-21-1-2-3-1005"));
+        assert!(!same_sid(Some("S-1-5-21-1-2-3-1005"), "S-1-5-21-1-2-3-1006"));
+        assert!(!same_sid(None, "S-1-5-21-1-2-3-1005"));
+        assert!(!same_sid(Some(""), ""));
+    }
 
     #[test]
     fn elige_un_nombre_libre() {

@@ -159,7 +159,10 @@ pub fn paths_in(args: &[String]) -> Vec<String> {
         let mut i = 0;
         while i < b.len() {
             let drive = i + 2 < b.len() && b[i].is_ascii_alphabetic() && b[i + 1] == b':' && b[i + 2] == b'\\' && (i == 0 || !b[i - 1].is_ascii_alphanumeric());
-            let unc = a[i..].starts_with("\\\\") && (i == 0 || !b[i - 1].is_ascii_alphanumeric());
+            // Solo bytes: `a[i..]` en mitad de una letra con tilde haría saltar el programa.
+            // Las comprobaciones son de bytes ASCII, que nunca caen dentro de un carácter UTF-8,
+            // así que cuando son ciertas, `i` es siempre un límite de carácter válido.
+            let unc = b[i] == b'\\' && b.get(i + 1) == Some(&b'\\') && (i == 0 || !b[i - 1].is_ascii_alphanumeric());
             if drive || unc {
                 out.push(a[i..].trim_matches('"').to_string());
                 break;
