@@ -298,6 +298,90 @@ pub fn redact_clipboard() -> Redacted {
     }
 }
 
+// ---------- Leer el texto de una imagen (Lector de errores) ----------
+
+/// La imagen que hay ahora en el portapapeles, si la hay.
+#[cfg(windows)]
+pub fn clipboard_image() -> Option<Image> {
+    read_clipboard_dib().and_then(|d| dib_to_image(&d))
+}
+
+/// Abre un PNG, JPG, BMP o GIF con el decodificador de Windows (WIC).
+#[cfg(windows)]
+fn decode_image(bytes: &[u8]) -> Result<Image, String> {
+    use windows::Graphics::Imaging::{BitmapAlphaMode, BitmapDecoder, BitmapPixelFormat};
+    use windows::Storage::Streams::{Buffer, DataReader, DataWriter, InMemoryRandomAccessStream};
+    let fail = |e: windows::core::Error| format!("No se pudo abrir la imagen: {}", e.message());
+    let stream = InMemoryRandomAccessStream::new().map_err(fail)?;
+    let writer = DataWriter::CreateDataWriter(&stream).map_err(fail)?;
+    writer.WriteBytes(bytes).map_err(fail)?;
+    writer.StoreAsync().map_err(fail)?.get().map_err(fail)?;
+    writer.FlushAsync().map_err(fail)?.get().map_err(fail)?;
+    writer.DetachStream().map_err(fail)?;
+    stream.Seek(0).map_err(fail)?;
+    let decoder = BitmapDecoder::CreateAsync(&stream).map_err(fail)?.get().map_err(|_| "Ese archivo no es una imagen que Windows sepa abrir (prueba con PNG o JPG).".to_string())?;
+    let bitmap = decoder.GetSoftwareBitmapConvertedAsync(BitmapPixelFormat::Bgra8, BitmapAlphaMode::Ignore).map_err(fail)?.get().map_err(fail)?;
+    let (w, h) = (bitmap.PixelWidth().map_err(fail)? as usize, bitmap.PixelHeight().map_err(fail)? as usize);
+    let size = w * h * 4;
+    let buffer = Buffer::Create(size as u32).map_err(fail)?;
+    buffer.SetLength(size as u32).map_err(fail)?;
+    bitmap.CopyToBuffer(&buffer).map_err(fail)?;
+    let mut pixels = vec![0u8; size];
+    DataReader::FromBuffer(&buffer).map_err(fail)?.ReadBytes(&mut pixels).map_err(fail)?;
+    Ok(Image { width: w, height: h, pixels })
+}
+
+/// El texto que Windows lee en una imagen, línea a línea. WinRT va en un hilo propio.
+#[cfg(windows)]
+fn run_ocr(source: Result<Image, Vec<u8>>) -> Result<String, String> {
+    std::thread::spawn(move || {
+        // SAFETY: inicializa WinRT para este hilo, que acaba aquí mismo.
+        let _ = unsafe { windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED) };
+        let img = match source {
+            Ok(i) => i,
+            Err(bytes) => decode_image(&bytes)?,
+        };
+        let words = recognize(&img)?;
+        // Las palabras llegan por líneas, pero sin saltos: se reconstruyen por la altura.
+        let mut out = String::new();
+        let mut last_y = f32::MIN;
+        for (text, a) in &words {
+            if !out.is_empty() {
+                out.push(if (a.y - last_y).abs() > a.h * 0.6 { '\n' } else { ' ' });
+            }
+            out.push_str(text);
+            last_y = a.y;
+        }
+        Ok(out)
+    })
+    .join()
+    .map_err(|_| "El OCR de Windows se detuvo inesperadamente.".to_string())?
+}
+
+/// Texto de los bytes de una imagen (PNG, JPG…).
+#[cfg(windows)]
+pub fn text_from_bytes(bytes: Vec<u8>) -> Result<String, String> {
+    run_ocr(Err(bytes))
+}
+
+/// Texto de la imagen del portapapeles.
+#[cfg(windows)]
+pub fn text_from_clipboard() -> Result<String, String> {
+    let img = clipboard_image().ok_or_else(|| NO_IMAGE.to_string())?;
+    run_ocr(Ok(img))
+}
+
+#[cfg(not(windows))]
+pub fn text_from_bytes(_: Vec<u8>) -> Result<String, String> {
+    Err("Solo en Windows.".into())
+}
+
+#[cfg(not(windows))]
+pub fn text_from_clipboard() -> Result<String, String> {
+    Err("Solo en Windows.".into())
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

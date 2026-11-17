@@ -1,8 +1,9 @@
 import { usePageActive } from "../lib/pageActive";
-import { ArrowDown, ArrowUp, ChevronRight, Cpu, FolderOpen, Layers, Lock, MemoryStick, Pause, Play, Search, ShieldAlert, Skull, TriangleAlert, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Cpu, FolderOpen, HelpCircle, Layers, Lock, MemoryStick, Pause, Play, Search, ShieldAlert, Skull, TriangleAlert, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { EmptyLine, ErrorState, Loading } from "../components/ui";
+import { WhyNotResponding } from "../components/expert/WhyNotResponding";
 import { toolsApi, type ProcessView } from "../lib/api";
 import { bytes } from "../lib/format";
 import { groupProcesses, isSystemProcess, killable, type ProcessGroup } from "../lib/processGroups";
@@ -48,6 +49,8 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
   const [selected, setSelected] = useState<Selection>(null);
   const [paused, setPaused] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Proceso del que se está mirando por qué no responde.
+  const [why, setWhy] = useState<number | null>(null);
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
   const inflight = useRef(false);
@@ -417,6 +420,15 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
           >
             <FolderOpen size={13} /> Abrir ubicación
           </button>
+          {sel.protection !== "self" && (
+            <button
+              onClick={() => setWhy(why === sel.pid ? null : sel.pid)}
+              className="flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-xs text-dim hover:text-neon"
+              title="Mira a qué está esperando este programa"
+            >
+              <HelpCircle size={13} /> ¿Por qué?
+            </button>
+          )}
           {sel.protection !== "critical" && sel.protection !== "self" && (
             <>
               <button
@@ -437,6 +449,9 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
             </>
           )}
         </div>
+      )}
+      {sel && why === sel.pid && sel.protection !== "self" && (
+        <WhyNotResponding key={sel.pid} pid={sel.pid} name={sel.name} onClose={() => void kill(sel, false)} canClose={sel.protection !== "critical"} onDismiss={() => setWhy(null)} />
       )}
       {dialog}
     </div>

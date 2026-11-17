@@ -89,6 +89,11 @@ const BLOCKED: &[&str] = &[
     "office_sign_out",
     "delete_credential",
     "sign_out_windows",
+    // Diagnóstico de experto: cerrar un programa o una conexión de red que tiene un archivo, y el usuario de prueba
+    "close_holder",
+    "close_smb_file",
+    "create_test_user",
+    "delete_test_user",
     // Red y Wi-Fi
     "set_dns",
     "save_hosts",
@@ -315,6 +320,8 @@ const SAFE: &[&str] = &[
     "get_settings", "save_settings", "list_clients", "visit_changes", "compare_client_machines", "save_client", "delete_client", "get_session",
     "start_session", "update_session", "cancel_session", "finish_session", "set_next_maintenance", "export_config", "import_config",
     "inventory_add_this", "inventory_remove", "save_network_map",
+    // diagnóstico de experto (solo leen; el apunte del culpable es del diario propio de AdminOps)
+    "why_not_responding", "file_holders", "holder_drives", "holder_pick", "error_lens_text", "error_lens_image", "error_lens_file", "error_lens_clipboard", "test_user_status", "bisect_note",
 ];
 
 pub fn active() -> bool {{

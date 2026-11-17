@@ -16,6 +16,7 @@ import { openHelp, openHelpTopic } from "../lib/help";
 import { GLOSSARY as TERMS } from "../lib/glossary";
 import { openComm } from "../lib/comms";
 import { didYouMean, fuzzyHas, tokens } from "../lib/palette";
+import { EXPERT_ENTRIES } from "./expert/paletteEntries";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -215,6 +216,8 @@ export function CommandPalette({
     }
     for (const a of actions)
       out.push({ key: `action:${a.id}`, kind: "action", title: a.title, subtitle: a.subtitle, search: norm(`${a.title} ${a.subtitle ?? ""} ${a.keywords ?? ""}`), run: a.run });
+    for (const x of EXPERT_ENTRIES)
+      out.push({ key: `expert:${x.id}`, kind: "action", title: x.title, subtitle: x.subtitle, search: norm(`${x.title} ${x.subtitle} ${x.keywords}`), run: () => onNavigate(x.page, x.focus) });
     for (const t of tweaks ?? []) {
       const page = CATEGORY_PAGE[t.category];
       if (!page) continue;

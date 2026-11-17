@@ -342,7 +342,7 @@ pub fn share_explain(name: String, user: String) -> Result<Explain, String> {
 // ---------- Unidades de red de este equipo ----------
 
 /// `\\equipo\recurso[\subcarpeta]` → (equipo, resto). Solo rutas de red normales.
-fn parse_unc(path: &str) -> Option<(&str, &str)> {
+pub(crate) fn parse_unc(path: &str) -> Option<(&str, &str)> {
     let rest = path.strip_prefix(r"\\")?;
     let (host, tail) = rest.split_once('\\')?;
     let tail = tail.trim_end_matches('\\');
@@ -374,7 +374,7 @@ fn network_key() -> Option<winreg::RegKey> {
 }
 
 #[cfg(windows)]
-fn remembered() -> Vec<(char, String)> {
+pub(crate) fn remembered() -> Vec<(char, String)> {
     let Some(key) = network_key() else { return Vec::new() };
     let mut out: Vec<(char, String)> = key
         .enum_keys()
@@ -390,7 +390,7 @@ fn remembered() -> Vec<(char, String)> {
 }
 
 #[cfg(not(windows))]
-fn remembered() -> Vec<(char, String)> {
+pub(crate) fn remembered() -> Vec<(char, String)> {
     Vec::new()
 }
 
@@ -413,7 +413,7 @@ fn forget(letter: char) {
 fn forget(_: char) {}
 
 /// ¿Contesta ese equipo por el puerto de las carpetas compartidas (445)?
-fn answers(host: &str) -> bool {
+pub(crate) fn answers(host: &str) -> bool {
     use std::net::{TcpStream, ToSocketAddrs};
     (host, 445u16).to_socket_addrs().map(|addrs| addrs.take(2).any(|a| TcpStream::connect_timeout(&a, Duration::from_millis(1500)).is_ok())).unwrap_or(false)
 }

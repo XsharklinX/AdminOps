@@ -1,5 +1,6 @@
 import { SavedViews } from "../components/SavedViews";
 import { EventDigestCard } from "../components/expert";
+import { BisectCard } from "../components/expert/BisectCard";
 import {
   CheckCircle2,
   ExternalLink,
@@ -310,6 +311,8 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
           </>
         )}
       </Card>
+
+      <BisectCard entries={entries} onChanged={() => void loadJournal()} />
 
       <EventDigestCard onNavigate={(p) => onNavigate?.(p)} />
 

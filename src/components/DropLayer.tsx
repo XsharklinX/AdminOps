@@ -69,7 +69,13 @@ export function DropLayer({ onNavigate }: { onNavigate: (page: PageId, section: 
             toast("info", "Los volcados de pantallazo se leen solos en Arranques y cuelgues.");
             break;
           default:
-            toast("info", `«${f.name}»: ${dropAction(f.kind)}.`);
+            if (/\.(png|jpe?g|bmp|gif|tiff?|webp)$/i.test(f.name)) {
+              deliverDropped("errorimage", f.path);
+              onNavigate("troubleshoot", "errorlens");
+            } else {
+              deliverDropped("holders", f.path);
+              onNavigate("tools", "whoholds");
+            }
         }
       }
     };
@@ -138,6 +144,8 @@ export function DropLayer({ onNavigate }: { onNavigate: (page: PageId, section: 
           <li>.zip cifrado → Caja fuerte</li>
           <li>Perfil (.json) → Perfiles</li>
           <li>Informe (.pdf) → se abre</li>
+          <li>Recorte o foto de un error → Lector de errores</li>
+          <li>Cualquier otro archivo o unidad → ¿Quién lo tiene?</li>
         </ul>
       </div>
     </div>

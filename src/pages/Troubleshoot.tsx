@@ -13,11 +13,13 @@ import { FindingList } from "../components/FindingList";
 import { LearnedStats } from "../components/LearnedStats";
 import { rememberSymptom } from "../lib/lastSymptom";
 import { knowledgeApi } from "../lib/api";
+import { ErrorLens } from "../components/expert/ErrorLens";
+import { TestUserCard } from "../components/expert/TestUserCard";
 
 
 
 /** «Algo no funciona»: eliges el síntoma y AdminOps comprueba y ofrece las reparaciones. */
-export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean; focus: string | null; onNavigate: (p: PageId) => void }) {
+export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean; focus: string | null; onNavigate: (p: PageId, focus?: string | null) => void }) {
   const [symptom, setSymptom] = useState<Symptom | null>(null);
   const [findings, setFindings] = useState<TroubleFinding[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,9 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
   useEffect(() => {
     if (focus === "repairs" || focus?.startsWith("repair.")) {
       window.setTimeout(() => document.getElementById("repairs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+    if (focus === "errorlens" || focus === "testuser") {
+      window.setTimeout(() => document.getElementById(focus)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     }
   }, [focus]);
 
@@ -151,6 +156,8 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
           )}
         </Card>
       )}
+      <ErrorLens onNavigate={(p, f) => onNavigate(p, f)} />
+      <TestUserCard isAdmin={isAdmin} />
       {dialog}
       {/* Reparaciones de Windows (antes, su propia página) */}
       <section id="repairs" className="col-span-12 scroll-mt-4">
