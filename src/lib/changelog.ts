@@ -18,6 +18,31 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.0",
+    title: "Impresoras RICOH y EPSON, diagnóstico de experto y más rápido",
+    added: [
+      "Impresoras RICOH y EPSON: cada impresora con su marca, modelo, conexión (USB o red con su IP) y, en las de red, número de serie y páginas impresas. Al lado, si su driver es el bueno: «Al día», «Viejo» (hay uno más nuevo), «Genérico» (el de Microsoft: imprime, pero sin bandejas, grapado ni nivel de tóner), «Falta» o «De otra marca», con el motivo al pasar el ratón. Las que están conectadas pero sin instalar salen arriba con «Instalarla».",
+      "Actualizar el driver en un clic: se guarda una copia del actual, se instala el nuevo, la impresora conserva su nombre, puerto y si es la predeterminada, sale una página de prueba y, si no salió bien, «Deshacer». También todas las RICOH o todas las EPSON a la vez, con un resumen para pegar en el ticket.",
+      "Drivers: tu biblioteca de drivers en una carpeta o en el pendrive (AdminOps lee qué versión es cada paquete y qué modelos cubre), Windows Update como primera fuente, y «Bajar de RICOH / EPSON», que abre la página oficial del modelo y recoge solo el archivo que llega a Descargas.",
+      "Escáneres RICOH (fi y ScanSnap) y EPSON: su driver, si falta el programa de escanear (PaperStream, Epson Scan 2) con su instalador de la biblioteca, y «Probar escaneo», que pide una página y te la enseña.",
+      "¿Por qué no responde?: en Procesos, un programa colgado dice a qué está esperando («Excel espera a la unidad Z:, que no contesta») y qué hacer: reconectar, esperar o cerrarlo sabiendo qué se pierde.",
+      "¿Quién tiene ese archivo?: suelta el archivo, la carpeta o el USB que no se deja expulsar y AdminOps dice qué programa lo tiene agarrado o quién lo tiene abierto por la red.",
+      "Encontrar el cambio que lo rompió: si algo dejó de funcionar tras varios cambios, AdminOps los deshace por mitades y te pregunta «¿Ya funciona?» hasta dar con el culpable; el resto se vuelve a aplicar.",
+      "¿Es el perfil o el equipo?: un usuario local de prueba con una contraseña fácil de dictar, que se borra solo con su carpeta a las 24 horas.",
+      "Lector de errores: pega o suelta la captura o la foto del error y AdminOps lee el código, explica qué significa y ofrece el arreglo que lo resuelve.",
+      "Puestos: cada equipo sale según contesta, con el progreso, y lo grave arriba (no responde, disco, seguridad, reinicio pendiente, espacio). «Volver a mirar los que fallaron».",
+      "Ctrl+K que hace las cosas: «desbloquear maria», «reiniciar PC-CONTA-03», «cola recepción», «liberar espacio»… con la confirmación en la misma caja y Ctrl+Z cuando se puede deshacer.",
+      "Personas → «Revisar su equipo»: espacio, memoria, días encendido, errores y cola de impresión del equipo donde tiene la sesión, con los arreglos a un clic.",
+      "¿Qué cambió?: una foto diaria pequeña del equipo y lo que es distinto desde la fecha que elijas (programas, drivers, actualizaciones, servicios, inicio y energía). Y «Pregúntale al equipo»: por qué se reinició anoche, por qué va lento desde el lunes, quién instaló esto, por qué no imprime y si se apagó o se colgó, con las pruebas debajo.",
+      "AdminOps en miniatura (Ctrl+Alt+A): una barra pequeña encima, en una esquina, con los arreglos del caso, para trabajar en el sitio del usuario sin tapar su pantalla.",
+      "Arreglos rápidos desde el icono junto al reloj (vaciar la cola, renovar la IP, reiniciar el Explorador, limpiar temporales), elegidos en Ajustes. Y desde el pendrive, al salir, AdminOps enseña lo que queda suyo en ese equipo y lo quita.",
+      "Más rápido: cada pestaña carga solo lo suyo, las pantallas no trabajan cuando no se ven, abren con su última lectura y su hora, se preparan al pasar el ratón, las listas largas ya no tienen «Mostrar más» y las últimas pantallas siguen como las dejaste.",
+    ],
+    fixed: [
+      "En el programa instalado, la vista previa del informe salía sin formato.",
+    ],
+  },
+  {
     version: "1.2.10",
     title: "Rediseño con aire y arreglos que se comprueban solos",
     added: [
