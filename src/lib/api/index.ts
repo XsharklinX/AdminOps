@@ -30,3 +30,4 @@ export * from "./expert";
 export * from "./knowledge";
 export * from "./printvendor";
 export * from "./askchange";
+export * from "./diagnose";

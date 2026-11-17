@@ -63,6 +63,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, EmptyLine, ErrorState, Loading, Modal, inputClass } from "../components/ui";
 import { RescueUsbCard } from "../components/bigbets";
+import { FileHolders } from "../components/expert/FileHolders";
 import { hwApi, toolboxApi, type CustomKind, type CustomTool, type Inventory, type ToolGroup, type ToolboxView } from "../lib/api";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -275,6 +276,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
     <div className="mx-auto max-w-(--page-max) space-y-6 px-8 py-6">
       <MachineCard />
       <RescueUsbCard isAdmin={isAdmin} />
+      <FileHolders />
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">

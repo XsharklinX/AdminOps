@@ -2,7 +2,7 @@
 // qué hacer con ellos, que los recoge al montarse o al momento si ya estaba abierta.
 import { useEffect, useRef } from "react";
 
-export type DropTarget = "image" | "vault" | "profile";
+export type DropTarget = "image" | "vault" | "profile" | "holders" | "errorimage";
 
 const EVENT = "adminops-dropped";
 const pending = new Map<DropTarget, string>();

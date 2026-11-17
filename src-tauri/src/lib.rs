@@ -121,6 +121,11 @@ mod outbound;
 mod psquote;
 mod rescue;
 mod vulndb;
+mod waitchain;
+mod filelocks;
+mod errlens;
+mod testuser;
+mod culprit;
 
 use tauri::Manager;
 
@@ -828,6 +833,20 @@ pub fn run() {
             accounts::office_sign_out,
             accounts::delete_credential,
             accounts::sign_out_windows,
+            waitchain::why_not_responding,
+            filelocks::file_holders,
+            filelocks::holder_drives,
+            filelocks::holder_pick,
+            filelocks::close_holder,
+            filelocks::close_smb_file,
+            errlens::error_lens_text,
+            errlens::error_lens_image,
+            errlens::error_lens_file,
+            errlens::error_lens_clipboard,
+            testuser::test_user_status,
+            testuser::create_test_user,
+            testuser::delete_test_user,
+            culprit::bisect_note,
         ]))
         .run(context)
         .expect("error while running tauri application");

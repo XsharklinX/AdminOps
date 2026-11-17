@@ -104,6 +104,11 @@ const CODES: &[Row] = &[
     (0x0000_0139, "KERNEL_SECURITY_CHECK_FAILURE", "stop", "El sistema detectó datos dañados en una estructura crítica.", "Driver incompatible o RAM con fallos.", "Actualiza drivers y prueba la memoria.", "boots"),
     (0x0000_007B, "INACCESSIBLE_BOOT_DEVICE", "stop", "Windows no puede leer el disco desde el que arranca.", "Cambio del modo SATA en la BIOS (AHCI/RAID), driver de almacenamiento o disco dañado.", "Revisa el modo SATA en la BIOS y la salud del disco; si fue tras actualizar, vuelve atrás desde el arranque avanzado.", "space"),
     (0x0000_0154, "UNEXPECTED_STORE_EXCEPTION", "stop", "Error en el almacén de memoria comprimida.", "Disco o SSD con problemas, o el antivirus.", "Revisa la salud del disco y actualiza el firmware del SSD.", "space"),
+    // ---- Impresoras compartidas ----
+    (0x0000_011B, "No se puede conectar a la impresora (0x11b)", "windows", "Windows no deja conectar con una impresora compartida por otro equipo.", "Una actualización de seguridad de Windows de 2021 (PrintNightmare) endureció la conexión: falla cuando un equipo la tiene y el otro no, o con autenticación distinta.", "Instala las mismas actualizaciones en los dos equipos, o conecta la impresora por su IP o por un puerto local en vez de por el nombre del equipo.", "printers"),
+    (0x0000_0709, "No se puede establecer la impresora predeterminada", "windows", "Windows no pudo conectar con la impresora o fijarla como predeterminada.", "Mismo origen que 0x11b (seguridad de impresión) o el servicio de cola de impresión con problemas.", "Reinicia la cola de impresión y conecta la impresora de nuevo; si es compartida, revisa que los dos equipos tengan las mismas actualizaciones.", "printers"),
+    (0x0000_0BCB, "No se encuentra el driver de impresora", "windows", "Windows no pudo instalar el driver de la impresora compartida.", "El driver no está disponible para esta versión de Windows o la seguridad de impresión bloquea instalarlo desde la red.", "Instala el driver del fabricante en este equipo y conecta la impresora de nuevo.", "printers"),
+    (0x0000_0040, "El nombre de red ya no está disponible", "network", "La conexión con el equipo o la impresora compartida se perdió.", "El otro equipo está apagado, cambió de nombre o la red se cortó.", "Comprueba que el otro equipo está encendido y responde, y conecta de nuevo.", "shares"),
     // ---- Office y activación ----
     (0xC004_F074, "No se encontró el servidor de activación (KMS)", "activation", "Windows u Office no encuentran el servidor de licencias de la empresa.", "Fuera de la red de la empresa, DNS que no resuelve el servidor KMS o una activación no oficial.", "Conéctate a la red de la empresa o usa una licencia OEM/retail.", ""),
     (0xC004_C003, "Clave bloqueada", "activation", "El servidor de activación rechazó la clave.", "Clave usada en demasiados equipos o no válida.", "Usa una clave válida para esa edición.", ""),
@@ -116,6 +121,61 @@ const CODES: &[Row] = &[
 fn by_name(q: &str) -> Option<&'static Row> {
     let q = q.trim().to_ascii_uppercase().replace(' ', "_");
     CODES.iter().find(|r| r.1.eq_ignore_ascii_case(&q))
+}
+
+/// Códigos de acceso remoto de Windows (VPN, «error 809»): se escriben en decimal.
+/// (número, nombre, qué es y por qué, qué hacer)
+const RAS: &[(u32, &str, &str, &str)] = &[
+    (619, "Se cortó la conexión con el servidor VPN", "El servidor VPN no completó la conexión: suele ser un cortafuegos o una directiva que bloquea el tráfico.", "Comprueba el cortafuegos y que el equipo tiene Internet; prueba desde otra red."),
+    (691, "Usuario o contraseña de la VPN incorrectos", "El servidor rechazó el usuario o la contraseña, o la cuenta está bloqueada o caducada.", "Revisa la contraseña (¿cambió hace poco?) y que la cuenta no esté bloqueada."),
+    (720, "No hay protocolos de control PPP configurados", "La conexión VPN no pudo negociar el protocolo con el servidor.", "Recrea la conexión VPN y repara la red."),
+    (789, "Falló la conexión L2TP por la seguridad", "El servidor L2TP/IPsec no aceptó la negociación de seguridad (clave previa o certificado).", "Comprueba la clave previa compartida o el certificado, y que el equipo detrás de un NAT permita L2TP."),
+    (800, "No se pudo establecer la conexión VPN", "El servidor VPN no se alcanza: puertos cerrados, nombre mal escrito o Internet caído.", "Comprueba Internet, la dirección del servidor y que el cortafuegos deja pasar la VPN."),
+    (809, "No se pudo establecer la conexión VPN (809)", "El equipo no recibe respuesta del servidor VPN: suele ser un router o cortafuegos que bloquea L2TP/IPsec (UDP 500 y 4500) o un servidor tras NAT.", "Prueba con otra red; detrás de un NAT hace falta permitir L2TP (clave AssumeUDPEncapsulationContextOnSendRule = 2) y abrir los puertos UDP 500 y 4500."),
+    (868, "No se resuelve el nombre del servidor VPN", "El nombre del servidor VPN no se traduce a una dirección.", "Comprueba el nombre, el DNS y que el equipo tiene Internet."),
+];
+
+/// Códigos de inicio de sesión de Microsoft 365 («AADSTS50126»). Solo se explican.
+/// (número, nombre, qué es y por qué, qué hacer)
+const AAD: &[(u32, &str, &str, &str)] = &[
+    (50126, "Usuario o contraseña incorrectos", "Microsoft rechazó la contraseña (o el usuario) al iniciar sesión.", "Comprueba la contraseña y el correo; si la cambió hace poco, que la actualice en todos sus dispositivos."),
+    (50053, "Cuenta bloqueada", "Demasiados intentos fallidos: la cuenta se bloqueó un rato.", "Espera unos minutos o desbloquéala en el dominio (Personas → Desbloquear)."),
+    (50057, "Cuenta desactivada", "La cuenta está deshabilitada.", "Quien administre Microsoft 365 debe reactivarla."),
+    (50076, "Hace falta verificación en dos pasos", "La cuenta debe confirmar con el móvil (MFA) y no se completó.", "Pídele que apruebe el aviso en su móvil o que registre su método de verificación."),
+    (50158, "Hace falta una verificación externa", "Una directiva de seguridad exige un paso extra de verificación.", "Que complete la verificación; si no le sale, que inicie sesión desde el navegador."),
+    (50034, "El usuario no existe en esa organización", "El correo escrito no pertenece a esa organización.", "Revisa que escribió bien el correo de trabajo (sin la dirección personal)."),
+    (53003, "Acceso bloqueado por una directiva de seguridad", "El acceso condicional de la empresa bloquea este inicio de sesión (equipo no conforme, ubicación o aplicación).", "Comprueba que el equipo está al día; si sigue, hay que hablar con quien administre las directivas."),
+    (700016, "Aplicación no encontrada", "La aplicación que intenta iniciar sesión no está registrada en esa organización.", "Revisa la dirección o la aplicación que usa; suele ser una configuración incorrecta."),
+    (65001, "Falta el consentimiento de la aplicación", "La aplicación necesita un permiso que nadie ha aprobado.", "Quien administre Microsoft 365 debe aprobar el consentimiento."),
+    (9002313, "Solicitud de inicio de sesión no válida", "El inicio de sesión llegó incompleto o caducado.", "Cierra sesión, borra las credenciales de Office guardadas y vuelve a entrar."),
+];
+
+fn from_table(code: String, name: &str, area: &'static str, what: &'static str, todo: &'static str) -> ErrorInfo {
+    ErrorInfo { code, name: name.into(), area, what, why: "", todo, page: "" }
+}
+
+/// «error 809»: un código de VPN, en decimal.
+pub fn explain_ras(n: u32) -> Option<ErrorInfo> {
+    RAS.iter().find(|r| r.0 == n).map(|r| from_table(format!("error {}", r.0), r.1, "network", r.2, r.3))
+}
+
+/// «AADSTS50126»: un código de inicio de sesión de Microsoft 365.
+pub fn explain_aad(n: u32) -> Option<ErrorInfo> {
+    AAD.iter().find(|r| r.0 == n).map(|r| from_table(format!("AADSTS{}", r.0), r.1, "office", r.2, r.3))
+}
+
+/// «error 5»: un error de Windows escrito en decimal, solo si el diccionario lo conoce.
+pub fn explain_win32(n: u32) -> Option<ErrorInfo> {
+    if n == 0 || n > 0xFFFF {
+        return None;
+    }
+    CODES.iter().find(|r| r.0 == 0x8007_0000 | n).map(info)
+}
+
+/// Pantallazos y errores con nombre propio («DPC_WATCHDOG_VIOLATION») que aparecen dentro de un texto.
+pub fn find_names(text: &str) -> Vec<ErrorInfo> {
+    let upper = text.to_ascii_uppercase();
+    CODES.iter().filter(|r| r.1.contains('_') && r.1.chars().all(|c| c.is_ascii_uppercase() || c == '_') && upper.contains(r.1)).map(info).collect()
 }
 
 /// Interpreta lo escrito como código: «0x80070005», «80070005», «-2147024891», «STOP 0x133», «0x0000007B».
@@ -213,6 +273,19 @@ mod tests {
         for (i, a) in CODES.iter().enumerate() {
             assert!(!a.3.is_empty() && !a.4.is_empty() && !a.5.is_empty(), "{}", a.1);
             assert!(CODES.iter().skip(i + 1).all(|b| b.0 != a.0), "repetido 0x{:X}", a.0);
+        }
+    }
+
+    #[test]
+    fn tablas_nuevas() {
+        assert_eq!(lookup("0x0000011b")[0].page, "printers");
+        assert!(explain_ras(809).unwrap().what.contains("VPN"));
+        assert_eq!(explain_aad(50126).unwrap().code, "AADSTS50126");
+        assert!(explain_win32(5).unwrap().name.contains("Acceso"));
+        assert!(explain_win32(0).is_none() && explain_win32(99999).is_none());
+        assert_eq!(find_names("Tu PC tuvo un problema: DPC_WATCHDOG_VIOLATION")[0].code, "0x133");
+        for n in RAS.iter().map(|r| r.0).chain(AAD.iter().map(|r| r.0)) {
+            assert_eq!(RAS.iter().filter(|x| x.0 == n).count() + AAD.iter().filter(|x| x.0 == n).count(), 1, "repetido {n}");
         }
     }
 }

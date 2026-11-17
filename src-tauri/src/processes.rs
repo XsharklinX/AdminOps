@@ -72,7 +72,7 @@ pub struct ProcessView {
     note: Option<&'static str>,
 }
 
-fn classify(name: &str, pid: u32, own: &HashSet<u32>) -> (&'static str, Option<&'static str>) {
+pub(crate) fn classify(name: &str, pid: u32, own: &HashSet<u32>) -> (&'static str, Option<&'static str>) {
     let lower = name.to_lowercase();
     if pid == 0 || pid == 4 || CRITICAL.contains(&lower.as_str()) {
         return ("critical", Some("Proceso crítico de Windows: finalizarlo provocaría un pantallazo azul o cerraría la sesión."));
@@ -87,7 +87,7 @@ fn classify(name: &str, pid: u32, own: &HashSet<u32>) -> (&'static str, Option<&
 }
 
 /// PIDs de AdminOps y de todo lo que cuelga de él (WebView2, PowerShell…).
-fn own_tree(sys: &System) -> HashSet<u32> {
+pub(crate) fn own_tree(sys: &System) -> HashSet<u32> {
     let me = std::process::id();
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for (pid, p) in sys.processes() {
