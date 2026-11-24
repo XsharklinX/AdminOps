@@ -2,6 +2,7 @@ import { CheckCircle2, CircleAlert, ExternalLink, FileCheck2, HardDriveDownload,
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, ErrorState, IconButton, Loading, iconBtn } from "../components/ui";
+import { ViewCommand } from "../components/ActionCommand";
 import { DataTable, type Column } from "../components/DataTable";
 import { printersApi, tweaksApi, vendorApi, type FoundPrinter, type PrinterCheck, type PrinterInfo, type PrinterSupply, type VendorKey, type VendorPrinter, type VendorPrinterInventory } from "../lib/api";
 import { goToPage } from "../lib/navigate";
@@ -55,11 +56,12 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
     void load();
   }, [load]);
 
-  const run = async (key: string, ok: string, op: () => Promise<void>) => {
+  const run = async (key: string, ok: string, op: () => Promise<string | null | void>) => {
     setBusy(key);
     try {
-      await op();
-      toast("ok", ok);
+      const measured = await op();
+      // Si la acción midió algo, el aviso dice la diferencia en vez de solo «hecho».
+      toast("ok", measured ? `${ok.replace(/\.$/, "")} · ${measured}` : ok);
       await load();
     } catch (e) {
       toast("error", String(e));
@@ -193,9 +195,10 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
                 <HardDriveDownload size={15} />
               </IconButton>
             )}
-            <IconButton label="Vaciar la cola de esta impresora" disabled={!p.jobs || busy !== null} onClick={() => void run(p.name, `Cola de ${p.name} vaciada.`, () => printersApi.clearQueue(p.name))}>
+            <IconButton kt="V" label="Vaciar la cola de esta impresora" disabled={!p.jobs || busy !== null} onClick={() => void run(p.name, `Cola de ${p.name} vaciada.`, () => printersApi.clearQueue(p.name))}>
               <XCircle size={15} />
             </IconButton>
+            <ViewCommand id="printer.clear-queue" context={p.name} icon />
             <IconButton label="Revisar: por qué no imprime y qué hacer" disabled={busy !== null} onClick={() => void check(p)}>
               <Stethoscope size={15} />
             </IconButton>
@@ -244,6 +247,7 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
           <Button kind="ghost" onClick={resetSpooler} disabled={!isAdmin || busy !== null} title={isAdmin ? undefined : "Requiere administrador"}>
             {busy === "spooler" ? <Loader2 size={14} className="animate-spin" /> : <Wrench size={14} />} Reiniciar cola de impresión
           </Button>
+          <ViewCommand id="repair.print-queue" />
           <button onClick={() => void load()} disabled={loading} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>

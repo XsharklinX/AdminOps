@@ -33,9 +33,28 @@ pub fn ps_literal(value: &str) -> String {
     format!("'{}'", ps_escape(value))
 }
 
+/// Texto para ir en un comentario (`# …`) o en un título de un script: sin saltos de
+/// línea ni caracteres de control. PowerShell termina el comentario también en
+/// U+0085, U+2028 y U+2029; si no se quitaran, lo que siguiera se ejecutaría como código.
+/// Cada uno se cambia por un espacio.
+pub fn ps_comment(value: &str) -> String {
+    let clean: String = value.chars().map(|c| if c.is_control() || matches!(c, '\u{0085}' | '\u{2028}' | '\u{2029}') { ' ' } else { c }).collect();
+    clean.trim().to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_comment_never_gets_a_line_break() {
+        for s in ["Mi\nApp", "Mi\rApp", "a\r\nb", "x\u{0085}y", "x\u{2028}y", "x\u{2029}y", "a\0b", "a\tb\u{000B}c\u{000C}d"] {
+            let c = ps_comment(s);
+            assert!(!c.chars().any(|ch| ch.is_control() || matches!(ch, '\u{0085}' | '\u{2028}' | '\u{2029}')), "{s:?} → {c:?}");
+        }
+        assert_eq!(ps_comment("Mi\nApp\r\nCalc; calc.exe"), "Mi App  Calc; calc.exe");
+        assert_eq!(ps_comment("normal ñ « »"), "normal ñ « »");
+    }
 
     /// Lo que PowerShell lee de una cadena entre comillas simples: la cadena
     /// termina en la primera comilla que no va duplicada. `None` si no termina

@@ -1,190 +1,380 @@
-# AdminOps — tanda 1.3 (empezada el 2026-11-16)
+# AdminOps — tanda 1.4 (elegida el 2026-11-20)
 
-Leer esto primero en cada sesión nueva. Junta tres listas aprobadas por el autor:
-- **Rapidez** (artifact QEtoJJr1BUUxwDnf7aa9gW): R1–R5, F1, F2, N1, N3, N5, N6, P1. Detalle en ROADMAP.md, «v1.2.11».
-- **Un día con AdminOps** (artifact NHa3f6FC9vmqrSXEeSLnRg): A2, B1, B2, B3, C1, C2, C3, D1, D2, F1, G1, G2.
-- **Impresoras RICOH y EPSON** (pedido directo, 2026-11-16).
+Leer esto primero en cada sesión nueva. El plan de la 1.3 está en `docs/PROGRESS-1.3.md`.
 
-Lo que pidió el autor: «nuestra app debe ser lo más profesional y útil posible para que cualquier
-persona que la utilice tenga la capacidad de dar mantenimiento y hacer funcionar y mejorar una PC».
-Va a enseñársela a su supervisor en unos días. App de **un solo técnico**: nada de varios usuarios.
-Las ideas le parecieron «raras o básicas»: hacerlas a fondo y que se noten, no la versión mínima.
+Sale del catálogo «Ideas para AdminOps 1.4» (https://claude.ai/artifact/WrP5AEk8vTcUuCJmmvGnfj,
+30 ideas). David eligió **21**; las maquetas del artifact son lo aprobado: hay que hacerlas así y a fondo,
+no la versión mínima.
 
-Reglas: sin build ni commit sin que lo pida; nada que necesite permisos de IT; sin datos personales en
-la interfaz; textos en español. Antes de cambiar algo visual nuevo (la pantalla de drivers), enseñar
-el antes y el después.
+Reglas de siempre: sin build ni commit sin que lo pida; nada que necesite permisos de IT (administrador
+local sí); un solo técnico; sin datos personales en la interfaz; textos en español. Cada fase termina
+con lint, typecheck, pruebas de Rust y de interfaz, y `npm run test:exe` + `npm run test:perf` con un
+.exe de depuración. Antes de cambiar algo visual que no esté ya en la maqueta, enseñar el antes y el después.
 
 ## Estado
-- 1.2.10 guardada en el commit 577029e (rama claude/great-mayer-m7kpmy), sin lo de la Fase 1.
-- 2026-11-16: **Fase 1 hecha**, commit 504f5bf. Detalle abajo.
-- Fase 2: David eligió P1–P6. **Encargo A (motor) hecho y revisado, sin commit; sigue el encargo B (interfaz)**. Investigado: RICOH (PCL6 Driver for Universal Print 4.42.0.0, jul 2025) y EPSON (Universal Print Driver) solo se bajan desde la página de soporte de cada modelo, sin enlace directo estable; por eso las fuentes son Windows Update → biblioteca local → abrir la página oficial y recoger la descarga de Descargas. Generador de la maqueta: gen3.py en el scratchpad de la sesión 01e269f2. Idea de la sesión anterior: módulo `printvendor.rs` (PnP + colas + Windows Update
-  con ServerSelection=2 + biblioteca de INF + `Set-Printer -DriverName` con deshacer).
+- 2026-11-20: **Fases 0, 1, 2 y 3 hechas, en la carpeta principal SIN commit** (sobre badb39d).
+  Hecho por oficiales en worktrees y pasado como parche; revisado por Opus (11 fallos + 3 posibles,
+  todos arreglados: el grave, B3 con RunOnce no abría la versión con administrador → tarea programada
+  «AdminOps seguir plan» AtLogOn + RunLevel Highest).
+  **Comprobado con**: tsc, eslint, vitest 335/335, cargo test 628 (54 ignoradas), clippy sin avisos,
+  `npm run build`, `test:perf` (referencia actualizada a 2198 KB: +8 %, lo nuevo de Ctrl+K, DataTable
+  y «Ver el comando»).
+  **Sin comprobar**: nada visto en la app abierta; `test:exe` no se lanzó (mueve el ratón de verdad);
+  la tarea programada tras un reinicio real; letras con Alt, arrastrar columnas, botones del ratón,
+  zoom por monitor.
+- Detalles que decidieron los oficiales (revisar con David si no le gustan):
+  - Letras con Alt (A2): «Liberar espacio» no existe como botón → L en «Liberar lo verde»; «Renovar la
+    IP» → R en «Reparación rápida».
+  - Filtro al escribir (A3): solo en tablas de 8 filas o más.
+  - Zoom (A8): elegir tamaño en Ajustes lo pone como general; Ctrl+/− lo guarda para el monitor actual.
+  - B3: cerrar el plan a medias pregunta «¿Parar el plan?».
+  - B4: las acciones de riesgo medio o alto salen desmarcadas y piden confirmación al ejecutar.
+- Pendiente de esta parte: «Ver el comando» no está en los limpiadores de Espacio, en el interruptor
+  de cada fila de Inicio ni en la bandeja. Ninguna acción usa todavía la medida «memoria». A4 sin
+  integrar con las vistas guardadas. Tras unirse al dominio con otra cuenta, la tarea de seguir el
+  plan no salta (es del usuario que la creó): el plan se recoge al abrir AdminOps.
+- 2026-11-21: **Fase 4 (C2, C4, C5) hecha por oficiales en la carpeta principal, sin commit**
+  (punto de restauración ccb2311 justo antes). C5 va en una pestaña nueva Hardware → «Conectados»
+  (la pantalla Dispositivos es la de equipos de la red); «sin driver» solo con el código 28 de Windows.
+  Revisión de Opus: NO PASA (8 fallos + 6 posibles; el grave: `[uint32]` de un HResult negativo
+  cortaba la instalación de Windows Update; el medio: «Cerrar y seguir» mataba powershell.exe).
+  Los 14 arreglados. **Comprobado con**: tsc, eslint, vitest 355/355, cargo test 676 (58 ignoradas),
+  clippy, `npm run build`; la función Emit ejecutada en PowerShell con -2145124329 → 0x80240017.
+  **Sin comprobar**: la app abierta, DISM real (pide administrador), EFI real, driver y WU reales.
+- 2026-11-21: Fase 5 (D3, D5, D8) lanzada a un oficial en la carpeta principal. Punto de restauración
+  `b3b3baea` (git stash create) + copia de los archivos sin seguimiento en el scratchpad (pre-f5).
+  Hecha: Hardware/«Este equipo» → «Pantallas» y «Teclado e idioma»; Recuperar archivos → pestaña
+  «Sin guardar de Office». **Comprobado con**: tsc, eslint, vitest 397/397, cargo test 707 (61
+  ignoradas), clippy, build; lecturas reales (1 monitor DELL por HDMI, 3 idiomas, 0 sin guardar).
+  **Sin comprobar**: ningún cambio real de pantalla ni de idioma, la cuenta atrás de 15 s, «Abrir una
+  copia», versiones anteriores (VSS), la app abierta.
+  Decisiones del oficial (revisar con David): nativa según el driver y si no el EDID; cambio temporal
+  y «Mantener» lo fija; «Hz bajos» solo avisa; `unsaved_copy` bloqueado en auditoría; ~DF*.tmp fuera.
+  Revisión de Opus: NO PASA (10 fallos + 7 posibles; los altos: con AdminOps elevado con otra cuenta
+  D5/D8 miraban al técnico, y cerrar AdminOps en los 15 s dejaba el cambio de pantalla puesto).
+  Los 17 arreglados (con otra cuenta, D8 solo lee el hive del cliente y no cambia nada; .asd/.xar
+  conservan extensión y se abren con su app de Office). **Comprobado con**: tsc, eslint, vitest
+  402/402, cargo test 718 (61 ignoradas), clippy, build, lecturas reales.
+  **Sin comprobar**: otra cuenta de administrador, cambios reales de pantalla/idioma, SPI_SETLANGTOGGLE,
+  cierre con cambio pendiente, «Abrir una copia» con Office real, la app abierta.
+- 2026-11-22: Fase 6 (D6, D7) lanzada a un oficial en la carpeta principal. Punto de restauración
+  `37188c37` (git stash create) + copia de los sin seguimiento en el scratchpad de la sesión
+  340a88aa (`pre-f6`). Encargo: `scratchpad/encargo-F6.md` de esa sesión. El enlace del artifact de
+  ideas ya no se puede leer; la copia local del HTML está en el scratchpad de la sesión bb5d87a2
+  (`ideas-adminops-14.html`, D6/D7 en las líneas 569-586).
+  Decisiones mías en el encargo (revisar con David): carpeta `C:\Escaneos`; usuario `escaner` oculto y
+  contraseña dictable que no se guarda («Contraseña nueva» la cambia); con red Pública no se abre el
+  cortafuegos sin un paso aparte; SMB1 solo se explica, nunca se activa; quitar la firma SMB
+  obligatoria como acción de riesgo alto; D7 con ETW de Kernel-Network (TCP y UDP) y plan B
+  `GetPerTcpConnectionEStats`; «Hoy» = lo medido mientras AdminOps miraba; «Pausar 2 h» cierra
+  OneDrive y lo reabre con una tarea programada de un solo uso.
+- 2026-11-22: **Fase 6 hecha, sin commit.** D6 = tarjeta «Escanear a carpeta» en Escáneres
+  (`scanfolder.rs`, `ScanToFolder.tsx`); D7 = pestaña Red → «Uso de la red» (`netusage.rs`,
+  `onedrive.rs`, `NetUsage.tsx`, `ProgramIcon.tsx`). Cortafuegos rehecho por mí: regla propia
+  `AdminOps-Escaneos-SMB` (TCP 445, solo desde la IP de la impresora, perfil actual, nunca Público);
+  las de Windows no se tocan porque la de SMB cubre Privada+Pública a la vez.
+  Revisión de Opus: NO PASA (2 altos: el deshacer borraba un recurso «Escaneos» previo; «Reanudar
+  OneDrive» no abría estando elevado; + 2 medios, 6 bajos, 8 posibles). Todos arreglados por el oficial;
+  los dos altos mirados por mí.
+  **Comprobado con**: tsc, eslint, vitest 430/430, cargo test 759 (65 ignoradas), clippy sin avisos.
+  **Sin comprobar**: `npm run build` tras los arreglos (lo corté; antes de los arreglos pasaba); sin
+  segunda revisión tras los arreglos; ETW real, plan B, registros SMB (piden administrador); nada real
+  de crear usuario/recurso/cortafuegos ni pausar OneDrive; la app abierta; `test:ui`/`test:exe`/`test:perf`.
+  Decisiones del oficial (revisar con David): siempre «X MB subidos en N min» (no «subiendo 38 GB»,
+  no se puede saber); «Subida libre» = línea − lo que suben todos (demo 19,4 en vez de 1,6); la espera
+  del escaneo arranca sola al preparar; contraseña de hasta 18 caracteres.
+- OJO vitest: lanzarlo desde `F:\` (PowerShell `Set-Location F:\Programacion\AdminOps`). Con la ruta
+  en minúscula `f:` fallan los 81 archivos con «Cannot read properties of undefined (reading 'config')».
+- OpenCode Go sin cuota mensual hasta ~2026-11-27: revisiones con Opus mientras tanto.
+- 2026-11-23: segunda revisión de Opus de los arreglos: NO PASA (4 medios, 6 bajos, 4 posibles). Todos
+  arreglados por un oficial y el diff mirado por mí: deshacer tolerante a fallos (acaba todo y avisa al
+  final); el recurso lleva la marca de AdminOps y no cuenta como previo; usuario `escaner` previo vuelve a
+  su estado (activado y UserList); el permiso NTFS del cliente se quita si no lo tenía; contraseña con
+  mínimo alto elige palabras por longitud (máximo real 18); contador para `AuditSmb1Access`; OneDrive
+  lanzado con `cmd /c start` (la tarea acaba y ningún límite lo mata), tarea de un momento con ajustes de
+  batería, procesos solo del usuario (CIM + GetOwner, sin administrador), «Reanudar» comprueba que se
+  abrió antes de borrar la tarea; ETW: un solo reintento tras pánico y luego error; plan B apaga todas.
+  **Comprobado con**: cargo test 767 (65 ignoradas, lanzado por mí), clippy, tsc, eslint, vitest 430
+  (del oficial). **Sin comprobar**: los scripts en Windows real (solo con el parser), `npm run build`
+  (bloqueado: build solo cuando David la pida), la app abierta.
+  Límite conocido: si se prepara dos veces, la segunda entrada del diario no quita el permiso NTFS del
+  cliente (ya lo tenía, se lo dio la primera); lo quita deshacer la primera.
+- 2026-11-23: David pide Fase 7 y Fase 8 seguidas. Fase 7 lanzada a un oficial en la carpeta principal.
+  Punto de restauración `67fd89d` (git stash create) + copia de los sin seguimiento en el scratchpad de
+  la sesión df0d25e6 (`pre-f7`). Encargo: `scratchpad/encargo-F7.md` de esa sesión.
+  Decisiones mías en el encargo (revisar con David): pestaña nueva Equipo → «Grabar el fallo»; MP4 H.264
+  con Media Foundation, 10 fps, hasta 1920 de ancho, sin audio; se deja el borde amarillo de Windows;
+  píldora «● Grabando» siempre encima y excluida de la captura; marcas CPU ≥ 90 % y disco ≥ 95 % durante
+  3 s, «no responde» con el nombre del programa (nunca el título de la ventana); «Causa probable» = el
+  pico que empezó en los 10 s antes de un cuelgue o error; vídeos en machine_data_dir, se borran al
+  cerrar o descartar el caso (sin caso, al cerrar AdminOps); comandos SAFE en auditoría.
+- 2026-11-23: **Fase 7 hecha por el oficial, sin commit y SIN REVISAR todavía.** Nuevos:
+  `src-tauri/src/faultrec.rs` + `faultrec/{capture,watch,analysis}.rs`, `src/lib/api/faultrec.ts`,
+  `src/lib/faultrec.ts(+test)`, `src/components/FaultRecorder.tsx`, `src/components/RecPill.tsx`.
+  Cambiados: lib.rs, audit.rs, cases.rs (borra al cerrar/descartar), perfhistory.rs (DiskBusy pub(crate) +
+  Drop), waitchain.rs (`hung_pids`), netusage.rs (`Idents`), eventdigest.rs (`known_title`), Cargo.toml
+  (protocol-asset + features de windows), tauri.conf.json (assetProtocol, CSP media-src),
+  capabilities/default.json (ventana `recpill`), main.tsx, Merged.tsx, sections.ts, demo.ts.
+  **Comprobado con**: captura real (`cargo test faultrec -- --ignored`: 3 s → MP4 1920×1080 de ~0,7 MB,
+  duración 3200 ms, orientación bien), cargo test 790 (67 ignoradas), clippy, tsc, eslint, vitest 445,
+  scan:secrets (todo del oficial). **Sin comprobar**: la app abierta (píldora, minimizar, vídeo por el
+  protocolo asset con la CSP, borrado al cerrar un caso real), monitor secundario, cambio de resolución,
+  cerrar AdminOps grabando, `test:ui`.
+  Decisiones del oficial (revisar con David): botón rojo = `Button kind="danger"`; eventos de ruido
+  (DCOM 10016…) no son marcas; las marcas de error no guardan el texto del evento («Error 1002» + frase
+  conocida); grabar sin caso → se borra al cerrar AdminOps aunque luego se abra un caso; cerrar el caso
+  grabando → no se guarda y avisa. Yo moví la marca de disco de la demo de 0:13 a 0:16 para que cumpla la
+  regla de 10 s de «Causa probable».
+- 2026-11-23: Revisión de Opus de la Fase 7: NO PASA (1 medio + 7 leves + 4 posibles). Arreglados:
+  cerrar AdminOps grabando dejaba la píldora abierta y el proceso vivo (ahora se cierra siempre en
+  `finish` y en `shutdown`); los avisos (Level 3) salían como «Error N» (ahora solo Level 1, 2); al
+  guardar cerrando AdminOps, nota «faltan las marcas de errores»; «Parar» antes del primer fotograma
+  (`STOP_EARLY`, mirado con `ACTIVE` bloqueado; la interfaz lo enseña como aviso, no como error);
+  `FINISHING` se pone antes de soltar `ACTIVE`; `<Result key>`; la consulta de respaldo sigue mientras
+  `finishing` y enseña `error` (sin repetir el aviso); monitor desconectado → para con nota
+  (`Done.lost`, mira `monitor_handle` tras 3 s sin fotogramas); si el codificador de la tarjeta falla en
+  el primer fotograma, se cambia al de programa; ventanas colgadas escondidas tras la «fantasma»
+  (`hung_window`: visible, o sin dueño y con barra de título; también en `is_hung`); `faultrec_delete`
+  avisa si el vídeo sigue ahí (lo borra la limpieza al cerrar). Sin tocar: el protocolo asset también
+  existe en los portales de Tickets (alcance solo a la carpeta, ruta difícil de adivinar, el vídeo no
+  se puede leer desde otro origen).
+  **Comprobado con**: clippy -D warnings, cargo test 790 (67 ignoradas), captura real `--ignored` (2/2),
+  tsc, eslint, vitest 445, sin tildes rotas. **Sin comprobar**: un programa colgado de verdad, monitor
+  desconectado, codificador de tarjeta que falle al escribir, la app abierta.
+- 2026-11-23: **David: fuera de la 1.4.0 la pantalla Tickets y la pestaña «Inventario web»** (los
+  portales web de tickets/inventario de la empresa; «no funciona como me gustaría»). Hecho con un
+  interruptor `WEB_TICKETS = false` en `src/lib/features.ts` (allí, la lista de lo que hay que devolver
+  si vuelve). `DISABLED_PAGES` en Sidebar.tsx entra en `allowedInMode` (barra, Ctrl+K, historial,
+  fijados, pantalla al abrir); sin el paso «Tus tickets» del Onboarding, sin «Pegar en Tickets» en el
+  caso, sin precargar esos portales, y en Ajustes → Portales solo se ven los de Correo y Teams (los ya
+  guardados no se borran). Textos reescritos sin nombrarlos. `test:exe` prueba los portales con Correo.
+  Correo y Teams siguen igual. La guía de la Fase 8 y el changelog de 1.4.0 NO deben mencionar Tickets.
+  **Comprobado con**: tsc, eslint, vitest 445, `vite build`. **Sin comprobar**: la app abierta.
+  Nota: vitest falla entero («reading 'config'») si se lanza desde `f:\` en minúscula: usar `F:\`.
+- 2026-11-23: **Fase 8 hecha, sin commit.** changelog.ts (entrada 1.4.0, con «removed»: Tickets e
+  Inventario web apagados), whatsNew.ts (NEW_IN de las pantallas nuevas), guide.ts (temas connected,
+  recorder, displays, keyboard, netusage, see-command; ampliados moving, update, install, recipes,
+  scanners, recover; glosario +6), README.md y README.en.md (este venía de 1.1.11), versión 1.4.0 con
+  `npm run setversion` + package-lock.json (venía de 1.2.9), notas en `docs/notas-1.4.0.md` (ES 489,
+  EN 486 caracteres). **Comprobado con**: tsc, eslint, vitest 445, cargo test 790, clippy, vite build,
+  `tests/ui/smoke.mjs` con `CHROMIUM_PATH` = Edge (55 pantallas, 57 secciones, 0 problemas; el
+  Chromium de Playwright no está instalado). **Sin comprobar**: `test:exe` y `test:perf` (necesitan
+  un .exe), la app abierta. Revisión de Opus previa a la build lanzada.
+- 2026-11-23: Revisión de Opus previa a la build: NO PASA (1 medio + 5 leves + 2 posibles), todo
+  arreglado (ejemplo de Ctrl+K que no existía → «liberar espacio y vaciar la cola»; Tickets fuera de
+  ResumeRibbon, ShortcutEditor y NavEditor; company.rs solo importa portales mail/teams; showError en
+  FaultRecorder; frase de Pantallas; «no responde» con ventana escondida solo si hay una «Ghost» visible;
+  shutdown espera 45 s si FINISHING).
+- 2026-11-23: **David pide análisis de Espacio rápido «como WizTree» y luego la build.** Medido: C: (1,9 M
+  archivos, SSD) tarda 257 s carpeta a carpeta sin administrador (el registro de la app tenía 7–11 min).
+  Hecho `src-tauri/src/space/mft.rs`: con administrador y NTFS lee la MFT de `\\.\X:` (solo lectura,
+  hilo lector + sync_channel, fixup, runlists, registros de extensión) y monta el mismo Node/Tops que
+  `walk`. Igual que walk: fuera todo lo que tiene reparse (uniones, OneDrive), System Volume Information y
+  los archivos de NTFS. Enlaces duros una vez. Disco entero siempre; subcarpeta solo sin seek penalty (SSD).
+  Cae a `walk` si: sin admin, no NTFS, sin letra, serie de volumen distinta (enlace a otro disco), MFT muy
+  fragmentada, destino que no es carpeta en uso. `SpaceView.fast`/`elevated` → línea del resultado en
+  Space.tsx. Guía, changelog, NEW_IN space:space, README y notas actualizados (ES 499, EN 500).
+  2.ª revisión de Opus: NO PASA hasta probarlo de verdad; sus 5 fallos y 5 posibles arreglados.
+  **Comprobado con**: 7 pruebas de mft.rs con registros fabricados, cargo test, clippy, tsc, eslint,
+  vitest 445. **Sin comprobar**: la lectura real como administrador →
+  `$env:SPACE_PATH='C:\'; cargo test --release --lib space_mft_real -- --ignored --nocapture` en una
+  consola de administrador (compara MFT con carpeta a carpeta). Build 1.4.0 lanzada con
+  ADMINOPS_SKIP_EXE_TEST=1.
+- 2026-11-23: 3.ª revisión de Opus: PASA (2 leves + 1 posible arreglados: NavEditor no enseña secciones
+  con solo páginas apagadas, README.en, «C:» → «C:\»). **BUILD 1.4.0 HECHA** en `release/v1.4.0`
+  (Setup 13,4 MB, clásico 10,0 MB, portable 14,0 MB, SHA256SUMS), sin rutas del equipo, SIN `test:exe`
+  ni `test:perf` (ADMINOPS_SKIP_EXE_TEST=1). Sin commit. Falta: que David la pruebe (primero Espacio como
+  administrador en C:, «leyendo el índice del disco»), commit y publicar.
+- 2026-11-23: el instalador propio (installer/) tenía el icono y el logo viejos: copiados de
+  src-tauri/icons/icon.ico y src/assets/logo.svg, recompilado y reempaquetado (David no lo había pedido;
+  no volver a compilar sin que lo diga). Nuevo `npm run publish:release` (scripts/publish-release.ps1): commit
+  + push + versión en GitHub. **Decisión de David:** tras cada build que pida, publicar sin preguntar. La
+  1.4.0 se publica cuando él la pruebe y lo diga.
+- 2026-11-23: David: «se ven demasiadas cosas, es lioso» + rehacer la grabación. Hecho (sin compilar, sin
+  revisar): botón de grabar en la barra de arriba junto a Teams y Correo (`src/components/RecButton.tsx`:
+  cámara gris parado; grabando, pastilla verde con punto que late y el tiempo; clic para; clic derecho abre
+  Grabar el fallo; al terminar navega a machine/recorder), guía y changelog al día. Artifact de ideas
+  «AdminOps más claro» https://claude.ai/artifact/A4eEutFgCGn7krrrqHsdPj (16: 7 para despejar, 9 de
+  grabación, la 8 es el botón ya hecho). **Espera su elección.** Pendiente pedido por David: Teams y Correo
+  con su icono oficial en la barra de arriba (en las maquetas ya sale así).
+## Tanda «más claro + grabación» (elegida el 2026-11-23, tras la build 1.4.0 sin publicar)
+Artifact https://claude.ai/artifact/A4eEutFgCGn7krrrqHsdPj. David: SÍ a 1, 2, 4, 7, 8–16. **Sin decidir (no es
+un no; no volver a empujarlas en esta tanda): 3 resumen único arriba, 5 Inicio «¿Qué le pasa?», 6 lo avanzado
+aparte.** Las maquetas del artifact son lo aprobado. Número de versión: decidir con David al pedir la build
+(la 1.4.0 compilada aún no está publicada). Añadidos suyos:
+- Grabación automática (10) **desactivada de serie** y nada molesta: «No volver a grabar por esto» (por
+  programa/código de error), límite por programa y tiempo, un solo aviso que agrupa, nunca 10 notificaciones.
+- Icono de la cámara con color, acoplado a Teams y Correo. Teams y Correo con su icono oficial.
+- La píldora «Grabando» se puede mover.
 
-## Orden propuesto (el autor puede cambiarlo)
+Fases:
+- **G0 — HECHA (sin compilar):** `BrandIcons.tsx` (TeamsIcon, OutlookIcon, RecordIcon verde con la misma
+  composición) en TopBar y RecButton; píldora arrastrable (`data-tauri-drag-region` + capacidad
+  `capabilities/recpill.json` con `core:window:allow-start-dragging`), punto verde que late y asa. tsc,
+  eslint, vitest. **Sin comprobar:** arrastrar de verdad (el clic en el texto/punto/fondo debe arrastrar,
+  «Parar» no). Falta: iconos oficiales también donde salgan Teams/Correo fuera de la barra (CommOpener,
+  Ajustes → Portales), si David lo quiere.
+- **G1 — HECHA 2026-11-23 (sin compilar, sin revisión de Opus):** cabecera en una línea (App.tsx: atrás + título +
+  aviso «N avisos» de QuickRead.tsx + hueco `lib/tabsSlot.ts` donde PageTabs se pinta por portal; sin hueco
+  —vista dividida, derecha— se pinta dentro como antes); icono ↻ solo fuera de NO_RELOAD; barra lateral solo con
+  pantallas (resume avisos y «Nuevo» de sus secciones); chincheta de fijar en cada pestaña y píldora (TabPin,
+  en la esquina); Estado del equipo en 4 grupos (MACHINE_GROUPS + GroupTabs en Merged.tsx, recuerda la píldora
+  por grupo); `Intro` en ui.tsx (1.ª vez entero, luego «Cómo funciona ▾»; localStorage adminops.introSeen)
+  aplicado por un oficial a 14 pantallas; Ajustes → Inicio y ventana → «Ver otra vez las explicaciones»; guía,
+  NavEditor y changelog al día. **Comprobado con:** tsc, eslint, vitest 445/445, test:ui con Edge
+  (CHROMIUM_PATH=msedge.exe; 55 pantallas + 57 secciones, 0 problemas) y capturas de machine-*.
+  **Sin comprobar:** app compilada, barra en modo «solo áreas», arrastre con la vista dividida.
+  Plan original: Estado del equipo en 4 grupos (Salud: Diagnóstico, Seguridad,
+  Rendimiento, Arranques · Piezas: Hardware, Conectados, Pantallas, Teclado, Periféricos · Qué pasó:
+  Historial, ¿Qué cambió?, Pregúntale · Grabar) con fila de botones dentro; barra lateral solo con
+  pantallas (las secciones solo arriba; ojo a fijados de secciones, Ctrl+K, KeyTips, NEW_IN, sections.ts y
+  sus pruebas); cabecera en una línea (título + aviso pequeño + pestañas; «Recargar» solo donde relee);
+  explicaciones plegadas en «Cómo funciona ▾» a partir de la 2.ª visita (por pantalla, localStorage).
+- **G2 — HECHA 2026-11-23 (sin compilar, sin revisión de Opus):** Rust por un oficial de Sonnet (encargo en el
+  scratchpad de la sesión 8e6f9dbc, `encargo-g2.md`): `faultrec_start(monitor, opts{window, region, input, mic})`,
+  `faultrec_windows`, `faultrec_pick_region` + `faultrec_region_done` (ventana transparente `recarea`, evento
+  `faultrec://region`), módulos nuevos `faultrec/input.rs` (sondeo con GetAsyncKeyState cada 8 ms, SIN ganchos;
+  letras siempre «•••»), `mic.rs` (WASAPI 48 kHz mono → pista AAC; relleno de silencio si se para), `win.rs`; Meta
+  gana target/inputOn/input/mic/voice y Status gana mic. Interfaz mía: Setup en FaultRecorder.tsx (Pantalla entera /
+  Una ventana / Una zona, interruptores de clics y teclas —sí de serie— y voz —no de serie—, guardados en
+  localStorage `adminops.faultrec.options`), AreaPicker.tsx (capa para dibujar), círculos de clic y teclas encima del
+  vídeo + pistas de clics y voz bajo la línea de tiempo, micrófono en la píldora, RecButton usa las opciones
+  guardadas (siempre pantalla entera), demo con ventanas, clics y voz. **Arreglado de paso:** cierre con 0xC0000005
+  al parar (el vigilante usaba el COM del hilo de captura; ahora `watch.rs` inicia el suyo): antes 3 de 6 pasadas
+  fallaban, después 8 de 8 bien. **Comprobado con:** clippy, cargo test 817 (71 ignoradas), pruebas reales de
+  ventana, zona, orientación y voz (pista de audio presente; el micro de aquí dio silencio), tsc, eslint, vitest
+  450/450, test:ui con Edge 0 problemas, captura de la pantalla de preparar. **Sin comprobar:** la capa de la zona
+  abierta de verdad, un clic o una tecla apuntados de verdad, voz con sonido, todo desde la app compilada.
+  Plan original: pantalla / una ventana (WGC CreateForWindow, sigue a la ventana) /
+  una zona (recorte del monitor); clics (ondas) y teclas («Ctrl + P»; en campos de contraseña «•••»: hook
+  de bajo nivel o GetAsyncKeyState, nunca guardar texto tecleado) pintados en el vídeo o como pista; voz
+  por micrófono opcional (apagado de serie, pista de audio en el MP4).
+- **G3 — HECHA 2026-11-23 (sin compilar, sin revisión de Opus):** Rust por un oficial de Sonnet (cortado por el
+  límite de 5 h y reanudado): `faultrec/vigil.rs` (sesión: captura 5 fps ≤1280 → H.264 por MFT síncrono →
+  anillo de 75 s en memoria, vigilante y clics en anillo, Ctrl+Alt+G solo mientras se vigila, avisos agrupados,
+  pausa durante la grabación a mano y vuelta), `mfenc.rs` (MFT + MP4 sin recodificar), `ring.rs`, `auto.rs`
+  (disparadores, límites 2/clave/hora y 10/día, EvtQuery cada 10 s, ajustes en `grabacion-auto.json`). Comandos
+  faultrec_watch_start/stop/status, faultrec_just_happened, faultrec_auto_get/set/ignore/unignore; eventos
+  faultrec://auto y faultrec://open (clic en el aviso). Interfaz mía: `FaultWatch.tsx` (barra del último minuto,
+  «¡Acaba de pasar!», automática apagada de serie con sus 3 disparadores e ignorados), origen en la lista y en la
+  grabación, «No volver a grabar por esto», punto verde y clic = guardar el último minuto en el botón de arriba,
+  demo. **Arreglado por mí:** el cierre con 0xC0000005 al parar seguía (3 de 20): `capture::keep_mta_alive`
+  (`CoIncrementMTAUsage` una vez) → 0 de 20, y las 8 pruebas reales ya pasan seguidas en un proceso.
+  **Consumo medido (optimizado, no release):** 0,8 % del equipo con la pantalla quieta, 1,6 % moviéndose; 76 s en
+  5,6 MB. **Comprobado con:** clippy, cargo test 848 (74 ignoradas), las 8 reales seguidas, tsc, eslint, vitest
+  453/453, test:ui 0 problemas. **Sin comprobar:** con la app compilada: Ctrl+Alt+G, avisos de Windows y su clic,
+  un disparador automático real, la vuelta a vigilar tras grabar a mano, la interfaz.
+  Plan original: búfer en memoria del último minuto («¡Acaba de pasar!» + atajo global);
+  disparadores automáticos (no responde, error de aplicación, CPU/disco al 100 % > 20 s) guardando 30 s
+  antes + 15 s después; desactivado de serie; ignorar por programa/código; límite; aviso agrupado.
+- **G4 — HECHA 2026-11-23 por mí (sin compilar, sin revisión de Opus):** Rust: Tick gana mem y net (sysinfo) y
+  Meta gana `samples` (pistas por segundo); `faultrec/clip.rs` (fotogramas con Media Foundation → JPEG con el
+  BitmapEncoder de WinRT; exportar un trozo sin recodificar, vídeo + voz); comandos faultrec_thumb (cacheada en
+  `<id>.thumb.jpg`), faultrec_to_report (`<id>.clip`, 3 fotogramas: marcas del trozo o principio/mitad/final),
+  faultrec_report_remove, faultrec_export (pregunta dónde con el diálogo); el informe mete «Grabación del fallo»
+  antes de las firmas (report_clips del caso abierto); limpieza de .jpg/.clip. Interfaz: TrackPanel (pistas
+  alineadas, clic = ir, arrastrar = recortar, lectura del segundo), ClipBar (Al informe / Al caso → nota del
+  caso / Exportar MP4), lista con miniaturas (RecList) como pantalla de inicio con «Grabar» y «Vigilar»,
+  «Todas las grabaciones» para volver; demo con pistas; guion de capturas `tests/ui/g4shots.mjs`.
+  **Comprobado con:** clippy, cargo test 851 (75 ignoradas), prueba real fotogramas + exportar (3 JPEG, trozo de
+  2,1 s), tsc, eslint, vitest 457/457, test:ui 0 problemas, capturas de lista, reproductor y recorte.
+  **Sin comprobar:** el PDF con la sección de la grabación, «Al caso» con un caso abierto, el diálogo de exportar,
+  todo desde la app compilada.
+  Plan original: reproductor con pistas (CPU, disco, red, memoria, errores, voz)
+  alineadas; recortar; «Al informe» (3 fotogramas con marcas en el PDF), «Al caso», «Exportar MP4» (solo
+  si lo exporta él); pantalla como lista con miniaturas y un botón grande «Grabar» + «Vigilar».
+- **G5 — Cierre:** guía, glosario, changelog, NEW_IN, revisión de Opus. Build solo cuando la pida; tras
+  la build, commit + `npm run publish:release` sin preguntar.
 
-### Fase 0 — Guardar la 1.2.10
-- [x] Commit 577029e (David dijo «sí, haz commit», 2026-11-16).
+- Sigue, en orden: (1) HECHO: revisión de Opus de la Fase 7 con el diff desde `67fd89d` + los archivos nuevos
+  (rúbrica: COM/MF emparejados y sin fugas, MP4 cerrado bien al parar/cerrar/pánico, alcance del
+  protocolo asset solo a `recordings`, ids sin rutas, sin títulos de ventana, borrado por caso, píldora
+  excluida de la captura); (2) HECHO: arreglar lo que salga; (3) Fase 8 (guía, glosario —hay dos: guide.ts:768 y
+  glossary.ts—, changelog.ts, prueba de pantallas, `scripts/version.ps1` a 1.4.0, README) y revisión de
+  Opus antes de la build; (4) `npm run build` / build solo cuando David la pida.
 
-### Fase 1 — Red de seguridad (primero, para que lo demás no rompa nada)
-- [x] **G2** `tests/exe/exe.mjs` (`npm run test:exe`; `--exe ruta.exe`, `--quick`). Arranca el .exe en
-      una carpeta portable limpia, se conecta a WebView2 por CDP, recorre las pantallas en los dos temas,
-      portal de prueba propio (no se recarga al volver y conserva la cookie), clic de ratón de verdad en
-      Ajustes tras el portal y cierre sin procesos colgados. Enganchada al final de `build-release.ps1`
-      (si falla, la carpeta pasa a `v<ver>-NO-DISTRIBUIR`; `ADMINOPS_SKIP_EXE_TEST=1` la salta).
-      Arreglos a la prueba en esta sesión: ajustes `{"onboarded":true}` antes de arrancar (si no, el
-      portable «vacío» se trae los datos del equipo con `closeMinimizes` y portales, y sale el asistente);
-      recargar tras marcar la versión vista (las Novedades tapaban el portal); pantallas que son pestaña
-      de otra según `PAGE_ALIAS`; captura que se atasca = fallo, no caída; si revienta, cierra igual;
-      Alt + SetForegroundWindow antes del clic y dice qué ventana había debajo (otro programa ≠ fallo);
-      el portal escucha el clic (si le llega, sigue encima: el fallo de la 1.1.6); espera hasta 10 s a
-      que WebView2 cierre sus procesos. Lint: `tests/exe` y `tests/perf` con globals de Node + navegador.
-      **Comprobado**: .exe de depuración actual (`cargo build --features tauri/custom-protocol`),
-      prueba completa pasa (arranque ~2 s). Ojo: el clic mueve el ratón de verdad; no tocar nada
-      mientras corre o falla con «el clic cayó en otro programa».
-- [x] **P1** `tests/perf/budget.mjs` (`npm run test:perf`), referencia `tests/perf/baseline.json`
-      (1977 KB, 49 trozos; Merged.js 764 KB e index.js 584 KB: R1/R5 los bajarán). Pasa.
-- [x] **Fallo real encontrado por G2 y arreglado**: en el programa compilado la vista previa del informe
-      (iframe `srcDoc`, `ReportPreview.tsx`) salía sin estilos: Tauri añade un nonce a `style-src` y eso
-      anula `'unsafe-inline'`. Arreglo: `"dangerousDisableAssetCspModification": ["style-src"]` en
-      `tauri.conf.json` (los scripts siguen con nonce). Comprobado con el .exe: sin errores de CSP.
+## Fases (orden propuesto; David puede cambiarlo)
 
-### Fase 2 — Impresoras y escáneres RICOH y EPSON (elegidas P1–P6 el 2026-11-16)
-Maqueta aprobada: https://claude.ai/artifact/GFCqRBdNeQP9uyDBw7mmGV (las seis partes: Sí).
-Fuentes de drivers, en este orden: **Windows Update** (WUA con `ServerSelection = 2`, oficiales y
-firmados) → **biblioteca local** (carpeta o pendrive) → **página oficial** de RICOH o EPSON abierta por
-AdminOps con el modelo copiado al portapapeles, y **recogida automática** del archivo que llegue a
-Descargas. RICOH (PCL6 Driver for Universal Print 4.42.0.0, jul 2025) y EPSON no tienen enlaces
-directos estables: nunca se baja nada a ciegas ni de webs de terceros.
+### Fase 0 — Icono «Equipo vivo» (A10) — HECHA
+- [ ] Afinar el boceto elegido (ventana azul con pulso verde y pie): SVG maestro, legible a 16 px,
+      una tinta y negativo, `svg_audit.py` y la hoja a tamaños reales (skill logo-design).
+- [ ] Enseñar a David el icono afinado junto al actual antes de cambiar nada.
+- [ ] `npx tauri icon` desde el maestro, `src/assets/logo.svg`, el logo de la barra de título, del
+      informe y del instalador; copia en `perfil/diseno/iconos/` y ficha `apps/adminops.md`.
 
-Base que ya existe: `printers.rs` (`list_printers` por spooler, `on_printer` + `tweaks.record`,
-`print_test_page`, `check_printer`, `find_network_printers`), `snmp.rs` (`printer_identity`,
-`printer_status`), `fixes/printdeep.rs` (`brand`, `generic_driver`, reinstalación limpia),
-`drivers.rs` (copia con pnputil), `paths::drivers_backup_dir`, `audit.rs` (`BLOCKED` = comandos que
-cambian el equipo; la prueba exige que cada comando esté en `SAFE` o en `BLOCKED`).
-Interfaz: `src/pages/Printers.tsx`; pestañas en `src/pages/Merged.tsx` (`SharedTab`, hoy
-`printers | shares`); alias en `Sidebar.tsx` (`PAGE_ALIAS`); API en `src/lib/api/install.ts`.
+### Fase 1 — Moverse y listas (A1, A3, A4, A5, A8) — HECHA
+- [ ] **A1** Atrás y adelante: pila de navegación con el estado de cada pantalla (pestaña, filtros,
+      scroll); Alt+←/→, botones laterales del ratón (button 3/4) y flecha en la cabecera con el nombre
+      de dónde vienes; mantener pulsada → las 10 últimas.
+- [ ] **A3** Escribir para filtrar en cualquier `DataTable` (letras y números con el foco fuera de un
+      campo); Esc borra; Enter abre si queda uno.
+- [ ] **A4** Columnas a tu gusto: clic derecho en la cabecera (ver/ocultar), arrastrar para ordenar,
+      doble clic ajusta el ancho; se guarda por pantalla y entra en `SavedViews`.
+- [ ] **A5** Listas en vivo quietas bajo el ratón: se congela el orden, no los datos; aviso «Orden en
+      pausa»; al salir, se recoloca con `useAnimatedList`. Procesos, Puestos, Dispositivos, Vigilante.
+- [ ] **A8** Ctrl + / Ctrl − / Ctrl+0: zoom del webview entre 80 % y 150 %, porcentaje un segundo en
+      pantalla, recordado por monitor. Probar a 1366×768 y en 4K.
 
-**Encargo A — motor (Rust, módulo nuevo `printvendor.rs`)**
-- [x] `printer_inventory()`: por cada impresora instalada (no virtual): marca (RICOH/EPSON/otra),
-      modelo limpio, conexión (USB / red + IP del puerto / WSD), driver (nombre, versión, fecha,
-      fabricante, inf de `Get-PrinterDriver`), tipo de driver (fabricante / genérico de Microsoft /
-      de otra marca). En las de red, por SNMP: modelo (`hrDeviceDescr` 1.3.6.1.2.1.25.3.2.1.3.1),
-      serie (`prtGeneralSerialNumber` 1.3.6.1.2.1.43.5.1.1.17.1) y páginas (`prtMarkerLifeCount`
-      1.3.6.1.2.1.43.10.2.1.4.1.1), en paralelo y con tiempo límite corto. Además, los aparatos
-      conectados **sin instalar**: PnP con VID 05CA (RICOH) o 04B8 (EPSON), o clase Printer con
-      código de problema 28.
-- [x] `scanner_inventory()`: dispositivos de imagen (clase PnP «Image» / WIA) de RICOH, EPSON y
-      PFU/Fujitsu (fi y ScanSnap, ahora RICOH): driver (`Win32_PnPSignedDriver`: versión y fecha),
-      tipo (WIA, TWAIN, PaperStream IP), estado (falta / funciona) y si están instalados los
-      programas de escanear (Epson Scan 2, PaperStream Capture/IP, ScanSnap Home; claves Uninstall).
-- [x] **Biblioteca**: carpeta en `Settings` (por defecto `<datos>/drivers`, viaja en el portable).
-      `driver_library()` recorre la carpeta, lee los `.inf` (`[Version] DriverVer`, `Class`,
-      `Provider` y los modelos de las secciones de fabricante), solo x64, y guarda un índice json.
-      `driver_library_add(path)`: copia un paquete (carpeta, `.zip`, o `.exe` autoextraíble que se
-      pueda abrir como zip; si no se puede abrir, se guarda tal cual como «instalador del fabricante»).
-- [x] `driver_candidates(device)`: lo que hay para ese modelo en la biblioteca y en Windows Update
-      (búsqueda WUA `IsInstalled=0 and Type='Driver'`, filtrada por ID de hardware o modelo;
-      tarda: se hace bajo demanda, con caché de la última búsqueda). Estado final: al día / viejo
-      (con la versión nueva y de dónde sale) / genérico / falta / de otra marca / **sin comparar**
-      (nunca «al día» si no hay con qué comparar).
-- [x] `printer_driver_update(printer, candidate)` (BLOCKED, requiere administrador): pasos con
-      progreso: 1) copia del driver actual (`pnputil /export-driver` a `drivers_backup_dir`);
-      2) instalar (`pnputil /add-driver <inf> /install` o la actualización de Windows Update);
-      3) `Add-PrinterDriver` con el nombre de modelo del inf; 4) `Set-Printer -DriverName`
-      conservando nombre, puerto, compartida y predeterminada; 5) página de prueba. Devuelve un id de
-      deshacer. `printer_driver_undo(id)` (BLOCKED): vuelve al driver anterior (no se desinstala el
-      viejo, así deshacer es inmediato). Todo con `tweaks.record`, también los fallos.
-- [x] `open_vendor_page(brand, model)`: abre la página oficial de soporte (RICOH / EPSON) y copia
-      el modelo al portapapeles. `watch_downloads(minutes)`: vigila la carpeta Descargas y avisa por
-      evento de los paquetes nuevos (`.exe`, `.zip`) con su versión y modelos si se pueden leer.
-- [x] `scanner_test(device)` (solo lectura del escáner): escaneo de prueba por WIA a un archivo
-      temporal; devuelve la imagen para enseñarla.
-- [x] Pruebas de la lógica pura: lectura de `.inf` (DriverVer, modelos), comparación de versiones
-      con 4 números, marca y modelo desde nombre/driver/ID de hardware, estado del driver.
+### Fase 2 — Teclado y Ctrl+K (A2, A9) — HECHA
+- [ ] **A2** Letras con Alt: tabla fija de letras por pantalla (no al azar), capa que las pinta con
+      Alt pulsado, barra lateral incluida; no pisar los atajos de Windows con Alt.
+- [ ] **A9** Ctrl+K con varias órdenes: partir por «y» y comas sobre el reconocedor actual; una
+      confirmación para todas; en serie por la cola de tareas; resultado de cada paso; Tab completa,
+      ↑ trae las últimas.
 
+### Fase 3 — Acciones que se explican, se prueban y se repiten (B1, B2, B3, B4) — HECHA
+- [ ] Base común: cada acción declara su comando equivalente (B1) y qué mide (B2). Revisar primero
+      cómo están registradas las acciones (`quickActions`, `fixLadder`, `tweaks.record`) para hacerlo
+      en un solo sitio.
+- [ ] **B1** «Ver el comando»: PowerShell/CMD exacto y comentado en español, «Copiar» y «Guardar
+      como .ps1»; si la acción usa la API de Windows, el equivalente más cercano y avisándolo.
+- [ ] **B2** Antes y después medidos en el aviso («C: 3,1 GB → 24,8 GB libres»), en el caso y en el
+      informe. El arranque se mide en el siguiente reinicio y se añade solo.
+- [ ] **B3** El plan sigue tras reiniciar: entrada en RunOnce del usuario con el id del plan; al
+      entrar, abre el plan, comprueba el paso y sigue. Banner «Seguido tras reiniciar · paso 3 de 5».
+- [ ] **B4** «Guardar como plantilla» al cerrar un caso: pasos sacados del diario, sin lo que falló,
+      desmarcar lo que era de ese equipo, nombre; aparece en Plantillas.
 
-**Encargo A HECHO (2026-11-16, sin commit)** — `src-tauri/src/printvendor.rs` + `printvendor/{inf.rs,logic.rs}`,
-`snmp.rs` (`printer_ids`: modelo, serie y páginas en una petición), registrado en `lib.rs` y `audit.rs`.
-Comprobado: `cargo clippy --all-targets -D warnings` limpio, `cargo test --lib` 539 pasan (23 nuevas). La
-lectura (inventarios) se ejecutó en este equipo (5 impresoras, 0 escáneres); lo que cambia el equipo
-**no se ha probado con hardware** (no hay RICOH ni EPSON aquí). Revisor de Go: 8 hallazgos, verificados
-y arreglados (ruta dentro de la biblioteca con `inside_library`; impresora por nombre exacto y `$p |
-Set-Printer`, nunca `-Name`; deshacer guardado antes de cambiar y vuelta automática si falla; sin rutas
-completas hacia la interfaz, `escalate::scrub`; límite de 4 GB; elección exacta del escáner WIA;
-`tweaks.record` también sin administrador).
+### Fase 4 — Las pantallas de siempre (C2, C4, C5)
+- [ ] **C2** Windows Update: en la fila del fallo, el código en una frase, la causa comprobada en este
+      equipo (partición reservada, servicio, componentes) y «Probar» con el siguiente escalón
+      (`CodeLinks` + `fixLadder`); progreso real por actualización.
+- [ ] **C4** Instalar: una fila por programa (descargando %, instalando, listo); salida de winget
+      línea a línea y códigos de salida traducidos; «Cerrar y seguir», «Reintentar», «Saltar»; resumen.
+- [ ] **C5** Dispositivos: `CM_Register_Notification` en Rust → evento; lo recién conectado arriba y
+      resaltado con su estado y acción; aviso desde la bandeja si está minimizado.
 
-Para el encargo B (contrato con la interfaz; todo en camelCase):
-- SAFE: `printer_inventory() -> {printers: PrinterInfo[], notInstalled: DetectedDevice[], windowsUpdateAt}`;
-  `PrinterInfo {name, vendor: ricoh|epson|otra, brand, model, connection {kind: usb|red|wsd|servidor|otra, ip, port},
-  driver {name, version, date, manufacturer, inf, kind: fabricante|generico|otraMarca|ninguno}, default, shared,
-  hardwareIds, snmp {model, serial, pages}, state {status: alDia|viejo|generico|falta|otraMarca|sinComparar, label,
-  reason, newVersion, source}, device}` (`device` se devuelve tal cual).
-  `scanner_inventory() -> {scanners: ScannerInfo[] (health funciona|falta, problem, driver, interfaces, state, device),
-  notInstalled, software [{id, name, vendor, installed, version}], windowsUpdateAt}`.
-  `driver_library(rescan?) -> {customDir (usuario tapado), isDefault, exists, scannedAt, drivers: LibDriver[],
-  installers: LibInstaller[] (con id)}`; `driver_library_add(path | "dl:…") -> AddResult`;
-  `set_driver_library_dir(dir?)`; `driver_candidates(device, searchUpdate?) -> {candidates [{id, source
-  biblioteca|windowsUpdate, title, version, date, model, matchedBy, comparable, newer, package}], state,
-  windowsUpdate {searched, fromCache, searchedAt, error, pendingTotal}}`;
-  `open_vendor_page(brand, model) -> {url, copied}`; `watch_downloads(minutes)`; `scanner_test(device) -> {dataUrl, bytes}`.
-- BLOCKED (piden administrador): `printer_driver_update(printer, candidate) -> {undoId, printer, previousDriver,
-  previousVersion, newDriver, newVersion, changed, testPageSent, rebootRequired, message}`;
-  `printer_driver_undo(id) -> string`; `printer_install(device, candidate) -> {printer, createdQueue, driver,
-  rebootRequired, message}`; `run_vendor_installer(id) -> {name, finished, exitCode, rebootRequired, message}`
-  (pide UAC si AdminOps no está elevado; espera 15 min como mucho).
-- Eventos: `printvendor:step {printer, step: backup|install|driver|assign|test|queue|run, index, total, state:
-  running|ok|skipped|error, message}`; `printvendor:download {id "dl:…", name, size, kind exe|zip, readable,
-  version, provider, vendor, models[]}`; `printvendor:watch {state started|ended|stopped, minutes}`.
-  Tareas en la barra (cancelables): `printvendor-wu`, `printvendor-update`, `printvendor-scan`.
-- Datos: biblioteca por defecto en `<datos compartidos>/printvendor/` (config.json, library-index.json);
-  caché de Windows Update en `<datos del equipo>/printvendor/wu-cache.json`; deshacer en undo.json; copias
-  del driver en `drivers_backup_dir/Impresora_<nombre>_<fecha>` (las ve «Restaurar drivers»).
-- Decisiones del oficial a confirmar con David: el driver universal de la propia marca cuenta como «del
-  fabricante», no «genérico»; universal frente a driver de modelo = «sin comparar»; Windows Update acepta la
-  licencia del driver (`AcceptEula`) al instalar.
+### Fase 5 — Diagnóstico nuevo, primera parte (D3, D5, D8)
+- [ ] **D3** Pantallas y monitores (página nueva): `QueryDisplayConfig` + EDID (marca, modelo,
+      nativa), escala, Hz, conexión; dibujo de la disposición; arreglos con `SetDisplayConfig` y
+      deshacer solo a los 15 s; reiniciar el driver gráfico.
+- [ ] **D5** Lo que no se guardó: carpetas de autorrecuperación de Office (registro), documentos sin
+      guardar, temporales y versiones anteriores (VSS); vista previa; «Abrir una copia» sin tocar el
+      original. Pestaña en Recuperar archivos.
+- [ ] **D8** El teclado escribe raro: idiomas de teclado, activo, atajo de cambio; prueba «ñ @ ´»;
+      «Dejar solo Español» y quitar el atajo, con deshacer.
 
-**Encargo B — interfaz**
-- [ ] Impresoras: marca (insignia RICOH / EPSON), modelo, conexión, serie y páginas; chip del estado
-      del driver con el motivo en `HoverCard`; aparatos sin instalar con «Instalarla».
-- [ ] Ficha del driver (Drawer): ahora / nuevo / de dónde sale; «Actualizar driver» con los pasos
-      en vivo; «¿Salió bien la página de prueba?» → Sí / Deshacer.
-- [ ] «Actualizar las RICOH» / «las EPSON»: en fila, resultado por impresora, resumen para copiar.
-- [ ] Pestañas nuevas en «Impresoras y carpetas»: **Escáneres** (con «Probar escaneo» y
-      «Instalar Epson Scan 2 / PaperStream») y **Drivers** (biblioteca: paquetes, carpeta, «Añadir»,
-      «Bajar de RICOH / EPSON» con la recogida desde Descargas). Alias en `PAGE_ALIAS`.
-- [ ] Guía (`guide.ts`), glosario si hace falta, novedades (`changelog.ts`) y la prueba de pantallas.
+### Fase 6 — Diagnóstico nuevo, segunda parte (D6, D7)
+- [ ] **D6** Escanear a carpeta: asistente en Escáneres (carpeta, recurso compartido, usuario local
+      con contraseña dictable, cortafuegos), panel grande con lo que se escribe en la RICOH/EPSON,
+      vigilar la carpeta y decir «Llegó…» o por qué no (SMB1, firma SMB). Pide administrador local.
+- [ ] **D7** ¿Quién se come internet?: subida y bajada por programa en vivo
+      (`GetPerTcpConnectionEStats` o ETW de red del kernel), a dónde se conecta, total del día;
+      «Pausar 2 h» para OneDrive.
 
-**Por comprobar a mano (no hay RICOH ni EPSON en este equipo)**: con David y sus impresoras reales.
+### Fase 7 — Grabar el fallo (D2)
+- [ ] Captura con `Windows.Graphics.Capture` y el codificador de Windows (sin ffmpeg), hasta 2 min,
+      solo en este equipo; línea de tiempo con errores del registro, programas colgados y picos de
+      CPU/disco; cada marca salta al segundo del vídeo; se borra al cerrar el caso.
 
-### Fase 3 — Rapidez (base de la fluidez)
-- [ ] R1 partir `Merged` · R2 temporizadores en pausa con la ventana oculta · R3 última lectura con su
-      hora en las pantallas de consulta · R4 precargar al pasar el ratón · R5 abrir antes ·
-      F1 listas virtuales · F2 las últimas pantallas siguen vivas.
-
-### Fase 4 — Diagnóstico de experto
-- [ ] **C1** ¿Por qué no responde?: Wait Chain Traversal (`GetThreadWaitChain`) + archivos y rutas de
-      red abiertas por el proceso; explicación en palabras y acciones (reconectar unidad, esperar, cerrar).
-- [ ] **C2** ¿Quién tiene ese archivo?: Restart Manager (`RmStartSession`/`RmGetList`) para archivo,
-      carpeta o unidad; por la red, `Get-SmbOpenFile` (ya en `office.rs`). Soltar archivos ya existe.
-- [ ] **D1** Encontrar el cambio que lo rompió: búsqueda por mitades sobre el diario y el deshacer.
-- [ ] **D2** ¿Perfil o equipo?: usuario local temporal con contraseña dictable, borrado con su carpeta
-      al terminar o a las 24 h (tarea programada).
-- [ ] **B1** Lector de errores: `ocr.rs` + `errcodes.rs` + soluciones; soltar o pegar imagen.
-
-### Fase 5 — El día a día
-- [ ] **A2** Puestos por gravedad: `check_stations` manda cada equipo al terminarlo (eventos).
-- [ ] **B2** Ctrl+K que ejecuta acciones con confirmación en la misma caja.
-- [ ] **B3** Su equipo, desde su ficha (Personas → revisar y arreglar a distancia).
-- [ ] **C3** AdminOps en miniatura (segunda ventana pequeña, como la nota de Ctrl+Alt+N).
-- [ ] **N1** ¿Qué cambió? · **N3** Pregúntale al equipo · **N5** arreglos desde la bandeja ·
-      **N6** salir sin dejar rastro.
-
-### Fase 6 — Lo que enseñas
-- [ ] **F1** Tu mes, medido: PDF con cifras que enlazan a su prueba (diario, casos, arranque medido).
-
-### Fase 7 — Antes de la presentación
-- [ ] **G1** Repaso de las 52 pantallas en los dos temas a 1366×768, con capturas antes/después.
+### Fase 8 — Cierre de la 1.4.0
+- [ ] Guía (`guide.ts`), glosario, novedades (`changelog.ts`), prueba de pantallas, subir a 1.4.0
+      (package.json, tauri.conf.json, Cargo.toml, README). Revisión de Opus antes de la build. Build
+      solo cuando David la pida.
 
 ## Decisiones del autor
-- 2026-11-16: N2 y N4 no. Todo lo de varios técnicos, no. Del catálogo «Un día», no: A1, A3, A4, B4,
-  C4, D3, E1–E4, F2, F3.
+- 2026-11-20: Sí a A1, A2, A3, A4, A5, A8, A9, A10, B1, B2, B3, B4, C2, C4, C5, D2, D3, D5, D6, D7, D8.
+- A10: el icono **«El equipo vivo»** (ventana con pulso), de los tres bocetos.
+- Sin elegir (no son un «no»; no volver a empujarlas en esta tanda): A6 ventana que recuerda su sitio,
+  A7 sacar a otra ventana, B5 scripts con formulario, B6 pendrive al día, C1 lo que creció, C3 informe
+  con portada, D1 mapa Wi-Fi, D4 certificados y hora, D9 quién no deja dormir.

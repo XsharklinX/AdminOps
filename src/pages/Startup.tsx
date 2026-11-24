@@ -11,6 +11,7 @@ import { ErrorState, Loading, iconBtn } from "../components/ui";
 import { DataTable, type Column } from "../components/DataTable";
 import { withoutUserPaths } from "../lib/errors";
 import { readCached, remember } from "../lib/cachedRead";
+import { usePageMemory } from "../lib/pageMemory";
 
 const SOURCE_LABEL = { registry: "Registro", folder: "Carpeta", task: "Tarea" };
 
@@ -18,8 +19,8 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
   const [items, setItems] = useState<StartupItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [hideMicrosoft, setHideMicrosoft] = useState(false);
+  const [query, setQuery] = usePageMemory("q", "");
+  const [hideMicrosoft, setHideMicrosoft] = usePageMemory("hideMicrosoft", false);
   const toast = useToast();
 
   const [failed, setFailed] = useState<string | null>(null);
@@ -59,10 +60,10 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
   const toggle = async (i: StartupItem) => {
     setBusy(i.id);
     try {
-      await systemApi.setStartupEnabled(i.id, !i.enabled);
+      const measured = await systemApi.setStartupEnabled(i.id, !i.enabled);
       // Actualización optimista: volver a listar lanza PowerShell y tarda ~1 s.
       setItems((all) => all?.map((x) => (x.id === i.id ? { ...x, enabled: !i.enabled } : x)) ?? null);
-      toast("ok", `${i.description ?? i.name}: ${i.enabled ? "no arrancará" : "arrancará"} con Windows.`);
+      toast("ok", `${i.description ?? i.name}: ${i.enabled ? "no arrancará" : "arrancará"} con Windows.${measured ? ` ${measured}.` : ""}`);
     } catch (e) {
       toast("error", `${i.name}: ${e}`);
     } finally {
@@ -146,7 +147,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar programa, editor o ruta…"
+            data-typefilter placeholder="Buscar programa, editor o ruta…"
             className="w-full rounded-md border border-line bg-panel py-1.5 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
           />
         </div>
@@ -169,6 +170,7 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
           padded
           sticky
           resizable="startup"
+          typeFilter={false}
           rows={visible}
           rowKey={(i) => i.id}
           rowClass={(i) => (i.enabled ? "" : "opacity-60")}

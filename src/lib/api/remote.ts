@@ -115,6 +115,8 @@ export interface NetRepair {
   steps: { title: string; ok: boolean; detail: string }[];
   reboot: boolean;
   verdict: NetVerdict;
+  /** «Ping al router: 340 ms → 4 ms», si se pudo medir antes y después. */
+  measureText?: string | null;
 }
 
 export const troubleshootApi = {

@@ -31,13 +31,14 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Explain } from "../components/ui";
+import { Button, Card, Explain, Intro } from "../components/ui";
 import { logQuietly, lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
 import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
 import { DataTable } from "../components/DataTable";
 import { Drawer } from "../components/Drawer";
 import { Copyable } from "../components/Copyable";
 import { HoverCard } from "../components/HoverCard";
+import { usePageMemory } from "../lib/pageMemory";
 
 const ipNum = (ip: string) => ip.split(".").reduce((a, o) => a * 256 + Number(o), 0);
 
@@ -173,7 +174,7 @@ export function Devices() {
   const [conflicts, setConflicts] = useState<IpConflict[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState("");
-  const [kindFilter, setKindFilter] = useState("all");
+  const [kindFilter, setKindFilter] = usePageMemory("chip", "all");
   const [detail, setDetail] = useState<LanDevice | null>(null);
   const office = useOfficeMap();
   const toast = useToast();
@@ -307,10 +308,10 @@ export function Devices() {
 
       <Card title="Dispositivos conectados a la red" icon={<Radar size={14} />}>
         <div className="flex flex-wrap items-center gap-3">
-          <p className="min-w-0 flex-1 text-sm text-dim">
+          <Intro id="router:devices" className="min-w-0 flex-1">
             Busca todo lo que hay en la red y lo identifica: tipo, fabricante, modelo y qué servicios ofrece. Los nuevos desde la última búsqueda se
             marcan para detectar intrusos.
-          </p>
+          </Intro>
           {scan && unknownVendors && (
             <Button kind="ghost" onClick={identifyVendors} disabled={vendorsBusy || busy !== null} title="Consulta en Internet solo el prefijo del fabricante de cada MAC">
               <Building2 size={14} /> {vendorsBusy ? "Identificando…" : "Fabricantes por MAC"}
@@ -371,6 +372,7 @@ export function Devices() {
           )}
           <DataTable
             rows={devices}
+            live
             rowKey={(d) => d.ip}
             onRowClick={(d) => editing !== d.ip && setDetail(d)}
             followFocus

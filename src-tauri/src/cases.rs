@@ -57,6 +57,88 @@ pub struct CaseAction {
     pub at: u64,
     pub title: String,
     pub ok: bool,
+    /// Lo medido antes y después, sin etiqueta («3,1 GB → 24,8 GB libres»), si la acción mide algo.
+    pub measure: Option<String>,
+}
+
+/// Una acción del caso en la lista de «Guardar como plantilla».
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateItem {
+    pub title: String,
+    /// `tweak` (un ajuste o tarea del catálogo) o `restorePoint`; vacío si no se puede repetir.
+    pub step: String,
+    /// El ajuste del catálogo, para `tweak`.
+    pub tweak_id: Option<String>,
+    pub repeatable: bool,
+    /// Por qué no se puede repetir.
+    pub reason: Option<String>,
+    /// Riesgo del ajuste en el catálogo (`low`, `medium` o `high`), para `tweak`.
+    pub risk: Option<String>,
+    /// El aviso del catálogo (efectos secundarios), si lo tiene.
+    pub note: Option<String>,
+}
+
+/// Lo que se hizo en el caso, listo para convertirlo en pasos de una plantilla.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateDraft {
+    pub items: Vec<TemplateItem>,
+    /// Lo que falló y se quitó: «Quitado: {título} (falló)».
+    pub removed: Vec<String>,
+}
+
+pub const ONLY_THIS_PC: &str = "Solo valía para este equipo";
+pub const NO_STEP_YET: &str = "Aún no es un paso de plantilla";
+
+/// Acciones sobre una persona o un equipo concreto, o que tocan contraseñas: no se repiten en otro equipo.
+fn only_for_this_pc(title: &str) -> bool {
+    let t = title.to_lowercase();
+    t.starts_with("dominio:")
+        || t.starts_with("cuentas:")
+        || t.starts_with("caso cerrado")
+        || t.starts_with("cambiar el nombre del equipo")
+        || ["laps", "bitlocker", "contraseña", "credencial", "desbloquear"].iter().any(|w| t.contains(w))
+}
+
+/// Convierte el diario del caso en la lista de la plantilla, en el orden en que se hizo.
+/// Lo que falló no sale (se cuenta aparte), lo deshecho tampoco, y cada ajuste una sola vez.
+pub fn template_items(entries: &[Entry]) -> TemplateDraft {
+    let mut items: Vec<TemplateItem> = Vec::new();
+    let mut removed: Vec<String> = Vec::new();
+    let item = |title: &str, step: &str, tweak_id: Option<String>, reason: Option<&str>| TemplateItem {
+        title: title.to_string(),
+        step: step.to_string(),
+        tweak_id,
+        repeatable: reason.is_none(),
+        reason: reason.map(String::from),
+        risk: None,
+        note: None,
+    };
+    for e in entries {
+        if e.op == Op::Revert || e.reverted {
+            continue;
+        }
+        if !e.ok {
+            if !removed.contains(&e.title) {
+                removed.push(e.title.clone());
+            }
+            continue;
+        }
+        let new = match (e.op, e.tweak_id.as_deref()) {
+            (Op::RestorePoint, _) => item("Punto de restauración", "restorePoint", None, None),
+            _ if only_for_this_pc(&e.title) => item(&e.title, "", None, Some(ONLY_THIS_PC)),
+            (Op::Apply | Op::Run, Some(id)) => item(&e.title, "tweak", Some(id.to_string()), None),
+            _ => item(&e.title, "", None, Some(NO_STEP_YET)),
+        };
+        let dup = items.iter().any(|x| if new.repeatable { x.step == new.step && x.tweak_id == new.tweak_id } else { x.title == new.title });
+        if !dup {
+            items.push(new);
+        }
+    }
+    // Lo que falló pero se repitió con éxito no se «quita»: salió bien al final.
+    removed.retain(|t| !entries.iter().any(|e| e.ok && !e.reverted && &e.title == t));
+    TemplateDraft { items, removed }
 }
 
 fn now() -> u64 {
@@ -100,6 +182,37 @@ fn counts(e: &Entry) -> bool {
     !e.title.starts_with("Dominio: consultad")
 }
 
+/// Una acción hecha: título, veces y su medida.
+type Done = (String, usize, Option<String>);
+
+/// Lo hecho y lo que falló, en orden. Acciones seguidas iguales (reintentos) se
+/// cuentan una vez («2 veces»); si miden algo, sale la medida (la del último intento).
+fn split_actions(entries: &[Entry]) -> (Vec<Done>, Vec<String>) {
+    let mut hechas: Vec<Done> = Vec::new();
+    let mut fallidas: Vec<String> = Vec::new();
+    for e in entries.iter().filter(|e| counts(e)) {
+        if e.ok {
+            let m = e.measure.as_ref().map(|m| m.text());
+            match hechas.last_mut() {
+                Some((t, n, last)) if *t == e.title => {
+                    *n += 1;
+                    if m.is_some() {
+                        *last = m;
+                    }
+                }
+                _ => hechas.push((e.title.clone(), 1, m)),
+            }
+        } else {
+            let porque = e.message.as_deref().map(|m| m.lines().next().unwrap_or("").chars().take(90).collect::<String>()).filter(|m| !m.is_empty());
+            fallidas.push(match porque {
+                Some(m) => format!("{} ({m})", e.title),
+                None => e.title.clone(),
+            });
+        }
+    }
+    (hechas, fallidas)
+}
+
 /// Redacta la resolución del caso a partir de lo que se hizo.
 ///
 /// No se inventa nada: cada línea es una acción real del diario, con su título,
@@ -113,30 +226,19 @@ pub fn compose(case: &Case, entries: &[Entry], at: u64) -> String {
         out.push(String::new());
     }
 
-    // Acciones seguidas iguales (reintentos) se cuentan una vez: «(2 veces)».
-    let mut hechas: Vec<(String, usize)> = Vec::new();
-    let mut fallidas: Vec<String> = Vec::new();
-    for e in entries.iter().filter(|e| counts(e)) {
-        if e.ok {
-            match hechas.last_mut() {
-                Some((t, n)) if *t == e.title => *n += 1,
-                _ => hechas.push((e.title.clone(), 1)),
-            }
-        } else {
-            let porque = e.message.as_deref().map(|m| m.lines().next().unwrap_or("").chars().take(90).collect::<String>()).filter(|m| !m.is_empty());
-            fallidas.push(match porque {
-                Some(m) => format!("{} ({m})", e.title),
-                None => e.title.clone(),
-            });
-        }
-    }
+    let (hechas, fallidas) = split_actions(entries);
 
     if hechas.is_empty() {
         out.push("No se hizo ningún cambio en el equipo desde AdminOps.".into());
     } else {
         out.push("Acciones realizadas:".into());
-        for (t, n) in &hechas {
-            out.push(if *n > 1 { format!("• {t} ({n} veces)") } else { format!("• {t}") });
+        for (t, n, m) in &hechas {
+            out.push(match (*n > 1, m) {
+                (true, Some(m)) => format!("• {t} ({n} veces · {m})"),
+                (true, None) => format!("• {t} ({n} veces)"),
+                (false, Some(m)) => format!("• {t} ({m})"),
+                (false, None) => format!("• {t}"),
+            });
         }
     }
     if !fallidas.is_empty() {
@@ -156,22 +258,9 @@ pub fn compose(case: &Case, entries: &[Entry], at: u64) -> String {
 
 /// Los hechos del caso para contarlos en otro tono.
 fn facts(case: &Case, entries: &[Entry], at: u64, findings: Vec<(String, Option<String>)>) -> crate::casetones::Facts {
-    let mut done: Vec<(String, usize)> = Vec::new();
-    let mut failed = Vec::new();
-    for e in entries.iter().filter(|e| counts(e)) {
-        if e.ok {
-            match done.last_mut() {
-                Some((t, n)) if *t == e.title => *n += 1,
-                _ => done.push((e.title.clone(), 1)),
-            }
-        } else {
-            let why = e.message.as_deref().map(|m| m.lines().next().unwrap_or("").chars().take(90).collect::<String>()).filter(|m| !m.is_empty());
-            failed.push(match why {
-                Some(m) => format!("{} ({m})", e.title),
-                None => e.title.clone(),
-            });
-        }
-    }
+    let (hechas, failed) = split_actions(entries);
+    // La medida va con la acción: «Vaciar la cola (Cola: 7 trabajos → 0)».
+    let done = hechas.into_iter().map(|(t, n, m)| (match m { Some(m) => format!("{t} ({m})"), None => t }, n)).collect();
     crate::casetones::Facts {
         ticket: case.ticket.clone(),
         person: case.person.clone(),
@@ -238,7 +327,7 @@ pub fn case_update(app: tauri::AppHandle, case: Case) -> Result<Case, String> {
 #[tauri::command]
 pub fn case_actions(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Vec<CaseAction> {
     let Some(c) = open_case(&load(&app)).cloned() else { return Vec::new() };
-    tweaks.journal_since(c.started).into_iter().filter(counts).map(|e| CaseAction { at: e.timestamp, title: e.title, ok: e.ok }).collect()
+    tweaks.journal_since(c.started).into_iter().filter(counts).map(|e| CaseAction { at: e.timestamp, title: e.title, ok: e.ok, measure: e.measure.map(|m| m.short()) }).collect()
 }
 
 /// Borrador de la resolución del caso abierto (sin cerrarlo).
@@ -262,6 +351,39 @@ pub fn case_tones(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Resul
     Ok(ToneSet { brief: t.brief, friendly: t.friendly, technical: compose(&c, &entries, now()) })
 }
 
+/// Pone a cada ajuste su riesgo y su aviso del catálogo (`catalog` da `(riesgo, aviso)` de un id).
+pub fn add_risk(draft: &mut TemplateDraft, catalog: impl Fn(&str) -> Option<(String, Option<String>)>) {
+    for item in &mut draft.items {
+        if let Some((risk, note)) = item.tweak_id.as_deref().and_then(&catalog) {
+            item.risk = Some(risk);
+            item.note = note;
+        }
+    }
+}
+
+/// Lo que se hizo en el caso abierto, para «Guardar como plantilla».
+#[tauri::command]
+pub fn case_template_draft(app: tauri::AppHandle, tweaks: State<'_, TweakState>) -> Result<TemplateDraft, String> {
+    let c = open_case(&load(&app)).cloned().ok_or("No hay ningún caso abierto.")?;
+    let mut draft = template_items(&tweaks.journal_since(c.started));
+    add_risk(&mut draft, |id| {
+        let t = tweaks.find(id).ok()?;
+        let risk = match t.risk {
+            crate::tweaks::model::Risk::Low => "low",
+            crate::tweaks::model::Risk::Medium => "medium",
+            crate::tweaks::model::Risk::High => "high",
+        };
+        Some((risk.to_string(), t.note.clone()))
+    });
+    Ok(draft)
+}
+
+/// El id del caso abierto, si lo hay (las grabaciones de «Grabar el fallo» cuelgan de él).
+pub fn open_case_id(app: &tauri::AppHandle) -> Option<String> {
+    let _g = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    load(app).into_iter().find(|c| c.ended == 0).map(|c| c.id)
+}
+
 /// Cierra el caso abierto guardando la resolución tal y como quedó.
 #[tauri::command]
 pub fn case_close(app: tauri::AppHandle, resolution: String, tweaks: State<'_, TweakState>) -> Result<Case, String> {
@@ -272,6 +394,8 @@ pub fn case_close(app: tauri::AppHandle, resolution: String, tweaks: State<'_, T
     cur.resolution = clean(&resolution, 8000, true);
     let out = cur.clone();
     save(&app, &list)?;
+    // Las grabaciones de pantalla de este caso no se quedan en el equipo.
+    crate::faultrec::delete_for_case(&app, &out.id);
     let que = if out.ticket.is_empty() { out.person.clone() } else { out.ticket.clone() };
     tweaks.record(Op::Run, &format!("Caso cerrado: {que}"), &Ok::<(), String>(()));
     Ok(out)
@@ -282,8 +406,13 @@ pub fn case_close(app: tauri::AppHandle, resolution: String, tweaks: State<'_, T
 pub fn case_discard(app: tauri::AppHandle) -> Result<(), String> {
     let _g = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut list = load(&app);
+    let dropped: Vec<String> = list.iter().filter(|c| c.ended == 0).map(|c| c.id.clone()).collect();
     list.retain(|c| c.ended != 0);
-    save(&app, &list)
+    save(&app, &list)?;
+    for id in dropped {
+        crate::faultrec::delete_for_case(&app, &id);
+    }
+    Ok(())
 }
 
 /// Casos anteriores de una persona (para su ficha), los más recientes primero.
@@ -304,7 +433,7 @@ mod tests {
     use super::*;
 
     fn entry(t: u64, title: &str, ok: bool, message: Option<&str>) -> Entry {
-        Entry { id: t, timestamp: t, op: Op::Run, tweak_id: None, title: title.into(), ok, message: message.map(String::from), backups: Vec::new(), reverted: false, undoable: false }
+        Entry { id: t, timestamp: t, op: Op::Run, tweak_id: None, title: title.into(), ok, message: message.map(String::from), backups: Vec::new(), reverted: false, undoable: false, measure: None }
     }
 
     fn caso() -> Case {
@@ -326,6 +455,86 @@ mod tests {
         assert!(i_cola < i_red, "en el orden en que se hizo");
         assert!(t.contains("Tiempo dedicado: 14 min."), "{t}");
         assert!(!t.contains("No se pudo"), "{t}");
+    }
+
+    fn con_tweak(t: u64, id: &str, title: &str, ok: bool) -> Entry {
+        Entry { tweak_id: Some(id.into()), ..entry(t, title, ok, None) }
+    }
+
+    /// De las acciones del caso salen los pasos: lo fallido queda fuera y contado, las de una
+    /// persona concreta salen desactivadas y cada ajuste cuenta una sola vez.
+    #[test]
+    fn journal_becomes_template_steps() {
+        let e = vec![
+            con_tweak(1_010, "cleanup.user-temp", "Limpiar temporales del usuario", true),
+            con_tweak(1_020, "repair.office", "Reparar Office", false),
+            entry(1_030, "Dominio: desbloquear la cuenta de maria.perez", true, None),
+            entry(1_040, "Dominio: consultada la contraseña LAPS de PC-CONTA-03", true, None),
+            con_tweak(1_050, "performance.power-plan", "Plan de energía Alto rendimiento", true),
+            con_tweak(1_060, "cleanup.user-temp", "Limpiar temporales del usuario", true),
+            entry(1_070, "Reparar la red", true, None),
+        ];
+        let d = template_items(&e);
+        let titulos: Vec<&str> = d.items.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(
+            titulos,
+            ["Limpiar temporales del usuario", "Dominio: desbloquear la cuenta de maria.perez", "Dominio: consultada la contraseña LAPS de PC-CONTA-03", "Plan de energía Alto rendimiento", "Reparar la red"]
+        );
+        assert!(d.items[0].repeatable && d.items[0].tweak_id.as_deref() == Some("cleanup.user-temp") && d.items[0].step == "tweak");
+        assert!(!d.items[1].repeatable && d.items[1].reason.as_deref() == Some(ONLY_THIS_PC));
+        assert!(!d.items[2].repeatable && d.items[2].reason.as_deref() == Some(ONLY_THIS_PC));
+        assert!(d.items[3].repeatable);
+        assert!(!d.items[4].repeatable && d.items[4].reason.as_deref() == Some(NO_STEP_YET));
+        assert_eq!(d.removed, ["Reparar Office"]);
+    }
+
+    /// Un fallo que luego salió bien no se quita; lo deshecho y los puntos de restauración se tratan aparte.
+    #[test]
+    fn retried_failures_and_undone_changes() {
+        let mut deshecha = con_tweak(1_030, "privacy.telemetry", "Reducir telemetría", true);
+        deshecha.reverted = true;
+        let e = vec![
+            con_tweak(1_010, "repair.sfc", "Reparar archivos del sistema", false),
+            con_tweak(1_020, "repair.sfc", "Reparar archivos del sistema", true),
+            deshecha,
+            Entry { op: Op::RestorePoint, ..entry(1_040, "AdminOps: antes de 'x'", true, None) },
+            Entry { op: Op::Revert, ..entry(1_050, "Deshacer algo", true, None) },
+        ];
+        let d = template_items(&e);
+        assert!(d.removed.is_empty(), "{:?}", d.removed);
+        let pasos: Vec<&str> = d.items.iter().map(|i| i.step.as_str()).collect();
+        assert_eq!(pasos, ["tweak", "restorePoint"]);
+    }
+
+    #[test]
+    fn the_template_items_carry_their_catalog_risk_and_note() {
+        let con_id = |t: u64, title: &str, id: &str| Entry { tweak_id: Some(id.into()), ..entry(t, title, true, None) };
+        let e = [con_id(1_010, "Quitar algo", "a.alto"), con_id(1_020, "Limpiar", "a.bajo")];
+        let mut d = template_items(&e);
+        add_risk(&mut d, |id| match id {
+            "a.alto" => Some(("high".into(), Some("Ojo con esto".into()))),
+            "a.bajo" => Some(("low".into(), None)),
+            _ => None,
+        });
+        assert_eq!(d.items[0].risk.as_deref(), Some("high"));
+        assert_eq!(d.items[0].note.as_deref(), Some("Ojo con esto"));
+        assert_eq!(d.items[1].risk.as_deref(), Some("low"));
+        assert!(d.items[1].note.is_none());
+    }
+
+    /// La medida de cada acción va entre paréntesis, también en los reintentos.
+    #[test]
+    fn measures_go_in_parentheses() {
+        let mut a = entry(1_010, "Liberar espacio", true, None);
+        a.measure = Some(crate::measure::Measure { label: "C:".into(), before: 3.1, after: 24.8, unit: "GB libres".into() });
+        let mut b = entry(1_020, "Vaciar la cola de impresión", true, None);
+        b.measure = Some(crate::measure::Measure { label: "Cola".into(), before: 7.0, after: 0.0, unit: "trabajos".into() });
+        let t = compose(&caso(), &[a.clone(), b.clone(), b], 1_100);
+        assert!(t.contains("• Liberar espacio (C: 3,1 GB → 24,8 GB libres)"), "{t}");
+        assert!(t.contains("• Vaciar la cola de impresión (2 veces · Cola: 7 trabajos → 0)"), "{t}");
+        // Sin medida, la línea es la de siempre.
+        let t = compose(&caso(), &[entry(1_010, "Reparar la red", true, None)], 1_100);
+        assert!(t.contains("• Reparar la red\n"), "{t}");
     }
 
     /// Lo que falló también se cuenta, aparte y con el motivo.

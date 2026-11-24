@@ -89,10 +89,21 @@ export interface TweakPreview {
   lines: PreviewLine[];
 }
 
+/** Lo medido antes y después de una acción (el texto en español lo da `measureApi.text`). */
+export interface Measure {
+  label: string;
+  before: number;
+  after: number;
+  /** «GB libres», «trabajos», «ms», «», «GB», «s» o «estado». */
+  unit: string;
+}
+
 export interface OpResult {
   status: TweakStatus;
   message: string;
   restorePointCreated: boolean;
+  /** Lo que midió la acción antes y después, si mide algo. El aviso ya lo dice en `message`. */
+  measure?: Measure | null;
 }
 
 export interface JournalEntry {
@@ -105,6 +116,7 @@ export interface JournalEntry {
   message: string | null;
   reverted: boolean;
   undoable: boolean;
+  measure?: Measure | null;
 }
 
 export interface RestorePoint {
@@ -126,7 +138,7 @@ export const tweaksApi = {
   journal: () => invoke<JournalEntry[]>("get_journal"),
   /** El diario en PDF (`ids`: solo esas entradas; vacío: todas). Nombre del archivo, o null si se cancela. */
   exportJournalPdf: (ids: number[]) => invoke<string | null>("export_journal_pdf", { ids }),
-  index: () => invoke<{ id: string; name: string; description: string; category: string }[]>("tweak_index"),
+  index: () => invoke<{ id: string; name: string; description: string; category: string; risk: Risk; note: string | null }[]>("tweak_index"),
   revertEntry: (entryId: number) => invoke<OpResult>("revert_entry", { entryId }),
   /** Antes → después de cada cosa que tocarán esos ajustes (solo lee). */
   preview: (ids: string[]) => invoke<TweakPreview[]>("tweak_preview", { ids }),
@@ -182,6 +194,7 @@ export const systemApi = {
     invoke<RemoveSummary>("remove_apps", { packages, skipRestorePoint }),
   reinstallApp: (pkg: string) => invoke<void>("reinstall_app", { package: pkg }),
   listStartup: () => invoke<StartupItem[]>("list_startup"),
-  setStartupEnabled: (id: string, enabled: boolean) => invoke<void>("set_startup_enabled", { id, enabled }),
+  /** Devuelve «Programas al iniciar: 14 → 13» si pudo medirlo. */
+  setStartupEnabled: (id: string, enabled: boolean) => invoke<string | null>("set_startup_enabled", { id, enabled }),
   targetUser: () => invoke<TargetUser | null>("get_target_user"),
 };

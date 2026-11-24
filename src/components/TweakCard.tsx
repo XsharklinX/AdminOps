@@ -2,13 +2,9 @@ import { ChevronDown, Loader2, Play, ShieldCheck, TriangleAlert } from "lucide-r
 import { useEffect, useRef, useState } from "react";
 import { TaskStatus } from "./TaskStatus";
 import { ChangePreview } from "./ChangePreview";
-import type { Risk, TweakStatus, TweakView } from "../lib/api";
-
-const RISK: Record<Risk, { label: string; cls: string }> = {
-  low: { label: "Riesgo bajo", cls: "text-ok border-ok/30 bg-ok/5" },
-  medium: { label: "Riesgo medio", cls: "text-warn border-warn/30 bg-warn/5" },
-  high: { label: "Riesgo alto", cls: "text-bad border-bad/30 bg-bad/5" },
-};
+import { ViewCommand } from "./ActionCommand";
+import type { TweakStatus, TweakView } from "../lib/api";
+import { RISK } from "../lib/risk";
 
 const STATUS: Partial<Record<TweakStatus, { label: string; cls: string }>> = {
   applied: { label: "Aplicado", cls: "text-neon" },
@@ -137,6 +133,7 @@ export function TweakCard({
                 <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
               </button>
             )}
+            <ViewCommand id={t.id} />
           </div>
         </div>
 

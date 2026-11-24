@@ -181,6 +181,8 @@ pub fn netwatch_start(app: tauri::AppHandle) -> WatchStatus {
         s.streak = 0;
     }
     log::info!("Vigilante de la conexión: en marcha");
+    // Mientras vigila, el uso de la red por programa también se mide (Red → Uso de la red).
+    crate::netusage::watch_started();
     let handle = app.clone();
     let round = ROUND.fetch_add(1, Ordering::SeqCst) + 1;
     let alive = move || RUNNING.load(Ordering::SeqCst) && ROUND.load(Ordering::SeqCst) == round;
@@ -219,6 +221,7 @@ pub fn netwatch_start(app: tauri::AppHandle) -> WatchStatus {
         s.status.running = false;
         let outages = s.status.outages.clone();
         drop(s);
+        crate::netusage::watch_stopped();
         save(&handle, &outages);
         log::info!("Vigilante de la conexión: detenido");
     });

@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- AdminOps: un medidor (diagnóstico) cuya aguja termina en una llave (reparación). -->
-  <rect x="4" y="4" width="92" height="92" rx="22" fill="#2F63D8"/>
-  <path d="M24 70 A30 30 0 1 1 76 70" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
-  <line x1="50" y1="58" x2="64" y2="42" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="68" cy="37" r="9" fill="#FFFFFF"/>
-  <rect x="65" y="24" width="7" height="13" rx="1" fill="#2F63D8" transform="rotate(41 68.5 30.5)"/>
-  <circle cx="50" cy="58" r="5.5" fill="#FFFFFF"/>
+  <title>AdminOps</title>
+  <!-- AdminOps: «El equipo vivo». Una pantalla con el pulso dentro: el equipo revisado y funcionando. -->
+  <rect x="4" y="4" width="92" height="92" rx="22" fill="#0F1720" stroke="#2A3B50" stroke-width="2"/>
+  <rect x="17.5" y="21.5" width="65" height="47" rx="7" fill="none" stroke="#5B8DEF" stroke-width="7"/>
+  <path d="M27 46h10l5-10 8 20 5-12h18" fill="none" stroke="#3ECF8E" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M37 80h26" stroke="#5B8DEF" stroke-width="7" stroke-linecap="round"/>
 </svg>

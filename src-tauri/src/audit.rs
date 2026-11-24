@@ -14,6 +14,21 @@ pub const MESSAGE: &str = "Modo auditoría activo: AdminOps no hace cambios en e
 
 /// Comandos que cambian el equipo (sistema, programas, usuarios, red, archivos).
 const BLOCKED: &[&str] = &[
+    // connected: buscar driver, volver a detectar y habilitar cambian el equipo
+    "connected_action",
+    // pantallas: cambiar la resolución o la disposición, confirmar o deshacer, y reiniciar el driver gráfico
+    "display_apply",
+    "display_confirm",
+    "display_undo",
+    "display_restart_driver",
+    // escanear a carpeta: crea usuario, recurso compartido y reglas del cortafuegos; cambia la contraseña, la red o la firma SMB; crea un acceso
+    "scanfolder_setup", "scanfolder_new_password", "scanfolder_private_network", "scanfolder_disable_signing", "scanfolder_desktop_shortcut",
+    // uso de la red: pausar OneDrive cierra el programa y programa una tarea
+    "onedrive_pause",
+    // teclado: dejar solo Español y quitar el atajo de cambio
+    "kbd_only_spanish",
+    // «Abrir una copia» de lo que no se guardó: crea un archivo en el Escritorio
+    "unsaved_copy",
     // Trabajos de noche: empezar ya ejecuta reparaciones.
     "night_run_now",
     // Arreglar un aviso de la campana: limpia, repara o reinicia algo.
@@ -54,8 +69,14 @@ const BLOCKED: &[&str] = &[
     "remove_apps",
     "reinstall_app",
     "set_startup_enabled",
+    // Reiniciar el equipo para seguir un plan de «Preparar equipos»
+    "plan_reboot",
     "upgrade_software",
     "install_apps",
+    "install_enqueue",
+    "install_retry",
+    "install_close_and_retry",
+    "update_install",
     "uninstall_program",
     "remove_leftovers",
     "remove_orphan_entry",
@@ -173,7 +194,7 @@ const SAFE: &[&str] = &[
     // applock
     "lock_status", "lock_verify", "lock_set", "lock_set_idle", "lock_disable", "lock_verify_windows", "data_crypt_status", "data_crypt_enable", "data_crypt_disable", "data_crypt_unlock_recovery",
     // apps
-    "app_catalog", "set_catalog_view", "installed_apps", "search_apps", "install_preflight", "save_app_list", "delete_app_list",
+    "app_catalog", "set_catalog_view", "installed_apps", "search_apps", "install_preflight", "save_app_list", "delete_app_list", "install_snapshot", "install_clear", "install_skip", "install_blockers",
     // audit
     "audit_mode", "set_audit_mode",
     // boottime
@@ -194,6 +215,22 @@ const SAFE: &[&str] = &[
     "is_admin", "relaunch_as_admin",
     // family
     "dns_filter_status", "blocked_sites", "logon_hours",
+    // connected (solo leen)
+    "connected_list", "connected_recent",
+    // displays, kbdlang y unsaved (solo leen; elegir un archivo solo abre un diálogo)
+    // escanear a carpeta (solo mira o abre la carpeta; en auditoría no enciende el registro de SMB1) y uso de la red (solo mide)
+    "scanfolder_status", "scanfolder_watch_start", "scanfolder_watch_status", "scanfolder_watch_stop", "scanfolder_diagnose", "scanfolder_open_folder",
+    "netusage_start", "netusage_snapshot", "netusage_stop", "netusage_icon",
+    // grabar el fallo: solo escribe el vídeo y las marcas en la carpeta de datos de AdminOps y no cambia nada del equipo
+    // (la ventana flotante es de AdminOps y se cierra sola); en auditoría funciona igual
+    "faultrec_monitors", "faultrec_start", "faultrec_status", "faultrec_stop", "faultrec_list", "faultrec_get", "faultrec_delete",
+    // elegir qué grabar: la lista de ventanas es solo lectura y el selector de zona es una ventana propia de AdminOps
+    "faultrec_windows", "faultrec_pick_region", "faultrec_region_done",
+    // Vigilar (el último minuto en memoria) y la grabación automática: solo escriben en la carpeta de AdminOps
+    "faultrec_watch_start", "faultrec_watch_stop", "faultrec_watch_status", "faultrec_just_happened",
+    "faultrec_auto_get", "faultrec_auto_set", "faultrec_auto_ignore", "faultrec_auto_unignore",
+    "faultrec_thumb", "faultrec_to_report", "faultrec_report_remove", "faultrec_export",
+    "displays_list", "kbd_state", "unsaved_list", "unsaved_preview", "unsaved_versions", "unsaved_pick",
     // hardware
     "hardware_inventory", "memory_test_result",
     // hardware::sensors
@@ -236,7 +273,7 @@ const SAFE: &[&str] = &[
     // bandeja: lista de arreglos (lectura) y lo que queda en modo portable (lectura)
     "tray_fixes_available", "portable_leftovers", "portable_cleanup",
     // cases
-    "case_current", "case_open", "case_update", "case_actions", "case_draft", "case_close", "case_discard", "cases_for_person",
+    "case_current", "case_open", "case_update", "case_actions", "case_template_draft", "case_draft", "case_close", "case_discard", "cases_for_person",
     // people
     "search_people", "person_details", "laps_password", "bitlocker_recovery",
     // paths
@@ -274,6 +311,10 @@ const SAFE: &[&str] = &[
     "support_package",
     // Prepara un correo (lo envía el técnico) y enseña los términos: no cambian el equipo.
     "report_problem",
+    // «Ver el comando» (lee el catálogo), guardarlo como .ps1 donde elija el técnico, medidas de antes y después
+    "action_command", "action_save_script", "measure_read", "measure_text", "measure_record",
+    // El plan de «Preparar equipos» guardado en los datos de AdminOps (reiniciar sí está bloqueado)
+    "plan_state_save", "plan_state_load", "plan_state_clear", "plan_check",
     // Guarda un PDF donde elija el técnico: no cambia el equipo.
     "export_journal_pdf",
     "terms_of_use",
@@ -307,9 +348,9 @@ const SAFE: &[&str] = &[
     // vault
     "vault_support", "vault_list", "vault_recovery_key", "vault_save_recovery", "vault_pick_location", "pick_folder", "pick_encrypted_zip",
     // window_state
-    "set_ui_zoom", "ui_ready", "ui_booting", "quit_app", "open_mini_monitor",
+    "set_ui_zoom", "current_monitor_name", "ui_ready", "ui_booting", "quit_app", "open_mini_monitor",
     // winupdate
-    "update_history", "update_pause_state", "pending_updates",
+    "update_history", "update_pause_state", "update_install_running", "pending_updates", "update_cause",
     // winwatch
     "list_windows_alerts", "mark_windows_alerts_read", "clear_windows_alerts", "check_windows_now", "unread_windows_alerts",
     "dismiss_windows_alert", "mute_windows_alert", "unmute_windows_alert", "muted_windows_alerts",

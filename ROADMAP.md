@@ -107,7 +107,17 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
-### Tanda 1.3 — plan en PROGRESS.md (elegida el 2026-11-16, sin empezar)
+### Tanda 1.4 — plan en PROGRESS.md (elegida el 2026-11-20, sin empezar)
+
+21 de las 30 ideas del catálogo «Ideas para AdminOps 1.4»: A1 atrás y adelante, A2 letras con Alt,
+A3 escribir para filtrar, A4 columnas a tu gusto, A5 listas quietas bajo el ratón, A8 Ctrl + / −,
+A9 Ctrl+K con varias órdenes, A10 icono «El equipo vivo», B1 ver el comando, B2 antes y después
+medidos, B3 seguir tras reiniciar, B4 guardar el caso como plantilla, C2 Windows Update explica el
+fallo, C4 Instalar por programa, C5 lo recién enchufado, D2 grabar el fallo, D3 pantallas y monitores,
+D5 lo que no se guardó, D6 escanear a carpeta, D7 quién se come internet, D8 el teclado escribe raro.
+Orden y detalle en `PROGRESS.md`; el plan de la 1.3 quedó en `docs/PROGRESS-1.3.md`.
+
+### Tanda 1.3 — plan en docs/PROGRESS-1.3.md (elegida el 2026-11-16, sin empezar)
 
 Junta la v1.2.11 de abajo, 12 ideas de «Un día con AdminOps» (A2, B1, B2, B3, C1, C2, C3, D1, D2, F1,
 G1, G2) y reconocer y actualizar drivers de impresoras y escáneres RICOH y EPSON. Orden y detalle en

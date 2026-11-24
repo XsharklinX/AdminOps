@@ -1,4 +1,5 @@
 // Mantenimiento a fondo y seguridad.
+import { listen } from "@tauri-apps/api/event";
 import { invoke } from "./core";
 import { type SoftwareUpdate } from "./tools";
 
@@ -55,7 +56,49 @@ export interface PendingUpdate {
   driver: boolean;
 }
 
+/** La causa de un fallo de Windows Update, comprobada en este equipo. */
+export interface UpdateCause {
+  kind: "esp" | "disk" | "service" | "reboot" | "components" | "clock";
+  /** Una frase con el dato medido. */
+  sentence: string;
+  /** El arreglo que toca primero (id del catálogo); sin él, no hay arreglo automático. */
+  fix: string | null;
+}
+
+/** Avance de una actualización mientras se descarga e instala (evento `wu-progress`). */
+export interface UpdateProgress {
+  id: string;
+  phase: "downloading" | "installing" | "done" | "reboot" | "failed";
+  percent: number | null;
+  bytes: number | null;
+  total: number | null;
+  code?: string | null;
+  explanation?: string | null;
+}
+
+/** Se suscribe al avance de las actualizaciones; devuelve cómo darse de baja. */
+export function onUpdateProgress(cb: (p: UpdateProgress) => void): () => void {
+  let off: (() => void) | null = null;
+  let gone = false;
+  listen<UpdateProgress>("wu-progress", (e) => cb(e.payload))
+    .then((u) => {
+      if (gone) u();
+      else off = u;
+    })
+    .catch(() => {});
+  return () => {
+    gone = true;
+    off?.();
+  };
+}
+
 export const updateApi = {
+  /** La causa del código en este equipo, o null si no se puede afirmar ninguna. */
+  cause: (code: string) => invoke<UpdateCause | null>("update_cause", { code }),
+  /** Descarga e instala; el avance de cada una llega por `onUpdateProgress`. */
+  install: (ids: string[]) => invoke<UpdateProgress[]>("update_install", { ids }),
+  /** ¿Sigue una instalación en marcha? Lo sabe el programa (la pantalla puede haberse cerrado y vuelto a abrir). */
+  installRunning: () => invoke<boolean>("update_install_running"),
   history: () => invoke<UpdateHistoryEntry[]>("update_history"),
   pauseState: () => invoke<{ pausedUntil: string | null }>("update_pause_state"),
   pause: (days: number) => invoke<void>("update_pause", { days }),

@@ -28,6 +28,7 @@ import { Timeline } from "../components/Timeline";
 import type { PageId } from "../components/Sidebar";
 import { useOnJournalChange } from "../lib/journalEvents";
 import { timeOfDay as time } from "../lib/format";
+import { usePageMemory } from "../lib/pageMemory";
 
 const OP = {
   apply: { label: "Aplicado", icon: Wrench },
@@ -42,8 +43,8 @@ const PAGE = 150;
 export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?: (p: PageId) => void }) {
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [journalError, setJournalError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<JournalFilter>("all");
-  const [query, setQuery] = useState("");
+  const [filter, setFilter] = usePageMemory<JournalFilter>("chip", "all");
+  const [query, setQuery] = usePageMemory("q", "");
   const [limit, setLimit] = useState(PAGE);
   const [points, setPoints] = useState<RestorePoint[] | null>(null);
   const [pointsError, setPointsError] = useState<string | null>(null);
@@ -228,7 +229,7 @@ export function History({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?
                     setQuery(e.target.value);
                     setLimit(PAGE);
                   }}
-                  placeholder="Buscar en el diario"
+                  data-typefilter placeholder="Buscar en el diario"
                   className="h-8 w-full rounded-md border border-line bg-void/60 pr-2 pl-7 text-xs text-ink outline-none placeholder:text-mute focus:border-neon/50"
                   aria-label="Buscar en el diario"
                 />

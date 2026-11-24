@@ -91,6 +91,11 @@ fn classify(provider: &str, id: u32) -> Option<&'static Known> {
     KNOWN.iter().find(|k| p.contains(k.0) && k.1 == id).or_else(|| KNOWN.iter().find(|k| p.contains(k.0) && k.1 == 0))
 }
 
+/// El título en una frase y el peso («matter», «watch» o «noise») de un evento que AdminOps ya conoce.
+pub fn known_title(provider: &str, id: u32) -> Option<(&'static str, &'static str)> {
+    classify(provider, id).map(|k| (k.3, k.2))
+}
+
 /// Agrupa por causa y ordena: lo que importa primero, luego por número de veces.
 pub fn digest(events: &[RawEvent]) -> Vec<EventGroup> {
     let mut groups: Vec<EventGroup> = Vec::new();

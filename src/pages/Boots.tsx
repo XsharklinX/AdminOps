@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FreshNote } from "../components/FreshNote";
 import { readCached } from "../lib/cachedRead";
 import { NeedsAdmin } from "../components/AdminBanner";
-import { Card, ErrorState, iconBtn, Loading, Tile } from "../components/ui";
+import { Card, ErrorState, iconBtn, Intro, Loading, Tile } from "../components/ui";
 import { insightApi, type BootLog } from "../lib/api";
 import { bytes, dateTime, shortDate } from "../lib/format";
 
@@ -65,7 +65,7 @@ export function Boots({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-60 flex-1 text-sm text-dim">Lo que dice el registro de Windows de los últimos 60 días: cuándo arrancó, cuándo se apagó mal y los pantallazos azules, con qué suele haber detrás.</p>
+        <Intro id="machine:boots" className="min-w-60 flex-1">Lo que dice el registro de Windows de los últimos 60 días: cuándo arrancó, cuándo se apagó mal y los pantallazos azules, con qué suele haber detrás.</Intro>
         <FreshNote at={at} refreshing={busy && log !== null} error={failed} />
         <button onClick={load} disabled={busy} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">
           <RotateCw size={14} className={busy ? "animate-spin" : ""} />

@@ -1,4 +1,5 @@
 // Instalar programas y red avanzada.
+import { listen } from "@tauri-apps/api/event";
 import { invoke } from "./core";
 
 // ---------- Instalar programas y red avanzada (v0.12) ----------
@@ -50,6 +51,59 @@ export interface Preflight {
   /** Avisos en claro, listos para mostrar. */
   warnings: string[];
 }
+
+/** Una fila de la cola de instalación (un programa). */
+export interface InstallItem {
+  id: string;
+  name: string;
+  state: "queued" | "starting" | "downloading" | "installing" | "done" | "skipped" | "failed";
+  /** Descarga en curso, 0-100. */
+  percent: number | null;
+  /** Tamaño de la descarga en bytes, si winget lo ha dicho. */
+  size: number | null;
+  /** El motivo, ya en español. */
+  message: string;
+  /** `close-app`: hay que cerrar el programa («Cerrar y seguir»). Vacío si no hay. */
+  kind: string;
+  reboot: boolean;
+  code: string | null;
+}
+
+/** Qué hay abierto del programa que bloquea la instalación. */
+export interface InstallBlockers {
+  processes: string[];
+  /** Ventanas visibles: si hay, se pide confirmación antes de cerrarlo. */
+  windows: number;
+}
+
+/** Se suscribe a los cambios de las filas de la cola; devuelve cómo darse de baja. */
+export function onInstallItem(cb: (item: InstallItem) => void): () => void {
+  let off: (() => void) | null = null;
+  let gone = false;
+  listen<InstallItem>("install-item", (e) => cb(e.payload))
+    .then((u) => {
+      if (gone) u();
+      else off = u;
+    })
+    .catch(() => {});
+  return () => {
+    gone = true;
+    off?.();
+  };
+}
+
+export const installQueueApi = {
+  /** Pone los programas en la cola y empieza; devuelve todas las filas. */
+  enqueue: (apps: CatalogApp[]) => invoke<InstallItem[]>("install_enqueue", { apps }),
+  /** Las filas tal como están (al volver a la pantalla). */
+  snapshot: () => invoke<InstallItem[]>("install_snapshot"),
+  /** Quita de la lista lo ya terminado. */
+  clear: () => invoke<void>("install_clear"),
+  skip: (id: string) => invoke<void>("install_skip", { id }),
+  retry: (id: string) => invoke<void>("install_retry", { id }),
+  blockers: (id: string) => invoke<InstallBlockers>("install_blockers", { id }),
+  closeAndRetry: (id: string) => invoke<void>("install_close_and_retry", { id }),
+};
 
 export const appsApi = {
   /** Red, espacio, winget y permisos antes de una instalación larga. */
@@ -167,7 +221,8 @@ export const printersApi = {
   list: () => invoke<PrinterInfo[]>("list_printers"),
   check: (name: string) => invoke<PrinterCheck>("check_printer", { name }),
   findOnNetwork: () => invoke<FoundPrinter[]>("find_network_printers"),
-  clearQueue: (name: string) => invoke<void>("clear_printer_queue", { name }),
+  /** Vacía la cola de la impresora. Devuelve «Cola: 7 trabajos → 0» si pudo medirla. */
+  clearQueue: (name: string) => invoke<string | null>("clear_printer_queue", { name }),
   testPage: (name: string) => invoke<void>("print_test_page", { name }),
   setDefault: (name: string) => invoke<void>("set_default_printer", { name }),
   remove: (name: string) => invoke<void>("remove_printer", { name }),

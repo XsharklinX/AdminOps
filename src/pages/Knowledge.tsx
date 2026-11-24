@@ -27,6 +27,7 @@ import {
   Button,
   EmptyState,
   inputClass,
+  Intro,
   Loading,
   Modal,
 } from "../components/ui";
@@ -146,7 +147,7 @@ export function Knowledge({
           </button>
         ))}
       </div>
-      <p className="text-xs text-dim">{current.hint}</p>
+      <Intro key={tab} id={`knowledge:${tab}`}>{current.hint}</Intro>
       {tab === "solutions" && (
         <>
           <Solutions openId={openId} onNavigate={onNavigate} />

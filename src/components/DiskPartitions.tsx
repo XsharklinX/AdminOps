@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
 import { NeedsAdmin } from "./AdminBanner";
-import { Button, Card, inputClass, Loading } from "./ui";
+import { Button, Card, inputClass, Intro, Loading } from "./ui";
 import { disksApi, partitionsApi, type DiskReport, type FoundPartition, type PartitionLayout, type TableBackup } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -199,9 +199,9 @@ export function PartitionsTab({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-0 flex-1 text-xs text-dim">
+        <Intro id="space:partitions" className="min-w-0 flex-1">
           La tabla de cada disco: qué particiones tiene, si está rota y, si falta una, dónde puede estar. Mirar es solo lectura. Antes de escribir algo se guarda una copia de la tabla, y se comprueba después.
-        </p>
+        </Intro>
         <select value={sel ?? ""} onChange={(e) => setSel(Number(e.target.value))} className={`${inputClass} w-auto max-w-xs`} aria-label="Disco">
           {disks.map((d) => (
             <option key={d.number} value={d.number}>

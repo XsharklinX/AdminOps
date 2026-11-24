@@ -1,8 +1,9 @@
+import { WEB_TICKETS } from "./lib/features";
 import { RotateCw } from "lucide-react";
 import { SlideMark } from "./components/SlideMark";
 import { useNarrow } from "./lib/useNarrow";
 import { listen } from "@tauri-apps/api/event";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { PaletteAction } from "./components/CommandPalette";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
@@ -18,6 +19,7 @@ import { TopBar } from "./components/TopBar";
 import { CommOpener } from "./components/CommOpener";
 import { useMachineState } from "./lib/machineState";
 import { sectionLabel, sectionsOf } from "./lib/sections";
+import { setTabsSlot } from "./lib/tabsSlot";
 import { PageIdContext, requestSection, useCurrentSections } from "./lib/sectionState";
 import { casesApi, knowledgeApi, logQuietly, api, programsApi, securityApi, updateApi, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
@@ -49,6 +51,13 @@ import { trackBoot } from "./lib/boot";
 import { MAX_ALIVE, busyPages, touchAlive, trimAlive } from "./lib/alive";
 import { setPrefetcher, setPrefetchRead } from "./lib/prefetch";
 import { PALETTE_EVENT } from "./lib/palette";
+import { entryFilter, pushHistory, snapshotOf, stepHistory, type HistEntry } from "./lib/history";
+import { memRestore } from "./lib/pageMemory";
+import { useTypeToFilter } from "./lib/typeFilter";
+import { BackButton } from "./components/BackButton";
+import { KeyTips } from "./components/KeyTips";
+import { ZoomKeys } from "./components/ZoomKeys";
+import { PlanResume } from "./components/PlanResume";
 import { startTour, tourFor } from "./lib/tour";
 import { Tour } from "./components/Tour";
 import { DemoBanner } from "./components/DemoMode";
@@ -218,15 +227,23 @@ function initialPage(): PageId {
   const prefs = getPrefs();
   if (prefs.mode === "user") return "dashboard";
   const start = prefs.startPage;
-  if (start !== "last" && isPageId(start)) return resolvePage(start)[0];
+  // Una pantalla apagada (lib/features.ts) que se hubiera elegido o fuera la última no se abre.
+  if (start !== "last" && isPageId(start) && allowedInMode(resolvePage(start)[0], prefs.mode)) return resolvePage(start)[0];
   try {
     const p = localStorage.getItem(LAST_PAGE);
-    if (p && p !== "diagnostics" && isPageId(p)) return resolvePage(p)[0];
+    if (p && p !== "diagnostics" && isPageId(p) && allowedInMode(resolvePage(p)[0], prefs.mode)) return resolvePage(p)[0];
   } catch {
     /* sin almacenamiento */
   }
   return "dashboard";
 }
+
+
+/**
+ * Pantallas sin «Volver a leer»: no leen nada del equipo (son tuyas o de AdminOps)
+ * o ya se actualizan solas. F5 sigue valiendo en todas.
+ */
+const NO_RELOAD: PageId[] = ["dashboard", "settings", "tools", "contacts", "agenda", "knowledge", "recipes", "session"];
 
 export default function App() {
   const [page, setPage] = useState<PageId>(() => {
@@ -240,9 +257,11 @@ export default function App() {
   const aliveRef = useRef<PageId[]>([]);
   // Sección o ajuste a resaltar al llegar desde un hallazgo del diagnóstico o la búsqueda.
   const [focus, setFocus] = useState<string | null>(null);
-  // Historial de páginas para Alt+← / Alt+→.
-  const back = useRef<PageId[]>([]);
-  const forward = useRef<PageId[]>([]);
+  // Historial de pantallas para Alt+← / Alt+→, los botones laterales del ratón y la flecha de la cabecera.
+  // Cada entrada guarda la pantalla, su scroll y lo que recuerda (filtros, orden, pestaña).
+  const back = useRef<HistEntry<PageId>[]>([]);
+  const forward = useRef<HistEntry<PageId>[]>([]);
+  const [, bumpHistory] = useReducer((n: number) => n + 1, 0);
   const pageRef = useRef(page);
   pageRef.current = page;
   const navigate = useCallback((to: PageId, focusOn: string | null = null) => {
@@ -253,8 +272,9 @@ export default function App() {
     if (!allowedInMode(p, getPrefs().mode)) return;
     if (p !== pageRef.current && !aliveRef.current.includes(p)) pageOpened(p);
     if (p !== pageRef.current) {
-      back.current = [...back.current.slice(-49), pageRef.current];
+      back.current = pushHistory(back.current, snapshotOf(pageRef.current));
       forward.current = [];
+      bumpHistory();
     }
     setPage(p);
     setFocus(f);
@@ -267,15 +287,35 @@ export default function App() {
     },
     [navigate],
   );
-  const goHistory = useCallback((dir: "back" | "forward") => {
-    const from = dir === "back" ? back : forward;
-    const to = dir === "back" ? forward : back;
-    const p = from.current.pop();
-    if (!p) return;
-    to.current.push(pageRef.current);
-    setPage(p);
+  /** Va a una entrada del historial: la pantalla vuelve con su filtro, su pestaña y su scroll. */
+  const openEntry = useCallback((e: HistEntry<PageId>) => {
+    memRestore(e.page, e.mem);
+    setPage(e.page);
     setFocus(null);
+    // El scroll se pone cuando la pantalla ya está pintada (si hubo que abrirla de nuevo, tarda un poco).
+    let tries = 0;
+    const put = () => {
+      const el = document.querySelector<HTMLElement>(`[data-page="${e.page}"]`);
+      if (el && !el.hidden) el.scrollTop = e.scroll;
+      if (++tries < 8 && (!el || el.hidden || Math.abs(el.scrollTop - e.scroll) > 2)) window.setTimeout(put, 60);
+    };
+    window.requestAnimationFrame(() => window.requestAnimationFrame(put));
   }, []);
+  /** Atrás o adelante, de uno en uno o saltando `skip` entradas más (el menú de la flecha). */
+  const goHistory = useCallback(
+    (dir: "back" | "forward", skip = 0) => {
+      const from = dir === "back" ? back : forward;
+      const to = dir === "back" ? forward : back;
+      // Lo que el modo usuario no permite no se abre por ningún camino.
+      const step = stepHistory(from.current, to.current, snapshotOf(pageRef.current), skip, (x) => allowedInMode(x.page, getPrefs().mode));
+      if (!step) return;
+      from.current = step.from;
+      to.current = step.to;
+      bumpHistory();
+      openEntry(step.target);
+    },
+    [openEntry],
+  );
   // Cuando la primera página está lista, el resumen del arranque va al registro
   // técnico: así se comparan versiones con datos (Ajustes → Rendimiento lo detalla).
   useEffect(() => {
@@ -319,6 +359,8 @@ export default function App() {
     // Lo que se pide desde el icono junto al reloj y hace la interfaz.
     const tray = listen<string>("tray-action", ({ payload }) => {
       if (payload === "alerts") setAlertSignal((n) => n + 1);
+      // Al pulsar el aviso de un dispositivo recién conectado que no funciona.
+      if (payload === "connected") navigate("machine", "connected");
       if (payload === "quick-scan") window.dispatchEvent(new Event(TRAY_QUICK_SCAN));
       if (payload === "portable-exit") window.dispatchEvent(new Event("adminops:portable-exit"));
     });
@@ -334,7 +376,7 @@ export default function App() {
       void un.then((f) => f());
       void tray.then((f) => f());
     };
-  }, []);
+  }, [navigate]);
 
   // Portales: el estado de cada vista web se escucha desde el principio y el
   // último portal usado de cada tipo se precarga, para que al entrar ya esté listo.
@@ -349,8 +391,9 @@ export default function App() {
     const t = setTimeout(() => {
       let id: string | null = null;
       try {
-        id = localStorage.getItem(lastPortalKey(""));
-        for (const k of ["inventory", "mail", "teams"] as const) {
+        // Con Tickets e Inventario web apagados (lib/features.ts) solo se precargan Correo y Teams.
+        id = WEB_TICKETS ? localStorage.getItem(lastPortalKey("")) : null;
+        for (const k of WEB_TICKETS ? (["inventory", "mail", "teams"] as const) : (["mail", "teams"] as const)) {
           const v = localStorage.getItem(lastPortalKey(k));
           if (v && localStorage.getItem(LAST_PAGE) === PORTAL_PAGE[k]) id = v;
         }
@@ -585,6 +628,26 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate, goHistory, closeTab]);
 
+  // Botones laterales del ratón: el 4.º (button 3) vuelve y el 5.º (button 4) avanza.
+  useEffect(() => {
+    const side = (e: MouseEvent) => {
+      if (e.button !== 3 && e.button !== 4) return;
+      e.preventDefault();
+      if (e.type === "mouseup" && !lockedRef.current) goHistory(e.button === 3 ? "back" : "forward");
+    };
+    window.addEventListener("mouseup", side);
+    window.addEventListener("mousedown", side);
+    window.addEventListener("auxclick", side);
+    return () => {
+      window.removeEventListener("mouseup", side);
+      window.removeEventListener("mousedown", side);
+      window.removeEventListener("auxclick", side);
+    };
+  }, [goHistory]);
+
+  // Escribir sin tener el foco en un campo filtra la lista de la pantalla.
+  useTypeToFilter(() => locked !== false || paletteOpen || workshop || onboarding || aboutOpen || helpOpen || findOpen || alertsOpen || caseDialog);
+
   useEffect(() => {
     trackBoot("permisos", api.isAdmin()).then(setIsAdmin).catch(() => setIsAdmin(false));
     trackBoot("usuario del equipo", systemApi.targetUser()).then(setTargetUser).catch(logQuietly("App"));
@@ -687,7 +750,9 @@ export default function App() {
       { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },
       { id: "wifistate", title: "Estado de la Wi-Fi", subtitle: "Reiniciar la tarjeta, ahorro de energía, adaptadores fantasma", keywords: "wifi tarjeta adaptador driver codigo 10", run: () => navigate("network") },
       // Páginas que ahora son pestañas de otra: se siguen encontrando por su nombre.
-      { id: "go:webinventory", title: "Inventario web de la empresa", subtitle: "Soporte → Inventario → Inventario web", keywords: "inventario web intranet portal empresa", run: () => navigate("inventory", "webinventory") },
+      ...(WEB_TICKETS
+        ? [{ id: "go:webinventory", title: "Inventario web de la empresa", subtitle: "Soporte → Inventario → Inventario web", keywords: "inventario web intranet portal empresa", run: () => navigate("inventory", "webinventory") }]
+        : []),
       { id: "go:localaccount", title: "Pasar el equipo a una cuenta local", subtitle: "Cuentas → salir de Entra ID o de la cuenta de Microsoft", keywords: "cuenta profesional azure entra desconectar local microsoft", run: () => navigate("accounts") },
       { id: "go:winupdate", title: "Windows Update", subtitle: "Actualizaciones → Windows Update", keywords: "parches actualizaciones windows", run: () => navigate("winupdate") },
       { id: "go:devices", title: "Dispositivos en la red", subtitle: "Red → Dispositivos", keywords: "escanear red ip mac intrusos", run: () => navigate("devices") },
@@ -740,6 +805,8 @@ export default function App() {
   // Dónde se está, para ofrecer «Seguir donde lo dejaste» la próxima vez.
   const sectionId = sections[page] ?? null;
   useEffect(() => rememberPlace(page, sectionId), [page, sectionId]);
+  // El hueco de la cabecera para las pestañas de la pantalla a la vista.
+  const tabsSlotRef = useCallback((el: HTMLDivElement | null) => setTabsSlot(page, el), [page]);
 
   // Cada página se construye una vez y se mantiene viva al cambiar de página (conserva sus datos,
   // su scroll y lo que esté haciendo). Se vuelve a cargar con «Recargar» o al cerrar la app.
@@ -819,45 +886,46 @@ export default function App() {
           <CaseBar onOpenChange={setCaseDialog} />
           {prefs.pageTabs && openTabs.length > 1 && <OpenTabs tabs={openTabs} current={page} onPick={(p) => navigate(p)} onClose={closeTab} />}
           <ResumeRibbon current={page} onGo={goTo} />
-          <header data-compact={compact} className="page-head flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-8 py-3">
-            {/* Una línea: la pantalla, de dónde cuelga (cada parte lleva a su sitio) y sus botones. */}
-            <h1 className="flex min-w-0 items-center gap-2 text-[19px] font-semibold tracking-tight">
-              <span className="truncate">{section ?? pageLabel(nav.id)}</span>
-              <PageHelp text={nav.help} />
-            </h1>
-            <nav aria-label="Dónde estás" className="flex min-w-0 items-center gap-1 overflow-hidden text-xs whitespace-nowrap text-mute">
-              {area && (
-                <button onClick={() => openArea(area)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
-                  {area.label}
-                </button>
-              )}
-              {section && (
-                <>
-                  <span aria-hidden>›</span>
-                  <button onClick={() => goTo(page, sectionsOf(page)[0]?.id ?? null)} className="rounded px-1 hover:bg-panel-2 hover:text-ink">
-                    {pageLabel(nav.id)}
-                  </button>
-                </>
-              )}
-            </nav>
-            <div className="ml-auto flex items-center gap-2">
+          <header data-compact={compact} className="page-head flex flex-wrap items-stretch gap-x-3 border-b border-line px-8">
+            {/* Una línea (1.4): atrás, la pantalla, su aviso si lo hay y sus pestañas (las pone la propia pantalla, ver tabsSlot). */}
+            <div className="flex min-w-0 shrink-0 items-center gap-2 py-2.5">
+              <BackButton
+                entries={[...back.current]
+                  .reverse()
+                  .filter((e) => allowedInMode(e.page, prefs.mode))
+                  .slice(0, 10)
+                  .map((e) => ({ label: pageLabel(e.page), filter: entryFilter(e) }))}
+                onBack={() => goHistory("back")}
+                onJump={(i) => goHistory("back", i)}
+              />
+              <h1 className="flex min-w-0 items-center gap-2 text-[19px] font-semibold tracking-tight">
+                <span className="truncate" title={area ? `${area.label} › ${pageLabel(nav.id)}${section ? ` › ${section}` : ""}` : undefined}>
+                  {pageLabel(nav.id)}
+                </span>
+                <PageHelp text={nav.help} />
+              </h1>
+              <QuickRead page={page} badges={machine.badges} onGo={(sec) => goTo(page, sec)} />
+            </div>
+            <div key={page} ref={tabsSlotRef} className="flex min-w-0 flex-1 items-stretch" />
+            <div className="flex shrink-0 items-center gap-2">
               {page === "dashboard" ? (
                 <span className="text-xs text-mute">En vivo · cada {prefs.refreshMs / 1000} s</span>
               ) : (
-                page !== "settings" && (
+                !NO_RELOAD.includes(page) && (
                   <button
                     onClick={() => setReloads((r) => ({ ...r, [page]: (r[page] ?? 0) + 1 }))}
-                    className="ico-spin flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-mute transition-colors hover:bg-panel-2 hover:text-ink"
-                    title="Vuelve a cargar esta página desde cero (F5)"
+                    className="ico-spin grid size-7 place-items-center rounded-md text-mute transition-colors hover:bg-panel-2 hover:text-ink"
+                    title="Volver a leer esta pantalla desde cero (F5)"
+                    aria-label="Volver a leer esta pantalla"
                   >
-                    <RotateCw size={13} /> Recargar
+                    <RotateCw size={14} />
                   </button>
                 )
               )}
             </div>
             {/* Con la barra en «solo áreas», las pantallas del área van debajo, como pestañas. */}
             {showTabs && tabs.length > 1 && (
-              <div ref={areaTabsRef} className="no-scrollbar relative isolate -mb-3 flex basis-full gap-1 overflow-x-auto">
+              <div ref={areaTabsRef} className="no-scrollbar relative isolate flex basis-full gap-1 overflow-x-auto border-t border-line">
                 <SlideMark within={areaTabsRef} kind="underline" />
                 {tabs.map((t) => (
                   <button
@@ -872,7 +940,6 @@ export default function App() {
               </div>
             )}
           </header>
-          <QuickRead page={page} badges={machine.badges} onGo={(sec) => goTo(page, sec)} />
           <div className="relative min-h-0 flex-1">
             {findOpen && <PageFind page={page} onClose={() => setFindOpen(false)} />}
             {alive.map((p) => {
@@ -910,6 +977,9 @@ export default function App() {
         </Suspense>
       )}
       <BootBar />
+      <PlanResume />
+      <KeyTips disabled={locked !== false} />
+      <ZoomKeys disabled={locked !== false} />
       <Tour version={appInfo?.version ?? ""} />
       <CelebrateLayer />
       <PortableExit appInfo={appInfo} />

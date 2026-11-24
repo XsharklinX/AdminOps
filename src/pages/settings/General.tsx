@@ -2,9 +2,9 @@
 import { AlertRules } from "./AlertRules";
 import { CheckCircle2, Download, HardDrive, Sparkles, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
-import { NAV } from "../../components/Sidebar";
+import { NAV, DISABLED_PAGES } from "../../components/Sidebar";
 import { useToast } from "../../components/feedback";
-import { Button, Card, Explain, inputClass, Toggle } from "../../components/ui";
+import { Button, Card, Explain, inputClass, resetIntros, Toggle } from "../../components/ui";
 import { openOnboarding } from "../../lib/navigate";
 import { appcareApi, configApi, logQuietly, type Settings, storageApi, type StorageInfo } from "../../lib/api";
 import { exportPrefs, importPrefs, setPrefs, usePrefs } from "../../lib/prefs";
@@ -21,7 +21,7 @@ import { setDemo } from "../../components/DemoMode";
 export function StartWindow({ s, set }: SettingsProps) {
   const prefs = usePrefs();
   const toast = useToast();
-  const pages = NAV.filter((n) => n.id !== "settings");
+  const pages = NAV.filter((n) => n.id !== "settings" && !DISABLED_PAGES.includes(n.id));
   return (
     <div className="space-y-4">
       <ModeCard />
@@ -46,7 +46,7 @@ export function StartWindow({ s, set }: SettingsProps) {
         <Autostart />
         <Row
           title="Volver a ver la bienvenida"
-          sub="El asistente de la primera vez: elegir el modo (técnico o usuario), la página de inicio y lo básico de AdminOps. No borra nada de lo que ya tengas configurado."
+          sub="El asistente de la primera vez: elegir el modo (técnico o usuario), la página de inicio y lo básico de AdminOps. Las explicaciones de cada pantalla, que se pliegan tras la primera visita, también pueden volver a salir enteras. No borra nada de lo que ya tengas configurado."
         >
           <div className="flex flex-wrap gap-2">
             <Button kind="ghost" size="sm" onClick={openOnboarding}>
@@ -61,6 +61,16 @@ export function StartWindow({ s, set }: SettingsProps) {
               }}
             >
               Ver «Primeros pasos»
+            </Button>
+            <Button
+              kind="ghost"
+              size="sm"
+              onClick={() => {
+                resetIntros();
+                toast("ok", "Las explicaciones vuelven a salir enteras la próxima vez que abras AdminOps.");
+              }}
+            >
+              Ver otra vez las explicaciones
             </Button>
           </div>
         </Row>
@@ -204,7 +214,7 @@ export function DataSettings({ s, set, portable, onImported }: SettingsProps & {
       <DataCare s={s} set={set} part="data" />
       <Card title="Copia de la configuración">
         <p className="mb-3 text-sm text-dim">
-          Guarda en un archivo tus ajustes (marca, precios, checklist, firma), los portales de Tickets y las preferencias de la interfaz, para llevarlos a otro
+          Guarda en un archivo tus ajustes (marca, precios, checklist, firma), los portales y las preferencias de la interfaz, para llevarlos a otro
           equipo o recuperarlos. No incluye contraseñas ni clientes.
         </p>
         <div className="flex gap-2">
@@ -263,7 +273,7 @@ function WhereStored({ portable }: { portable: boolean }) {
   const travels = [
     "Tus ajustes, marca, precios, checklist y firma",
     "Clientes, contactos, agenda, seguimientos y casos",
-    "Portales (Tickets, Correo, Teams…) y sus cuentas guardadas para «Entrar solo», cifradas",
+    "Portales (Correo, Teams…) y sus cuentas guardadas para «Entrar solo», cifradas",
     "Accesos a routers y conexiones de acceso remoto (contraseñas cifradas)",
     "Apariencia, navegación, atajos y favoritos",
     "Informes PDF (todos juntos)",
@@ -323,7 +333,7 @@ function WhereStored({ portable }: { portable: boolean }) {
             <span>
               Guardar también el navegador interno en el pendrive
               <span className="block text-xs text-dim">
-                No deja nada de Correo, Teams ni Tickets en el disco del equipo (para equipos de clientes), pero en un pendrive van mucho más lentos: páginas en
+                No deja nada de Correo ni Teams en el disco del equipo (para equipos de clientes), pero en un pendrive van mucho más lentos: páginas en
                 blanco y un arranque de varios segundos más. Desactivado, cada equipo guarda su sesión en su propio disco, que es donde de todas formas vale.
               </span>
             </span>

@@ -43,6 +43,39 @@ export interface Baseline {
   avgMs: number;
   estimateMs: number;
   names: string[];
+  /** El equipo donde se quitaron: el apunte puede viajar en el USB y no vale en otro equipo. */
+  host?: string;
+  /** Ya se apuntó la medida del arranque en el diario (y con ello en el caso y el informe). */
+  logged?: boolean;
+}
+
+const BASELINE_KEY = "adminops.startupGain";
+
+/** Lo que se apuntó la última vez que se quitaron programas del inicio (para medir tras reiniciar). */
+export function readBaseline(): Baseline | null {
+  try {
+    return JSON.parse(localStorage.getItem(BASELINE_KEY) ?? "null") as Baseline | null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * El apunte, si es de este equipo. Si se hizo en otro (viajó en el USB), no vale y sale `null`.
+ * Los apuntes viejos, sin equipo, se aceptan: no se puede saber de dónde son.
+ */
+export function forHost(b: Baseline | null, host: string): Baseline | null {
+  if (!b) return null;
+  if (b.host && host && b.host.toLowerCase() !== host.toLowerCase()) return null;
+  return b;
+}
+
+export function writeBaseline(b: Baseline): void {
+  try {
+    localStorage.setItem(BASELINE_KEY, JSON.stringify(b));
+  } catch {
+    /* sin almacenamiento: no se podrá medir después */
+  }
 }
 
 /** El primer arranque después de quitar programas, frente a la media de antes. */

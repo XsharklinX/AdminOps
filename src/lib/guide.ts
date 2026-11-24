@@ -2,6 +2,7 @@
 // antes de tocar. Está escrita para quien no la conoce. Lo que aquí se dice que
 // se puede deshacer es lo que el programa deshace de verdad: si una pantalla
 // cambia, su apartado se actualiza con ella.
+import { WEB_TICKETS } from "./features";
 import { GLOSSARY as TECH_GLOSSARY } from "./glossary";
 import type { PageId } from "../components/Sidebar";
 
@@ -76,16 +77,25 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "moving",
         title: "Moverse por la aplicación",
-        what: "A la izquierda, la columna de áreas (Inicio, Este equipo, Red, Programas, Gestión, Soporte). Al lado, las pantallas del área elegida y, debajo de cada una, sus secciones: lo que hay dentro se ve sin abrir nada. Arriba, el equipo en una línea: nombre, dominio, permisos, Internet, disco y avisos; cada dato lleva a donde se mira o se arregla.",
+        what: "A la izquierda, la columna de áreas (Inicio, Este equipo, Red, Programas, Gestión, Soporte). Al lado, las pantallas del área elegida, y en la cabecera de cada pantalla, en la misma línea que el título, sus secciones como pestañas. Arriba, el equipo en una línea: nombre, dominio, permisos, Internet, disco y avisos; cada dato lleva a donde se mira o se arregla.",
         how: [
           "«Todo» (arriba en la columna de áreas, o Ctrl+K o F1) enseña el programa entero en una pantalla, por áreas. Escribiendo, busca cualquier cosa: una sección («dominio», «AD»), un problema («no imprime»), una herramienta, un ajuste o un contacto.",
           "Encima del título se ve dónde estás: área › pantalla › sección. Cada parte se puede pulsar.",
           "La chincheta, al pasar el ratón por una línea de la barra, la fija arriba (también una sección, como Dominio).",
           "Al lado de algunas secciones sale su estado: los avisos del último diagnóstico, si el equipo está en el dominio, el espacio que queda.",
           "Teams y Correo se abren desde sus iconos de la barra de arriba. Herramientas de Windows y Ajustes están abajo en la columna de áreas.",
-          "Alt+← y Alt+→ vuelven a la pantalla anterior y a la siguiente. Ctrl+, abre Ajustes. Ctrl+L bloquea AdminOps si hay PIN.",
+          "Alt+← y Alt+→ (o los botones laterales del ratón) vuelven a la pantalla anterior y a la siguiente, con sus filtros. La flecha de la cabecera dice de dónde vienes; mantenla pulsada, o clic derecho, para ver las 10 últimas.",
+          "Mantén Alt pulsado: cada botón enseña una letra, y pulsarla lo ejecuta. Las letras son siempre las mismas en cada pantalla. Esc cancela.",
+          "En una tabla larga, escribe sin hacer clic en ningún campo y se filtra. Esc lo borra; Enter abre la fila si queda una sola.",
+          "Columnas a tu gusto: clic derecho en la cabecera para ver u ocultar, arrastra un nombre para cambiar el orden y doble clic en el borde para ajustar el ancho. «Restablecer columnas» lo deja como venía.",
+          "Ctrl + y Ctrl − cambian el tamaño de todo (del 80 % al 150 %) y se recuerda por monitor; Ctrl+0 vuelve al normal.",
+          "Ctrl+K entiende varias órdenes seguidas, separadas por «y» o comas («liberar espacio y vaciar la cola»): una confirmación para todas y el resultado de cada una. Tab completa; ↑ trae las últimas.",
+          "Ctrl+, abre Ajustes. Ctrl+L bloquea AdminOps si hay PIN.",
         ],
-        notes: ["La barra lateral se puede reorganizar entera en Ajustes → Navegación, y dejar solo la columna de áreas para ganar espacio."],
+        notes: [
+          "La barra lateral se puede reorganizar entera en Ajustes → Navegación, y dejar solo la columna de áreas para ganar espacio.",
+          "Las listas que se mueven solas (procesos, pantallas) se quedan quietas mientras el ratón está encima: lo dice «Orden en pausa mientras apuntas». Los datos siguen al día.",
+        ],
       },
       {
         id: "first-steps",
@@ -93,7 +103,7 @@ export const GUIDE: GuideChapter[] = [
         what: "Lo que conviene dejar puesto la primera vez. El Panel lo recuerda en «Primeros pasos» hasta que esté hecho.",
         how: [
           "Tus datos y los de tu empresa (Ajustes → Informes y cobros): salen en los informes.",
-          "Los portales que uses: tickets, correo, Teams (Ajustes → Portales y correo).",
+          "Los portales que uses: correo y Teams (Ajustes → Portales y correo).",
           "Un PIN de bloqueo (Ajustes → Seguridad), sobre todo en un pendrive.",
           "La copia automática de tus datos (Ajustes → Datos y copias).",
         ],
@@ -126,6 +136,15 @@ export const GUIDE: GuideChapter[] = [
         how: ["Se crean solos. También puedes crear uno a mano en Historial → Puntos de restauración.", "Para volver a un punto: «Restaurar sistema», en esa misma tarjeta, abre la herramienta de Windows."],
         notes: ["Un punto de restauración recupera la configuración de Windows y los programas, no tus documentos.", "Necesita que «Protección del sistema» esté activada en Windows; AdminOps avisa si no lo está."],
         go: ["history"],
+      },
+      {
+        id: "see-command",
+        title: "«Ver el comando» y el antes y el después",
+        what: "Al lado de muchas acciones, «Ver el comando» enseña lo que AdminOps hace paso a paso como PowerShell, comentado en español, para aprenderlo, copiarlo o guardarlo como .ps1. Y el resultado de una acción dice lo que se midió antes y después («C: 3,1 GB → 24,8 GB libres»).",
+        notes: [
+          "Si la acción usa funciones de Windows por dentro, lo que se enseña es lo equivalente en PowerShell, y se avisa.",
+          "El antes y el después queda en el diario, en el caso y en el informe. Lo que solo se nota al arrancar (quitar programas del inicio) se mide en el siguiente reinicio y se añade solo.",
+        ],
       },
       {
         id: "audit",
@@ -288,6 +307,65 @@ export const GUIDE: GuideChapter[] = [
         go: ["machine", "peripherals"],
       },
       {
+        id: "connected",
+        title: "Conectados",
+        what: "Todo lo que Windows tiene enchufado (USB, Bluetooth, impresoras, cámaras) con su estado: funciona, sin driver, con error o deshabilitado. Lo que se acaba de conectar o quitar sale arriba y resaltado, para ver al momento qué hizo Windows con ello.",
+        how: ["Conecta el aparato con la pantalla abierta: aparece arriba con «Recién conectado».", "Según su estado: «Buscar driver», «Volver a detectar» o «Habilitar»."],
+        go: ["machine", "connected"],
+      },
+      {
+        id: "recorder",
+        title: "Grabar el fallo",
+        what: "Para el fallo que solo pasa a ratos. Graba la pantalla entera, una ventana o una zona hasta 2 minutos mientras el usuario lo repite y, a la vez, apunta los errores de Windows, los programas que dejan de responder, el procesador, el disco, la memoria y la red de cada segundo. Después se ve como un monitor de rendimiento: el vídeo y, debajo, una pista por cosa.",
+        how: [
+          "Lo más rápido: el botón de la cámara en la barra de arriba, al lado de Teams y Correo. Graba la pantalla entera y, mientras graba, se enciende con un punto verde y el tiempo; otro clic para. Con clic derecho se abre esta pantalla.",
+          "Desde aquí: «Grabar», y elige qué: la pantalla entera, una ventana (solo sale esa, aunque se mueva o tenga otra encima) o una zona que dibujas con el ratón. AdminOps se aparta y queda una píldora «Grabando» que se puede arrastrar y no sale en el vídeo.",
+          "«Clics y teclas» (encendido de serie) pinta un círculo en cada clic y enseña los atajos («Ctrl + P», «Intro»). «Voz» (apagada de serie) graba el micrófono para que el usuario cuente lo que hace.",
+          "Al parar, cada marca salta a su segundo y «Causa probable» señala el pico que empezó justo antes de un cuelgue o de un error. Un clic en las pistas lleva a ese segundo; arrastrar sobre ellas recorta un trozo.",
+          "Con el trozo: «Al informe» mete tres fotogramas con sus marcas en el PDF del cliente, «Al caso» lo apunta en las notas del caso y «Exportar MP4» lo guarda donde digas.",
+        ],
+        notes: [
+          "Lo que se escribe nunca se guarda: al escribir sale «•••», también en las contraseñas. Solo se ven los atajos y las teclas como Intro o Esc.",
+          "El vídeo no sale del equipo salvo con «Exportar MP4». Se borra al cerrar o descartar el caso; si no había caso, al cerrar AdminOps. «Borrar grabación» no se puede deshacer.",
+          "Las marcas dicen el nombre del programa, nunca el título de sus ventanas, y de los errores de Windows solo el código.",
+        ],
+        go: ["machine", "recorder"],
+      },
+      {
+        id: "recorder-watch",
+        title: "Vigilar: «¡Acaba de pasar!»",
+        what: "Para el fallo que nunca sale cuando grabas. Con «Vigilar», AdminOps guarda en memoria el último minuto de la pantalla, sin escribir nada en el disco. Cuando el usuario dice «¡ya pasó!», un clic guarda esos 60 segundos con sus marcas, como la repetición de una consola.",
+        how: [
+          "Grabar el fallo → «Vigilar». El borde amarillo de Windows avisa al usuario de que se le mira la pantalla, y el botón de la cámara de arriba lleva un punto verde.",
+          "Cuando pase: «¡Acaba de pasar!», Ctrl+Alt+G desde cualquier sitio o un clic en el botón de la cámara de arriba.",
+          "«Guardar sola cuando algo falla» (apagada de serie): si un programa deja de responder, sale un error de aplicación o el procesador o el disco se quedan al 100 % más de 20 s, guarda los 30 s de antes y los 15 de después y avisa una sola vez.",
+        ],
+        notes: [
+          "Vigilar nunca graba el micrófono. Gasta poco: alrededor del 1 % del procesador y unos 6 MB de memoria.",
+          "La automática no molesta: como mucho 2 por programa y hora y 10 al día, un solo aviso cada 10 minutos, y «No volver a grabar por esto» en cada grabación guardada sola.",
+        ],
+        go: ["machine", "recorder"],
+      },
+      {
+        id: "displays",
+        title: "Pantallas",
+        what: "Cada monitor con su marca, modelo, resolución nativa, escala, frecuencia (Hz) y cable, y un dibujo de cómo están colocados. Para «se ve borroso», «se ve estirado» o «el segundo monitor no sale».",
+        how: [
+          "Si un monitor no está en su resolución nativa, su fila ofrece ponérsela.",
+          "«Extender» y «Duplicar» para dos pantallas; «Reiniciar el driver gráfico» cuando la imagen se queda negra o congelada.",
+          "Tras cada cambio sale «¿Se ve bien?»: «Mantener» lo deja; si no contestas, vuelve como estaba a los 15 segundos.",
+        ],
+        go: ["machine", "displays"],
+      },
+      {
+        id: "keyboard",
+        title: "Teclado e idioma",
+        what: "Para «la ñ no sale» o «la arroba está en otro sitio»: los idiomas de teclado instalados, cuál está activo y el atajo que cambia de idioma sin querer. Una caja para probar «ñ @ ´».",
+        how: ["«Dejar solo Español y quitar el atajo» quita los demás teclados y el atajo de cambio.", "«Deshacer» lo deja como estaba."],
+        notes: ["Si abriste AdminOps como administrador con otra cuenta, mira el teclado del usuario de la sesión, pero no lo cambia."],
+        go: ["machine", "keyboard"],
+      },
+      {
         id: "security",
         title: "Seguridad",
         what: "Una nota de 0 a 100 con cada punto explicado: antivirus, cortafuegos, control de cuentas, cifrado del disco, protocolos antiguos, escritorio remoto, cuentas y programas de riesgo sin actualizar. Cada punto flojo tiene su botón.",
@@ -336,6 +414,8 @@ export const GUIDE: GuideChapter[] = [
           "«Liberar lo verde», en «Qué puedes liberar», vacía de una vez los sitios seguros.",
         ],
         notes: [
+          "Con AdminOps abierto como administrador, en discos NTFS se lee de una vez el índice de archivos del disco (como WizTree): un disco con millones de archivos, en segundos. Debajo del resultado lo dice («leyendo el índice del disco»). Sin administrador, en discos que no son NTFS o en una subcarpeta de un disco mecánico, se recorre carpeta a carpeta, como siempre.",
+          "Leyendo el índice, un archivo con varios nombres (los enlaces de Windows en WinSxS, por ejemplo) se cuenta una vez, en la carpeta de su primer nombre: por eso System32 o WinSxS pueden pesar distinto que en el Explorador.",
           "Desde aquí no se pueden borrar Windows, un programa instalado entero ni un perfil de usuario: cada cosa se quita desde su sitio (Limpieza, Programas, Usuarios).",
           "Lo que sea demasiado grande para la papelera, Windows lo borra del todo.",
           "Los duplicados de más de 256 MB se comparan por muestras (principio, final y dieciséis trozos), no enteros: lo dice cada grupo.",
@@ -367,9 +447,9 @@ export const GUIDE: GuideChapter[] = [
   {
     id: "support",
     title: "Soporte",
-    intro: "El trabajo diario con personas, clientes y tickets.",
+    intro: "El trabajo diario con personas y clientes.",
     topics: [
-      {
+      ...(WEB_TICKETS ? ([{
         id: "tickets",
         title: "Tickets",
         what: "La web de tickets o la intranet de tu empresa dentro de AdminOps, con la sesión recordada. Funciona como un navegador: la dirección guardada es solo la página de inicio, y desde ella puedes ir a cualquier otra.",
@@ -380,7 +460,7 @@ export const GUIDE: GuideChapter[] = [
         ],
         notes: ["Las páginas de un portal no tienen acceso a AdminOps ni al equipo: están aisladas.", "«Sesión privada» no guarda nada en el equipo y cierra la sesión al salir. Úsala en equipos ajenos."],
         go: ["tickets"],
-      },
+      }] as GuideTopic[]) : []),
       {
         id: "mail-teams",
         title: "Correo y Teams",
@@ -392,8 +472,10 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "inventory",
         title: "Inventario",
-        what: "Todo el inventario en un sitio. «Mi inventario»: el parque de equipos con la ficha de cada uno y un veredicto (seguir, mejorar, renovar), exportable a Excel. «Inventario web»: la web de inventario de tu empresa dentro de AdminOps, con los datos de este equipo a mano para rellenar el formulario.",
-        notes: ["La web de inventario navega con libertad, como Tickets."],
+        what: WEB_TICKETS
+          ? "Todo el inventario en un sitio. «Mi inventario»: el parque de equipos con la ficha de cada uno y un veredicto (seguir, mejorar, renovar), exportable a Excel. «Inventario web»: la web de inventario de tu empresa dentro de AdminOps, con los datos de este equipo a mano para rellenar el formulario."
+          : "El parque de equipos con la ficha de cada uno y un veredicto (seguir, mejorar, renovar), exportable a Excel.",
+        notes: WEB_TICKETS ? ["La web de inventario navega con libertad, como Tickets."] : [],
         go: ["inventory"],
       },
       {
@@ -467,6 +549,14 @@ export const GUIDE: GuideChapter[] = [
         go: ["router", "speed"],
       },
       {
+        id: "netusage",
+        title: "Uso de la red",
+        what: "Para «Internet va lento» cuando el culpable está dentro de casa: la subida y la bajada de cada programa en vivo, a dónde se conecta y cuánto lleva hoy.",
+        how: ["Ordena por bajada o subida para ver quién se la come.", "Si es OneDrive sincronizando, «Pausar 2 h» lo cierra y lo vuelve a abrir solo a las 2 horas; «Reanudar ahora» lo adelanta."],
+        notes: ["«Hoy» es lo que AdminOps midió mientras miraba (esta pantalla o el vigilante en marcha), no todo el día del equipo."],
+        go: ["router", "usage"],
+      },
+      {
         id: "netwatch",
         title: "Vigilante de la conexión",
         what: "Para «se me corta Internet a ratos». Se deja en marcha y cada 5 segundos hace un ping al router y a Internet; apunta cada corte con su hora, cuánto duró y de quién era la culpa: del router (no contestaba ni él) o de Internet (el router sí, fuera no).",
@@ -492,6 +582,11 @@ export const GUIDE: GuideChapter[] = [
         id: "update",
         title: "Actualizar programas y Windows",
         what: "Programas con versión nueva (usa winget, la herramienta de Windows) para actualizarlos en lote, y Windows Update: qué falta, el historial con cada error explicado, pausar y ocultar una actualización que da problemas.",
+        how: [
+          "En Windows Update, cada fallo dice su código en una frase y lo que AdminOps comprobó en este equipo (espacio de la partición reservada, servicios, componentes).",
+          "«Probar» aplica el arreglo que toca; si no basta, «Siguiente paso» propone el siguiente. Después, vuelve a buscar actualizaciones para comprobarlo.",
+        ],
+        notes: ["Los arreglos de Windows Update necesitan abrir AdminOps como administrador."],
         go: ["apps", "update"],
       },
       {
@@ -502,7 +597,7 @@ export const GUIDE: GuideChapter[] = [
           "«Empresa» enseña solo lo que se usa en una oficina; «Todo» añade juegos y programas de uso personal.",
           "«Personalizar» deja ocultar los programas o las categorías que no usas. Se guarda y viaja con tus datos.",
           "Marca los programas o carga una lista. Las categorías de arriba filtran.",
-          "«Instalar». Se ve el progreso de cada uno y se puede cancelar.",
+          "«Instalar». Cada programa tiene su fila: en cola, descargando, instalando, listo. Si uno falla se queda en su fila con «Reintentar» y «Saltar»; si es porque el programa está abierto, «Cerrar y seguir». Al final, un resumen.",
         ],
         notes: ["Necesita Internet y winget, que viene con Windows 11 y con las versiones recientes de Windows 10."],
         go: ["apps", "install"],
@@ -518,7 +613,11 @@ export const GUIDE: GuideChapter[] = [
         id: "recipes",
         title: "Preparar equipos",
         what: "Plantillas: todo lo que haces a un equipo nuevo (quitar preinstaladas, instalar programas, aplicar ajustes, crear el usuario, ponerle nombre, unirlo al dominio), de una vez y siempre igual. Perfiles: grupos de ajustes que se aplican juntos (Oficina, Gaming, Equipo viejo, Privacidad máxima, o los tuyos).",
-        notes: ["Las contraseñas se piden al ejecutar la plantilla y nunca se guardan.", "Un perfil se puede deshacer entero o ajuste por ajuste."],
+        how: [
+          "Si un paso pide reiniciar, «Reiniciar y seguir»: al volver a entrar en Windows, AdminOps se abre solo y sigue por donde iba («Seguido tras reiniciar · paso 3 de 5»). «Parar el plan» lo cancela.",
+          "Al cerrar un caso, «Guardar como plantilla» convierte lo que se hizo en una plantilla. Lo de riesgo medio o alto sale desmarcado: eso se elige a propósito.",
+        ],
+        notes: ["Las contraseñas se piden al ejecutar la plantilla y nunca se guardan.", "Un perfil se puede deshacer entero o ajuste por ajuste.", "Un plan de hace más de 24 horas ya no se retoma solo."],
         go: ["recipes"],
       },
     ],
@@ -558,7 +657,17 @@ export const GUIDE: GuideChapter[] = [
         id: "scanners",
         title: "Escáneres",
         what: "Los escáneres RICOH (fi y ScanSnap) y EPSON: su driver, si funciona y si está instalado el programa con el que se escanea (PaperStream, Epson Scan 2, ScanSnap Home).",
-        how: ["«Probar escaneo» pide una página por Windows y te la enseña: si sale, el escáner funciona y el problema está en el programa.", "Si falta el programa y su instalador está en tu biblioteca, «Instalar» lo abre (Windows pedirá permiso)."],
+        how: [
+          "«Probar escaneo» pide una página por Windows y te la enseña: si sale, el escáner funciona y el problema está en el programa.",
+          "Si falta el programa y su instalador está en tu biblioteca, «Instalar» lo abre (Windows pedirá permiso).",
+          "«Escanear a carpeta», para que la RICOH o la EPSON de red deje los escaneos en este equipo: «Preparar este equipo» crea la carpeta, la comparte, crea un usuario local con una contraseña fácil de dictar y abre el cortafuegos. Después enseña en grande lo que hay que escribir en la impresora.",
+          "«Esperar un escaneo de prueba»: si llega, lo dice («Llegó… · 2 páginas»); si no, «¿Por qué no llega?» repasa red, usuario, recurso compartido y la versión de SMB.",
+        ],
+        notes: [
+          "Preparar la carpeta necesita abrir AdminOps como administrador. «Deshacer todo» quita lo que se creó.",
+          "La contraseña no se guarda: si se pierde, «Contraseña nueva». Con la red como Pública, el cortafuegos no se abre sin un paso aparte.",
+          "SMB1 (el de las impresoras muy antiguas) solo se explica: AdminOps no lo activa, porque es inseguro.",
+        ],
         go: ["scanners"],
       },
       {
@@ -656,7 +765,12 @@ export const GUIDE: GuideChapter[] = [
         id: "recover",
         title: "Recuperar archivos",
         what: "Intenta recuperar archivos borrados con la herramienta de Microsoft para eso, sin tocar la consola.",
-        how: ["Elige el disco donde estaban y otro disco distinto donde guardar lo recuperado.", "Cuanto antes, mejor: deja de usar el disco en cuanto notes la pérdida."],
+        how: [
+          "Elige el disco donde estaban y otro disco distinto donde guardar lo recuperado.",
+          "Cuanto antes, mejor: deja de usar el disco en cuanto notes la pérdida.",
+          "Para «se cerró Word y no lo guardé», la pestaña «Sin guardar de Office»: las copias de autorrecuperación, los documentos sin guardar y los temporales, con vista previa. «Abrir una copia» nunca toca el original.",
+          "Como administrador, busca también en las versiones anteriores que guarda Windows.",
+        ],
         notes: ["No siempre se puede. En discos SSD, lo borrado suele desaparecer de verdad en poco tiempo."],
         go: ["data", "recover"],
       },
@@ -768,6 +882,7 @@ export interface GlossaryEntry {
 export const GLOSSARY: GlossaryEntry[] = [
   { term: "Administrador", def: "Cuenta de Windows con permiso para cambiar el sistema. AdminOps necesita abrirse con una para aplicar cambios." },
   { term: "Ajuste", def: "Un cambio concreto de la configuración de Windows que AdminOps sabe aplicar y deshacer." },
+  { term: "Autorrecuperación", def: "Las copias que Word, Excel y PowerPoint guardan solas cada pocos minutos. Sirven para rescatar un documento que se cerró sin guardar." },
   { term: "BitLocker", def: "El cifrado de discos de Windows. Si el disco está cifrado y se pierde la clave de recuperación, los datos no se pueden leer." },
   { term: "Bloatware", def: "Aplicaciones que vienen preinstaladas con el equipo y que casi nadie pidió." },
   { term: "Caso", def: "Una incidencia de una persona, con lo que se hizo para resolverla. Al cerrarlo queda en su ficha." },
@@ -780,9 +895,12 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: "DNS", def: "El servicio que traduce nombres de webs a direcciones. Si falla, «no hay Internet» aunque la conexión esté bien." },
   { term: "Dominio", def: "La red de una empresa en la que las cuentas y los equipos se gestionan desde un servidor central (Active Directory)." },
   { term: "Driver", def: "El programa que permite a Windows usar una pieza del equipo. Un driver defectuoso causa pantallazos azules." },
+  { term: "EDID", def: "La ficha que cada monitor da de sí mismo: marca, modelo y resolución nativa." },
   { term: "Escritorio remoto", def: "La forma que trae Windows de manejar un equipo desde otro." },
+  { term: "Firma SMB", def: "Un sello que Windows puede exigir en cada conexión a sus carpetas compartidas. Algunas impresoras que escanean a carpeta no lo saben poner y no pueden entrar." },
   { term: "Hallazgo", def: "Cada cosa que encuentra el diagnóstico, con su gravedad." },
   { term: "Hosts", def: "Un archivo de Windows que fuerza a qué dirección va un nombre. Se usa para bloquear sitios, y el malware también lo usa." },
+  { term: "Hz", def: "Las veces por segundo que se redibuja la pantalla. Lo normal es 60 o más; por debajo, la imagen parpadea o va a saltos." },
   { term: "IP", def: "La dirección de un equipo en la red. La IP pública es la que se ve desde Internet." },
   { term: "MAC", def: "El identificador de fábrica de una tarjeta de red." },
   { term: "Modo auditoría", def: "Estado en el que AdminOps solo mira: no cambia nada en el equipo." },
@@ -794,7 +912,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: "PIN", def: "El código con el que se bloquea AdminOps." },
   { term: "Plantilla", def: "Una secuencia guardada de pasos para preparar un equipo, o un texto con huecos que se rellenan solos." },
   { term: "Portable", def: "La versión que no se instala: se ejecuta desde una carpeta o un pendrive y guarda ahí sus datos." },
-  { term: "Portal", def: "Una web (tickets, correo, Teams, el panel de un router) abierta dentro de AdminOps." },
+  { term: "Portal", def: "Una web (correo, Teams, el panel de un router) abierta dentro de AdminOps." },
   { term: "Punto de restauración", def: "Una foto de la configuración de Windows a la que se puede volver." },
   { term: "Registro (de Windows)", def: "La base de datos donde Windows y los programas guardan su configuración." },
   { term: "Registro técnico", def: "El archivo donde AdminOps anota lo que ejecuta y sus errores." },
@@ -805,7 +923,9 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: "SFC", def: "Herramienta de Windows que comprueba y repara los archivos del sistema." },
   { term: "SMART", def: "Los datos de salud que un disco da de sí mismo: horas de uso, errores, temperatura." },
   { term: "SmartScreen", def: "El filtro de Windows que avisa al ejecutar programas que no reconoce o que no están firmados." },
+  { term: "SMB", def: "El lenguaje con el que Windows comparte carpetas e impresoras por la red. Su versión antigua, SMB1, es insegura." },
   { term: "Unidad de red", def: "Una letra (Z:, por ejemplo) que apunta a una carpeta compartida de otro equipo." },
+  { term: "Versiones anteriores", def: "Las copias de archivos y carpetas que Windows guarda con los puntos de restauración, si están activados en ese disco." },
   { term: "Wake-on-LAN", def: "Encender un equipo apagado mandándole una señal por la red. Requiere cable y tenerlo activado en la BIOS." },
   { term: "WebView2", def: "El componente de Microsoft Edge, incluido en Windows, con el que AdminOps dibuja su ventana." },
   { term: "winget", def: "El instalador de programas de Windows. AdminOps lo usa para instalar y actualizar." },
@@ -826,7 +946,7 @@ export const FAQ: FaqEntry[] = [
   { q: "¿AdminOps envía mis datos a algún sitio?", a: "No. No tiene cuentas, ni servidor, ni telemetría. Solo se conecta a Internet para lo que tú le pides: comprobar si hay versión nueva, la prueba de velocidad, instalar programas y las webs que abres dentro." },
   { q: "Apliqué un ajuste y algo va peor. ¿Qué hago?", a: "Estado del equipo → Historial → Diario de cambios, busca el ajuste y pulsa «Deshacer». Si fueron varios, deshaz de uno en uno empezando por el último. Si el equipo no arranca bien, usa «Restaurar sistema» con el punto de restauración que se creó antes." },
   { q: "¿Por qué muchos botones están apagados?", a: "Porque AdminOps no está abierto como administrador, o porque el modo auditoría está activo. Al pasar el ratón por el botón dice el motivo." },
-  { q: "¿Puedo usar el mismo pendrive en varios equipos?", a: "Sí, para eso está. Tus datos van en el pendrive; en cada equipo tendrás que entrar una vez en los portales (correo, tickets), porque Windows guarda esas sesiones por equipo." },
+  { q: "¿Puedo usar el mismo pendrive en varios equipos?", a: "Sí, para eso está. Tus datos van en el pendrive; en cada equipo tendrás que entrar una vez en los portales (correo, Teams), porque Windows guarda esas sesiones por equipo." },
   { q: "Windows dice que el programa no es de confianza.", a: "AdminOps no está firmado digitalmente. En el aviso, «Más información» → «Ejecutar de todas formas». Descárgalo siempre de su origen oficial." },
   { q: "El antivirus bloqueó una acción.", a: "AdminOps cambia la configuración del sistema, y algunos antivirus de empresa lo vigilan. AdminOps no intenta saltárselo: quien administra el antivirus tiene que autorizarlo." },
   { q: "¿El modo usuario impide que alguien cambie cosas?", a: "No. Esconde opciones para no confundir, pero no es una protección. Para impedir cambios, la persona debe usar una cuenta de Windows estándar." },

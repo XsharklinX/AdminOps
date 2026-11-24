@@ -1,18 +1,11 @@
 import { Loader2, TrendingDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { logQuietly, maintenanceApi, systemApi, type BootAnalysis, type StartupItem } from "../lib/api";
-import { average, gains, measured, secsText, type Baseline } from "../lib/startupGain";
+import { logQuietly, maintenanceApi, measureApi, systemApi, type BootAnalysis, type StartupItem } from "../lib/api";
+import { average, forHost, gains, measured, readBaseline, secsText, writeBaseline, type Baseline } from "../lib/startupGain";
+import { ViewCommand } from "./ActionCommand";
 import { useToast } from "./feedback";
 import { Card } from "./ui";
-
-const KEY = "adminops.startupGain";
-const readBaseline = (): Baseline | null => {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "null") as Baseline | null;
-  } catch {
-    return null;
-  }
-};
+import { hostName } from "../lib/machineHost";
 
 /**
  * Inicio de Windows → «Lo que se gana»: qué programas retrasan el arranque y
@@ -28,6 +21,8 @@ export function StartupGain({ items, isAdmin, onChanged }: { items: StartupItem[
 
   useEffect(() => {
     maintenanceApi.boot().then(setBoot).catch(logQuietly("StartupGain"));
+    // Un apunte hecho en otro equipo (viajó en el USB) no se enseña aquí.
+    void hostName().then((h) => setBaseline((b) => forHost(b, h)));
   }, []);
 
   const list = useMemo(() => (boot ? gains(items, boot.culprits) : []), [boot, items]);
@@ -41,6 +36,8 @@ export function StartupGain({ items, isAdmin, onChanged }: { items: StartupItem[
   const apply = async () => {
     setBusy(true);
     const done: string[] = [];
+    // Cuántos programas arrancaban antes de quitarlos, para decir cuántos quedan.
+    const before = await measureApi.read("inicio").catch(() => null);
     for (const g of list.filter((x) => chosen.has(x.item.id))) {
       if (g.item.needsAdmin && !isAdmin) continue;
       try {
@@ -52,14 +49,12 @@ export function StartupGain({ items, isAdmin, onChanged }: { items: StartupItem[
     }
     setBusy(false);
     if (!done.length) return;
-    const b: Baseline = { at: Date.now() / 1000, avgMs: avg, estimateMs: Math.max(0, avg - saving), names: done };
-    try {
-      localStorage.setItem(KEY, JSON.stringify(b));
-    } catch {
-      /* sin almacenamiento: no se podrá medir después */
-    }
+    const b: Baseline = { at: Date.now() / 1000, avgMs: avg, estimateMs: Math.max(0, avg - saving), names: done, host: await hostName() };
+    writeBaseline(b);
     setBaseline(b);
-    toast("ok", `${done.length} programas ya no arrancan con Windows. Tras el próximo reinicio, aquí verás lo que se ganó.`);
+    const after = before === null ? null : await measureApi.read("inicio").catch(() => null);
+    const count = after === null || before === null ? null : await measureApi.text({ label: "Programas al iniciar", before, after, unit: "" }).catch(() => null);
+    toast("ok", `${done.length} programas ya no arrancan con Windows.${count ? ` ${count}.` : ""} Tras el próximo reinicio, aquí verás lo que se ganó.`);
     onChanged();
   };
 
@@ -120,6 +115,7 @@ export function StartupGain({ items, isAdmin, onChanged }: { items: StartupItem[
             <button onClick={() => void apply()} disabled={busy || chosen.size === 0} className="ml-auto flex items-center gap-1.5 rounded-lg bg-neon px-3 py-1.5 text-xs font-medium text-on-neon disabled:opacity-50">
               {busy && <Loader2 size={12} className="animate-spin" />} Quitarlos y medir
             </button>
+            {chosen.size === 1 && <ViewCommand id="startup.disable" context={[...chosen][0]} />}
           </div>
           <p className="mt-2 text-[11px] text-mute">Es una estimación: los retrasos se solapan entre sí. Lo de verdad se ve tras el próximo reinicio.</p>
         </>

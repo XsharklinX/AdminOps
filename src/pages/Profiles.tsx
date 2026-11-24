@@ -31,7 +31,7 @@ import { ProfileEditor } from "../components/ProfileEditor";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, profilesApi, workApi, type ProfileDef, type ProfileResult, type ProfileView } from "../lib/api";
 import { useOnJournalChange } from "../lib/journalEvents";
-import { ErrorState, Loading, Overlay, softBtn } from "../components/ui";
+import { ErrorState, Intro, Loading, Overlay, softBtn } from "../components/ui";
 import { NeedsAdmin } from "../components/AdminBanner";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -222,7 +222,7 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       <div className="mb-4 flex items-center gap-2">
-        <p className="text-sm text-dim">Aplica varios ajustes de una vez con un solo punto de restauración.</p>
+        <Intro id="recipes:profiles">Aplica varios ajustes de una vez con un solo punto de restauración.</Intro>
         <button
           onClick={() => setEditing(null)}
           className="ml-auto flex items-center gap-1.5 rounded-md border border-neon/50 bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon hover:bg-neon/20"

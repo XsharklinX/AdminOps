@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "recpill",
+  "description": "La píldora de «Grabar el fallo» se puede arrastrar a otro sitio de la pantalla (no tiene marco).",
+  "windows": ["recpill"],
+  "permissions": ["core:window:allow-start-dragging"]
+}

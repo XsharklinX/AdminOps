@@ -26,6 +26,7 @@ import { programKey as key, norm } from "../lib/programs";
 import { officeApi, programsApi, toolsApi, type InstalledProgram, type Leftover, type SoftwareUpdate } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { readCached, remember } from "../lib/cachedRead";
+import { usePageMemory } from "../lib/pageMemory";
 
 type Filter = "all" | "updates" | "big" | "recent" | "user" | "wizard" | "orphans";
 
@@ -47,10 +48,10 @@ type RunState = "pending" | "running" | "ok" | "error" | "skipped";
 export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
   const [list, setList] = useState<InstalledProgram[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
-  const [hideComponents, setHideComponents] = useState(true);
-  const [hideMicrosoft, setHideMicrosoft] = useState(false);
+  const [query, setQuery] = usePageMemory("q", "");
+  const [filter, setFilter] = usePageMemory<Filter>("chip", "all");
+  const [hideComponents, setHideComponents] = usePageMemory("hideComponents", true);
+  const [hideMicrosoft, setHideMicrosoft] = usePageMemory("hideMicrosoft", false);
   const [updates, setUpdates] = useState<SoftwareUpdate[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [target, setTarget] = useState<InstalledProgram | null>(null);
@@ -340,7 +341,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar programa o editor…"
+            data-typefilter placeholder="Buscar programa o editor…"
             className="w-full rounded-md border border-line bg-panel py-1.5 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
           />
         </div>
@@ -398,6 +399,7 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
           padded
           sticky
           resizable="programs"
+          typeFilter={false}
           rows={visible}
           rowKey={(p) => p.id}
           columns={columns}

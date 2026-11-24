@@ -8,6 +8,7 @@ import { failed, SEVERITY_ORDER, SEVERITY_LABEL, severityOf, sortBySeverity, typ
 import { DataTable } from "../components/DataTable";
 import { Copyable } from "../components/Copyable";
 import { HoverCard } from "../components/HoverCard";
+import { usePageMemory } from "../lib/pageMemory";
 
 const ACTION_LABEL: Record<StationAction, string> = {
   restart: "Reiniciar",
@@ -51,7 +52,7 @@ export function Stations() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const run = useRef("");
   const lastDeep = useRef(false);
-  const [onlyIssues, setOnlyIssues] = useState(false);
+  const [onlyIssues, setOnlyIssues] = usePageMemory("onlyIssues", false);
   // Puestos marcados para actuar sobre ellos a la vez.
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [acting, setActing] = useState<StationAction | null>(null);
@@ -351,6 +352,7 @@ export function Stations() {
                 size="xs"
                 alignTop
                 rows={shown}
+                live
                 rowKey={(r) => r.host}
                 rowClass={(r) => (picked.has(r.host) ? "bg-neon/5" : "")}
                 columns={[

@@ -3,20 +3,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { inventoryLines, MachineActions, VerdictChip, VERDICT } from "../components/inventory";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass } from "../components/ui";
+import { Button, Card, inputClass, Intro } from "../components/ui";
 import { SavedViews } from "../components/SavedViews";
 import { matchesMachine } from "../lib/inventoryFilter";
 import { officeApi, toCsv, workApi, type Client, type Machine } from "../lib/api";
 import { fullDate as date } from "../lib/format";
+import { usePageMemory } from "../lib/pageMemory";
 
 type Row = { client: Client; machine: Machine };
 
 export function Inventory() {
   const [clients, setClients] = useState<Client[] | null>(null);
-  const [filter, setFilter] = useState<string>("all");
-  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [filter, setFilter] = usePageMemory<string>("chip", "all");
+  const [clientFilter, setClientFilter] = usePageMemory<string>("client", "all");
   // Texto libre: «windows 10», «sin tpm», un modelo, un cliente…
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = usePageMemory("q", "");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -120,10 +121,10 @@ export function Inventory() {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <Card title="Inventario de equipos" icon={<Boxes size={14} />}>
-        <p className="mb-3 text-sm text-dim">
+        <Intro id="inventory:inventory" className="mb-3">
           Cada equipo que pasa por una sesión de servicio (o que añades aquí) queda en la ficha de su cliente con su hardware y una recomendación:
           seguir, mejorar (SSD, memoria, batería…) o renovar.
-        </p>
+        </Intro>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-dim">Añadir este equipo a</span>
           <select value={target} onChange={(e) => setTarget(e.target.value)} className="rounded-md border border-line bg-void/60 px-3 py-1.5 text-sm text-ink outline-none">
@@ -148,7 +149,7 @@ export function Inventory() {
           {chip("upgrade", "Mejorar", counts.upgrade)}
           {chip("ok", "Bien", counts.ok)}
         </div>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrar: windows 10, sin tpm, modelo…" className={`${inputClass} w-60 py-1.5`} aria-label="Filtrar el inventario" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} data-typefilter placeholder="Filtrar: windows 10, sin tpm, modelo…" className={`${inputClass} w-60 py-1.5`} aria-label="Filtrar el inventario" />
         <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="rounded-md border border-line bg-void/60 px-3 py-1.5 text-sm text-ink outline-none">
           <option value="all">Todos los clientes</option>
           {(clients ?? []).filter((c) => c.machines.length).map((c) => (

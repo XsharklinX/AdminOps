@@ -44,14 +44,14 @@ pub struct Sample {
 
 /// Lo ocupado que está el disco: el contador de Windows «% de tiempo inactivo» (al revés).
 #[cfg(windows)]
-struct DiskBusy {
+pub(crate) struct DiskBusy {
     query: windows_sys::Win32::System::Performance::PDH_HQUERY,
     counter: windows_sys::Win32::System::Performance::PDH_HCOUNTER,
 }
 
 #[cfg(windows)]
 impl DiskBusy {
-    fn new() -> Option<Self> {
+    pub(crate) fn new() -> Option<Self> {
         use windows_sys::Win32::System::Performance::*;
         unsafe {
             let mut query = std::ptr::null_mut();
@@ -69,7 +69,7 @@ impl DiskBusy {
     }
 
     /// Media desde la lectura anterior.
-    fn read(&self) -> Option<f32> {
+    pub(crate) fn read(&self) -> Option<f32> {
         use windows_sys::Win32::System::Performance::*;
         unsafe {
             if PdhCollectQueryData(self.query) != 0 {
@@ -84,15 +84,26 @@ impl DiskBusy {
     }
 }
 
+#[cfg(windows)]
+impl Drop for DiskBusy {
+    fn drop(&mut self) {
+        // Cada grabación de «Grabar el fallo» abre la suya: se cierra al terminar.
+        // SAFETY: la consulta se abrió en `new` y no se usa después.
+        unsafe {
+            windows_sys::Win32::System::Performance::PdhCloseQuery(self.query);
+        }
+    }
+}
+
 #[cfg(not(windows))]
-struct DiskBusy;
+pub(crate) struct DiskBusy;
 
 #[cfg(not(windows))]
 impl DiskBusy {
-    fn new() -> Option<Self> {
+    pub(crate) fn new() -> Option<Self> {
         None
     }
-    fn read(&self) -> Option<f32> {
+    pub(crate) fn read(&self) -> Option<f32> {
         None
     }
 }

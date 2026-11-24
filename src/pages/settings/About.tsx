@@ -179,7 +179,7 @@ export function ModeCard() {
       </div>
       <p className="mt-3 text-[11px] text-mute">
         {prefs.mode === "user"
-          ? "En modo usuario no se ven tus clientes, contactos, tickets ni correo, ni lo que puede romper el equipo."
+          ? "En modo usuario no se ven tus clientes, contactos ni correo, ni lo que puede romper el equipo."
           : "Si dejas AdminOps a la persona que usa el equipo, pásalo a modo usuario."}{" "}
         Es un modo de la interfaz, no una barrera de seguridad
         {lock?.enabled

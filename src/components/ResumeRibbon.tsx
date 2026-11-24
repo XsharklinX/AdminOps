@@ -2,7 +2,7 @@
 // última pantalla y sección en la que se estaba. Un clic y estás.
 import { History, X } from "lucide-react";
 import { useState } from "react";
-import { pageLabel, isPageId, type PageId } from "./Sidebar";
+import { pageLabel, isPageId, type PageId, DISABLED_PAGES } from "./Sidebar";
 import { sectionLabel } from "../lib/sections";
 
 const KEY = "adminops.lastPlace";
@@ -27,7 +27,7 @@ export function rememberPlace(page: PageId, section: string | null) {
 export function lastPlace(now = Date.now()): Place | null {
   try {
     const p = JSON.parse(localStorage.getItem(KEY) ?? "null") as Place | null;
-    if (!p || !isPageId(p.page) || now - p.at > 7 * 24 * 3600 * 1000) return null;
+    if (!p || !isPageId(p.page) || DISABLED_PAGES.includes(p.page) || now - p.at > 7 * 24 * 3600 * 1000) return null;
     return p;
   } catch {
     return null;

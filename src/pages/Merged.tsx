@@ -1,6 +1,7 @@
 // Páginas que agrupan varias vistas relacionadas en pestañas, para que cada
 // cosa esté en un solo sitio (Red, Usuarios y cuentas, Inventario, Optimizar
 // Windows…).
+import { WEB_TICKETS } from "../lib/features";
 import {
   BookCopy,
   DatabaseBackup,
@@ -16,11 +17,15 @@ import {
   Activity,
   Building2,
   Cpu,
+  Usb,
+  Video,
   FolderKey,
   HardDrive,
   History as HistoryIcon,
   Keyboard,
+  Languages,
   Layers,
+  Monitor,
   Network as NetworkIcon,
   Printer,
   ScanLine,
@@ -46,13 +51,20 @@ import {
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { Loading } from "../components/ui";
 import { lazyTab } from "../lib/lazyTab";
-import { PageTabs, TabPanels, type PageTab } from "../components/PageTabs";
+import { PageTabs, TabPanels, TabPin, type PageTab } from "../components/PageTabs";
 import type { PageId } from "../components/Sidebar";
+import { tabLetters } from "../lib/keytips";
+import { navKey } from "../lib/sections";
 import { onSectionRequest, reportSection, usePageId } from "../lib/sectionState";
+import { usePageMemory } from "../lib/pageMemory";
 const Devices = lazyTab(() => import("./Devices"), "Devices");
 const Accounts = lazyTab(() => import("./Accounts"), "Accounts");
 const Diagnostics = lazyTab(() => import("./Diagnostics"), "Diagnostics");
 const Hardware = lazyTab(() => import("./Hardware"), "Hardware");
+const Connected = lazyTab(() => import("./Connected"), "Connected");
+const Displays = lazyTab(() => import("./Displays"), "Displays");
+const NetUsage = lazyTab(() => import("./NetUsage"), "NetUsage");
+const KeyboardPage = lazyTab(() => import("./Keyboard"), "Keyboard");
 const History = lazyTab(() => import("./History"), "History");
 const Security = lazyTab(() => import("./Security"), "Security");
 const Bloatware = lazyTab(() => import("./Bloatware"), "Bloatware");
@@ -96,6 +108,7 @@ const Boots = lazyTab(() => import("./Boots"), "Boots");
 const Peripherals = lazyTab(() => import("./Peripherals"), "Peripherals");
 const NetWatch = lazyTab(() => import("./NetWatch"), "NetWatch");
 const AskPc = lazyTab(() => import("../components/AskPc"), "AskPc");
+const FaultRecorder = lazyTab(() => import("../components/FaultRecorder"), "FaultRecorder");
 const WhatChanged = lazyTab(() => import("../components/WhatChanged"), "WhatChanged");
 
 /** Pestaña elegida (o la que pide un enlace) y las ya visitadas, que se mantienen montadas. */
@@ -104,13 +117,16 @@ function useTabs<T extends string>(
   focus: string | null | undefined,
 ) {
   const first = tabs[0].id;
-  const [tab, setTab] = useState<T>(() =>
+  // La pestaña se recuerda por pantalla: al volver (o con «atrás») sale la misma.
+  const [tab, setTab] = usePageMemory<T>(`tab:${first}`, () =>
     tabs.some((t) => t.id === focus) ? (focus as T) : first,
   );
-  const [visited, setVisited] = useState<T[]>([tab]);
+  const [seen, setSeen] = useState<T[]>([tab]);
+  // Las ya visitadas siguen montadas; una que llega por «atrás» cuenta también.
+  const visited = seen.includes(tab) ? seen : [...seen, tab];
   const choose = (t: T) => {
     setTab(t);
-    setVisited((v) => (v.includes(t) ? v : [...v, t]));
+    setSeen(visited.includes(t) ? visited : [...visited, t]);
   };
   useEffect(() => {
     if (focus && tabs.some((t) => t.id === focus)) choose(focus as T);
@@ -131,19 +147,86 @@ function useTabs<T extends string>(
   return { tab, visited, choose };
 }
 
+/** Grupo de pestañas: arriba sale el grupo y, dentro, una fila corta de píldoras. */
+export interface TabGroup<T extends string> {
+  id: string;
+  label: string;
+  help?: string;
+  tabs: T[];
+}
+
+/** Grupos y la fila de píldoras del grupo a la vista (Estado del equipo, 1.4). */
+function GroupTabs<T extends string>({
+  groups,
+  tabs,
+  tab,
+  choose,
+}: {
+  groups: TabGroup<T>[];
+  tabs: PageTab<T>[];
+  tab: T;
+  choose: (t: T) => void;
+}) {
+  const page = usePageId();
+  const current = groups.find((g) => g.tabs.includes(tab)) ?? groups[0];
+  // Al volver a un grupo sale la píldora que se dejó abierta en él.
+  const [last, setLast] = usePageMemory<Record<string, T>>("tab-groups", () => ({}));
+  useEffect(() => {
+    if (last[current.id] !== tab) setLast({ ...last, [current.id]: tab });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de pestaña
+  }, [tab]);
+  const pills = current.tabs.map((id) => tabs.find((t) => t.id === id)!).filter(Boolean);
+  const letters = tabLetters(pills.map((p) => p.short ?? p.label));
+  return (
+    <>
+      <PageTabs
+        tabs={groups.map((g) => ({ id: g.id, label: g.label, help: g.help }))}
+        value={current.id}
+        onChange={(id) => {
+          const g = groups.find((x) => x.id === id)!;
+          choose(last[g.id] && g.tabs.includes(last[g.id]) ? last[g.id] : g.tabs[0]);
+        }}
+        pinnable={false}
+      />
+      {pills.length > 1 && (
+        <div role="tablist" aria-label={current.label} className="mx-auto flex w-full max-w-(--page-max) shrink-0 flex-wrap gap-1.5 px-6 pt-4">
+          {pills.map((p, i) => (
+            <button
+              key={p.id}
+              role="tab"
+              data-kt={letters[i]}
+              aria-selected={p.id === tab}
+              onClick={() => choose(p.id)}
+              title={p.help}
+              className={`group/tab relative flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12.5px] transition-colors ${
+                p.id === tab ? "border-neon/50 bg-neon/10 font-medium text-ink" : "border-line text-dim hover:border-line-2 hover:text-ink"
+              }`}
+            >
+              {p.short ?? p.label}
+              {page && <TabPin k={navKey(page, p.id)} label={p.label} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function Tabbed<T extends string>({
   tabs,
   focus,
   render,
+  groups,
 }: {
   tabs: PageTab<T>[];
   focus?: string | null;
   render: (t: T, visible: boolean) => ReactNode;
+  groups?: TabGroup<T>[];
 }) {
   const { tab, visited, choose } = useTabs(tabs, focus);
   return (
     <div className="flex h-full flex-col">
-      <PageTabs tabs={tabs} value={tab} onChange={choose} />
+      {groups ? <GroupTabs groups={groups} tabs={tabs} tab={tab} choose={choose} /> : <PageTabs tabs={tabs} value={tab} onChange={choose} />}
       <TabPanels
         value={tab}
         visited={visited}
@@ -216,7 +299,7 @@ export function Apps({
   );
 }
 
-type NetTab = "router" | "devices" | "speed" | "watch" | "tools";
+type NetTab = "router" | "devices" | "speed" | "usage" | "watch" | "tools";
 const NET: PageTab<NetTab>[] = [
   {
     id: "router",
@@ -235,6 +318,12 @@ const NET: PageTab<NetTab>[] = [
     label: "Velocidad y diagnóstico",
     icon: <Gauge size={14} />,
     help: "Test de velocidad, estado de la conexión, reparar la red y controlar la Wi-Fi.",
+  },
+  {
+    id: "usage",
+    label: "Uso de la red",
+    icon: <NetworkIcon size={14} />,
+    help: "Qué programa sube y baja cuánto, en vivo y por programa, a dónde se conecta y cuánto movió hoy. Dice cuándo uno satura la línea y deja pausar OneDrive 2 horas.",
   },
   {
     id: "watch",
@@ -274,6 +363,8 @@ export function MyNetwork({
           <Devices />
         ) : t === "speed" ? (
           <Network isAdmin={isAdmin} />
+        ) : t === "usage" ? (
+          <NetUsage />
         ) : t === "watch" ? (
           <NetWatch />
         ) : (
@@ -290,7 +381,7 @@ export function Workstations() {
 }
 
 type InventoryTab = "inventory" | "webinventory";
-const INVENTORY: PageTab<InventoryTab>[] = [
+const INVENTORY_ALL: PageTab<InventoryTab>[] = [
   {
     id: "inventory",
     label: "Mi inventario",
@@ -304,6 +395,8 @@ const INVENTORY: PageTab<InventoryTab>[] = [
     help: "La web de inventario de tu empresa, dentro de AdminOps, con los datos de este equipo a mano para rellenar el formulario.",
   },
 ];
+
+const INVENTORY = INVENTORY_ALL.filter((t) => WEB_TICKETS || t.id !== "webinventory");
 
 /** Todo el inventario: el propio y la web de inventario de la empresa. */
 export function InventoryPage({
@@ -792,7 +885,7 @@ export function PrintersAndShares({
   );
 }
 
-type MachineTab = "diagnostics" | "hardware" | "performance" | "security" | "boots" | "peripherals" | "history" | "changed" | "ask";
+type MachineTab = "diagnostics" | "hardware" | "connected" | "performance" | "recorder" | "security" | "boots" | "peripherals" | "displays" | "keyboard" | "history" | "changed" | "ask";
 const MACHINE: PageTab<MachineTab>[] = [
   {
     id: "diagnostics",
@@ -807,10 +900,22 @@ const MACHINE: PageTab<MachineTab>[] = [
     help: "Qué piezas lleva el equipo (para el inventario), temperaturas en vivo, salud de los discos (SMART) y prueba de memoria.",
   },
   {
+    id: "connected",
+    label: "Conectados",
+    icon: <Usb size={14} />,
+    help: "Lo que Windows tiene conectado a este equipo y si funciona: sin driver, con error o bien. Lo que enchufas o quitas sale arriba al momento, con su acción.",
+  },
+  {
     id: "performance",
     label: "Rendimiento",
     icon: <Gauge size={14} />,
     help: "Procesador, memoria y disco de los últimos 7 días, minuto a minuto, y qué programa había detrás de cada pico. Se mide mientras AdminOps está abierta.",
+  },
+  {
+    id: "recorder",
+    label: "Grabar el fallo",
+    icon: <Video size={14} />,
+    help: "Para el fallo que no sale cuando el técnico mira: graba la pantalla hasta 2 minutos, solo en este equipo, y apunta a la vez los errores de Windows, los programas que se cuelgan y los picos de procesador y disco. Cada marca salta a su segundo del vídeo y todo se borra al cerrar el caso.",
   },
   {
     id: "security",
@@ -821,18 +926,33 @@ const MACHINE: PageTab<MachineTab>[] = [
   {
     id: "boots",
     label: "Arranques y cuelgues",
+    short: "Arranques",
     icon: <Power size={14} />,
     help: "Cuándo arrancó y se apagó mal el equipo, los pantallazos azules explicados y cuánto tarda en arrancar (60 días).",
   },
   {
     id: "peripherals",
     label: "Probar periféricos",
+    short: "Periféricos",
     icon: <Keyboard size={14} />,
     help: "Pantalla (píxeles muertos), teclado, altavoces izquierdo y derecho, micrófono y cámara.",
   },
   {
+    id: "displays",
+    label: "Pantallas",
+    icon: <Monitor size={14} />,
+    help: "Cada monitor con su resolución, su cable y sus Hz, y si va borroso o estirado porque no usa la suya. Con arreglos que se deshacen solos si no se ve bien.",
+  },
+  {
+    id: "keyboard",
+    label: "Teclado e idioma",
+    icon: <Languages size={14} />,
+    help: "Los idiomas de teclado instalados, el atajo que cambia de idioma sin avisar y una prueba de «ñ @ ´» para saber por qué el teclado escribe raro.",
+  },
+  {
     id: "history",
     label: "Historial del equipo",
+    short: "Historial",
     icon: <HistoryIcon size={14} />,
     help: "Todo lo que ha pasado en este equipo: cambios, avisos, actualizaciones, drivers y apagados, con «Deshacer» y los puntos de restauración.",
   },
@@ -845,9 +965,18 @@ const MACHINE: PageTab<MachineTab>[] = [
   {
     id: "ask",
     label: "Pregúntale al equipo",
+    short: "Pregúntale",
     icon: <MessageCircleQuestion size={14} />,
     help: "Preguntas fijas (¿por qué se reinició anoche?, ¿por qué va lento?, ¿quién instaló esto?, ¿por qué no imprime?) con la respuesta en una frase y las pruebas debajo.",
   },
+];
+
+/** Las 13 secciones en 4 grupos: arriba no caben 13 pestañas (1.4, idea 1). */
+const MACHINE_GROUPS: TabGroup<MachineTab>[] = [
+  { id: "health", label: "Salud", help: "Diagnóstico, seguridad, rendimiento de los últimos días y arranques.", tabs: ["diagnostics", "security", "performance", "boots"] },
+  { id: "parts", label: "Piezas", help: "Hardware, lo conectado, pantallas, teclado e idioma, y probar periféricos.", tabs: ["hardware", "connected", "displays", "keyboard", "peripherals"] },
+  { id: "past", label: "Qué pasó", help: "El historial del equipo, qué cambió desde una fecha y preguntas con respuesta.", tabs: ["history", "changed", "ask"] },
+  { id: "record", label: "Grabar", help: "Grabar el fallo que no sale cuando miras.", tabs: ["recorder"] },
 ];
 
 /**
@@ -871,6 +1000,7 @@ export function MachineState({
   return (
     <Tabbed
       tabs={MACHINE}
+      groups={MACHINE_GROUPS}
       focus={tab ?? sectionTab(inner)}
       render={(t) => {
         const f = t === (tab ?? sectionTab(inner)) ? inner : null;
@@ -880,13 +1010,17 @@ export function MachineState({
           return (
             <Hardware isAdmin={isAdmin} focus={f} onNavigate={onNavigate} />
           );
+        if (t === "connected") return <Connected isAdmin={isAdmin} />;
         if (t === "security")
           return (
             <Security isAdmin={isAdmin} focus={f} onNavigate={onNavigate} />
           );
         if (t === "performance") return <PerfHistory />;
+        if (t === "recorder") return <FaultRecorder />;
         if (t === "boots") return <Boots isAdmin={isAdmin} />;
         if (t === "peripherals") return <Peripherals />;
+        if (t === "displays") return <Displays />;
+        if (t === "keyboard") return <KeyboardPage />;
         if (t === "changed") return <WhatChanged />;
         if (t === "ask") return <AskPc />;
         return <History isAdmin={isAdmin} onNavigate={onNavigate} />;

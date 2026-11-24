@@ -4,13 +4,15 @@
 // atiende, qué equipo, cuánto lleva y cuántas acciones van apuntadas. Todo lo
 // que se hace en AdminOps queda en el diario, y al cerrar el caso se redacta la
 // resolución con eso, para pegarla en el ticket en vez de escribirla de memoria.
+import { WEB_TICKETS } from "../lib/features";
 import { knowledgeApi } from "../lib/api";
 import { SYMPTOMS } from "../lib/symptoms";
 import { lastSymptom } from "../lib/lastSymptom";
-import { ClipboardCheck, Copy, Crop, Loader2, Pencil, PictureInPicture, Send, TicketPlus, Trash2, X } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Copy, Crop, Loader2, Pencil, PictureInPicture, Save, Send, TicketPlus, Trash2, X, XCircle } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
-import { logQuietly, casesApi, noteApi, portalsApi, workApi, type Case, type CaseTones, type ClipRedacted } from "../lib/api";
+import { logQuietly, casesApi, noteApi, portalsApi, workApi, type Case, type CaseAction, type CaseTones, type ClipRedacted } from "../lib/api";
+import { CaseTemplate } from "./CaseTemplate";
 import { CASE_CHANGED_EVENT, caseChanged, elapsed, OPEN_CASE_EVENT } from "../lib/currentCase";
 import { goToPage } from "../lib/navigate";
 import { lastPortalKey } from "../lib/portalState";
@@ -111,7 +113,9 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
         .actions()
         .then((a) => {
           setCount(a.length);
-          setLast(a.length ? a[a.length - 1].title : null);
+          const u = a[a.length - 1];
+          // Si la acción midió algo, su «antes → después» va al lado.
+          setLast(u ? (u.measure ? `${u.title} (${u.measure})` : u.title) : null);
         })
         .catch(logQuietly("CaseBar")),
     [],
@@ -178,6 +182,7 @@ export function CaseBar({ onOpenChange }: { onOpenChange?: (open: boolean) => vo
       )}
       {dialog?.kind === "close" && current && (
         <CloseDialog
+          current={current}
           onClose={() => setDialog(null)}
           onClosed={() => {
             setDialog(null);
@@ -255,7 +260,7 @@ function CaseEditor({ mode, prefill, onClose, onSaved }: { mode: "new" | "edit";
 }
 
 /** Cerrar el caso: la resolución redactada, editable, lista para el ticket. */
-function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () => void }) {
+function CloseDialog({ current, onClose, onClosed }: { current: Case; onClose: () => void; onClosed: () => void }) {
   const [text, setText] = useState<string | null>(null);
   const [tones, setTones] = useState<CaseTones | null>(null);
   const [tone, setTone] = useState<keyof CaseTones>("technical");
@@ -266,6 +271,8 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
   const [topic, setTopic] = useState(() => lastSymptom() ?? "");
   const [fix, setFix] = useState("");
   const [doneActions, setDoneActions] = useState<string[]>([]);
+  const [actions, setActions] = useState<CaseAction[]>([]);
+  const [template, setTemplate] = useState(false);
   const toast = useToast();
 
   useLiveEffect((vigente) => {
@@ -273,6 +280,7 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
       .actions()
       .then((a) => {
         if (!vigente()) return;
+        setActions(a);
         const ok = a.filter((x) => x.ok).map((x) => x.title);
         setDoneActions([...new Set(ok)].reverse());
         // Lo último que se hizo bien suele ser lo que lo arregló.
@@ -370,8 +378,13 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
           <Button kind="ghost" onClick={() => void copy().then((ok) => toast(ok ? "ok" : "error", ok ? "Resolución copiada." : "No se pudo copiar."))} disabled={!text}>
             <Copy size={14} /> Copiar
           </Button>
-          <Button kind="ghost" onClick={() => void paste()} disabled={!text || busy !== null} title="Escribe la resolución en el campo del ticket que tengas seleccionado en el portal">
-            {busy === "paste" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Pegar en Tickets
+          {WEB_TICKETS && (
+            <Button kind="ghost" onClick={() => void paste()} disabled={!text || busy !== null} title="Escribe la resolución en el campo del ticket que tengas seleccionado en el portal">
+              {busy === "paste" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Pegar en Tickets
+            </Button>
+          )}
+          <Button kind="secondary" onClick={() => setTemplate(true)} disabled={busy !== null}>
+            <Save size={14} /> Guardar como plantilla
           </Button>
           <Button onClick={() => void close()} disabled={text === null || busy !== null}>
             {busy === "close" ? <Loader2 size={14} className="animate-spin" /> : <ClipboardCheck size={14} />} Cerrar caso
@@ -380,6 +393,18 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
       }
     >
       {error && <p className="mb-3 flex items-center gap-2 text-xs text-bad"><X size={12} />{error}</p>}
+      {actions.length > 0 && (
+        <ul className="mb-3 max-h-40 divide-y divide-line/60 overflow-y-auto rounded-lg border border-line text-[13px]" aria-label="Acciones apuntadas">
+          {actions.map((a, i) => (
+            <li key={i} className="flex items-center gap-2 px-3 py-1.5">
+              {a.ok ? <CheckCircle2 size={13} className="shrink-0 text-ok" /> : <XCircle size={13} className="shrink-0 text-bad" />}
+              <span className="min-w-0 flex-1 truncate text-ink">{a.title}</span>
+              {a.measure && <span className="shrink-0 font-mono text-xs text-ok">{a.measure}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {template && <CaseTemplate current={current} onClose={() => setTemplate(false)} />}
       {text === null && !error ? (
         <p className="flex items-center gap-2 text-sm text-mute">
           <Loader2 size={14} className="animate-spin" /> Redactando la resolución…
@@ -432,8 +457,8 @@ function CloseDialog({ onClose, onClosed }: { onClose: () => void; onClosed: () 
             </div>
           </div>
           <p className="mt-2 text-[11px] text-mute">
-            Sale del diario: cada línea es algo que se hizo de verdad en AdminOps. Puedes retocarla antes de pegarla. Para «Pegar en Tickets», deja antes seleccionado en el portal el
-            campo donde va la resolución.
+            Sale del diario: cada línea es algo que se hizo de verdad en AdminOps. Puedes retocarla antes de pegarla.
+            {WEB_TICKETS && " Para «Pegar en Tickets», deja antes seleccionado en el portal el campo donde va la resolución."}
           </p>
         </>
       )}

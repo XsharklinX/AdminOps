@@ -1,3 +1,4 @@
+import { WEB_TICKETS } from "../lib/features";
 import { cancelPrefetch, prefetchPage } from "../lib/prefetch";
 import { SlideMark } from "./SlideMark";
 import { useNarrow } from "../lib/useNarrow";
@@ -59,6 +60,7 @@ export type PageId =
   | "troubleshoot"
   | "security"
   | "hardware"
+  | "connected"
   | "processes"
   | "space"
   | "profiles"
@@ -177,7 +179,9 @@ export const NAV: NavItem[] = [
     id: "inventory",
     label: "Inventario",
     tab: "Inventario",
-    help: "Todo el inventario en un sitio: el tuyo, con la ficha y el veredicto de cada equipo, y la web de inventario de la empresa dentro de AdminOps, con los datos de este equipo a mano para rellenarla.",
+    help: WEB_TICKETS
+      ? "Todo el inventario en un sitio: el tuyo, con la ficha y el veredicto de cada equipo, y la web de inventario de la empresa dentro de AdminOps, con los datos de este equipo a mano para rellenarla."
+      : "Tu inventario de equipos, con la ficha de cada uno y qué conviene hacer con él.",
   },
   {
     id: "users",
@@ -273,6 +277,7 @@ export const PAGE_ALIAS: Partial<Record<PageId, [PageId, string]>> = {
   // Estado del equipo
   diagnostics: ["machine", "diagnostics"],
   hardware: ["machine", "hardware"],
+  connected: ["machine", "connected"],
   security: ["machine", "security"],
   history: ["machine", "history"],
   // Personas y clientes
@@ -349,8 +354,8 @@ export const AREA_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * Las áreas de la barra lateral (1.2). Cada una enseña sus pantallas y, debajo de
- * cada pantalla, sus secciones (lib/sections.ts): nada queda detrás de una pestaña.
+ * Las áreas de la barra lateral (1.2). Cada una enseña sus pantallas; las
+ * secciones de cada pantalla van en la cabecera, en la línea del título (1.4).
  * Teams y Correo no están: se abren desde la barra de arriba. Herramientas de
  * Windows y Ajustes van abajo, en la columna de áreas.
  */
@@ -376,7 +381,9 @@ const withIcon = (a: Omit<Area, "icon">): Area => ({ ...a, icon: AREA_ICONS[a.ic
  */
 export const USER_MODE_PAGES: PageId[] = ["dashboard", "machine", "space", "troubleshoot", "remote", "settings"];
 
-export const allowedInMode = (page: PageId, mode: "admin" | "user") => mode === "admin" || USER_MODE_PAGES.includes(page);
+/** Pantallas apagadas de momento (ver lib/features.ts): no se ven ni se puede ir a ellas. */
+export const DISABLED_PAGES: PageId[] = WEB_TICKETS ? [] : ["tickets"];
+export const allowedInMode = (page: PageId, mode: "admin" | "user") => !DISABLED_PAGES.includes(page) && (mode === "admin" || USER_MODE_PAGES.includes(page));
 
 /** Estructura de fábrica. */
 export const AREAS: Area[] = DEFAULT_AREAS.map(withIcon);
@@ -503,9 +510,9 @@ function BadgeTag({ b }: { b: Badge }) {
 }
 
 /**
- * La barra lateral de 1.2: una columna con las áreas y, a su lado, el árbol del
- * área: cada pantalla y, debajo, sus secciones como líneas. Lo que antes estaba
- * en una pestaña (Dominio, Inicio de Windows, Carpetas compartidas…) se ve aquí.
+ * La barra lateral: una columna con las áreas y, a su lado, las pantallas del
+ * área. Las secciones de cada pantalla van en la cabecera (1.4); aquí solo se
+ * resumen sus avisos y lo nuevo, y se ven las que se hayan fijado.
  */
 export function Sidebar({
   active,
@@ -609,20 +616,31 @@ export function Sidebar({
     );
   };
 
-  /** Una pantalla y sus secciones. */
+  /**
+   * Una pantalla. Sus secciones van arriba, en la cabecera (1.4, idea 2): aquí
+   * solo se resume lo que piden (el peor aviso y en cuántas) y si hay algo nuevo.
+   */
   const pageLines = (p: PageId) => {
     const list = sectionsOf(p);
-    return (
-      <div key={p} className="flex flex-col gap-px">
-        {line(navKey(p), pageLabel(p), {
-          current: isCurrent(p, null),
-          onClick: () => onNavigate(p),
-          badge: badgeOf(navKey(p)),
-          title: NAV.find((n) => n.id === p)?.help,
-        })}
-        {list.map((s) => line(navKey(p, s.id), s.label, { sub: true, current: isCurrent(p, s.id), onClick: () => onNavigate(p, s.id), badge: badgeOf(navKey(p, s.id)) }))}
-      </div>
-    );
+    const own = badgeOf(navKey(p));
+    const alerts = list
+      .map((s) => ({ s, b: badgeOf(navKey(p, s.id)) }))
+      .filter((x): x is { s: (typeof list)[number]; b: Badge } => !!x.b && (x.b.tone === "bad" || x.b.tone === "warn"));
+    const worst = alerts.find((x) => x.b.tone === "bad") ?? alerts[0];
+    const summary: Badge | undefined =
+      own ??
+      (worst && {
+        text: alerts.length === 1 ? worst.b.text : `${alerts.length} avisos`,
+        tone: worst.b.tone,
+        title: alerts.map((x) => `${x.s.label}: ${x.b.title || x.b.text}`).join("\n"),
+      });
+    const freshInside = list.some((s) => fresh.includes(navKey(p, s.id)));
+    return line(navKey(p), pageLabel(p), {
+      current: p === active,
+      onClick: () => onNavigate(p),
+      badge: summary ?? (freshInside ? { text: "Nuevo", tone: "ok", title: "Algo de esta pantalla ha cambiado en esta versión. La marca se va al entrar en lo nuevo." } : undefined),
+      title: NAV.find((n) => n.id === p)?.help,
+    });
   };
 
   const fixedButton = (label: string, Icon: LucideIcon, on: boolean, onClick: () => void, title?: string) => (
@@ -640,7 +658,7 @@ export function Sidebar({
   );
 
   const rail = (
-    <nav ref={railRef} aria-label="Áreas" data-tour="sidebar" className={`relative isolate flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
+    <nav ref={railRef} aria-label="Áreas" data-tour="sidebar" data-kt-side className={`relative isolate flex w-[84px] shrink-0 flex-col items-center gap-0.5 bg-panel py-2 ${mini ? "" : sb.position === "right" ? "border-l border-line" : "border-r border-line"}`}>
       <SlideMark within={railRef} kind="rail" />
       {areas.map((a) => {
         const on = !mini ? shown?.id === a.id && (activeArea?.id === a.id || !activeArea) : activeArea?.id === a.id;
@@ -704,7 +722,7 @@ export function Sidebar({
             sb.position === "right" ? "left-0" : "right-0"
           }`}
         />
-        <nav aria-label="Pantallas y secciones" className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 pt-3 pb-3">
+        <nav aria-label="Pantallas y secciones" data-kt-side className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 pt-3 pb-3">
           {pinned.length > 0 && (
             <div ref={pinRef} className="flex flex-col gap-px">
               {header("Fijados")}
@@ -730,7 +748,7 @@ export function Sidebar({
           {shown && (
             <div className="flex flex-col gap-2">
               {header(shown.label, <span>{shown.pages.length}</span>)}
-              <div ref={treeRef} className="relative isolate flex flex-col gap-2">
+              <div ref={treeRef} className="relative isolate flex flex-col gap-px">
                 <SlideMark within={treeRef} />
                 {shown.pages.map(pageLines)}
               </div>

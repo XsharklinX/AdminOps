@@ -2,6 +2,7 @@ import { ArrowRight, CheckCircle2, CircleAlert, Gauge, Globe, Loader2, Router, S
 import { useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { Button, Card } from "./ui";
+import { ViewCommand } from "./ActionCommand";
 import { goToPage } from "../lib/navigate";
 import { troubleshootApi, type NetCheck, type NetRepair, type NetVerdict } from "../lib/api";
 
@@ -110,7 +111,8 @@ export function NetRepairCard({ isAdmin }: { isAdmin: boolean }) {
       const r = await troubleshootApi.repairNetwork(deep);
       setResult(r);
       // El detalle va en el diagnóstico de abajo; el aviso solo dice cómo quedó.
-      toast(r.verdict.level === "ok" ? "ok" : "info", r.verdict.title);
+      // Si se pudo medir, el aviso dice cuánto cambió (el ping antes y después).
+      toast(r.verdict.level === "ok" ? "ok" : "info", r.measureText ? `${r.verdict.title} · ${r.measureText}` : r.verdict.title);
     } catch (e) {
       toast("error", String(e));
     } finally {
@@ -124,12 +126,18 @@ export function NetRepairCard({ isAdmin }: { isAdmin: boolean }) {
         Para «conectado sin Internet», webs que no cargan o una IP 169.254. Comprueba la conexión antes y después para ver si se arregló.
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => run(false)} disabled={!!busy || !isAdmin} title={isAdmin ? undefined : "Requiere ejecutar AdminOps como administrador"}>
-          {busy === "quick" ? <Loader2 size={13} className="animate-spin" /> : <Wrench size={13} />} Reparación rápida
-        </Button>
-        <Button kind="ghost" onClick={() => run(true)} disabled={!!busy || !isAdmin} title={isAdmin ? "Además restablece Winsock y TCP/IP (requiere reiniciar)" : "Requiere ejecutar AdminOps como administrador"}>
-          {busy === "deep" ? <Loader2 size={13} className="animate-spin" /> : <Wrench size={13} />} Reparación a fondo
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button kt="R" onClick={() => run(false)} disabled={!!busy || !isAdmin} title={isAdmin ? undefined : "Requiere ejecutar AdminOps como administrador"}>
+            {busy === "quick" ? <Loader2 size={13} className="animate-spin" /> : <Wrench size={13} />} Reparación rápida
+          </Button>
+          <ViewCommand id="net.repair-quick" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button kind="ghost" onClick={() => run(true)} disabled={!!busy || !isAdmin} title={isAdmin ? "Además restablece Winsock y TCP/IP (requiere reiniciar)" : "Requiere ejecutar AdminOps como administrador"}>
+            {busy === "deep" ? <Loader2 size={13} className="animate-spin" /> : <Wrench size={13} />} Reparación a fondo
+          </Button>
+          <ViewCommand id="net.repair-deep" />
+        </div>
       </div>
       {busy && <p className="mt-3 text-xs text-mute">Reparando y esperando a que vuelva la conexión (hasta medio minuto)…</p>}
       {result && <VerdictBox v={result.verdict} onDeep={() => run(true)} />}

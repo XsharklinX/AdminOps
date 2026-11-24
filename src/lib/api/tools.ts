@@ -153,6 +153,10 @@ export interface SpaceView {
   files: number;
   denied: number;
   seconds: number;
+  /** Leído del índice de archivos del disco (MFT) de una vez, no carpeta a carpeta. */
+  fast: boolean;
+  /** AdminOps abierto como administrador. */
+  elevated: boolean;
   folder: SpaceFolder;
   largestFiles: SpaceEntry[];
   /** Grandes y sin tocar en más de un año. */

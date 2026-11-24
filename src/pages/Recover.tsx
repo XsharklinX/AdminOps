@@ -4,6 +4,7 @@ import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, inputClass, Loading } from "../components/ui";
 import { CarveCard } from "../components/DiskRescue";
+import { UnsavedOffice } from "../components/UnsavedOffice";
 import { recoverApi, type RecoverDrive } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 
@@ -17,7 +18,45 @@ const KINDS: [string, string][] = [
 
 const driveLabel = (d: RecoverDrive) => `${d.letter}: ${d.label ? `· ${d.label} ` : ""}· ${bytes(d.size, 0)} · ${d.fs}${d.kind === "Removable" ? " · extraíble" : ""}`;
 
+const VIEWS = [
+  { id: "deleted", label: "Borrados", kt: "B" },
+  { id: "unsaved", label: "Sin guardar de Office", kt: "S" },
+] as const;
+
+/** Recuperar archivos: lo borrado (Windows File Recovery) y lo que Office dejó sin guardar. */
 export function Recover({ isAdmin }: { isAdmin: boolean }) {
+  const [view, setView] = useState<(typeof VIEWS)[number]["id"]>("deleted");
+  // La segunda pestaña no lee nada hasta que se abre la primera vez.
+  const [unsavedSeen, setUnsavedSeen] = useState(false);
+  const choose = (id: (typeof VIEWS)[number]["id"]) => {
+    if (id === "unsaved") setUnsavedSeen(true);
+    setView(id);
+  };
+  return (
+    <div>
+      <div className="mx-auto max-w-(--page-max) px-6 pt-6">
+        <span className="flex w-fit overflow-hidden rounded-md border border-line text-xs" role="tablist" aria-label="Qué recuperar">
+          {VIEWS.map((v) => (
+            <button key={v.id} role="tab" data-kt={v.kt} aria-selected={view === v.id} onClick={() => choose(v.id)} className={`px-3 py-1.5 ${view === v.id ? "bg-neon/15 text-neon" : "text-mute hover:text-ink"}`}>
+              {v.label}
+            </button>
+          ))}
+        </span>
+      </div>
+      {/* Las dos se quedan montadas: una recuperación en marcha no se pierde al cambiar de pestaña. */}
+      <div className={view === "deleted" ? "" : "hidden"}>
+        <Deleted isAdmin={isAdmin} />
+      </div>
+      {(view === "unsaved" || unsavedSeen) && (
+        <div className={`mx-auto max-w-(--page-max) p-6 ${view === "unsaved" ? "" : "hidden"}`}>
+          <UnsavedOffice isAdmin={isAdmin} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Deleted({ isAdmin }: { isAdmin: boolean }) {
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [drives, setDrives] = useState<RecoverDrive[]>([]);
   const [source, setSource] = useState("");

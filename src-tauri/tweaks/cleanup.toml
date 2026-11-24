@@ -21,6 +21,7 @@ name = "Limpiar temporales del usuario"
 description = "Vacía la carpeta temporal del usuario con la sesión abierta. Los archivos en uso se omiten automáticamente."
 category = "cleanup"
 risk = "low"
+measure = "espacio"
 kind = "action"
 
 [tweak.script]
@@ -39,6 +40,7 @@ name = "Limpiar temporales de Windows"
 description = 'Vacía C:\Windows\Temp. Los archivos en uso se omiten automáticamente.'
 category = "cleanup"
 risk = "low"
+measure = "espacio"
 kind = "action"
 admin = true
 
@@ -58,6 +60,7 @@ name = "Vaciar papelera de reciclaje"
 description = "Elimina definitivamente el contenido de la papelera de todas las unidades."
 category = "cleanup"
 risk = "medium"
+measure = "espacio"
 kind = "action"
 note = "No se puede deshacer."
 
@@ -83,6 +86,7 @@ name = "Limpiar caché de Optimización de distribución"
 description = "Borra las actualizaciones que Windows guarda para compartir con otros equipos de la red."
 category = "cleanup"
 risk = "low"
+measure = "espacio"
 kind = "action"
 admin = true
 
@@ -102,6 +106,7 @@ name = "Liberador de espacio (silencioso)"
 description = "Ejecuta cleanmgr con temporales, caché de miniaturas y de shaders, restos de actualizaciones y registros de instalación."
 category = "cleanup"
 risk = "low"
+measure = "espacio"
 kind = "action"
 admin = true
 note = "Puede tardar varios minutos. Conserva los volcados de memoria para poder diagnosticar pantallazos azules."
@@ -130,6 +135,7 @@ name = "Limpiar almacén de componentes (WinSxS)"
 description = "Elimina versiones antiguas de componentes de Windows reemplazadas por actualizaciones."
 category = "cleanup"
 risk = "low"
+measure = "espacio"
 kind = "action"
 admin = true
 note = "Puede tardar de 5 a 20 minutos."
@@ -150,6 +156,7 @@ name = "Vaciar descargas de Windows Update"
 description = 'Borra SoftwareDistribution\Download. Soluciona actualizaciones atascadas o corruptas.'
 category = "cleanup"
 risk = "medium"
+measure = "espacio"
 kind = "action"
 admin = true
 note = "Detiene Windows Update un momento. Las actualizaciones pendientes se volverán a descargar."
@@ -172,6 +179,7 @@ name = "Limpiar caché de los navegadores"
 description = "Borra la caché de Chrome, Edge, Brave, Opera y Firefox en todos los perfiles del usuario. No toca contraseñas, historial, cookies ni marcadores."
 category = "cleanup"
 risk = "low"
+measure = "espacio"
 kind = "action"
 note = "Los navegadores abiertos se omiten: ciérralos y repite para limpiarlos también."
 

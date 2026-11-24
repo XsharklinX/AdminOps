@@ -381,7 +381,7 @@ export function Contacts({ focus, onNavigate }: { focus: string | null; onNaviga
                 if (e.key === "Escape") setFilters({ query: "" });
                 if (e.key === "Enter" && filtered.length === 1) setDetail(filtered[0].id);
               }}
-              placeholder="Buscar… (ext:21, empresa:x, #etiqueta, -excluir)   Atajo: /"
+              data-typefilter placeholder="Buscar… (ext:21, empresa:x, #etiqueta, -excluir)   Atajo: /"
               className={`${inputClass} pr-9 pl-9`}
             />
             <button onClick={() => setMenu(menu === "help" ? null : "help")} className="absolute top-2 right-2.5 text-mute hover:text-ink" title="Cómo buscar">

@@ -19,6 +19,27 @@ export const LADDERS: Record<string, Rung[]> = {
     { kind: "fix", id: "repair.dism", label: "Reparar la imagen de Windows (DISM)", minutes: 20 },
     { kind: "manual", label: "Instalar la actualización a mano", detail: "Buscar su número (KB…) en el Catálogo de Microsoft Update, descargarla e instalarla con doble clic." },
   ],
+  // Windows Update que falla: de lo más concreto (la causa medida) a lo más fuerte.
+  "repair.esp-fonts": [
+    { kind: "fix", id: "repair.wu-services", label: "Reiniciar los servicios de Windows Update" },
+    { kind: "fix", id: "repair.windows-update", label: "Restablecer Windows Update", minutes: 2 },
+    { kind: "fix", id: "repair.dism", label: "Reparar la imagen de Windows (DISM)", minutes: 20 },
+    { kind: "manual", label: "Instalar la actualización a mano", detail: "Buscar su número (KB…) en el Catálogo de Microsoft Update, descargarla e instalarla con doble clic." },
+  ],
+  "repair.wu-services": [
+    { kind: "fix", id: "repair.windows-update", label: "Restablecer Windows Update", minutes: 2 },
+    { kind: "fix", id: "repair.dism", label: "Reparar la imagen de Windows (DISM)", minutes: 20 },
+    { kind: "manual", label: "Instalar la actualización a mano", detail: "Buscar su número (KB…) en el Catálogo de Microsoft Update, descargarla e instalarla con doble clic." },
+  ],
+  "repair.time-sync": [
+    { kind: "fix", id: "repair.windows-update", label: "Restablecer Windows Update", minutes: 2 },
+    { kind: "fix", id: "repair.dism", label: "Reparar la imagen de Windows (DISM)", minutes: 20 },
+  ],
+  "cleanup.windows-update-cache": [
+    { kind: "fix", id: "repair.wu-services", label: "Reiniciar los servicios de Windows Update" },
+    { kind: "fix", id: "repair.windows-update", label: "Restablecer Windows Update", minutes: 2 },
+    { kind: "fix", id: "repair.dism", label: "Reparar la imagen de Windows (DISM)", minutes: 20 },
+  ],
   "cleanup.user-temp": [
     { kind: "fix", id: "cleanup.windows-temp", label: "Limpiar también los temporales de Windows" },
     { kind: "fix", id: "cleanup.windows-update-cache", label: "Vaciar las descargas de Windows Update" },

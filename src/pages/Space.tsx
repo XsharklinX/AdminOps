@@ -22,7 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, Explain, smallBtn } from "../components/ui";
-import { api, appApi, logQuietly, toolsApi, tweaksApi, type Duplicates, type Freeable, type SpaceEntry, type SpaceFolder, type SpaceView } from "../lib/api";
+import { api, appApi, logQuietly, measureApi, toolsApi, tweaksApi, type Duplicates, type Measure, type Freeable, type SpaceEntry, type SpaceFolder, type SpaceView } from "../lib/api";
 import { bytes, ago, friendlyPath } from "../lib/format";
 import { crumbsOf, type FolderSort, kindColor, kindLabel, kindShares, LOOSE, looseSize, matchesText, parentOf, percent, sortEntries } from "../lib/spaceView";
 import { squarify } from "../lib/treemap";
@@ -281,17 +281,24 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
     });
     if (!ok) return;
     const failed: string[] = [];
+    // Cada limpieza mide el espacio libre antes y después: juntas, de la primera a la última.
+    const measures: Measure[] = [];
     for (const f of safe) {
       setFreeing(f.name);
       try {
-        await tweaksApi.run(CLEANER[f.key]);
+        const r = await tweaksApi.run(CLEANER[f.key]);
+        if (r.measure) measures.push(r.measure);
       } catch (e) {
         failed.push(`${f.name}: ${e}`);
       }
     }
     setFreeing(null);
     if (failed.length) toast("error", `No se pudo vaciar todo. ${failed.join(" · ")}`);
-    else toast("ok", "Hecho. Abajo sale lo que queda.");
+    else if (measures.length) {
+      const total: Measure = { ...measures[measures.length - 1], before: measures[0].before };
+      const text = await measureApi.text(total).catch(() => null);
+      toast("ok", text ? `${text}. Abajo sale lo que queda.` : "Hecho. Abajo sale lo que queda.");
+    } else toast("ok", "Hecho. Abajo sale lo que queda.");
     loadFreeable();
     loadDrives();
   };
@@ -375,7 +382,9 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
         {scan && !running && (
           <p className="mt-3 text-xs text-dim">
             {bytes(scan.size)} en {scan.files.toLocaleString("es")} archivos · analizado en {scan.seconds.toFixed(1)} s
-            {scan.denied > 0 && <span className="text-mute"> · {scan.denied} carpetas sin acceso (ejecuta como administrador para verlas)</span>}
+            {scan.fast && " leyendo el índice del disco"}
+            {scan.denied > 0 && <span className="text-mute"> · {scan.denied} carpetas sin acceso</span>}
+            {!scan.elevated && <span className="text-mute"> · Abre AdminOps como administrador: lo ve todo y, en discos NTFS, en segundos.</span>}
           </p>
         )}
       </Card>
@@ -819,7 +828,7 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
             Verde: se puede borrar sin pensarlo. Naranja: míralo antes, puede haber cosas del usuario.
           </p>
           {safe.length > 0 && (
-            <Button onClick={freeSafe} disabled={freeing !== null}>
+            <Button kt="L" onClick={freeSafe} disabled={freeing !== null}>
               {freeing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
               {freeing ? `Vaciando ${freeing}…` : `Liberar lo verde · ${bytes(safeSize)}`}
             </Button>

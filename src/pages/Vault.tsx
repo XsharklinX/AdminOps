@@ -3,7 +3,7 @@ import { Copy, Eye, EyeOff, FolderLock, FolderOpen, HardDrive, KeyRound, Lock, L
 import { useCallback, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Explain, inputClass, Loading, Modal } from "../components/ui";
+import { Button, Card, Explain, inputClass, Intro, Loading, Modal } from "../components/ui";
 import { logQuietly, vaultApi, type VaultStatus, type VaultSupport } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -135,11 +135,11 @@ export function Vault() {
     <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Caja fuerte" icon={<Lock size={14} />} className="col-span-12">
         <div className="flex flex-wrap items-start gap-4">
-          <p className="min-w-0 flex-1 text-sm text-dim">
+          <Intro id="data:vault" className="min-w-0 flex-1">
             Un archivo que funciona como una unidad cifrada con BitLocker y contraseña. Guarda dentro lo que quieras proteger. Sigue protegido aunque
             se desinstale AdminOps: con <b className="font-medium text-ink">doble clic en el archivo .vhdx</b> Windows pide la contraseña y la abre;
             para cerrarla, clic derecho en la unidad → Expulsar.
-          </p>
+          </Intro>
           <div className="flex gap-2">
             <Button kind="ghost" onClick={() => vaultApi.addExisting().then((v) => v && load()).catch((e) => toast("error", String(e)))}>
               <FolderOpen size={14} /> Añadir existente

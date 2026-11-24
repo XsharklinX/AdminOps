@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "recarea",
+  "description": "La ventana transparente donde se dibuja la zona que se quiere grabar en «Grabar el fallo». Puede pedir el foco para recibir el teclado (Esc cancela); sus comandos y eventos salen de la capacidad «default».",
+  "windows": ["recarea"],
+  "permissions": ["core:window:allow-set-focus"]
+}

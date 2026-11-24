@@ -295,6 +295,8 @@ pub struct NetRepair {
     /// Qué pasa y qué hacer ahora. Lo importante del resultado: marcar cuatro
     /// casillas está bien para ver si mejoró, pero no dice dónde está el problema.
     pub verdict: Verdict,
+    /// «Ping al router: 340 ms → 4 ms», si se pudo medir antes y después.
+    pub measure_text: Option<String>,
 }
 
 /// Diagnóstico en cristiano de cómo quedó la red.
@@ -401,30 +403,47 @@ Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { "$($_.St
 "$n"
 "#;
 
+/// Un paso de la reparación de red que es un programa de Windows: (título, programa, argumentos).
+pub(crate) type NetCmd = (&'static str, &'static str, &'static [&'static str]);
+
+/// Antes de reiniciar los adaptadores. La tabla ARP se queda con la MAC vieja del
+/// router cuando lo cambian o se reinicia: el equipo tiene IP, ve la red y aun así
+/// no llega a la puerta de enlace. Vaciarla es inofensivo y se rehace sola.
+pub(crate) const NET_FIRST: &[NetCmd] = &[
+    ("Vaciar la caché de DNS", "ipconfig.exe", &["/flushdns"]),
+    ("Vaciar la tabla de direcciones de la red (ARP)", "netsh.exe", &["interface", "ip", "delete", "arpcache"]),
+];
+
+/// Solo en la reparación a fondo. Un proxy heredado de otra red deja el equipo «conectado sin Internet».
+pub(crate) const NET_DEEP: &[NetCmd] = &[
+    ("Restablecer Winsock", "netsh.exe", &["winsock", "reset"]),
+    ("Restablecer la pila TCP/IP", "netsh.exe", &["int", "ip", "reset"]),
+    ("Quitar el proxy de las descargas del sistema", "netsh.exe", &["winhttp", "reset", "proxy"]),
+];
+
+pub(crate) const NET_ADAPTERS_TITLE: &str = "Reiniciar los adaptadores de red";
+pub(crate) const NET_RENEW: NetCmd = ("Renovar la dirección IP", "ipconfig.exe", &["/renew"]);
+
+pub(crate) fn restart_adapters_script() -> &'static str {
+    RESTART_ADAPTERS
+}
+
 pub fn network_repair(deep: bool) -> Result<NetRepair, String> {
     wifictl::need_admin()?;
     let before = quick_net_check()?;
     let mut steps = Vec::new();
     let opts = || crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: None };
-    steps.push(step("Vaciar la caché de DNS", crate::ps::exec_opts("ipconfig.exe", &["/flushdns"], opts())));
-    // La tabla ARP se queda con la MAC vieja del router cuando lo cambian o se
-    // reinicia: el equipo tiene IP, ve la red y aun así no llega a la puerta de
-    // enlace. Vaciarla es inofensivo y se rehace sola.
-    steps.push(step("Vaciar la tabla de direcciones de la red (ARP)", crate::ps::exec_opts("netsh.exe", &["interface", "ip", "delete", "arpcache"], opts())));
-    if deep {
-        steps.push(step("Restablecer Winsock", crate::ps::exec_opts("netsh.exe", &["winsock", "reset"], opts())));
-        steps.push(step("Restablecer la pila TCP/IP", crate::ps::exec_opts("netsh.exe", &["int", "ip", "reset"], opts())));
-        // Un proxy heredado de otra red deja el equipo «conectado sin Internet».
-        steps.push(step("Quitar el proxy de las descargas del sistema", crate::ps::exec_opts("netsh.exe", &["winhttp", "reset", "proxy"], opts())));
+    for (title, program, args) in NET_FIRST.iter().chain(if deep { NET_DEEP } else { &[] }) {
+        steps.push(step(title, crate::ps::exec_opts(program, args, opts())));
     }
-    steps.push(step("Reiniciar los adaptadores de red", crate::ps::powershell_opts(RESTART_ADAPTERS, opts())));
+    steps.push(step(NET_ADAPTERS_TITLE, crate::ps::powershell_opts(RESTART_ADAPTERS, opts())));
     // Tras reiniciar el adaptador, esperar a que vuelva la conexión antes de renovar.
     std::thread::sleep(Duration::from_secs(4));
     // Con IP fija /renew falla sin importancia: se informa como aviso, no como error.
-    let renew = crate::ps::exec_opts("ipconfig.exe", &["/renew"], opts());
+    let renew = crate::ps::exec_opts(NET_RENEW.1, NET_RENEW.2, opts());
     steps.push(match renew {
-        Ok(_) => step("Renovar la dirección IP", Ok(String::new())),
-        Err(_) => Step { title: "Renovar la dirección IP".into(), ok: true, detail: "Algún adaptador tiene IP fija o sin conexión: no se renovó.".into() },
+        Ok(_) => step(NET_RENEW.0, Ok(String::new())),
+        Err(_) => Step { title: NET_RENEW.0.into(), ok: true, detail: "Algún adaptador tiene IP fija o sin conexión: no se renovó.".into() },
     });
     let start = Instant::now();
     let mut after = quick_net_check()?;
@@ -433,15 +452,19 @@ pub fn network_repair(deep: bool) -> Result<NetRepair, String> {
         after = quick_net_check()?;
     }
     let verdict = verdict_for(&after, deep);
-    Ok(NetRepair { before, after, steps, reboot: deep, verdict })
+    Ok(NetRepair { before, after, steps, reboot: deep, verdict, measure_text: None })
 }
 
 #[tauri::command(async)]
 pub fn repair_network(tweaks: State<'_, TweakState>, deep: bool) -> Result<NetRepair, String> {
-    let r = network_repair(deep);
+    let (r, measure) = crate::measure::around(Some("ping"), || network_repair(deep));
     let title = if deep { "Reparar la red a fondo" } else { "Reparar la red" };
-    tweaks.record(Op::Run, title, &r.as_ref().map(|_| ()).map_err(Clone::clone));
-    r
+    let text = measure.as_ref().map(crate::measure::Measure::text);
+    tweaks.record_measured(Op::Run, title, &r.as_ref().map(|_| ()).map_err(Clone::clone), measure);
+    r.map(|mut r| {
+        r.measure_text = text;
+        r
+    })
 }
 
 // ---------- Wi-Fi ----------

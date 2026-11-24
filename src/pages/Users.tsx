@@ -138,7 +138,7 @@ export function Users({ isAdmin }: { isAdmin: boolean }) {
           <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar un usuario" className={`${inputClass} pl-8`} aria-label="Buscar un usuario" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} data-typefilter placeholder="Buscar un usuario" className={`${inputClass} pl-8`} aria-label="Buscar un usuario" />
             </div>
             <button onClick={() => void load()} disabled={loading} className="rounded-md p-2 text-dim transition-colors hover:bg-panel-2 hover:text-ink" title="Volver a leer">
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />

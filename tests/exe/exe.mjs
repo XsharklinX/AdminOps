@@ -87,7 +87,7 @@ const portal = createServer((req, res) => {
 });
 await new Promise((r) => portal.listen(0, "127.0.0.1", r));
 const portalUrl = `http://127.0.0.1:${portal.address().port}/`;
-writeFileSync(join(dataDir, "portals.json"), JSON.stringify([{ id: "prueba", name: "Portal de prueba", url: portalUrl, extraDomains: [] }], null, 2));
+writeFileSync(join(dataDir, "portals.json"), JSON.stringify([{ id: "prueba", name: "Portal de prueba", url: portalUrl, extraDomains: [], kind: "mail" }], null, 2));
 
 // ── 3. Arrancar el .exe con el puerto de depuración de WebView2 ────────────
 const conf = JSON.parse(readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8"));
@@ -233,28 +233,29 @@ const portalPage = async () => {
   }
   return null;
 };
-await go("tickets");
+// Tickets está apagado (src/lib/features.ts): los portales se prueban con el de Correo, que es el mismo mecanismo.
+await go("mail");
 let pp = await portalPage();
 if (!pp) {
-  fail("portal", "Tickets no abrió el portal de prueba en 10 s (ver portal-sin-abrir.png)");
+  fail("portal", "Correo no abrió el portal de prueba en 10 s (ver portal-sin-abrir.png)");
   await page.screenshot({ path: join(out, "portal-sin-abrir.png"), timeout: 10000 }).catch(() => {});
 }
 else {
   await pp.waitForSelector("#estado", { timeout: 10000 }).catch(() => fail("portal", "el portal no terminó de cargar («Abriendo…» colgado)"));
   await page.screenshot({ path: join(out, "portal.png") });
-  // Que el portal no tape nada fuera de Tickets lo comprueba el clic de verdad
+  // Que el portal no tape nada fuera de Correo lo comprueba el clic de verdad
   // del paso 6: document.visibilityState no sirve, porque al ocultar la vista
   // nativa la página de dentro sigue diciendo «visible».
   const loads = visits;
   await go("settings");
   await sleep(800);
-  await go("tickets");
+  await go("mail");
   await sleep(800);
   pp = await portalPage();
-  if (!pp) fail("portal", "al volver a Tickets el portal ya no está");
+  if (!pp) fail("portal", "al volver a Correo el portal ya no está");
   else {
     // Al volver no se recarga: se enseña la misma vista, viva.
-    if (visits !== loads) fail("portal", `se recargó al volver a Tickets (${visits - loads} cargas de más)`);
+    if (visits !== loads) fail("portal", `se recargó al volver a Correo (${visits - loads} cargas de más)`);
     // Y la sesión (la cookie) sobrevive: al recargar, el portal reconoce al usuario.
     await pp.reload({ waitUntil: "domcontentloaded" }).catch(() => {});
     const again = await pp.textContent("#estado").catch(() => "");

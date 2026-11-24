@@ -396,7 +396,7 @@ function ReportProblem() {
 
       <label className="block">
         <span className="mb-1 block text-xs text-dim">Qué pasó (lo que esperabas y lo que ocurrió)</span>
-        <textarea value={what} onChange={(e) => setWhat(e.target.value)} rows={5} maxLength={4000} placeholder="Al abrir Tickets y poner mis credenciales, la página se queda en blanco." className={`${inputClass} resize-y`} />
+        <textarea value={what} onChange={(e) => setWhat(e.target.value)} rows={5} maxLength={4000} placeholder="Al abrir el Correo y poner mis credenciales, la página se queda en blanco." className={`${inputClass} resize-y`} />
       </label>
       <label className="block">
         <span className="mb-1 block text-xs text-dim">Qué estabas haciendo y cómo se repite (opcional)</span>

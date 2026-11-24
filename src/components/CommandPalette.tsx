@@ -1,4 +1,4 @@
-import { AppWindow, BookOpen, Bug, CornerDownLeft, FileText, Lightbulb, ListTree, Loader2, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, Zap } from "lucide-react";
+import { AppWindow, BookOpen, Bug, CheckCircle2, Circle, CornerDownLeft, FileText, Lightbulb, ListTree, Loader2, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, XCircle, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, allowedInMode, isPageId, navLabel, pageLabel, visibleAreas, type Area, type PageId } from "./Sidebar";
 import type { Badge } from "../lib/machineState";
@@ -7,7 +7,7 @@ import { navKey, PAGE_KEYWORDS, parseNavKey, sectionsOf } from "../lib/sections"
 import { useToast } from "./feedback";
 import { logQuietly, contactsApi, errorsApi, lanApi, libraryApi, officeApi, toolboxApi, tweaksApi, type Contact, type ErrorInfo, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
 import { openCase } from "../lib/currentCase";
-import { recognize, type Recognized } from "../lib/recognize";
+import { completePhrase, recognize, type Recognized } from "../lib/recognize";
 import { BUILTIN_SOLUTIONS } from "../lib/solutionsCatalog";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { EmptyLine } from "./ui";
@@ -16,7 +16,7 @@ import { openHelp, openHelpTopic } from "../lib/help";
 import { GLOSSARY as TERMS } from "../lib/glossary";
 import { openComm } from "../lib/comms";
 import { didYouMean, fuzzyHas, tokens } from "../lib/palette";
-import { loadRecent, execute, useQuickEntries, type QuickEntry, type QuickResult, type Recent } from "../lib/quickActions";
+import { loadRecent, loadPhrases, execute, auditBlocked, auditBlockedText, runSteps, stepsSummary, undoSteps, useQuickEntries, useQuickSteps, type QuickEntry, type QuickResult, type Recent, type StepState } from "../lib/quickActions";
 import { EXPERT_ENTRIES } from "./expert/paletteEntries";
 
 /** Páginas del catálogo de ajustes, por categoría. */
@@ -173,7 +173,13 @@ export function CommandPalette({
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<QuickResult | null>(null);
   const [recent, setRecent] = useState<Recent[]>(loadRecent);
+  // Varias acciones en una frase («liberar espacio y vaciar cola»): cómo va cada paso.
+  const [stepView, setStepView] = useState<{ state: StepState; text?: string }[]>([]);
+  const lastResults = useRef<QuickResult[]>([]);
+  // Flecha arriba con la caja vacía: por dónde va el recorrido de las últimas frases (-1: no se está recorriendo).
+  const histPos = useRef(-1);
   const quick = useQuickEntries(query, open);
+  const multi = useQuickSteps(query, open);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -345,6 +351,8 @@ export function CommandPalette({
     setIndex(0);
     setArmed(null);
     setOutcome(null);
+    setStepView([]);
+    lastResults.current = [];
   }, [query]);
   useEffect(() => {
     list.current?.querySelector(`[data-i="${index}"]`)?.scrollIntoView({ block: "nearest" });
@@ -367,6 +375,34 @@ export function CommandPalette({
     setRecent(loadRecent());
   };
 
+  // Los pasos que se van a hacer, si cada uno se entendió y no hay dudas.
+  const multiReady = multi?.plans && multi.plans.length === multi.steps.length && multi.plans.every((p) => p.entry) ? multi.plans.map((p) => p.entry as QuickEntry) : null;
+
+  const runMulti = async () => {
+    // Con los pasos ya hechos (stepView lleno) no se repite: hay que cambiar la frase.
+    if (running || !multiReady || stepView.length) return;
+    // Una sola confirmación para todos; si alguna está bloqueada por el modo auditoría, no se hace ninguna.
+    const blocked = await auditBlocked(multiReady);
+    if (blocked) {
+      setArmed(null);
+      setOutcome({ ok: false, text: auditBlockedText(blocked) });
+      return;
+    }
+    if (armed !== "multi") {
+      setArmed("multi");
+      return;
+    }
+    setArmed(null);
+    setOutcome(null);
+    setRunning(true);
+    setStepView(multiReady.map(() => ({ state: "wait" as StepState })));
+    const results = await runSteps(multiReady, (i, state, r) => setStepView((v) => v.map((x, j) => (j === i ? { state, text: r?.text } : x))));
+    lastResults.current = results;
+    setRunning(false);
+    setOutcome({ ok: results.every((r) => r.ok), text: stepsSummary(results), undo: results.some((r) => r.ok && r.undo) ? async () => (await undoSteps(lastResults.current)).text : undefined });
+    setRecent(loadRecent());
+  };
+
   const undoQuick = async () => {
     const u = outcome?.undo;
     if (!u || running) return;
@@ -381,6 +417,10 @@ export function CommandPalette({
   };
 
   const pick = (e: Entry | undefined) => {
+    if (multi) {
+      void runMulti();
+      return;
+    }
     if (!e) return;
     if (e.quick) {
       void runQuick(e.quick);
@@ -487,9 +527,29 @@ export function CommandPalette({
             <input
               ref={input}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                histPos.current = -1;
+                setQuery(e.target.value);
+              }}
               onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
+                // ↑/↓ recorren las últimas frases: con la caja vacía y mientras se siga en una de ellas.
+                const phrases = loadPhrases();
+                const browsing = histPos.current >= 0 && query === phrases[histPos.current];
+                if (e.key === "Tab" && !e.shiftKey) {
+                  const c = completePhrase(query);
+                  if (c) {
+                    e.preventDefault();
+                    setQuery(c);
+                  }
+                } else if (e.key === "ArrowUp" && (browsing || (!query && phrases.length > 0))) {
+                  e.preventDefault();
+                  histPos.current = Math.min(histPos.current + 1, phrases.length - 1);
+                  setQuery(phrases[histPos.current]);
+                } else if (e.key === "ArrowDown" && browsing) {
+                  e.preventDefault();
+                  histPos.current -= 1;
+                  setQuery(histPos.current >= 0 ? phrases[histPos.current] : "");
+                } else if (e.key === "ArrowDown") {
                   e.preventDefault();
                   setIndex((i) => Math.min(i + 1, results.length - 1));
                 } else if (e.key === "ArrowUp") {
@@ -518,7 +578,46 @@ export function CommandPalette({
 
         {query.trim() ? (
           <div ref={list} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
-            {(running || outcome) && (
+            {multi && (
+              <div className="mb-2 rounded-xl border border-line bg-panel p-2">
+                {multi.steps.map((s, i) => {
+                  const plan = multi.plans?.[i];
+                  const view = stepView[i];
+                  const state: StepState = view?.state ?? "wait";
+                  const title = plan?.entry ? (plan.entry.short ?? plan.entry.title) : s.text;
+                  const right = view?.text ?? plan?.problem ?? plan?.entry?.detail ?? (multi.plans ? "" : "Buscando…");
+                  return (
+                    <div key={`${i}:${s.text}`} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm">
+                      {state === "run" ? (
+                        <Loader2 size={14} className="shrink-0 animate-spin text-neon" />
+                      ) : state === "ok" ? (
+                        <CheckCircle2 size={14} className="shrink-0 text-ok" />
+                      ) : state === "bad" ? (
+                        <XCircle size={14} className="shrink-0 text-bad" />
+                      ) : (
+                        <Circle size={14} className="shrink-0 text-mute" />
+                      )}
+                      <span className="min-w-0 truncate font-medium text-ink">
+                        {i + 1} · {title}
+                      </span>
+                      <span className={`ml-auto min-w-0 max-w-[55%] truncate text-[11.5px] ${state === "bad" || plan?.problem ? "text-bad" : state === "ok" ? "text-ok" : "text-mute"}`} title={right}>
+                        {right}
+                      </span>
+                    </div>
+                  );
+                })}
+                {multiReady && !outcome && !stepView.length && (
+                  <button
+                    onClick={() => void runMulti()}
+                    disabled={running}
+                    className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg border border-neon/60 bg-neon/10 px-3 py-1.5 text-sm font-medium text-ink disabled:opacity-60"
+                  >
+                    {armed === "multi" ? `Intro otra vez para hacer los ${multiReady.length}` : `Hacer los ${multiReady.length} · Intro`}
+                  </button>
+                )}
+              </div>
+            )}
+            {(running || outcome) && !(multi && running) && (
               <div
                 role="status"
                 className={`mb-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${running ? "border-line text-dim" : outcome?.ok ? "border-ok/40 bg-ok/10 text-ink" : "border-bad/40 bg-bad/10 text-ink"}`}
@@ -560,7 +659,7 @@ export function CommandPalette({
                 ))}
               </div>
             )}
-            {results.length === 0 && (
+            {results.length === 0 && !multi && (
               <EmptyLine>
                 Nada coincide con «{query}».{" "}
                 {suggestion ? (

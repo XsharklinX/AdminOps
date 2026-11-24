@@ -6,7 +6,16 @@ import { RELEASES } from "./changelog";
 
 /** En qué versión cambió cada pantalla o sección (clave de `navKey`). Se añade al publicar. */
 export const NEW_IN: Record<string, string> = {
-  "space:space": "1.2.3",
+  "machine:recorder": "1.4.0",
+  "machine:displays": "1.4.0",
+  "machine:keyboard": "1.4.0",
+  "machine:connected": "1.4.0",
+  "router:usage": "1.4.0",
+  "printers:scanners": "1.4.0",
+  "apps:winupdate": "1.4.0",
+  "apps:install": "1.4.0",
+  "recipes:recipes": "1.4.0",
+  "space:space": "1.4.0",
   "space:health": "1.2.10",
   "tweaks:startup": "1.2.10",
   "machine:diagnostics": "1.2.10",
@@ -15,7 +24,7 @@ export const NEW_IN: Record<string, string> = {
   "machine:hardware": "1.2.8",
   "space:partitions": "1.2.7",
   "data:backups": "1.2.7",
-  "data:recover": "1.2.7",
+  "data:recover": "1.4.0",
   "session:report": "1.2.6",
   troubleshoot: "1.2.8",
   stations: "1.2.8",

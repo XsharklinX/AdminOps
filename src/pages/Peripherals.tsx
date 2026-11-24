@@ -120,7 +120,7 @@ function KeyboardTest({ active }: { active: boolean }) {
           </Button>
         )}
       </div>
-      <div className={`mt-3 space-y-1 overflow-x-auto ${on ? "" : "opacity-60"}`}>
+      <div data-keytest={on ? "1" : undefined} className={`mt-3 space-y-1 overflow-x-auto ${on ? "" : "opacity-60"}`}>
         {ROWS.map((row, r) => (
           <div key={r} className="flex gap-1">
             {row.map(([code, label]) => (

@@ -84,6 +84,49 @@ export const wipeApi = {
   openSettings: (uri: string) => invoke<void>("open_ms_settings", { uri }),
 };
 
+/** Un archivo que Word, Excel o PowerPoint dejaron por si se cerraban mal. */
+export interface UnsavedFile {
+  /** Ruta completa (para pedir la vista previa o la copia). */
+  path: string;
+  name: string;
+  /** Word, Excel, PowerPoint u Office. */
+  app: string;
+  /** Autorrecuperación, Sin guardar, Copia de seguridad o Temporal. */
+  origin: string;
+  size: number;
+  /** Segundos desde 1970. */
+  modified: number;
+  ext: string;
+  /** Extensión con la que se abrirá la copia, si se sabe. */
+  copyExt: string | null;
+}
+
+export interface RecentDoc {
+  name: string;
+  path: string;
+  app: string;
+  /** Segundos desde 1970. */
+  opened: number;
+}
+
+export interface UnsavedVersion {
+  id: string;
+  /** Cuándo se hizo la copia de Windows (segundos desde 1970). */
+  when: number;
+  size: number;
+  modified: number;
+}
+
+export const unsavedApi = {
+  list: () => invoke<{ files: UnsavedFile[]; recent: RecentDoc[] }>("unsaved_list"),
+  preview: (path: string) => invoke<{ lines: string[] }>("unsaved_preview", { path }),
+  /** En qué copias de «Versiones anteriores» está el archivo. Pide administrador. */
+  versions: (path: string) => invoke<{ versions: UnsavedVersion[]; snapshots: number }>("unsaved_versions", { path }),
+  pick: () => invoke<string | null>("unsaved_pick"),
+  /** Copia al Escritorio (del archivo, o de una versión) y la abre. El original no se toca. */
+  copy: (path: string, version?: string) => invoke<{ name: string; opened: boolean; message: string }>("unsaved_copy", { path, version: version ?? null }),
+};
+
 export const recoverApi = {
   status: () => invoke<{ installed: boolean; drives: RecoverDrive[] }>("recover_status"),
   install: () => invoke<void>("recover_install"),

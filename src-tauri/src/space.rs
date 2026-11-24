@@ -8,6 +8,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 
+mod mft;
+
 const TOP_FILES: usize = 100;
 /// Carpetas más pequeñas se suman al padre pero no se guardan como nodo.
 const MIN_NODE: u64 = 1024 * 1024;
@@ -294,6 +296,10 @@ pub struct SpaceView {
     files: u64,
     denied: u64,
     seconds: f64,
+    /// Leído del índice de archivos del disco (MFT), no carpeta a carpeta.
+    fast: bool,
+    /// AdminOps abierto como administrador (sin eso no hay vía rápida ni se ven todas las carpetas).
+    elevated: bool,
     folder: SpaceFolder,
     largest_files: Vec<SpaceEntry>,
     /// Grandes y sin tocar en más de un año: lo que de verdad se puede ofrecer borrar.
@@ -362,6 +368,8 @@ fn now() -> u64 {
 
 #[tauri::command(async)]
 pub fn scan_space(app: tauri::AppHandle, path: String) -> Result<SpaceView, String> {
+    // «C:» a secas es la carpeta actual de esa unidad, no la raíz: se le pone la barra.
+    let path = if path.len() == 2 && path.ends_with(':') { format!("{path}\\") } else { path };
     let root = PathBuf::from(&path);
     if !root.is_dir() {
         return Err(format!("No existe la carpeta {path}"));
@@ -382,7 +390,15 @@ pub fn scan_space(app: tauri::AppHandle, path: String) -> Result<SpaceView, Stri
         });
     }
     let start = Instant::now();
-    let (tree, mut tops) = walk(&root, &counters);
+    // Como administrador y en NTFS, el índice de archivos del disco de una vez (segundos); si no, carpeta a carpeta.
+    let fast = mft::scan(&root, &counters);
+    let fast_used = fast.is_some();
+    let (tree, mut tops) = fast.unwrap_or_else(|| {
+        // Si la MFT se leyó a medias, su cuenta no se suma a la del recorrido.
+        counters.files.store(0, Ordering::Relaxed);
+        counters.bytes.store(0, Ordering::Relaxed);
+        walk(&root, &counters)
+    });
     done.store(true, Ordering::SeqCst);
     crate::task::notify_if_long(&app, "Análisis de espacio", start.elapsed(), CANCEL.load(Ordering::SeqCst));
     if CANCEL.load(Ordering::SeqCst) {
@@ -391,7 +407,7 @@ pub fn scan_space(app: tauri::AppHandle, path: String) -> Result<SpaceView, Stri
     tops.finish();
     let top = &tops.all;
     let seconds = start.elapsed().as_secs_f64();
-    log::info!("Análisis de espacio de {path}: {} archivos, {} bytes en {seconds:.1} s", tree.files, tree.size);
+    log::info!("Análisis de espacio de {path}: {} archivos, {} bytes en {seconds:.1} s ({})", tree.files, tree.size, if fast_used { "MFT" } else { "carpeta a carpeta" });
 
     let view = SpaceView {
         root: root.display().to_string(),
@@ -399,6 +415,8 @@ pub fn scan_space(app: tauri::AppHandle, path: String) -> Result<SpaceView, Stri
         files: tree.files,
         denied: counters.denied.load(Ordering::Relaxed),
         seconds,
+        fast: fast_used,
+        elevated: crate::elevation::is_elevated(),
         folder: folder_of(&tree, &root),
         largest_files: top.iter().take(50).map(file_entry).collect(),
         // Grandes y sin tocar en más de un año: lo primero que se ofrece borrar.
@@ -1003,14 +1021,39 @@ mod tests {
         }
     }
 
+    /// Compara la lectura de la MFT con el recorrido normal (en una consola de administrador):
+    /// `$env:SPACE_PATH='C:\'; cargo test --release --lib space_mft_real -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn space_mft_real() {
+        let path = std::env::var("SPACE_PATH").unwrap_or_else(|_| "C:\\Windows".into());
+        let t = Instant::now();
+        let Some((fast, ftops)) = mft::scan(Path::new(&path), &Counters::default()) else {
+            println!("{path}: no se pudo leer la MFT (¿consola sin administrador o disco que no es NTFS?)");
+            return;
+        };
+        let fast_s = t.elapsed().as_secs_f64();
+        let t = Instant::now();
+        let (slow, _) = walk(Path::new(&path), &Counters::default());
+        let slow_s = t.elapsed().as_secs_f64();
+        println!("MFT: {} archivos, {:.2} GB en {fast_s:.1} s", fast.files, fast.size as f64 / 1e9);
+        println!("Carpeta a carpeta: {} archivos, {:.2} GB en {slow_s:.1} s", slow.files, slow.size as f64 / 1e9);
+        for c in fast.children.iter().take(8) {
+            let other = slow.children.iter().find(|s| s.name == c.name).map_or(0, |s| s.size);
+            println!("  {:<40} MFT {:>8.2} GB · normal {:>8.2} GB", c.name, c.size as f64 / 1e9, other as f64 / 1e9);
+        }
+        println!("Más grande: {:?}", ftops.all.iter().max_by_key(|x| x.0).map(|x| &x.1));
+    }
+
     /// Mide un análisis real: `cargo test --release space_real -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn space_real() {
+        // Otra carpeta o disco con la variable SPACE_PATH (p. ej. `C:\`).
+        let path = std::env::var("SPACE_PATH").unwrap_or_else(|_| "C:\\Windows".into());
         let c = Counters::default();
         let t = Instant::now();
-        let (tree, _) = walk(Path::new("C:\\Windows"), &c);
-        // Con los tipos de archivo: mismo tiempo que antes, dentro del margen.
-        println!("C:\\Windows: {} archivos, {:.1} GB en {:.1} s", tree.files, tree.size as f64 / 1e9, t.elapsed().as_secs_f64());
+        let (tree, _) = walk(Path::new(&path), &c);
+        println!("{path}: {} archivos, {:.1} GB en {:.1} s", tree.files, tree.size as f64 / 1e9, t.elapsed().as_secs_f64());
     }
 }

@@ -1,3 +1,4 @@
+import { WEB_TICKETS } from "../lib/features";
 import { ArrowLeft, ArrowRight, Building2, Check, Mail, ShieldCheck, Stethoscope, Ticket, TriangleAlert, UserRound, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.svg";
@@ -7,7 +8,7 @@ import { setPrefs, type AppMode } from "../lib/prefs";
 
 type Step = "mode" | "tech" | "tickets" | "mail" | "domain" | "done";
 
-const TECH_STEPS: Step[] = ["mode", "tech", "tickets", "mail", "domain", "done"];
+const TECH_STEPS: Step[] = (["mode", "tech", "tickets", "mail", "domain", "done"] as Step[]).filter((x) => WEB_TICKETS || x !== "tickets");
 const USER_STEPS: Step[] = ["mode", "done"];
 
 const TITLE: Record<Step, string> = {
@@ -251,7 +252,7 @@ function ModeStep({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode) =>
       <div className="grid gap-3 sm:grid-cols-2">
         {card("admin", <Wrench size={15} />, "Modo técnico", "Para ti: AdminOps completo.", [
           "Diagnóstico, ajustes de Windows, usuarios y cuentas",
-          "Clientes, informes, tickets y correo",
+          WEB_TICKETS ? "Clientes, informes, tickets y correo" : "Clientes, informes y correo",
           "Para cambiar el equipo hay que abrirlo como administrador",
         ])}
         {card("user", <UserRound size={15} />, "Modo usuario", "Para quien usa el equipo a diario.", [
@@ -269,7 +270,7 @@ function ModeStep({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode) =>
       ) : (
         <p className="flex items-start gap-2 rounded-lg border border-line bg-void/40 px-3 py-2 text-[11px] text-mute">
           <ShieldCheck size={13} className="mt-0.5 shrink-0 text-neon" />
-          No se verán tus clientes, contactos, tickets ni correo, ni lo que puede romper el equipo. Es un modo de la interfaz para evitar accidentes: para que no
+          No se verán tus clientes, contactos ni correo, ni lo que puede romper el equipo. Es un modo de la interfaz para evitar accidentes: para que no
           se pueda volver al modo técnico sin ti, pon un PIN en Ajustes → Seguridad.
         </p>
       )}

@@ -298,7 +298,8 @@ pub fn install_preflight(count: usize) -> Preflight {
 
 #[tauri::command(async)]
 pub fn install_apps(app: tauri::AppHandle, apps: Vec<CatalogApp>, state: State<'_, TweakState>) -> Result<Vec<InstallResult>, String> {
-    let task = Task::new(&app, "install-apps");
+    // Otra clave que la de la cola: cancelar una no cancela la otra; el cerrojo evita dos winget a la vez.
+    let task = Task::new(&app, "install-apps:lote");
     let total = apps.len();
     let mut seen = HashSet::new();
     let mut results = Vec::new();
@@ -321,6 +322,7 @@ pub fn install_apps(app: tauri::AppHandle, apps: Vec<CatalogApp>, state: State<'
              --accept-source-agreements --disable-interactivity | Out-String\n$o\n\"EXIT:$LASTEXITCODE\"",
             a.id
         );
+        let _winget = crate::installq::winget_lock();
         let r = crate::ps::powershell_opts(&script, task.opts(Some(Duration::from_secs(30 * 60))))
             .map_err(winget_missing)
             .and_then(|out| {
@@ -329,7 +331,7 @@ pub fn install_apps(app: tauri::AppHandle, apps: Vec<CatalogApp>, state: State<'
                     Some(0) => Ok("Instalado".to_string()),
                     Some(REBOOT_REQUIRED) => Ok("Instalado (requiere reiniciar)".to_string()),
                     Some(UPDATE_NOT_APPLICABLE | ALREADY_INSTALLED) => Ok("Ya estaba instalado".to_string()),
-                    _ => Err(if last.is_empty() { format!("winget terminó con código {code:?}") } else { last }),
+                    _ => Err(if last.is_empty() { format!("winget terminó con código {code:?}") } else { crate::escalate::scrub(&last) }),
                 }
             });
         state.record(Op::Run, &format!("Instalar {}", a.name), &r);

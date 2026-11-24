@@ -184,7 +184,7 @@ pub fn list_printers() -> Result<Vec<Printer>, String> {
 }
 
 /// Ejecuta una acción sobre la impresora `name` (el nombre viaja en base64).
-fn on_printer(name: &str, body: &str, title: &str, tweaks: &TweakState) -> Result<(), String> {
+fn on_printer(name: &str, body: &str, title: &str, measure: bool, tweaks: &TweakState) -> Result<Option<String>, String> {
     if name.is_empty() || name.len() > 300 {
         return Err("Nombre de impresora no válido.".into());
     }
@@ -193,14 +193,21 @@ fn on_printer(name: &str, body: &str, title: &str, tweaks: &TweakState) -> Resul
          if (-not $p) {{ throw 'La impresora ya no existe. Actualiza la lista.' }}\n{body}\n'ok'",
         text_var("name", name)
     );
-    let result = crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(90)), task: None }).map(|_| ());
-    tweaks.record(Op::Run, &format!("{title}: {name}"), &result);
-    result
+    let spec = measure.then(|| format!("cola:{name}"));
+    let (result, measured) = crate::measure::around(spec.as_deref(), || {
+        crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(90)), task: None }).map(|_| ())
+    });
+    let text = measured.as_ref().map(crate::measure::Measure::text);
+    tweaks.record_measured(Op::Run, &format!("{title}: {name}"), &result, measured);
+    result.map(|()| text)
 }
 
+/// Lo que hace «Vaciar la cola» sobre la impresora `$name` (lo enseña «Ver el comando»).
+pub(crate) const CLEAR_QUEUE_BODY: &str = "Get-PrintJob -PrinterName $name | Remove-PrintJob";
+
 #[tauri::command(async)]
-pub fn clear_printer_queue(name: String, tweaks: State<'_, TweakState>) -> Result<(), String> {
-    on_printer(&name, "Get-PrintJob -PrinterName $name | Remove-PrintJob", "Vaciar la cola de impresión", &tweaks)
+pub fn clear_printer_queue(name: String, tweaks: State<'_, TweakState>) -> Result<Option<String>, String> {
+    on_printer(&name, CLEAR_QUEUE_BODY, "Vaciar la cola de impresión", true, &tweaks)
 }
 
 #[tauri::command(async)]
@@ -210,8 +217,10 @@ pub fn print_test_page(name: String, tweaks: State<'_, TweakState>) -> Result<()
         "$r = Invoke-CimMethod -InputObject $p -MethodName PrintTestPage\n\
          if ($r.ReturnValue -ne 0) { throw \"Windows no pudo enviar la página de prueba (código $($r.ReturnValue)).\" }",
         "Página de prueba",
+        false,
         &tweaks,
     )
+    .map(|_| ())
 }
 
 #[tauri::command(async)]
@@ -223,8 +232,10 @@ pub fn set_default_printer(name: String, tweaks: State<'_, TweakState>) -> Resul
          $r = Invoke-CimMethod -InputObject $p -MethodName SetDefaultPrinter\n\
          if ($r.ReturnValue -ne 0) { throw \"Windows no pudo cambiar la predeterminada (código $($r.ReturnValue)).\" }",
         "Impresora predeterminada",
+        false,
         &tweaks,
     )
+    .map(|_| ())
 }
 
 #[tauri::command(async)]
@@ -236,8 +247,10 @@ pub fn remove_printer(name: String, tweaks: State<'_, TweakState>) -> Result<(),
         &name,
         "Get-PrintJob -PrinterName $name -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue\nRemove-Printer -Name $name",
         "Quitar impresora",
+        false,
         &tweaks,
     )
+    .map(|_| ())
 }
 
 // ---------- Revisión de una impresora ----------

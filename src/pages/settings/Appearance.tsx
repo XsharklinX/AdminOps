@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Volume2 } from "lucide-react";
 import { Card, Explain, inputClass, smallBtn, Toggle } from "../../components/ui";
-import { type Accent, ACCENTS, previewAccent, setPrefs, usePrefs, ZOOMS } from "../../lib/prefs";
+import { type Accent, ACCENTS, effectiveZoom, previewAccent, setPrefs, setZoomGeneral, usePrefs, ZOOMS } from "../../lib/prefs";
 import { getSchedule, getTheme, getThemeMode, setSchedule, setThemeMode, type ThemeMode } from "../../lib/theme";
 import { playSound } from "../../lib/sounds";
 import { celebrate } from "../../components/Celebrate";
@@ -137,8 +137,8 @@ export function Appearance() {
             {ZOOMS.map((z) => (
               <button
                 key={z.value}
-                onClick={() => setPrefs({ zoom: z.value })}
-                className={`rounded-md px-3 py-1.5 text-[13px] ${prefs.zoom === z.value ? "bg-panel-2 font-medium text-ink" : "text-dim hover:text-ink"}`}
+                onClick={() => setZoomGeneral(z.value)}
+                className={`rounded-md px-3 py-1.5 text-[13px] ${effectiveZoom(prefs) === z.value ? "bg-panel-2 font-medium text-ink" : "text-dim hover:text-ink"}`}
               >
                 {z.label}
               </button>

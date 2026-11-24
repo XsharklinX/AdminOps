@@ -1,5 +1,6 @@
 // Tickets, dominio, personas, empresa, seguimientos y el caso de ahora.
 import { invoke } from "./core";
+import type { Risk } from "./system";
 
 // ---------- Tickets y dominio (v0.13) ----------
 
@@ -183,6 +184,28 @@ export interface CaseAction {
   at: number;
   title: string;
   ok: boolean;
+  /** Lo medido antes y después, sin etiqueta («3,1 GB → 24,8 GB libres»), si la acción mide algo. */
+  measure: string | null;
+}
+
+/** Una acción del caso en la lista de «Guardar como plantilla». */
+export interface TemplateItem {
+  title: string;
+  /** «tweak» (un ajuste o tarea del catálogo) o «restorePoint»; vacío si no se puede repetir. */
+  step: string;
+  tweakId: string | null;
+  repeatable: boolean;
+  reason: string | null;
+  /** Riesgo del ajuste en el catálogo (solo los de tipo «tweak»). */
+  risk: Risk | null;
+  /** El aviso del catálogo, si lo tiene. */
+  note: string | null;
+}
+
+export interface TemplateDraft {
+  items: TemplateItem[];
+  /** Lo que falló y se quitó. */
+  removed: string[];
 }
 
 export const casesApi = {
@@ -190,6 +213,8 @@ export const casesApi = {
   open: (c: Partial<Case>) => invoke<Case>("case_open", { case: emptyCase(c) }),
   update: (c: Partial<Case>) => invoke<Case>("case_update", { case: emptyCase(c) }),
   actions: () => invoke<CaseAction[]>("case_actions"),
+  /** Lo que se hizo en el caso, listo para convertirlo en una plantilla de «Preparar equipos». */
+  templateDraft: () => invoke<TemplateDraft>("case_template_draft"),
   draft: () => invoke<string>("case_draft"),
   /** La resolución en tres tonos: breve, para la persona y técnica. */
   tones: () => invoke<CaseTones>("case_tones"),

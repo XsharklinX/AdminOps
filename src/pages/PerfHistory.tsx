@@ -4,7 +4,7 @@ import { PerfInsightsCard } from "../components/expert";
 import { PictureInPicture2, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TimeChart } from "../components/TimeChart";
-import { Card, EmptyState, ErrorState, iconBtn, Loading, smallBtn, Tile } from "../components/ui";
+import { Card, EmptyState, ErrorState, iconBtn, Intro, Loading, smallBtn, Tile } from "../components/ui";
 import { insightApi, logQuietly, timelineApi, workApi, type Sample, type TimelineEvent } from "../lib/api";
 import { blame, describeStep, findStepUps, relevant } from "../lib/perfCorrelate";
 import { dateTime } from "../lib/format";
@@ -74,9 +74,9 @@ export function PerfHistory() {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-60 flex-1 text-sm text-dim">
+        <Intro id="machine:performance" className="min-w-60 flex-1">
           Cómo ha ido el equipo, minuto a minuto. Se mide <b className="font-medium text-ink">mientras AdminOps está abierta</b>: los huecos de la gráfica son ratos con AdminOps cerrada.
-        </p>
+        </Intro>
         <div className="inline-flex rounded-lg border border-line bg-void p-0.5" role="group" aria-label="Tramo">
           {RANGES.map((r) => (
             <button key={r.id} onClick={() => setRange(r.id)} aria-pressed={range === r.id} className={`rounded-md px-2.5 py-1 text-xs ${range === r.id ? "bg-panel-2 font-medium text-ink" : "text-dim hover:text-ink"}`}>

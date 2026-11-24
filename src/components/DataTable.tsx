@@ -1,8 +1,13 @@
 // La tabla de AdminOps: misma cabecera, misma densidad y ordenar por columna en
 // todas las pantallas. Antes cada página pintaba la suya, cada una a su manera.
-import { ArrowDown, ArrowUp } from "lucide-react";
-import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
+import { Fragment, useDeferredValue, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { moved, toggled, visibleIds, type ColInfo, type ColSaved } from "../lib/colset";
+import { useFrozenOrder, usePointerHold, useReorderFlip } from "../lib/liveOrder";
+import { usePageMemory } from "../lib/pageMemory";
 import { useRowWindow } from "../lib/rowWindow";
+import { matchesFilter, nodeText, TYPEFILTER_EVENT, type TypeFilterDetail } from "../lib/typeFilter";
 import { SlideMark } from "./SlideMark";
 
 /** Filas que se pintan de golpe en una tabla con detalles desplegables; el resto, a medida que se desplaza. Sin detalles, a partir de aquí la lista es virtual: solo se pintan las filas que se ven. */
@@ -22,7 +27,21 @@ function moveFocus(e: KeyboardEvent<HTMLTableRowElement>, dir: 1 | -1, follow = 
 }
 
 const COLS_KEY = "adminops.cols.";
+const COLSET_KEY = "adminops.colset.";
 const MIN_COL = 56;
+const MAX_FIT = 640;
+/** Tablas con al menos tantas filas reciben lo que se escribe sin tener el foco en un campo. */
+const TYPE_MIN_ROWS = 8;
+
+function loadColset(key: string | undefined): ColSaved | null {
+  if (!key) return null;
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLSET_KEY + key) ?? "null");
+    return raw && Array.isArray(raw.order) && Array.isArray(raw.shown) ? { order: raw.order.map(String), shown: raw.shown.map(String) } : null;
+  } catch {
+    return null;
+  }
+}
 
 function loadWidths(key: string | undefined): Record<string, number> {
   if (!key) return {};
@@ -47,6 +66,8 @@ export interface Column<T> {
   headClass?: string;
   /** El clic en esta celda no cuenta como clic en la fila (lleva botones o un campo). */
   stopClick?: boolean;
+  /** Oculta de fábrica: se ofrece en el menú de columnas (clic derecho en la cabecera). */
+  hidden?: boolean;
 }
 
 export interface SortState {
@@ -93,6 +114,8 @@ export function DataTable<T>({
   followFocus = false,
   selected,
   resizable,
+  live = false,
+  typeFilter = true,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -119,15 +142,21 @@ export function DataTable<T>({
   selected?: (row: T) => boolean;
   /** Nombre con el que se recuerda el ancho de las columnas que se ensanchan arrastrando. Sin él, no se pueden ensanchar. */
   resizable?: string;
+  /** Lista que cambia sola (procesos, puestos): con el puntero encima el orden se queda quieto, aunque las cifras sigan cambiando. */
+  live?: boolean;
+  /** Con la tabla a la vista, lo que se escribe sin tener el foco en un campo la filtra. */
+  typeFilter?: boolean;
 }) {
-  const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
+  const uid = useId();
+  // El orden se recuerda por pantalla (con «atrás», o al volver a abrirla).
+  const [sort, setSort] = usePageMemory<SortState | null>(`sort:${resizable ?? uid}`, initialSort ?? null);
   // Mientras se escribe en un filtro, la tabla se pone al día un instante después:
   // el campo de texto responde a cada tecla aunque haya miles de filas.
   const deferred = useDeferredValue(rows);
   const [limit, setLimit] = useState(FIRST_ROWS);
   const sentinel = useRef<HTMLTableRowElement>(null);
   const body = useRef<HTMLTableSectionElement>(null);
-  const sorted = useMemo(() => {
+  const ordered = useMemo(() => {
     const col = sort ? columns.find((c) => c.id === sort.id) : undefined;
     return sort && col?.sortBy ? sortRows(deferred, col.sortBy, sort.desc) : deferred;
     // Las columnas se crean en cada render de la página; lo que importa es por cuál se ordena.
@@ -137,11 +166,65 @@ export function DataTable<T>({
   const wrap = useRef<HTMLDivElement>(null);
   const [focusKey, setFocusKey] = useState<string | number | null>(null);
 
+  // Columnas: las que se ven y su orden (clic derecho en la cabecera, arrastrar).
+  const [saved, setSaved] = useState<ColSaved | null>(() => loadColset(resizable));
+  // La primera columna con nombre (la de siempre) y las que no tienen nombre (casillas, botones) no se pueden ocultar.
+  const firstNamed = columns.findIndex((c) => nodeText(c.header).trim());
+  const infos: ColInfo[] = columns.map((c, i) => ({ id: c.id, hidden: c.hidden, locked: i === 0 || i === firstNamed || !nodeText(c.header).trim() }));
+  const shownIds = visibleIds(infos, saved);
+  const shownKey = shownIds.join("|");
+  const cols = shownIds.map((id) => columns.find((c) => c.id === id)!);
+  const colsRef = useRef(cols);
+  colsRef.current = cols;
+  const saveColset = (next: ColSaved | null) => {
+    setSaved(next);
+    if (!resizable) return;
+    try {
+      if (next) localStorage.setItem(COLSET_KEY + resizable, JSON.stringify(next));
+      else localStorage.removeItem(COLSET_KEY + resizable);
+    } catch {
+      /* dura esta sesión */
+    }
+  };
+  const [colMenu, setColMenu] = useState<{ x: number; y: number } | null>(null);
+  const [dragCol, setDragCol] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: string; after: boolean } | null>(null);
+
+  // Filtro rápido: lo que se escribe sin tener el foco en un campo.
+  const [tf, setTf] = useState("");
+  const matched = useMemo(() => {
+    // `shownKey` cambia al mostrar u ocultar una columna: el filtro se vuelve a pasar con las que se ven.
+    if (!tf.trim() || !shownKey) return ordered;
+    return ordered.filter((row) => matchesFilter(colsRef.current.map((c) => `${nodeText(c.cell(row))} ${c.sortBy?.(row) ?? ""}`).join(" "), tf));
+  }, [ordered, tf, shownKey]);
+  const matchRef = useRef({ rows: matched, onRowClick });
+  matchRef.current = { rows: matched, onRowClick };
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const on = (ev: Event) => {
+      const k = (ev as CustomEvent<TypeFilterDetail>).detail.key;
+      if (k === "Backspace") setTf((t) => t.slice(0, -1));
+      else if (k === "Escape") setTf("");
+      else if (k === "Enter") {
+        const m = matchRef.current;
+        if (m.rows.length === 1 && m.onRowClick) m.onRowClick(m.rows[0]);
+      } else setTf((t) => t + k);
+    };
+    el.addEventListener(TYPEFILTER_EVENT, on);
+    return () => el.removeEventListener(TYPEFILTER_EVENT, on);
+  }, []);
+
+  // Lista en vivo: con el puntero dentro, el orden espera.
+  const held = usePointerHold(body, live);
+  useReorderFlip(body, held);
+  const sorted = useFrozenOrder(matched, (r, i) => String(rowKey(r, i)), held);
+
   // Lista larga y sin detalles que se abren bajo las filas: solo se pintan las filas a la vista.
   const virtual = !expanded && sorted.length > FIRST_ROWS;
   const win = useRowWindow(body, sorted.length, virtual);
   // Con otras filas (otro filtro), se vuelve a empezar por las primeras.
-  useEffect(() => setLimit(FIRST_ROWS), [deferred]);
+  useEffect(() => setLimit(FIRST_ROWS), [deferred, tf]);
   // Al llegar al final de lo pintado, se pintan más.
   useEffect(() => {
     const el = sentinel.current;
@@ -209,6 +292,43 @@ export function DataTable<T>({
     window.addEventListener("pointerup", stop);
   };
 
+  /** Doble clic en el borde: el ancho justo para lo más largo de la columna. */
+  const fitColumn = (e: React.MouseEvent, id: string) => {
+    const th = (e.currentTarget as HTMLElement).closest("th");
+    const rowsEl = body.current?.querySelectorAll<HTMLTableRowElement>("tr:not([data-spacer])");
+    if (!th) return;
+    let w = th.scrollWidth;
+    const at = th.cellIndex;
+    let n = 0;
+    rowsEl?.forEach((tr) => {
+      const td = tr.cells[at];
+      if (!td || n++ > 120 || tr.cells.length !== cols.length) return;
+      const cs = getComputedStyle(td);
+      const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      w = Math.max(w, td.scrollWidth, ...[...td.children].map((ch) => (ch as HTMLElement).scrollWidth + pad));
+    });
+    const fit = Math.min(MAX_FIT, Math.max(MIN_COL, Math.ceil(w) + 2));
+    setWidths((cur) => {
+      const next = { ...cur, [id]: fit };
+      try {
+        localStorage.setItem(COLS_KEY + resizable, JSON.stringify(next));
+      } catch {
+        /* dura esta sesión */
+      }
+      return next;
+    });
+  };
+
+  const resetColumns = () => {
+    saveColset(null);
+    setWidths({});
+    try {
+      if (resizable) localStorage.removeItem(COLS_KEY + resizable);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
+
   const toggle = (c: Column<T>) =>
     setSort((cur) => {
       if (cur?.id === c.id) return { id: c.id, desc: !cur.desc };
@@ -219,22 +339,91 @@ export function DataTable<T>({
 
   const pad = padded ? "px-3" : "pr-3 last:pr-0";
   return (
-    <div ref={wrap} className="relative isolate">
+    <div
+      ref={wrap}
+      className="relative isolate"
+      data-typefilter={typeFilter && (ordered.length >= TYPE_MIN_ROWS || tf) ? "" : undefined}
+      data-tf-active={tf ? "1" : undefined}
+    >
+    {(tf || live) && (
+      <div className="mb-1.5 flex min-h-6 items-center gap-2 text-xs">
+        {tf && (
+          <span className="inline-flex max-w-[60%] items-center gap-1.5 rounded-md border border-neon/40 bg-panel px-2 py-0.5 text-ink">
+            <Search size={12} className="shrink-0 text-mute" />
+            <span className="truncate">{tf}</span>
+            <button onClick={() => setTf("")} aria-label="Quitar el filtro" title="Quitar el filtro (Esc)" className="shrink-0 text-mute hover:text-ink">
+              <X size={12} />
+            </button>
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-2">
+          {tf && (
+            <span className="text-mute tabular">
+              {sorted.length} de {ordered.length}
+            </span>
+          )}
+          {live && (
+            <span aria-hidden={!held} className={`rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-[11px] text-neon ${held ? "" : "invisible"}`}>
+              Orden en pausa mientras apuntas
+            </span>
+          )}
+        </span>
+      </div>
+    )}
     {onRowClick && <SlideMark within={wrap} selector={focusKey !== null ? 'tr[data-focused="true"]' : 'tr[data-selected="true"]'} />}
     <table className={`w-full ${size === "xs" ? "text-xs" : "text-[13px]"}`}>
-      <thead className={sticky ? "sticky top-0 z-10 bg-panel shadow-[0_1px_0_var(--color-line)]" : undefined}>
-        <tr className="text-[11px] text-mute">
-          {columns.map((c) => {
+      <thead data-no-ctx className={sticky ? "sticky top-0 z-10 bg-panel shadow-[0_1px_0_var(--color-line)]" : undefined}>
+        <tr
+          className="text-[11px] text-mute"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setColMenu({ x: e.clientX, y: e.clientY });
+          }}
+        >
+          {cols.map((c) => {
             const on = sort?.id === c.id;
+            const drop = dropAt?.id === c.id && dragCol !== c.id ? (dropAt.after ? "inset -2px 0 0 0 var(--color-neon)" : "inset 2px 0 0 0 var(--color-neon)") : undefined;
             return (
               <th
                 key={c.id}
                 onClick={c.sortBy ? () => toggle(c) : undefined}
+                onDragOver={
+                  dragCol
+                    ? (e) => {
+                        e.preventDefault();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        const after = e.clientX > r.left + r.width / 2;
+                        setDropAt((d) => (d?.id === c.id && d.after === after ? d : { id: c.id, after }));
+                      }
+                    : undefined
+                }
+                onDrop={
+                  dragCol
+                    ? (e) => {
+                        e.preventDefault();
+                        if (dropAt) saveColset(moved(infos, saved, dragCol, dropAt.id, dropAt.after));
+                        setDragCol(null);
+                        setDropAt(null);
+                      }
+                    : undefined
+                }
                 aria-sort={on ? (sort.desc ? "descending" : "ascending") : undefined}
-                style={resizable && widths[c.id] ? { width: widths[c.id], minWidth: widths[c.id], maxWidth: widths[c.id] } : undefined}
+                style={{ ...(resizable && widths[c.id] ? { width: widths[c.id], minWidth: widths[c.id], maxWidth: widths[c.id] } : null), boxShadow: drop }}
                 className={`${resizable ? "relative" : ""} ${pad} ${padded ? "py-2" : "pb-2"} font-medium ${ALIGN[c.align ?? "left"]} ${c.sortBy ? "cursor-pointer select-none hover:text-ink" : ""} ${c.headClass ?? ""}`}
               >
-                <span className={`inline-flex items-center gap-1 ${on ? "text-neon" : ""}`}>
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", c.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDragCol(c.id);
+                  }}
+                  onDragEnd={() => {
+                    setDragCol(null);
+                    setDropAt(null);
+                  }}
+                  className={`inline-flex items-center gap-1 ${on ? "text-neon" : ""}`}
+                >
                   {c.header}
                   {on && (sort.desc ? <ArrowDown size={10} /> : <ArrowUp size={10} />)}
                 </span>
@@ -245,19 +434,8 @@ export function DataTable<T>({
                     aria-label={`Ancho de la columna ${c.id}`}
                     onPointerDown={(e) => startResize(e, c.id)}
                     onClick={(e) => e.stopPropagation()}
-                    onDoubleClick={() => {
-                      setWidths((w) => {
-                        const { [c.id]: _gone, ...rest } = w;
-                        void _gone;
-                        try {
-                          localStorage.setItem(COLS_KEY + resizable, JSON.stringify(rest));
-                        } catch {
-                          /* sin almacenamiento */
-                        }
-                        return rest;
-                      });
-                    }}
-                    title="Arrastra para ensanchar · doble clic para el ancho de siempre"
+                    onDoubleClick={(e) => fitColumn(e, c.id)}
+                    title="Arrastra para ensanchar · doble clic para ajustar al contenido"
                     className="absolute top-0 -right-1 bottom-0 z-20 w-2 cursor-col-resize hover:bg-neon/30"
                   />
                 )}
@@ -297,9 +475,10 @@ export function DataTable<T>({
                       }
                     : undefined
                 }
+                data-flip={live ? String(rowKey(row, i)) : undefined}
                 className={`border-t border-line/60 ${alignTop ? "align-top" : ""} ${onRowClick ? "cursor-pointer hover:bg-panel-2/60" : ""} ${fresh.has(rowKey(row, i)) ? "row-in" : ""} ${rowClass?.(row) ?? ""}`}
               >
-                {columns.map((c) => (
+                {cols.map((c) => (
                   <td
                     key={c.id}
                     onClick={c.stopClick ? (e) => e.stopPropagation() : undefined}
@@ -311,7 +490,7 @@ export function DataTable<T>({
               </tr>
               {detail && (
                 <tr>
-                  <td colSpan={columns.length} className="bg-void/40 px-3 py-2">
+                  <td colSpan={cols.length} className="bg-void/40 px-3 py-2">
                     {detail}
                   </td>
                 </tr>
@@ -322,7 +501,7 @@ export function DataTable<T>({
         {virtual && bottomSpacer > 0 && <tr data-spacer="1" aria-hidden style={{ height: bottomSpacer }} />}
         {!virtual && sorted.length > limit && (
           <tr ref={sentinel}>
-            <td colSpan={columns.length} className="px-3 py-3 text-center font-sans text-xs text-mute">
+            <td colSpan={cols.length} className="px-3 py-3 text-center font-sans text-xs text-mute">
               Mostrando {limit.toLocaleString("es-ES")} de {sorted.length.toLocaleString("es-ES")}…{" "}
               <button onClick={() => setLimit(sorted.length)} className="text-neon hover:underline">
                 Ver todas
@@ -330,15 +509,86 @@ export function DataTable<T>({
             </td>
           </tr>
         )}
-        {sorted.length === 0 && empty && (
+        {sorted.length === 0 && (tf ? ordered.length > 0 : empty) && (
           <tr>
-            <td colSpan={columns.length} className="px-3 py-6 text-center font-sans text-sm text-mute">
-              {empty}
+            <td colSpan={cols.length} className="px-3 py-6 text-center font-sans text-sm text-mute">
+              {tf && ordered.length > 0 ? `Nada coincide con «${tf}»` : empty}
             </td>
           </tr>
         )}
       </tbody>
     </table>
+    {colMenu && (
+      <ColumnMenu
+        at={colMenu}
+        items={columns
+          .map((c, i) => ({ id: c.id, label: nodeText(c.header).trim(), locked: infos[i].locked, on: shownIds.includes(c.id) }))
+          .filter((x) => x.label)}
+        onToggle={(id) => saveColset(toggled(infos, saved, id))}
+        onReset={() => {
+          resetColumns();
+          setColMenu(null);
+        }}
+        onClose={() => setColMenu(null)}
+      />
+    )}
     </div>
+  );
+}
+
+/** El menú de columnas (clic derecho en la cabecera): una casilla por columna y «Restablecer». */
+function ColumnMenu({
+  at,
+  items,
+  onToggle,
+  onReset,
+  onClose,
+}: {
+  at: { x: number; y: number };
+  items: { id: string; label: string; locked?: boolean; on: boolean }[];
+  onToggle: (id: string) => void;
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState(at);
+  useEffect(() => {
+    const r = box.current?.getBoundingClientRect();
+    if (r) setPos({ x: Math.max(6, Math.min(at.x, window.innerWidth - r.width - 6)), y: Math.max(6, Math.min(at.y, window.innerHeight - r.height - 6)) });
+  }, [at]);
+  useEffect(() => {
+    const down = (e: MouseEvent) => {
+      if (!box.current?.contains(e.target as Node)) onClose();
+    };
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("mousedown", down);
+    window.addEventListener("blur", onClose);
+    window.addEventListener("keydown", esc, true);
+    return () => {
+      window.removeEventListener("mousedown", down);
+      window.removeEventListener("blur", onClose);
+      window.removeEventListener("keydown", esc, true);
+    };
+  }, [onClose]);
+  return createPortal(
+    <div ref={box} role="menu" aria-label="Columnas" data-no-ctx className="fixed z-[70] min-w-48 max-w-72 rounded-lg border border-line-2 bg-panel p-1 text-[13px] shadow-2xl" style={{ left: pos.x, top: pos.y }}>
+      <div className="px-2.5 pt-1 pb-1.5 text-[11px] font-medium text-mute">Columnas</div>
+      {items.map((it) => (
+        <label key={it.id} role="menuitemcheckbox" aria-checked={it.on} className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 ${it.locked ? "text-mute" : "cursor-pointer text-dim hover:bg-neon/10 hover:text-ink"}`}>
+          <input type="checkbox" checked={it.on} disabled={it.locked} onChange={() => onToggle(it.id)} className="accent-(--color-neon)" />
+          <span className="min-w-0 flex-1 truncate">{it.label}</span>
+        </label>
+      ))}
+      <div className="my-1 border-t border-line" />
+      <button role="menuitem" onClick={onReset} className="flex w-full rounded-md px-2.5 py-1.5 text-left text-dim hover:bg-neon/10 hover:text-ink">
+        Restablecer columnas
+      </button>
+    </div>,
+    document.body,
   );
 }

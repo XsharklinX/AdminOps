@@ -75,6 +75,12 @@ impl TweakState {
         self.catalog.iter().find(|t| t.id == id).ok_or_else(|| format!("Ajuste desconocido: {id}"))
     }
 
+    /// Todo el catálogo (para las pruebas de «Ver el comando»).
+    #[cfg(test)]
+    pub fn all(&self) -> &[Tweak] {
+        &self.catalog
+    }
+
     /// Para los arreglos de la bandeja: decide si hace falta administrador antes de ejecutar.
     pub fn tweak_needs_admin(&self, id: &str) -> bool {
         self.find(id).map(|t| t.needs_admin()).unwrap_or(false)
@@ -107,9 +113,12 @@ impl TweakState {
         }
         self.check_can_modify(t)?;
         let mut e = entry(Op::Run, Some(&t.id), &format!("{} (mantenimiento programado)", t.name));
-        let result = engine::run_action(t, None);
+        let (result, measure) = crate::measure::around(t.measure.as_deref(), || engine::run_action(t, None));
         match &result {
-            Ok(msg) => e.message = Some(msg.clone()),
+            Ok(msg) => {
+                e.message = Some(msg.clone());
+                e.measure = measure;
+            }
             Err(err) => {
                 e.ok = false;
                 e.message = Some(err.clone());
@@ -161,18 +170,36 @@ impl TweakState {
         self.check_can_modify(t)?;
         match t.kind {
             Kind::Action => run_logged(self, t, None),
-            _ => apply_logged(self, t, None).map(|()| if t.reboot { "Aplicado. Reinicia para que surta efecto.".into() } else { "Aplicado.".to_string() }),
+            _ => apply_logged(self, t, None).map(|m| {
+            crate::measure::with_message(if t.reboot { "Aplicado. Reinicia para que surta efecto." } else { "Aplicado." }, m.as_ref())
+        }),
         }
     }
 
     /// Registra en el diario una operación ajena al catálogo (finalizar un
     /// proceso, actualizar software…). No se puede deshacer.
     pub fn record<T>(&self, op: Op, title: &str, result: &Result<T, String>) {
+        self.record_measured(op, title, result, None);
+    }
+
+    /// Como `record`, con lo que midió la acción antes y después (solo si salió bien).
+    pub fn record_measured<T>(&self, op: Op, title: &str, result: &Result<T, String>, measure: Option<crate::measure::Measure>) {
         let mut e = entry(op, None, title);
-        if let Err(err) = result {
-            e.ok = false;
-            e.message = Some(err.clone());
+        match result {
+            Ok(_) => e.measure = measure,
+            Err(err) => {
+                e.ok = false;
+                e.message = Some(err.clone());
+            }
         }
+        self.log(e);
+    }
+
+    /// Apunta en el diario una medida suelta (p. ej. el arranque, que solo se
+    /// puede medir tras reiniciar): «Arranque: 1 min 40 s → 38 s».
+    pub fn record_measure_note(&self, title: &str, measure: crate::measure::Measure) {
+        let mut e = entry(Op::Run, None, title);
+        e.measure = Some(measure);
         self.log(e);
     }
 
@@ -257,6 +284,8 @@ pub struct OpResult {
     status: Status,
     message: String,
     restore_point_created: bool,
+    /// Lo medido antes y después, si la acción mide algo.
+    measure: Option<crate::measure::Measure>,
 }
 
 fn view(state: &TweakState, t: &Tweak, status: Status) -> TweakView {
@@ -284,6 +313,8 @@ pub struct TweakIndex {
     name: String,
     description: String,
     category: String,
+    risk: model::Risk,
+    note: Option<String>,
 }
 
 /// Nombre y categoría de todo el catálogo, sin detectar el estado (para la búsqueda global).
@@ -292,7 +323,7 @@ pub fn tweak_index(state: State<'_, TweakState>) -> Vec<TweakIndex> {
     state
         .catalog
         .iter()
-        .map(|t| TweakIndex { id: t.id.clone(), name: t.name.clone(), description: t.description.clone(), category: t.category.clone() })
+        .map(|t| TweakIndex { id: t.id.clone(), name: t.name.clone(), description: t.description.clone(), category: t.category.clone(), risk: t.risk, note: t.note.clone() })
         .collect()
 }
 
@@ -329,19 +360,21 @@ pub fn apply_tweak(
         !skip_restore_point && ensure_restore_point(&state, &task, &t.name, Some(&t.id), t.risk >= Risk::Medium)?;
     task.step(format!("Aplicando {}…", t.name));
 
-    apply_logged(&state, t, Some(&task))?;
+    let measure = apply_logged(&state, t, Some(&task))?;
     let message = if t.reboot { "Aplicado. Reinicia para que surta efecto." } else { "Aplicado." };
-    Ok(OpResult { status: engine::detect(t), message: message.into(), restore_point_created })
+    Ok(OpResult { status: engine::detect(t), message: crate::measure::with_message(message, measure.as_ref()), restore_point_created, measure })
 }
 
 /// Aplica un ajuste y lo registra en el diario (sin punto de restauración).
-fn apply_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<(), String> {
+fn apply_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<Option<crate::measure::Measure>, String> {
     let mut e = entry(Op::Apply, Some(&t.id), &t.name);
-    match engine::apply(t, task) {
+    let (applied, measure) = crate::measure::around(t.measure.as_deref(), || engine::apply(t, task));
+    match applied {
         Ok(backups) => {
             e.backups = backups;
+            e.measure = measure.clone();
             state.log(e);
-            Ok(())
+            Ok(measure)
         }
         Err(err) => {
             e.ok = false;
@@ -363,17 +396,26 @@ fn revert_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<b
 
 /// Ejecuta una tarea puntual y la registra en el diario.
 fn run_logged(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<String, String> {
+    run_logged_measured(state, t, task).map(|(msg, _)| msg)
+}
+
+/// Igual que `run_logged`, y además devuelve lo medido antes y después.
+fn run_logged_measured(state: &TweakState, t: &Tweak, task: Option<&Task>) -> Result<(String, Option<crate::measure::Measure>), String> {
     let mut e = entry(Op::Run, Some(&t.id), &t.name);
-    let result = engine::run_action(t, task);
+    let (result, measure) = crate::measure::around(t.measure.as_deref(), || engine::run_action(t, task));
     match &result {
-        Ok(msg) => e.message = Some(msg.clone()),
+        Ok(msg) => {
+            e.message = Some(msg.clone());
+            e.measure = measure.clone();
+        }
         Err(err) => {
             e.ok = false;
             e.message = Some(err.clone());
         }
     }
     state.log(e);
-    result
+    // El aviso dice la diferencia en vez de «Hecho»; el diario guarda lo que dijo la acción.
+    result.map(|msg| (crate::measure::with_message(&msg, measure.as_ref()), measure))
 }
 
 /// Deshace un ajuste: con la copia exacta del diario si AdminOps lo aplicó,
@@ -419,6 +461,10 @@ pub fn revert_entry(app: tauri::AppHandle, entry_id: u64, state: State<'_, Tweak
 fn needs_admin(backups: &[journal::Backup]) -> bool {
     backups.iter().any(|b| match b {
         journal::Backup::Registry { path, .. } => !path.to_ascii_uppercase().starts_with("HKCU"),
+        // La lista de idiomas es del usuario: no hace falta administrador.
+        journal::Backup::Languages { .. } => false,
+        // Cerrar y abrir OneDrive del usuario no pide administrador, salvo si hay que hacerlo en la sesión de otra cuenta.
+        journal::Backup::OneDrivePause { .. } => crate::target_user::hkcu_redirect().is_some(),
         _ => true,
     })
 }
@@ -438,11 +484,20 @@ fn finish_revert(
             } else {
                 e.message = Some("Sin copia previa: restaurados valores de fábrica.".into());
             }
+            // Lo que quedó sin deshacer a propósito (la carpeta de escaneos con archivos dentro).
+            let note = crate::scanfolder::take_undo_note();
+            if let Some(n) = &note {
+                e.message = Some(n.clone());
+            }
             state.log(e);
             let reboot = t.is_some_and(|t| t.reboot);
-            let message = if reboot { "Deshecho. Reinicia para que surta efecto." } else { "Deshecho." };
+            let mut message = if reboot { "Deshecho. Reinicia para que surta efecto.".to_string() } else { "Deshecho.".to_string() };
+            if let Some(n) = note {
+                message.push(' ');
+                message.push_str(&n);
+            }
             let status = t.map_or(Status::Action, engine::detect);
-            Ok(OpResult { status, message: message.into(), restore_point_created: false })
+            Ok(OpResult { status, message, restore_point_created: false, measure: None })
         }
         Err(err) => {
             e.ok = false;
@@ -462,7 +517,7 @@ pub fn run_action(app: tauri::AppHandle, id: String, state: State<'_, TweakState
     state.check_can_modify(t)?;
     let task = Task::new(&app, format!("tweak:{id}")).named(t.name.clone());
     task.step(format!("Ejecutando {}…", t.name));
-    run_logged(&state, t, Some(&task)).map(|message| OpResult { status: Status::Action, message, restore_point_created: false })
+    run_logged_measured(&state, t, Some(&task)).map(|(message, measure)| OpResult { status: Status::Action, message, restore_point_created: false, measure })
 }
 
 #[tauri::command]

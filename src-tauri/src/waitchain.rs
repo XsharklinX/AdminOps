@@ -284,13 +284,56 @@ mod win {
         (tids.len(), out)
     }
 
+    /// ¿Está Windows enseñando alguna ventana «fantasma» (la copia gris con «No responde» que pone encima de un
+    /// programa colgado)? Solo entonces tiene sentido mirar las ventanas escondidas.
+    fn ghost_visible() -> bool {
+        use windows_sys::Win32::Foundation::{HWND, LPARAM};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetClassNameW, IsWindowVisible};
+        unsafe extern "system" fn each(hwnd: HWND, lparam: LPARAM) -> i32 {
+            // SAFETY: lparam es el puntero al bool de la llamada, vivo durante EnumWindows; el búfer es local.
+            unsafe {
+                let mut buf = [0u16; 16];
+                let n = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+                if n == 5 && String::from_utf16_lossy(&buf[..5]) == "Ghost" && IsWindowVisible(hwnd) != 0 {
+                    *(lparam as *mut bool) = true;
+                    return 0;
+                }
+            }
+            1
+        }
+        let mut found = false;
+        // SAFETY: el puntero apunta a `found`, que sigue vivo durante la llamada.
+        unsafe {
+            EnumWindows(Some(each), &mut found as *mut bool as LPARAM);
+        }
+        found
+    }
+
+    /// ¿Es una ventana «No responde» de verdad? Visible, o, si Windows está enseñando una «fantasma», la ventana
+    /// principal que esconde detrás (sin dueño y con barra de título). Sin fantasma, una ventana escondida de un
+    /// hilo ocupado no cuenta: hay programas que dejan así ventanas de trabajo y no están colgados.
+    unsafe fn hung_window(hwnd: windows_sys::Win32::Foundation::HWND, ghosts: bool) -> bool {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{GW_OWNER, GWL_STYLE, GetWindow, GetWindowLongW, IsHungAppWindow, IsWindowVisible, WS_CAPTION};
+        // SAFETY: `hwnd` viene de EnumWindows; si la ventana ya no existe, estas funciones solo devuelven 0.
+        unsafe {
+            if IsHungAppWindow(hwnd) == 0 {
+                return false;
+            }
+            if IsWindowVisible(hwnd) != 0 {
+                return true;
+            }
+            ghosts && GetWindow(hwnd, GW_OWNER).is_null() && (GetWindowLongW(hwnd, GWL_STYLE) as u32 & WS_CAPTION) == WS_CAPTION
+        }
+    }
+
     /// ¿Alguna ventana de este proceso está marcada «No responde»?
     pub fn is_hung(pid: u32) -> bool {
         use windows_sys::Win32::Foundation::{HWND, LPARAM};
-        use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId, IsHungAppWindow, IsWindowVisible};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId};
         struct Probe {
             pid: u32,
             hung: bool,
+            ghosts: bool,
         }
         unsafe extern "system" fn each(hwnd: HWND, lparam: LPARAM) -> i32 {
             // SAFETY: lparam es el puntero al `Probe` de la llamada, vivo durante EnumWindows.
@@ -298,31 +341,70 @@ mod win {
                 let probe = &mut *(lparam as *mut Probe);
                 let mut owner = 0u32;
                 GetWindowThreadProcessId(hwnd, &mut owner);
-                if owner == probe.pid && IsWindowVisible(hwnd) != 0 && IsHungAppWindow(hwnd) != 0 {
+                if owner == probe.pid && hung_window(hwnd, probe.ghosts) {
                     probe.hung = true;
                     return 0;
                 }
             }
             1
         }
-        let mut probe = Probe { pid, hung: false };
+        let mut probe = Probe { pid, hung: false, ghosts: ghost_visible() };
         // SAFETY: el puntero apunta a `probe`, que sigue vivo durante la llamada.
         unsafe {
             EnumWindows(Some(each), &mut probe as *mut Probe as LPARAM);
         }
         probe.hung
     }
+
+    /// Los procesos que ahora mismo tienen una ventana visible de nivel superior marcada «No responde»
+    /// (una sola pasada por todas las ventanas; la usa «Grabar el fallo»).
+    pub fn hung_pids() -> std::collections::HashSet<u32> {
+        use windows_sys::Win32::Foundation::{HWND, LPARAM};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId};
+        struct Found {
+            set: std::collections::HashSet<u32>,
+            ghosts: bool,
+        }
+        unsafe extern "system" fn each(hwnd: HWND, lparam: LPARAM) -> i32 {
+            // SAFETY: lparam es el puntero al `Found` de la llamada, vivo durante EnumWindows.
+            unsafe {
+                let found = &mut *(lparam as *mut Found);
+                if hung_window(hwnd, found.ghosts) {
+                    let mut owner = 0u32;
+                    GetWindowThreadProcessId(hwnd, &mut owner);
+                    if owner != 0 {
+                        found.set.insert(owner);
+                    }
+                }
+            }
+            1
+        }
+        let mut found = Found { set: std::collections::HashSet::new(), ghosts: ghost_visible() };
+        // SAFETY: el puntero apunta a `found`, que sigue vivo durante la llamada.
+        unsafe {
+            EnumWindows(Some(each), &mut found as *mut Found as LPARAM);
+        }
+        found.set
+    }
 }
 
 #[cfg(not(windows))]
 mod win {
     use super::Chain;
+    pub fn hung_pids() -> std::collections::HashSet<u32> {
+        std::collections::HashSet::new()
+    }
     pub fn chains(_: u32) -> (usize, Vec<Chain>) {
         (0, Vec::new())
     }
     pub fn is_hung(_: u32) -> bool {
         false
     }
+}
+
+/// Los procesos con una ventana «No responde» ahora mismo.
+pub(crate) fn hung_pids() -> std::collections::HashSet<u32> {
+    win::hung_pids()
 }
 
 /// Conexiones del proceso con otro equipo (las que se quedan a medias son la pista).

@@ -50,6 +50,7 @@ name = "Renovar la IP"
 description = "Pide una dirección nueva al router o al servidor (DHCP) y vacía la caché de nombres. No toca Winsock ni la pila TCP/IP y no quita una IP fija."
 category = "repair"
 risk = "low"
+measure = "ping"
 kind = "action"
 admin = true
 
@@ -72,6 +73,7 @@ name = "Restablecer red"
 description = "Reinicia Winsock y la pila TCP/IP y renueva la IP. Soluciona 'conectado sin Internet', DNS que no resuelven y restos de VPN o malware."
 category = "repair"
 risk = "medium"
+measure = "ping"
 kind = "action"
 admin = true
 note = "Se pierde la configuración de IP fija, si la hay. Requiere reiniciar."
@@ -92,6 +94,7 @@ name = "Reparar Windows Update"
 description = "Detiene los servicios de actualización y renombra SoftwareDistribution y catroot2 para que se regeneren."
 category = "repair"
 risk = "medium"
+measure = "servicio:wuauserv"
 kind = "action"
 admin = true
 note = "Se pierde el historial de actualizaciones que muestra Configuración (no las actualizaciones instaladas)."
@@ -110,11 +113,94 @@ Start-Service 'cryptsvc', 'bits', 'wuauserv' -ErrorAction SilentlyContinue
 '''
 
 [[tweak]]
+id = "repair.wu-services"
+name = "Reiniciar los servicios de Windows Update"
+description = "Vuelve a activar (si estaban deshabilitados) y reinicia los servicios que usa Windows Update: Windows Update, BITS y Servicios criptográficos."
+category = "repair"
+risk = "low"
+measure = "servicio:wuauserv"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+# Cómo deben arrancar: los dos primeros a demanda y el de criptografía siempre
+$start = [ordered]@{ cryptsvc = 'Automatic'; bits = 'Manual'; wuauserv = 'Manual' }
+$fixed = @()
+foreach ($n in $start.Keys) {
+  $s = Get-CimInstance Win32_Service -Filter "Name='$n'" -ErrorAction SilentlyContinue
+  if ($s -and $s.StartMode -eq 'Disabled') {
+    Set-Service -Name $n -StartupType $start[$n]
+    $fixed += $s.DisplayName
+  }
+}
+Stop-Service wuauserv, bits -Force -ErrorAction SilentlyContinue
+Start-Service cryptsvc, bits, wuauserv -ErrorAction SilentlyContinue
+if ($fixed.Count) { 'Servicios reactivados y reiniciados: ' + ($fixed -join ', ') + '.' } else { 'Servicios de Windows Update reiniciados.' }
+'''
+
+[[tweak]]
+id = "repair.esp-fonts"
+name = "Liberar la partición reservada del sistema"
+description = "Borra de la partición de arranque (EFI) las fuentes de arranque de idiomas asiáticos (chino, japonés, coreano), que Microsoft recomienda quitar cuando Windows Update falla por falta de espacio (0x800f0922). Las latinas no se tocan. Si el equipo usa alguno de esos idiomas, las fuentes de ese idioma se dejan y se dice."
+category = "repair"
+risk = "medium"
+kind = "action"
+admin = true
+note = "Solo borra esas fuentes, que Windows no usa si el equipo no está en esos idiomas: lo comprueba antes (idioma de la interfaz, del sistema y de los teclados) y deja las del idioma que use. Si no hay nada que quitar, no toca nada."
+
+[tweak.script]
+run = '''
+# Partición del sistema EFI de este equipo
+$esp = Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.GptType -eq '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}' } | Select-Object -First 1
+$msg = 'Este equipo no arranca con una partición EFI: no hay nada que liberar y no se ha tocado nada.'
+if ($esp) {
+  # Idiomas en uso: interfaz, formato, sistema e idiomas del teclado
+  $tags = @((Get-UICulture).Name, (Get-Culture).Name, (Get-WinSystemLocale).Name) + @((Get-WinUserLanguageList -ErrorAction SilentlyContinue).LanguageTag)
+  $usa = { param($p) @($tags | Where-Object { $_ -and $_.ToLower().StartsWith($p) }).Count -gt 0 }
+  # Fuentes por idioma; las latinas (Segoe, WGL4) no están en la lista
+  $grupos = [ordered]@{
+    'chino'    = @('zh', 'chs_boot.ttf', 'cht_boot.ttf', 'msyh_boot.ttf', 'msyhn_boot.ttf', 'msjh_boot.ttf', 'msjhn_boot.ttf')
+    'japonés'  = @('ja', 'jpn_boot.ttf', 'meiryo_boot.ttf', 'meiryon_boot.ttf')
+    'coreano'  = @('ko', 'kor_boot.ttf', 'malgun_boot.ttf', 'malgunn_boot.ttf')
+  }
+  $sobran = @(); $dejadas = @()
+  foreach ($g in $grupos.Keys) {
+    $prefijo = $grupos[$g][0]; $fuentes = $grupos[$g][1..($grupos[$g].Count - 1)]
+    if (& $usa $prefijo) { $dejadas += $g } else { $sobran += $fuentes }
+  }
+  # Se monta un momento en una letra libre (se miran todas las unidades, también las de red y las no listas)
+  $usadas = @([IO.DriveInfo]::GetDrives() | ForEach-Object { [char]::ToUpper($_.Name[0]) }) + @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | ForEach-Object { [char]::ToUpper($_.Name[0]) })
+  $letter = [char[]]'ZYXWVUTSRQPONMLKJIHGFED' | Where-Object { $usadas -notcontains $_ } | Select-Object -First 1
+  if (-not $letter) { throw 'No hay ninguna letra de unidad libre para montar la partición del sistema.' }
+  mountvol "$($letter):" /S
+  if ($LASTEXITCODE) { throw 'No se pudo montar la partición del sistema.' }
+  try {
+    $fonts = "$($letter):\EFI\Microsoft\Boot\Fonts"
+    $files = @(Get-ChildItem $fonts -Force -File -ErrorAction SilentlyContinue | Where-Object { $sobran -contains $_.Name.ToLower() })
+    if ($files.Count -eq 0) {
+      $msg = 'No hay nada seguro que liberar en la partición del sistema: no se ha tocado nada.'
+    } else {
+      $bytes = ($files | Measure-Object Length -Sum).Sum
+      $files | Remove-Item -Force
+      $msg = 'Liberados {0:N1} MB en la partición del sistema.' -f ($bytes / 1MB)
+    }
+    if ($dejadas.Count -gt 0) { $msg += ' Se dejaron las fuentes de ' + ($dejadas -join ', ') + ' porque el equipo usa ese idioma.' }
+  } finally {
+    mountvol "$($letter):" /D | Out-Null
+    if ($LASTEXITCODE) { $msg += " Atención: la partición del sistema sigue montada en $($letter): (quítala con «mountvol $($letter): /D» o reinicia)." }
+  }
+}
+$msg
+'''
+
+[[tweak]]
 id = "repair.print-queue"
 name = "Desatascar cola de impresión"
 description = "Vacía los trabajos de impresión bloqueados y reinicia la cola."
 category = "repair"
 risk = "low"
+measure = "cola"
 kind = "action"
 admin = true
 
@@ -245,6 +331,7 @@ name = "Reconstruir la búsqueda de Windows"
 description = "Reinicia el servicio de búsqueda y reconstruye el índice. Para cuando el menú Inicio o el Explorador no encuentran archivos o programas."
 category = "repair"
 risk = "low"
+measure = "servicio:WSearch"
 kind = "action"
 admin = true
 note = "Tras reconstruir, la búsqueda tarda un rato (de minutos a horas según los archivos) en volver a encontrarlo todo."
@@ -264,6 +351,7 @@ name = "Reiniciar el audio"
 description = "Reinicia los servicios de audio de Windows. Soluciona el sonido que desaparece, el icono de altavoz con una X o dispositivos que no aparecen."
 category = "repair"
 risk = "low"
+measure = "servicio:Audiosrv"
 kind = "action"
 admin = true
 

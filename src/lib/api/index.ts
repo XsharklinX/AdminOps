@@ -31,3 +31,7 @@ export * from "./knowledge";
 export * from "./printvendor";
 export * from "./askchange";
 export * from "./diagnose";
+export * from "./actions";
+export * from "./netusage";
+export * from "./faultrec";
+export * from "./scanfolder";

@@ -126,7 +126,7 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar programa…"
+            data-typefilter placeholder="Buscar programa…"
             className="w-full rounded-md border border-line bg-panel py-1.5 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
           />
         </div>

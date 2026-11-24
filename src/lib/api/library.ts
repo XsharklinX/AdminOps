@@ -41,10 +41,11 @@ export type RecipeStep =
   | { kind: "bloatware" }
   | { kind: "installList"; listId: string; listName: string }
   | { kind: "profile"; profileId: string; profileName: string }
-  | { kind: "tweaks"; ids: string[] }
+  | { kind: "tweaks"; ids: string[]; /** Nombres para enseñarlos en la plantilla (si vienen de un caso). */ names?: string[] }
   | { kind: "user"; name: string; fullName: string; admin: boolean }
   | { kind: "rename"; newName: string }
   | { kind: "domain"; domain: string; ou: string }
+  | { kind: "reboot" }
   | { kind: "diagnostics" };
 
 export interface Recipe {
@@ -54,6 +55,11 @@ export interface Recipe {
   steps: RecipeStep[];
   created?: number;
   updated?: number;
+  /** Guardada desde un caso: sale con la marca «Nueva» hasta que se use. */
+  isNew?: boolean;
+  /** Veces que se ha usado. */
+  uses?: number;
+  lastUsed?: number;
 }
 
 export interface StationList {

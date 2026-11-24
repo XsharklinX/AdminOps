@@ -32,6 +32,21 @@ const SAM = /^(?:[a-z0-9-]+\\)?[a-záéíóúñü]+[._][a-záéíóúñü0-9]+$/
 const FULL_NAME = /^[a-záéíóúñü]{2,}(\s+[a-záéíóúñü]{2,})+$/i;
 const PRINTER = /\b(impresora|impresoras|printer|hp|epson|ricoh|brother|kyocera|canon|xerox|lexmark)\b/i;
 
+/**
+ * Palabras de un problema («monitor borroso», «excel no se guardó»): con alguna, dos palabras sueltas
+ * son una búsqueda y no el nombre de una persona.
+ */
+const PROBLEM_WORDS = new Set([
+  "monitor", "monitores", "pantalla", "pantallas", "borroso", "borrosa", "estirado", "estirada", "resolucion", "detecta", "teclado", "arroba", "sitio",
+  "ingles", "idioma", "excel", "word", "powerpoint", "guardo", "guardar", "guardado", "cerro", "recuperar", "autorrecuperacion",
+  "escanear", "escaner", "escaneo", "escanea", "carpeta", "configurar", "internet", "lento", "lenta", "subida", "bajada", "onedrive", "come", "consume", "usa", "quien", "ancho", "banda", "sincronizando",
+]);
+
+/** Hablar de escanear: con una marca de impresora de por medio («configurar escaner ricoh») no es «una impresora». */
+const SCANNING = /\b(escaner|escaneres|escanear|escanea|escaneo|scanner)\b/;
+
+const plain = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 export function recognize(raw: string): Recognized | null {
   const v = raw.trim();
   if (v.length < 2 || v.length > 64) return null;
@@ -39,10 +54,10 @@ export function recognize(raw: string): Recognized | null {
   if (IP.test(v)) return { kind: "ip", value: v, sure: true };
   // Extensión: 3 a 5 cifras. Más largo es un teléfono o un número de serie.
   if (/^\d{3,5}$/.test(v)) return { kind: "extension", value: v, sure: true };
-  if (PRINTER.test(v)) return { kind: "printer", value: v, sure: true };
+  if (PRINTER.test(v) && !SCANNING.test(plain(v))) return { kind: "printer", value: v, sure: true };
   if (COMPUTER.test(v)) return { kind: "computer", value: v.toUpperCase(), sure: true };
   if (SAM.test(v)) return { kind: "person", value: v.split("\\").pop() ?? v, sure: true };
-  if (FULL_NAME.test(v)) return { kind: "person", value: v, sure: false };
+  if (FULL_NAME.test(v) && !plain(v).split(/\s+/).some((w) => PROBLEM_WORDS.has(w))) return { kind: "person", value: v, sure: false };
   return null;
 }
 
@@ -53,7 +68,7 @@ export function recognize(raw: string): Recognized | null {
 // faltan. Esto solo entiende la frase; lo que se hace (los mismos comandos que
 // los botones de cada pantalla) está en lib/quickActions.ts.
 
-export type ActionKind = "unlock" | "restart" | "queue" | "laps" | "space";
+export type ActionKind = "unlock" | "restart" | "queue" | "laps" | "space" | "explorer";
 
 export interface ActionIntent {
   action: ActionKind;
@@ -67,6 +82,8 @@ const VERBS: Record<ActionKind, string[]> = {
   queue: ["cola", "colas", "vaciar", "vacia"],
   laps: ["laps"],
   space: ["liberar", "libera"],
+  // Sin verbo propio: sale de «reiniciar explorador».
+  explorer: [],
 };
 
 /** Palabras de enlace que se saltan entre el verbo y el nombre. */
@@ -81,6 +98,9 @@ function isWord(w: string, list: string[]): boolean {
 }
 
 const HOST = /^[a-z0-9][a-z0-9._-]{1,62}$/i;
+/** Palabras que, tras «vaciar cola», significan «todas las colas». */
+const ALL_QUEUES = new Set(["impresion", "impresiones", "impresoras", "todas", "todo", "todos"]);
+const EXPLORER = ["explorador", "explorer", "explorer.exe"];
 
 export function parseAction(raw: string): ActionIntent | null {
   const words = raw.trim().split(/\s+/).filter(Boolean);
@@ -99,6 +119,10 @@ export function parseAction(raw: string): ActionIntent | null {
     // «cola» sin nada más no es una acción: es una búsqueda.
   }
   while (rest.length && LINK.has(strip(rest[0]))) rest = rest.slice(1);
+  // «vaciar cola», «vaciar la cola de impresión», «vaciar todas las colas»: sin nombre, son todas.
+  if (action === "queue" && first.startsWith("vaci") && rest.every((w) => ALL_QUEUES.has(strip(w)) || LINK.has(strip(w)))) return { action, arg: "" };
+  // «reiniciar el explorador»: el Explorador de Windows, no un equipo.
+  if (action === "restart" && rest.length === 1 && isWord(strip(rest[0]), EXPLORER)) return { action: "explorer", arg: "" };
   if (action === "space") {
     // «liberar espacio» (o «liberar» a secas); «liberar la cuenta de x» no es esto.
     const ok = rest.length === 0 || (rest.length === 1 && isWord(strip(rest[0]), ["espacio", "disco"]));
@@ -108,4 +132,59 @@ export function parseAction(raw: string): ActionIntent | null {
   if (arg.length < 2) return null;
   if ((action === "restart" || action === "laps") && !HOST.test(arg)) return null;
   return { action, arg };
+}
+
+// ---------- Varias acciones en una frase ----------
+//
+// «liberar espacio y vaciar cola y reiniciar explorador». Solo se parte si cada
+// trozo es una acción reconocida: «desbloquear maria y juan» o «maria y juan»
+// siguen siendo una sola búsqueda.
+
+/** « y », comas y puntos y coma. */
+const SEPARATOR = /\s+y\s+|\s*[,;]\s*/gi;
+const MAX_STEPS = 6;
+
+export interface ActionStep {
+  /** El trozo de frase, tal como se escribió. */
+  text: string;
+  intent: ActionIntent;
+}
+
+/** La frase partida por « y », «, » y «;», sin trozos vacíos. */
+export function splitPhrase(raw: string): string[] {
+  return raw
+    .split(SEPARATOR)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Los pasos de la frase, o null si no son dos o más y todos acciones reconocidas. */
+export function parseSteps(raw: string): ActionStep[] | null {
+  const parts = splitPhrase(raw);
+  if (parts.length < 2 || parts.length > MAX_STEPS) return null;
+  const steps: ActionStep[] = [];
+  for (const text of parts) {
+    const intent = parseAction(text);
+    if (!intent) return null;
+    steps.push({ text, intent });
+  }
+  return steps;
+}
+
+/** Órdenes completas que Tab sabe terminar, de la más probable a la menos. */
+const COMPLETIONS = ["liberar espacio", "vaciar cola de impresión", "reiniciar explorador", "desbloquear ", "reiniciar ", "laps ", "vaciar cola "];
+
+/**
+ * Tab: completa la orden a medias (la que va tras el último « y » o coma) con la
+ * acción más probable. Devuelve la frase entera completada, o null si no hay nada que completar.
+ */
+export function completePhrase(raw: string): string | null {
+  let cut = 0;
+  for (const m of raw.matchAll(SEPARATOR)) cut = (m.index ?? 0) + m[0].length;
+  const head = raw.slice(0, cut);
+  const tail = raw.slice(cut).replace(/^\s+/, "");
+  const t = strip(tail);
+  if (t.length < 2) return null;
+  const hit = COMPLETIONS.find((c) => strip(c).startsWith(t) && strip(c) !== t);
+  return hit ? head + hit : null;
 }

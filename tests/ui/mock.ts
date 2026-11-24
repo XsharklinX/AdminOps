@@ -26,7 +26,7 @@ function answer(cmd: string, args: Record<string, unknown> | undefined): unknown
     const f = FIXTURES[cmd];
     return typeof f === "function" ? (f as (a: unknown) => unknown)(args) : structuredClone(f);
   }
-  const demo = demoAnswer(cmd);
+  const demo = demoAnswer(cmd, args);
   if (demo !== undefined) return demo;
   const kind = w.__E2E_DEFAULTS__?.[cmd];
   if (!kind) w.__E2E_UNKNOWN__.add(cmd);

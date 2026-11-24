@@ -4,6 +4,7 @@
 // la barra lateral llevaría a una sección que no existe.
 import { describe, expect, it } from "vitest";
 import { isPageId } from "../components/Sidebar";
+import { WEB_TICKETS } from "./features";
 import { parseNavKey, navKey, SECTIONS } from "./sections";
 
 const MERGED = Object.values(import.meta.glob("../pages/Merged.tsx", { query: "?raw", import: "default", eager: true }) as Record<string, string>)[0];
@@ -20,7 +21,7 @@ function tabsOf(text: string, constName: string): [string, string][] {
 const PAGE_OF_CONST: Record<string, string> = {
   APPS: "apps",
   NET: "router",
-  INVENTORY: "inventory",
+  INVENTORY_ALL: "inventory",
   TWEAK_TABS: "tweaks",
   PREP: "recipes",
   TOOLBOX: "tools",
@@ -39,7 +40,9 @@ describe("secciones de cada pantalla", () => {
       const real = tabsOf(MERGED, c);
       expect(real.length, c).toBeGreaterThan(1);
       const reg = (SECTIONS as Record<string, { id: string; label: string }[]>)[page]?.map((s) => [s.id, s.label]);
-      expect(reg, page).toEqual(real);
+      // «Inventario web» sigue en el código pero apagada (lib/features.ts).
+      const shown = WEB_TICKETS ? real : real.filter(([id]) => id !== "webinventory");
+      expect(reg, page).toEqual(shown);
     }
   });
 

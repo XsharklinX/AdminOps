@@ -23,6 +23,7 @@ import type { PanelBlock } from "../lib/panelLayout";
 import { TodayCard } from "../components/TodayCard";
 import { DIAG_COUNT_CHANGED, DIAG_UPDATED } from "../lib/diagRun";
 import { trend } from "../lib/trend";
+import { ViewCommand } from "../components/ActionCommand";
 
 type Latest = Awaited<ReturnType<typeof diagApi.latest>>;
 
@@ -188,11 +189,11 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
           sub: `Según el diagnóstico ${ago(latest.timestamp)}.`,
         };
 
-  const quickActions: { key: string; label: string; icon: typeof Brush; run: () => void }[] = [
-    { key: "temp", label: "Limpiar temporales", icon: Brush, run: () => quick("temp", "Temporales", runTweak("cleanup.user-temp")) },
-    { key: "dns", label: "Vaciar caché DNS", icon: Wifi, run: () => quick("dns", "Caché DNS", runTweak("cleanup.dns-cache")) },
-    { key: "explorer", label: "Reiniciar Explorador", icon: RefreshCw, run: () => quick("explorer", "Explorador", runTweak("repair.explorer")) },
-    { key: "rp", label: "Crear punto de restauración", icon: RotateCcw, run: () => quick("rp", "Punto de restauración", () => tweaksApi.createRestorePoint()) },
+  const quickActions: { key: string; label: string; icon: typeof Brush; run: () => void; /** La acción del registro, para «Ver el comando». */ command?: string }[] = [
+    { key: "temp", label: "Limpiar temporales", icon: Brush, run: () => quick("temp", "Temporales", runTweak("cleanup.user-temp")), command: "cleanup.user-temp" },
+    { key: "dns", label: "Vaciar caché DNS", icon: Wifi, run: () => quick("dns", "Caché DNS", runTweak("cleanup.dns-cache")), command: "cleanup.dns-cache" },
+    { key: "explorer", label: "Reiniciar Explorador", icon: RefreshCw, run: () => quick("explorer", "Explorador", runTweak("repair.explorer")), command: "repair.explorer" },
+    { key: "rp", label: "Crear punto de restauración", icon: RotateCcw, run: () => quick("rp", "Punto de restauración", () => tweaksApi.createRestorePoint()), command: "restore-point" },
     { key: "speed", label: "Test de velocidad", icon: Gauge, run: () => onNavigate("network") },
     { key: "space", label: "Ver qué ocupa el disco", icon: HardDrive, run: () => onNavigate("space") },
     { key: "sfc", label: "Reparar archivos de Windows", icon: LifeBuoy, run: () => onNavigate("repair", "repair.sfc") },
@@ -272,15 +273,13 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
         <Section title="Acciones rápidas" action={<LinkButton onClick={() => onNavigate("tools")}>Herramientas</LinkButton>}>
           <div className="flex flex-col py-1">
             {quickActions.map((q) => (
-              <button
-                key={q.key}
-                onClick={q.run}
-                disabled={busy !== null}
-                className="-mx-2 flex h-9 items-center gap-3 rounded-lg px-2 text-left text-[13px] text-ink transition-colors hover:bg-panel-2 disabled:opacity-50"
-              >
-                {busy === q.key ? <Loader2 size={16} className="animate-spin text-neon" /> : <q.icon size={16} strokeWidth={1.6} className="text-mute" />}
-                {q.label}
-              </button>
+              <div key={q.key} className="-mx-2 flex h-9 items-center rounded-lg px-2 transition-colors hover:bg-panel-2">
+                <button onClick={q.run} disabled={busy !== null} className="flex h-9 min-w-0 flex-1 items-center gap-3 text-left text-[13px] text-ink disabled:opacity-50">
+                  {busy === q.key ? <Loader2 size={16} className="animate-spin text-neon" /> : <q.icon size={16} strokeWidth={1.6} className="text-mute" />}
+                  {q.label}
+                </button>
+                {q.command && <ViewCommand id={q.command} />}
+              </div>
             ))}
           </div>
           <FavoriteTools onNavigate={onNavigate} />

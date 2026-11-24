@@ -1,7 +1,8 @@
+import { parseNavKey } from "../../lib/sections";
 import { Eye, EyeOff, GripVertical, Plus, RotateCcw, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm } from "../../components/feedback";
-import { AREA_ICONS, effectiveAreas, NAV, navLabel, type PageId } from "../../components/Sidebar";
+import { AREA_ICONS, effectiveAreas, NAV, navLabel, type PageId, DISABLED_PAGES } from "../../components/Sidebar";
 import { Button, Card, Explain, Toggle } from "../../components/ui";
 import { DEFAULT_SIDEBAR, setPrefs, setSidebar, usePrefs, type NavArea, type SidebarPrefs } from "../../lib/prefs";
 
@@ -49,6 +50,8 @@ function Check({ checked, onChange, label }: { checked: boolean; onChange: (v: b
 export function NavEditor() {
   const prefs = usePrefs();
   const sb = prefs.sidebar;
+  // Una pantalla apagada (lib/features.ts) fijada no se enseña aquí: no se puede ir a ella.
+  const shownFavorites = sb.favorites.filter((k) => !DISABLED_PAGES.includes(parseNavKey(k).page));
   const { confirm, dialog } = useConfirm();
   const areas: NavArea[] = effectiveAreas(prefs.layout).map((a) => ({ id: a.id, label: a.label, icon: a.iconName, pages: [...a.pages] }));
   const hidden = new Set<PageId>(prefs.layout?.hidden ?? []);
@@ -110,7 +113,7 @@ export function NavEditor() {
         <Card title="Estructura">
           <div className="flex flex-wrap items-center gap-2">
             <Explain short="Arrastra las secciones y las páginas (por el asa ⋮⋮) para ordenarlas o moverlas de sección." className="min-w-0 flex-1">
-              Pulsa el icono de una sección para cambiarlo y escribe encima de cualquier nombre para renombrarlo. ★ fija la pantalla arriba de la barra (las secciones se fijan con la chincheta, en la propia barra); el ojo la oculta de la barra (sigue en «Todo» y en Ctrl+K).
+              Pulsa el icono de una sección para cambiarlo y escribe encima de cualquier nombre para renombrarlo. ★ fija la pantalla arriba de la barra (las secciones se fijan con la chincheta que sale al pasar el ratón por su pestaña); el ojo la oculta de la barra (sigue en «Todo» y en Ctrl+K).
             </Explain>
             <Button kind="ghost" onClick={() => save([...areas, { id: `custom-${Date.now().toString(36)}`, label: "Mi sección", icon: "Star", pages: [] }])}>
               <Plus size={14} /> Nueva sección
@@ -120,6 +123,10 @@ export function NavEditor() {
 
         {areas.map((a, ai) => {
           const Icon = AREA_ICONS[a.icon] ?? AREA_ICONS.Folder;
+          // Páginas que se ven (sin las apagadas en lib/features.ts). Una sección con solo páginas apagadas no
+          // se enseña: borrarla no serviría, la barra la vuelve a crear para no perderlas.
+          const shown = a.pages.filter((p) => !DISABLED_PAGES.includes(p)).length;
+          if (shown === 0 && a.pages.length > 0) return null;
           return (
             <div
               key={a.id}
@@ -176,21 +183,21 @@ export function NavEditor() {
                   className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium text-ink outline-none hover:border-line focus:border-neon/50"
                   aria-label="Nombre de la sección"
                 />
-                <span className="text-xs text-mute">{a.pages.length}</span>
+                <span className="text-xs text-mute">{shown}</span>
                 <button
                   onClick={() => save(areas.filter((_, k) => k !== ai))}
-                  disabled={a.pages.length > 0}
+                  disabled={shown > 0}
                   className="rounded p-1 text-mute hover:bg-panel-2 hover:text-bad disabled:opacity-25"
-                  title={a.pages.length ? "Mueve antes sus páginas a otra sección" : "Quitar sección"}
+                  title={shown ? "Mueve antes sus páginas a otra sección" : "Quitar sección"}
                 >
                   <Trash2 size={14} />
                 </button>
               </div>
-              {a.pages.length === 0 ? (
+              {shown === 0 ? (
                 <p className="px-4 py-3 text-xs text-mute">Suelta aquí páginas. Las secciones vacías no aparecen en la barra lateral.</p>
               ) : (
                 <ul className="px-2 py-1">
-                  {a.pages.map((p) => {
+                  {a.pages.filter((p) => !DISABLED_PAGES.includes(p)).map((p) => {
                     const key = `page-${p}`;
                     return (
                       <li
@@ -279,12 +286,12 @@ export function NavEditor() {
         </Card>
 
         <Card title="Accesos rápidos en la barra">
-          <Opt title="Fijados" sub="Arriba de la barra: las pantallas marcadas con ★ aquí y lo que fijes con la chincheta al pasar el ratón por la barra (también secciones, como Dominio).">
-            {sb.favorites.length === 0 ? (
+          <Opt title="Fijados" sub="Arriba de la barra: las pantallas marcadas con ★ aquí y lo que fijes con la chincheta al pasar el ratón por la barra o por una pestaña (también secciones, como Dominio).">
+            {shownFavorites.length === 0 ? (
               <p className="text-xs text-mute">Ninguna todavía.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {sb.favorites.map((k) => (
+                {shownFavorites.map((k) => (
                   <button
                     key={k}
                     onClick={() => setSidebar({ favorites: sb.favorites.filter((x) => x !== k) })}

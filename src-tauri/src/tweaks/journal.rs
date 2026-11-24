@@ -31,6 +31,40 @@ pub enum Backup {
     /// App (Appx) quitada. Deshacer = reinstalar desde Microsoft Store con winget.
     #[serde(rename_all = "camelCase")]
     Appx { name: String, store_id: Option<String> },
+    /// La lista de idiomas de teclado del usuario. Deshacer = volver a ponerla (Set-WinUserLanguageList).
+    #[serde(rename_all = "camelCase")]
+    Languages { list: Vec<crate::kbdlang::LanguageEntry> },
+    /// «Pausar OneDrive 2 h»: deshacer = borrar la tarea que lo iba a abrir y abrirlo ahora.
+    #[serde(rename_all = "camelCase")]
+    OneDrivePause { task: String, exe: String, sid: Option<String> },
+    /// «Escanear a carpeta»: deshacer = quitar el recurso compartido, el usuario (si lo creó AdminOps) y lo que se
+    /// abrió del cortafuegos; la carpeta se queda si tiene archivos.
+    #[serde(rename_all = "camelCase")]
+    ScanFolder {
+        created_user: bool,
+        firewall: Vec<String>,
+        /// El recurso «Escaneos» ya existía (en la misma carpeta): al deshacer no se borra, se le devuelven sus permisos.
+        #[serde(default)]
+        share_existed: bool,
+        #[serde(default)]
+        share_access: Vec<crate::scanfolder::ShareAce>,
+        /// La carpeta la creó AdminOps: solo entonces se borra al deshacer (y si está vacía).
+        #[serde(default)]
+        folder_created: bool,
+        /// El usuario «escaner» ya existía y no era de AdminOps: cómo estaba (activado y su entrada para ocultarlo).
+        /// Los diarios viejos no lo tienen: entonces al deshacer no se toca.
+        #[serde(default)]
+        user_prev: Option<crate::scanfolder::UserPrev>,
+        /// El SID del usuario del equipo al que AdminOps dio permiso en la carpeta (no lo tenía antes). Sin él, no se quita nada.
+        #[serde(default)]
+        client_sid: Option<String>,
+    },
+    /// La firma SMB obligatoria que se quitó. Deshacer = volver a ponerla.
+    #[serde(rename_all = "camelCase")]
+    SmbSigning { previous: bool },
+    /// La red que se puso como privada. Deshacer = volver a su categoría.
+    #[serde(rename_all = "camelCase")]
+    NetworkCategory { interface_index: u32, previous: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -61,6 +95,10 @@ pub struct Entry {
     /// Se puede deshacer desde el historial (se calcula al guardar).
     #[serde(default)]
     pub undoable: bool,
+    /// Lo que midió la acción antes y después («C: 3,1 GB → 24,8 GB libres»). Los
+    /// diarios de antes no lo tienen: se leen igual.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub measure: Option<crate::measure::Measure>,
 }
 
 pub struct Journal {
@@ -161,5 +199,6 @@ pub fn entry(op: Op, tweak_id: Option<&str>, title: &str) -> Entry {
         backups: Vec::new(),
         reverted: false,
         undoable: false,
+        measure: None,
     }
 }

@@ -6,7 +6,7 @@ import { askPcApi, logQuietly, printersApi, type PcAnswer, type PcQuestion, type
 import { goToPage } from "../lib/navigate";
 import { addDays, isoDay, lastMonday, weekdayOf } from "../lib/whatChanged";
 import { useToast } from "./feedback";
-import { Button, Card, inputClass } from "./ui";
+import { Button, Card, inputClass, Intro } from "./ui";
 
 const when = (t: number) => new Date(t * 1000).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -46,9 +46,9 @@ export function AskPc() {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <Card title="Pregúntale al equipo" icon={<MessageCircleQuestion size={14} />}>
-        <p className="mb-3 text-sm text-dim">
+        <Intro id="machine:ask" className="mb-3">
           Preguntas fijas, con la respuesta en una frase y las pruebas debajo. Sale de lo que AdminOps ya lee de este equipo; si no hay pruebas, dice «No lo sé» y qué mirar. Solo lee.
-        </p>
+        </Intro>
         <ul className="space-y-2">
           <li className="flex flex-wrap items-center gap-2">
             <Button kind="ghost" onClick={() => void ask("restart")} disabled={!!busy}>

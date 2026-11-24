@@ -4,13 +4,14 @@
 import { CheckCircle2, CircleAlert, Download, Loader2, RefreshCw, ScanLine } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
+import { ScanToFolder } from "../components/ScanToFolder";
 import { ActionError, BrandBadge, DriverChip } from "../components/printers/Parts";
 import { describeDriver, installerFor, missingSoftware, VENDOR_NAME } from "../components/printers/logic";
-import { Button, EmptyState, ErrorState, iconBtn, Loading } from "../components/ui";
+import { Button, EmptyState, ErrorState, iconBtn } from "../components/ui";
 import { goToPage } from "../lib/navigate";
 import { vendorApi, type DriverLibrary, type VendorScanner, type VendorScannerInventory } from "../lib/api";
 
-export function Scanners({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
+export function Scanners({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
   const [inv, setInv] = useState<VendorScannerInventory | null>(null);
   const [lib, setLib] = useState<DriverLibrary | null>(null);
@@ -62,7 +63,17 @@ export function Scanners({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
       setShots((m) => ({ ...m, [s.name]: r }));
     });
 
-  if (!inv) return failed ? <ErrorState page message={failed} onRetry={() => void load()} /> : <Loading page text="Buscando escáneres…" />;
+  if (!inv)
+    return (
+      <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-dim">{failed ? "No se pudo leer la lista de escáneres" : "Buscando escáneres…"}</p>
+        </div>
+        {/* El asistente no depende de la lista de escáneres: se ve aunque falle o tarde (y en la misma posición que abajo, para no perder su estado). */}
+        <ScanToFolder isAdmin={isAdmin} />
+        {failed && <ErrorState message={failed} onRetry={() => void load()} />}
+      </div>
+    );
 
   const vendors = [...inv.scanners.map((s) => s.vendor), ...inv.notInstalled.map((d) => d.vendor)];
   const missing = missingSoftware(inv.software, vendors);
@@ -78,6 +89,8 @@ export function Scanners({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+
+      <ScanToFolder isAdmin={isAdmin} />
 
       {inv.scanners.length === 0 && inv.notInstalled.length === 0 && (
         <EmptyState icon={<ScanLine size={28} />} title="No hay escáneres RICOH, PFU ni EPSON conectados">

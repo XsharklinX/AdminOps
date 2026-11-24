@@ -7,7 +7,9 @@ import { WhyNotResponding } from "../components/expert/WhyNotResponding";
 import { toolsApi, type ProcessView } from "../lib/api";
 import { bytes } from "../lib/format";
 import { useRowWindow } from "../lib/rowWindow";
+import { useFrozenOrder, usePointerHold, useReorderFlip } from "../lib/liveOrder";
 import { groupProcesses, isSystemProcess, killable, type ProcessGroup } from "../lib/processGroups";
+import { usePageMemory } from "../lib/pageMemory";
 
 type SortKey = "name" | "pid" | "cpu" | "memory" | "disk";
 type Scope = "all" | "people" | "system";
@@ -35,9 +37,9 @@ function Shield({ protection }: { protection: ProcessView["protection"] }) {
 export function Processes({ isAdmin }: { isAdmin: boolean }) {
   const [procs, setProcs] = useState<ProcessView[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "cpu", desc: true });
-  const [scope, setScope] = useState<Scope>("all");
+  const [query, setQuery] = usePageMemory("q", "");
+  const [sort, setSort] = usePageMemory<{ key: SortKey; desc: boolean }>("sort", { key: "cpu", desc: true });
+  const [scope, setScope] = usePageMemory<Scope>("scope", "all");
   const [grouped, setGroupedState] = useState(() => {
     try {
       return localStorage.getItem(GROUPED_KEY) !== "0";
@@ -104,17 +106,22 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
     [sort.desc],
   );
 
-  const list = useMemo(
+  const listNow = useMemo(
     () => order(filtered, (p) => (sort.key === "name" ? p.name.toLowerCase() : sort.key === "disk" ? p.diskReadPerSec + p.diskWritePerSec : p[sort.key])),
     [filtered, order, sort.key],
   );
-  const groups = useMemo(
+  const groupsNow = useMemo(
     () => order(groupProcesses(filtered), (g) => (sort.key === "name" ? g.key : sort.key === "pid" ? g.procs.length : g[sort.key])),
     [filtered, order, sort.key],
   );
 
   // Lista larga: solo se pintan las filas a la vista (con grupos abiertos, todas, que su alto varía).
   const body = useRef<HTMLTableSectionElement>(null);
+  // Con el puntero encima, el orden espera (las cifras siguen cambiando); al apartarlo, se recoloca con animación.
+  const held = usePointerHold(body);
+  useReorderFlip(body, held);
+  const list = useFrozenOrder(listNow, (p) => String(p.pid), held);
+  const groups = useFrozenOrder(groupsNow, (g) => g.key, held);
   const count = grouped ? groups.length : list.length;
   const win = useRowWindow(body, count, count > 80 && (!grouped || open.size === 0));
 
@@ -216,6 +223,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
   const procRow = (p: ProcessView, nested = false) => (
     <tr
       key={p.pid}
+      data-flip={nested ? undefined : String(p.pid)}
       onClick={() => setSelected({ kind: "proc", pid: p.pid })}
       className={`cursor-pointer border-t border-line/60 ${selected?.kind === "proc" && selected.pid === p.pid ? "bg-neon/10" : nested ? "bg-void/30 hover:bg-panel-2" : "hover:bg-panel-2"}`}
     >
@@ -267,6 +275,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input
             value={query}
+            data-typefilter
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar nombre, PID, ruta o usuario…"
             className="w-full rounded-md border border-line bg-panel py-1.5 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
@@ -279,6 +288,9 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
         >
           {paused ? <Play size={12} /> : <Pause size={12} />} {paused ? "Reanudar" : "Pausar"}
         </button>
+        <span aria-hidden={!held} className={`rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-[11px] text-neon ${held ? "" : "invisible"}`}>
+          Orden en pausa mientras apuntas
+        </span>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -330,6 +342,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
                   const row = (
                     <tr
                       key={g.key}
+                      data-flip={g.key}
                       onClick={() => setSelected(single ? { kind: "proc", pid: g.procs[0].pid } : { kind: "group", key: g.key })}
                       className={`cursor-pointer border-t border-line/60 ${
                         (selected?.kind === "group" && selected.key === g.key) || (single && selected?.kind === "proc" && selected.pid === g.procs[0].pid) ? "bg-neon/10" : "hover:bg-panel-2"

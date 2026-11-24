@@ -214,9 +214,56 @@ pub fn set_ui_zoom(app: tauri::AppHandle, scale: f64) -> Result<(), String> {
     w.set_zoom(scale).map_err(|e| e.to_string())
 }
 
+/// Nombre del monitor en el que está la ventana principal (el nombre del dispositivo de pantalla, sin datos personales).
+fn monitor_name_of(window: &tauri::WebviewWindow) -> Option<String> {
+    window.current_monitor().ok().flatten().and_then(|m| m.name().cloned())
+}
+
+/// Qué monitor tiene la ventana ahora: el tamaño de la interfaz se recuerda por monitor.
+#[tauri::command]
+pub fn current_monitor_name(app: tauri::AppHandle) -> Option<String> {
+    use tauri::Manager;
+    app.get_webview_window("main").and_then(|w| monitor_name_of(&w))
+}
+
+/// Último monitor del que se avisó, para avisar solo cuando cambia.
+static LAST_MONITOR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// ¿Es otro monitor que el último avisado? Si lo es, lo anota.
+fn monitor_changed(last: &mut Option<String>, now: Option<String>) -> bool {
+    if now.is_none() || *last == now {
+        return false;
+    }
+    *last = now;
+    true
+}
+
+/// Se llama al mover la ventana o al cambiar su escala: si pasó a otro monitor, avisa a la interfaz (`monitor-changed`).
+pub fn watch_monitor(window: &tauri::Window) {
+    use tauri::{Emitter, Manager};
+    let Some(w) = window.app_handle().get_webview_window("main") else { return };
+    let now = monitor_name_of(&w);
+    let changed = match LAST_MONITOR.lock() {
+        Ok(mut last) => monitor_changed(&mut last, now.clone()),
+        Err(_) => false,
+    };
+    if changed {
+        let _ = window.app_handle().emit("monitor-changed", now);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn warns_only_when_the_monitor_changes() {
+        let mut last = None;
+        assert!(monitor_changed(&mut last, Some("A".into())));
+        assert!(!monitor_changed(&mut last, Some("A".into())));
+        assert!(!monitor_changed(&mut last, None));
+        assert!(monitor_changed(&mut last, Some("B".into())));
+    }
 
     #[test]
     fn only_restores_onto_connected_screens() {

@@ -319,6 +319,67 @@ export function Explain({ short, children, className = "" }: { short: ReactNode;
   );
 }
 
+const INTRO_KEY = "adminops.introSeen";
+
+function introSeen(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(INTRO_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Ya se ha visto la explicación de esta pantalla (para las pruebas y para «Volver a enseñar»). */
+export const introWasSeen = (id: string) => introSeen().includes(id);
+
+/** Vuelve a enseñar todas las explicaciones abiertas (Ajustes). */
+export function resetIntros() {
+  try {
+    localStorage.removeItem(INTRO_KEY);
+  } catch {
+    /* sin almacenamiento */
+  }
+}
+
+/**
+ * El párrafo con el que abre una pantalla. La primera vez se ve entero; a partir
+ * de la segunda queda plegado en «Cómo funciona ▾» (1.4, idea 7): quien ya sabe
+ * qué hace la pantalla no lo tiene que leer cada vez. `id`: uno por pantalla.
+ */
+export function Intro({ id, children, className = "" }: { id: string; children: ReactNode; className?: string }) {
+  // Se decide al montar: mientras la pantalla siga abierta no cambia.
+  const [first] = useState(() => !introWasSeen(id));
+  const [open, setOpen] = useState(first);
+  useEffect(() => {
+    if (!first) return;
+    try {
+      const seen = introSeen();
+      if (!seen.includes(id)) localStorage.setItem(INTRO_KEY, JSON.stringify([...seen, id].slice(-300)));
+    } catch {
+      /* sin almacenamiento: se enseña siempre */
+    }
+  }, [first, id]);
+  if (open)
+    return (
+      <div className={`text-[13px] leading-relaxed text-dim ${className}`}>
+        {children}
+        <button type="button" onClick={() => setOpen(false)} aria-expanded className="ml-1.5 inline-flex items-center gap-0.5 text-xs text-neon hover:underline">
+          Ocultar
+          <ChevronDown size={12} className="rotate-180" />
+        </button>
+      </div>
+    );
+  return (
+    <div className={className}>
+      <button type="button" onClick={() => setOpen(true)} aria-expanded={false} className="inline-flex items-center gap-0.5 text-xs text-neon hover:underline">
+        Cómo funciona
+        <ChevronDown size={12} />
+      </button>
+    </div>
+  );
+}
+
 /** El nombre del ajuste de la fila (para los lectores de pantalla del interruptor). */
 export const ToggleLabelCtx = createContext<string | undefined>(undefined);
 
@@ -367,16 +428,19 @@ export function IconButton({
   onClick,
   disabled,
   danger,
+  kt,
   children,
 }: {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   danger?: boolean;
+  /** Letra fija para el modo Alt (mantener Alt enseña la letra de cada botón). */
+  kt?: string;
   children: ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} title={label} aria-label={label} className={`${iconBtn} ${danger ? "ico-lid hover:text-bad" : "ico-pop"}`}>
+    <button type="button" onClick={onClick} disabled={disabled} data-kt={kt} title={label} aria-label={label} className={`${iconBtn} ${danger ? "ico-lid hover:text-bad" : "ico-pop"}`}>
       {children}
     </button>
   );
@@ -392,8 +456,11 @@ export function Button({
   kind = "primary",
   title,
   size = "md",
+  kt,
 }: {
   children: ReactNode;
+  /** Letra fija para el modo Alt (mantener Alt enseña la letra de cada botón). */
+  kt?: string;
   /** Si devuelve una promesa, el botón enseña que trabaja y termina en «Hecho». */
   onClick?: () => unknown;
   disabled?: boolean;
@@ -435,6 +502,7 @@ export function Button({
       onClick={click}
       disabled={disabled || state === "busy"}
       title={title}
+      data-kt={kt}
       aria-busy={state === "busy" || undefined}
       className={`relative flex items-center gap-1.5 rounded-lg border font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-[13px]"} ${style} ${state === "busy" ? "!opacity-80" : ""}`}
     >

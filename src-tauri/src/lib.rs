@@ -10,6 +10,14 @@ mod diagnostics;
 mod domain;
 mod drivers;
 mod elevation;
+mod connected;
+mod displays;
+mod netusage;
+mod faultrec;
+mod onedrive;
+mod scanfolder;
+mod kbdlang;
+mod unsaved;
 mod hardware;
 mod keys;
 mod maintenance;
@@ -20,6 +28,9 @@ mod minimon;
 mod network;
 mod nightjobs;
 mod cases;
+mod actioninfo;
+mod measure;
+mod planrun;
 mod followups;
 mod snmp;
 mod storage;
@@ -79,7 +90,11 @@ mod tray;
 mod tweaks;
 mod users;
 mod window_state;
+mod conpty;
 mod winupdate;
+mod wucause;
+mod wingetout;
+mod installq;
 mod workflow;
 mod vault;
 mod wipe;
@@ -235,7 +250,15 @@ pub fn run() {
                     log::info!("Ventana destruida a los {} ms", boottime::since_start_ms());
                     minimon::close(window.app_handle());
                     mini::close(window.app_handle());
+                    // Un cambio de pantalla sin confirmar se deshace antes de salir.
+                    displays::restore_pending_on_exit(window.app_handle());
+                    // La sesión de ETW y la espera de un escaneo se paran con la ventana.
+                    netusage::shutdown();
+                    scanfolder::shutdown();
+                    // Una grabación en marcha se cierra bien (el MP4 queda entero) y las sin caso se borran.
+                    faultrec::shutdown(window.app_handle());
                 }
+                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::ScaleFactorChanged { .. } => window_state::watch_monitor(window),
                 _ => {}
             }
         })
@@ -302,6 +325,16 @@ pub fn run() {
             quicknote::start(app.handle().clone());
             // AdminOps en miniatura con Ctrl+Alt+A.
             mini::start(app.handle().clone());
+            // Lo que se enchufa y se quita (Hardware → Conectados).
+            connected::start(app.handle().clone());
+            // El aviso de que cambió la pantalla lo da la misma ventana oculta; aquí se guarda a quién avisar.
+            displays::start(app.handle().clone());
+            // Uso de la red y escanear a carpeta: se guarda la app y se deja como estaba lo que una ejecución anterior dejó a medias.
+            netusage::start(app.handle().clone());
+            onedrive::start(app.handle().clone());
+            scanfolder::start(app.handle().clone());
+            // Grabar el fallo: borra lo que quedó a medias o de un caso que ya no está.
+            faultrec::start(app.handle().clone());
             if std::env::args().any(|a| a == "--auditoria") {
                 audit::set(true);
             }
@@ -341,6 +374,16 @@ pub fn run() {
             tweaks::appx::reinstall_app,
             tweaks::startup::list_startup,
             tweaks::startup::set_startup_enabled,
+            actioninfo::action_command,
+            actioninfo::action_save_script,
+            measure::measure_read,
+            measure::measure_text,
+            measure::measure_record,
+            planrun::plan_state_save,
+            planrun::plan_state_load,
+            planrun::plan_state_clear,
+            planrun::plan_check,
+            planrun::plan_reboot,
             target_user::get_target_user,
             diagnostics::run_diagnostics,
             diagnostics::list_snapshots,
@@ -371,6 +414,7 @@ pub fn run() {
             cases::case_open,
             cases::case_update,
             cases::case_actions,
+            cases::case_template_draft,
             cases::case_draft,
             cases::case_close,
             cases::case_discard,
@@ -413,6 +457,59 @@ pub fn run() {
             task::cancel_task,
             drivers::backup_drivers,
             hardware::hardware_inventory,
+            connected::connected_list,
+            connected::connected_recent,
+            connected::connected_action,
+            displays::displays_list,
+            displays::display_apply,
+            displays::display_confirm,
+            displays::display_undo,
+            displays::display_restart_driver,
+            netusage::netusage_start,
+            netusage::netusage_snapshot,
+            netusage::netusage_stop,
+            netusage::netusage_icon,
+            faultrec::faultrec_monitors,
+            faultrec::faultrec_start,
+            faultrec::faultrec_status,
+            faultrec::faultrec_stop,
+            faultrec::faultrec_list,
+            faultrec::faultrec_get,
+            faultrec::faultrec_delete,
+            faultrec::faultrec_windows,
+            faultrec::faultrec_pick_region,
+            faultrec::faultrec_region_done,
+            faultrec::faultrec_watch_start,
+            faultrec::faultrec_watch_stop,
+            faultrec::faultrec_watch_status,
+            faultrec::faultrec_just_happened,
+            faultrec::faultrec_auto_get,
+            faultrec::faultrec_auto_set,
+            faultrec::faultrec_auto_ignore,
+            faultrec::faultrec_auto_unignore,
+            faultrec::faultrec_thumb,
+            faultrec::faultrec_to_report,
+            faultrec::faultrec_report_remove,
+            faultrec::faultrec_export,
+            onedrive::onedrive_pause,
+            scanfolder::scanfolder_status,
+            scanfolder::scanfolder_setup,
+            scanfolder::scanfolder_new_password,
+            scanfolder::scanfolder_private_network,
+            scanfolder::scanfolder_disable_signing,
+            scanfolder::scanfolder_watch_start,
+            scanfolder::scanfolder_watch_status,
+            scanfolder::scanfolder_watch_stop,
+            scanfolder::scanfolder_diagnose,
+            scanfolder::scanfolder_open_folder,
+            scanfolder::scanfolder_desktop_shortcut,
+            kbdlang::kbd_state,
+            kbdlang::kbd_only_spanish,
+            unsaved::unsaved_list,
+            unsaved::unsaved_preview,
+            unsaved::unsaved_versions,
+            unsaved::unsaved_pick,
+            unsaved::unsaved_copy,
             hardware::memory_test_result,
             hardware::smart::smart_status,
             disks::disks_status,
@@ -559,6 +656,13 @@ pub fn run() {
             apps::search_apps,
             apps::install_preflight,
             apps::install_apps,
+            installq::install_enqueue,
+            installq::install_snapshot,
+            installq::install_clear,
+            installq::install_skip,
+            installq::install_retry,
+            installq::install_blockers,
+            installq::install_close_and_retry,
             apps::save_app_list,
             apps::delete_app_list,
             migrate::migrate_profiles,
@@ -607,6 +711,9 @@ pub fn run() {
             winupdate::update_pause,
             winupdate::pending_updates,
             winupdate::set_update_hidden,
+            winupdate::update_install,
+            winupdate::update_install_running,
+            wucause::update_cause,
             programs::list_programs,
             programs::uninstall_program,
             programs::remove_leftovers,
@@ -700,6 +807,7 @@ pub fn run() {
             applock::lock_disable,
             applock::lock_verify_windows,
             window_state::set_ui_zoom,
+            window_state::current_monitor_name,
             window_state::ui_ready,
             window_state::ui_booting,
             window_state::quit_app,
@@ -860,6 +968,15 @@ pub fn run() {
             testuser::delete_test_user,
             culprit::bisect_note,
         ]))
-        .run(context)
-        .expect("error while running tauri application");
+        .build(context)
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // Salir por cualquier camino (cerrar, reiniciar con administrador…): si había un cambio de pantalla sin confirmar, se deshace.
+            if let tauri::RunEvent::Exit = event {
+                displays::restore_pending_on_exit(app);
+                netusage::shutdown();
+                scanfolder::shutdown();
+                faultrec::shutdown(app);
+            }
+        });
 }

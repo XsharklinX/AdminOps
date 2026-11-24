@@ -4,7 +4,7 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { appcareApi, autoBackupApi, lockApi, logQuietly, storageApi, type AppInfo, type AutoBackupInfo, type LockStatus, type StorageInfo, type UpdateInfo } from "../../lib/api";
 import { ago } from "../../lib/format";
-import { ACCENTS, usePrefs, ZOOMS } from "../../lib/prefs";
+import { ACCENTS, effectiveZoom, usePrefs, ZOOMS } from "../../lib/prefs";
 import { getTheme } from "../../lib/theme";
 import type { SettingsSection } from "./catalog";
 import type { SettingsProps } from "./shared";
@@ -47,7 +47,7 @@ export function Summary({ s, appInfo, onGo }: { s: SettingsProps["s"]; appInfo: 
     appcareApi.checkUpdate().then(setUpdate, () => setUpdate("error"));
   };
 
-  const zoom = ZOOMS.find((z) => z.value === prefs.zoom)?.label ?? "Normal";
+  const zoom = ZOOMS.find((z) => z.value === effectiveZoom(prefs))?.label ?? "Normal";
   const backupOn = !!backup?.enabled && !!backup.here;
 
   return (

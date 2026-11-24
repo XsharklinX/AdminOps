@@ -6,7 +6,7 @@ import { logQuietly, whatChangedApi, type ChangeView, type WhatChangedInfo } fro
 import { goToPage } from "../lib/navigate";
 import { addDays, dayEs, describeChange, groupByKind, isoDay, KIND_LABEL, weekdayOf } from "../lib/whatChanged";
 import { useToast } from "./feedback";
-import { Button, Card, EmptyLine } from "./ui";
+import { Button, Card, EmptyLine, Intro } from "./ui";
 
 export function WhatChanged() {
   const [info, setInfo] = useState<WhatChangedInfo | null>(null);
@@ -57,10 +57,10 @@ export function WhatChanged() {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <Card title="¿Qué cambió?" icon={<GitCompare size={14} />}>
-        <p className="text-sm text-dim">
+        <Intro id="machine:changed">
           AdminOps guarda cada día una foto pequeña de este equipo (programas, drivers, actualizaciones, servicios, lo que arranca y los ajustes de energía) y te dice qué es distinto
           desde la fecha que elijas. Solo lee.
-        </p>
+        </Intro>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2 text-dim">
             Desde

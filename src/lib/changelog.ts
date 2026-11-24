@@ -18,6 +18,30 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.0",
+    title: "Grabar el fallo, pantallas, escanear a carpeta y quién se come Internet",
+    added: [
+      "Grabar el fallo, como un monitor de rendimiento: bajo el vídeo, una pista por cosa (procesador, disco, memoria, red, errores, clics y teclas, y voz), alineadas, con lo que marcaba cada una en el segundo del cabezal. Arrastrando sobre las pistas se recorta el trozo que importa: «Al informe» mete tres fotogramas con sus marcas en el PDF del cliente, «Al caso» lo apunta en las notas y «Exportar MP4» lo guarda donde digas (el vídeo solo sale del equipo así). La pantalla abre con la lista de grabaciones, cada una con su miniatura, qué pasó y la causa probable.",
+      "Vigilar (Grabar el fallo): AdminOps guarda en memoria el último minuto de la pantalla, sin escribir nada en el disco, y «¡Acaba de pasar!» (o Ctrl+Alt+G desde cualquier sitio, o el botón de la cámara arriba, que lleva un punto verde mientras vigila) lo guarda con sus marcas. Con «Guardar sola cuando algo falla» (apagada de serie) se guarda sola si un programa se cuelga, sale un error de aplicación o el procesador o el disco se quedan al 100 %: los 30 s de antes y los 15 de después, un solo aviso, límites por programa y «No volver a grabar por esto».",
+      "Grabar el fallo elige qué grabar: la pantalla entera, una sola ventana (aunque se mueva o tenga otra encima) o una zona que se dibuja con el ratón. En el vídeo se ven los clics y los atajos que pulsó el usuario («Ctrl + P», «Intro»); lo que escribe nunca se guarda, sale «•••». Y, si se enciende, la voz del micrófono para que cuente lo que hace (apagada de serie). Debajo del vídeo, una pista de clics y teclas y otra de voz.",
+      "Menos lío: Estado del equipo pasa de 13 pestañas a 4 grupos (Salud, Piezas, Qué pasó y Grabar), con una fila corta de botones dentro. La barra lateral enseña solo las pantallas del área, y las secciones van arriba, en la misma línea que el título y su aviso («1 aviso»); una sección se fija en la barra con la chincheta de su pestaña. Cada pantalla abre con su explicación la primera vez y después la deja plegada en «Cómo funciona ▾» (Ajustes → Inicio y ventana la vuelve a enseñar).",
+      "Espacio, mucho más rápido: con AdminOps abierto como administrador, en discos NTFS lee de una vez el índice de archivos del disco (como WizTree), y un disco con millones de archivos se analiza en segundos en vez de minutos. Sin administrador, avisa de que así sería más rápido.",
+      "Grabar el fallo (el botón de la cámara arriba, junto a Teams y Correo, que se enciende en verde mientras graba): graba la pantalla hasta 2 minutos mientras el usuario repite lo que falla y, a la vez, apunta los errores de Windows, los programas que dejan de responder y los picos de procesador y disco. Cada marca salta a su segundo del vídeo y «Causa probable» señala el pico que vino justo antes del cuelgue. Una píldora «Grabando» queda encima, fuera del vídeo. El vídeo no sale del equipo y se borra al cerrar el caso.",
+      "Pantallas: cada monitor con su marca, modelo, resolución nativa, escala, Hz y cable. Ponerle su resolución, extender o duplicar: si no pulsas «Mantener», vuelve como estaba a los 15 segundos. Y reiniciar el driver gráfico cuando la imagen se queda negra.",
+      "Teclado e idioma: los idiomas de teclado instalados, el atajo que cambia de idioma sin avisar y una prueba de «ñ @ ´». «Dejar solo Español y quitar el atajo», con «Deshacer».",
+      "Conectados: lo que Windows tiene enchufado, con su estado. Lo recién conectado sale arriba y resaltado, con «Buscar driver», «Volver a detectar» o «Habilitar».",
+      "Sin guardar de Office (Recuperar archivos): las copias de autorrecuperación, los documentos sin guardar y los temporales de Office, y las versiones anteriores de Windows. «Abrir una copia» nunca toca el original.",
+      "Escanear a carpeta (Escáneres): prepara la carpeta, el recurso compartido, un usuario local con una contraseña fácil de dictar y el cortafuegos; enseña en grande lo que hay que escribir en la RICOH o la EPSON y espera el escaneo de prueba: «Llegó…» o por qué no llega. «Deshacer todo» lo quita.",
+      "Uso de la red: subida y bajada de cada programa en vivo, a dónde se conecta y el total de hoy. «Pausar 2 h» para OneDrive cuando se come la conexión.",
+      "Windows Update: cada fallo con su código explicado en una frase, la causa comprobada en este equipo y «Probar» con el arreglo que toca; si no basta, «Siguiente paso». Instalar: una fila por programa (descargando, instalando, listo) con «Cerrar y seguir», «Reintentar» y «Saltar».",
+      "Acciones que se explican y se miden: «Ver el comando» enseña el PowerShell equivalente, comentado en español, para copiarlo o guardarlo como .ps1. El resultado dice el antes y el después («C: 3,1 GB → 24,8 GB libres»), también en el caso y en el informe; el arranque se mide en el siguiente reinicio.",
+      "Preparar equipos: «Reiniciar y seguir» retoma el plan solo al volver a entrar, con el paso en el que va. Y al cerrar un caso, «Guardar como plantilla» convierte lo que se hizo en una plantilla para repetirlo.",
+      "Moverse más rápido: Alt+←, Alt+→ y los botones laterales del ratón para volver (mantén pulsada la flecha para ver las 10 últimas); con Alt pulsado, cada botón enseña su letra; escribir sobre una tabla la filtra; columnas a tu gusto (clic derecho en la cabecera, arrastrar, doble clic para ajustar); las listas en vivo no se mueven bajo el ratón; Ctrl + y Ctrl − cambian el tamaño, recordado por monitor; y Ctrl+K hace varias cosas seguidas («liberar espacio y vaciar la cola»).",
+      "Icono nuevo: «El equipo vivo», la ventana con pulso.",
+    ],
+    removed: ["Tickets e Inventario web se apagan de momento: no funcionaban como debían. Correo y Teams siguen igual."],
+  },
+  {
     version: "1.3.0",
     title: "Impresoras RICOH y EPSON, diagnóstico de experto y más rápido",
     added: [

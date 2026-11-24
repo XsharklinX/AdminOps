@@ -301,6 +301,7 @@ pub fn install_pawnio(app: tauri::AppHandle) -> Result<String, String> {
     task.step("Instalando PawnIO con winget…");
     let script = "winget install --id namazso.PawnIO --exact --silent --accept-package-agreements --accept-source-agreements \
                   --disable-interactivity | Out-String\n\"EXIT:$LASTEXITCODE\"";
+    let _winget = crate::installq::winget_lock();
     let out = ps::powershell_opts(script, task.opts(Some(Duration::from_secs(10 * 60))))?;
     if pawnio_installed() || out.trim_end().ends_with("EXIT:0") {
         Ok("PawnIO instalado. Reinicia AdminOps para ver las temperaturas de CPU y placa.".into())

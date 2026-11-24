@@ -283,7 +283,7 @@ pub fn apply_profile(
                 n += 1;
                 task.step(format!("{n}/{total} · {}…", t.name));
                 match apply_logged(&state, t, Some(&task)) {
-                    Ok(()) => {
+                    Ok(_) => {
                         reboot |= t.reboot;
                         ("applied", None)
                     }

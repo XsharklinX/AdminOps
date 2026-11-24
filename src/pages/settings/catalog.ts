@@ -15,7 +15,7 @@ export const SECTIONS = [
   { id: "data", group: "Datos", label: "Datos y copias", icon: DatabaseBackup, hint: "Dónde están tus datos, sus copias, la limpieza y la configuración para otro equipo." },
   { id: "security", group: "Datos", label: "Seguridad", icon: Lock, hint: "El bloqueo con PIN o contraseña, y los puntos de restauración antes de cambiar Windows." },
   { id: "reports", group: "Trabajo", label: "Informes y cobros", icon: Building2, hint: "Tu marca, firma, checklist, garantías e impuestos." },
-  { id: "portals", group: "Trabajo", label: "Portales y red", icon: Ticket, hint: "Tickets, inventario web, el Correo, Teams y el dominio habitual." },
+  { id: "portals", group: "Trabajo", label: "Portales y red", icon: Ticket, hint: "El Correo, Teams y el dominio habitual." },
   { id: "about", group: "AdminOps", label: "Acerca de", icon: Info, hint: "Versión y actualizaciones, licencias, y lo que tarda AdminOps en abrirse." },
 ] as const satisfies readonly { id: string; group: string; label: string; icon: LucideIcon; hint: string }[];
 
@@ -70,12 +70,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { section: "navigation", title: "Accesos rápidos en la barra", keywords: "favoritos fijados chincheta recientes" },
   // Portales y red
   { section: "portals", title: "Dominio habitual", keywords: "dominio unir equipos active directory ad" },
-  { section: "portals", title: "Cómo se abren los portales", keywords: "precargar cerrar zoom tickets correo teams" },
-  { section: "portals", title: "Precargar el último portal", keywords: "rapido tickets correo teams inventario" },
+  { section: "portals", title: "Cómo se abren los portales", keywords: "precargar cerrar zoom correo teams" },
+  { section: "portals", title: "Precargar el último portal", keywords: "rapido correo teams" },
   { section: "portals", title: "Zoom de los portales", keywords: "tamaño letra web" },
   { section: "portals", title: "Cómo se abren Teams y el Correo", keywords: "navegador aplicacion outlook teams abrir fuera preguntar" },
   { section: "portals", title: "Dominio de la empresa", keywords: "intranet cuenta windows autenticacion integrada" },
-  { section: "portals", title: "Portales configurados", keywords: "tickets inventario correo teams web sesion privada privacidad rellenar inicio de sesion cuenta guardada" },
+  { section: "portals", title: "Portales configurados", keywords: "correo teams web sesion privada privacidad rellenar inicio de sesion cuenta guardada" },
   // Seguridad
   { section: "security", title: "Bloqueo de AdminOps", keywords: "pin contraseña bloquear" },
   { section: "security", title: "Bloquear por inactividad", keywords: "minutos tiempo automatico bloqueo" },

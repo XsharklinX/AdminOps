@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { Responsible } from "../components/Responsible";
-import { Card } from "../components/ui";
+import { Card, Intro } from "../components/ui";
 import { TweaksPage } from "./TweaksPage";
 import { troubleshootApi, type TroubleFinding, type TroubleFix } from "../lib/api";
 import { SYMPTOMS } from "../lib/symptoms";
@@ -90,7 +90,7 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
   return (
     <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="¿Qué le pasa al equipo?" icon={<Wrench size={14} />} className="col-span-12">
-        <p className="mb-3 text-xs text-dim">Elige el síntoma: AdminOps revisa en orden las causas típicas y te ofrece la reparación de cada una.</p>
+        <Intro id="troubleshoot" className="mb-3">Elige el síntoma: AdminOps revisa en orden las causas típicas y te ofrece la reparación de cada una.</Intro>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {SYMPTOMS.map((s) => (
             <button

@@ -49,7 +49,7 @@ export function Outbound({ s, set }: SettingsProps) {
           })}
         </ul>
       )}
-      <p className="mt-3 text-[11px] text-mute">Los portales que configures (tickets, correo, Teams) son webs que abres tú dentro de AdminOps; no se cuentan aquí. En ningún caso se envían datos de clientes, contactos ni contraseñas.</p>
+      <p className="mt-3 text-[11px] text-mute">Los portales que configures (correo, Teams) son webs que abres tú dentro de AdminOps; no se cuentan aquí. En ningún caso se envían datos de clientes, contactos ni contraseñas.</p>
     </Card>
   );
 }

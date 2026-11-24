@@ -1,14 +1,16 @@
 // La barra de arriba (1.2): el equipo en una línea. Cada dato se puede pulsar y
 // lleva a donde se mira o se arregla: el dominio a Dominio, el disco a Espacio,
 // los avisos al Diagnóstico. Teams y Correo se abren desde aquí, encima de lo
-// que estés viendo, en lugar de ocupar sitio en la barra lateral.
-import { Mail, MessagesSquare, Search } from "lucide-react";
+// que estés viendo, en lugar de ocupar sitio en la barra lateral; y al lado, grabar la pantalla.
+import { Search } from "lucide-react";
 import type { ReactNode } from "react";
 import logo from "../assets/logo.svg";
 import { api, type AppInfo, type TargetUser } from "../lib/api";
 import { diskTone, gbText, type MachineState, type Tone } from "../lib/machineState";
 import { openComm } from "../lib/comms";
 import { usePrefs } from "../lib/prefs";
+import { OutlookIcon, TeamsIcon } from "./BrandIcons";
+import { RecButton } from "./RecButton";
 import { allowedInMode, type PageId } from "./Sidebar";
 
 const DOT: Record<Tone, string> = { ok: "bg-ok", warn: "bg-warn", bad: "bg-bad", neutral: "bg-mute" };
@@ -56,7 +58,7 @@ export function TopBar({
   const { ctx, net, findings } = state;
   const b = (t: string) => <b className="font-medium text-ink">{t}</b>;
   const where = { ask: "", adminops: " (en AdminOps)", browser: " (en el navegador)", app: " (en su aplicación)" };
-  const appButton = (page: "teams" | "mail", label: string, Icon: typeof Mail) =>
+  const appButton = (page: "teams" | "mail", label: string, Icon: typeof TeamsIcon) =>
     allowedInMode(page, prefs.mode) && (
       <button
         onClick={() => openComm(page)}
@@ -64,7 +66,7 @@ export function TopBar({
         title={`${label}${where[prefs.comms[page]]} · se cambia en Ajustes → Portales y correo`}
         aria-label={label}
       >
-        <Icon size={17} strokeWidth={1.6} />
+        <Icon size={19} />
       </button>
     );
 
@@ -160,8 +162,9 @@ export function TopBar({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
-        {appButton("teams", "Teams", MessagesSquare)}
-        {appButton("mail", "Correo", Mail)}
+        {appButton("teams", "Teams", TeamsIcon)}
+        {appButton("mail", "Correo", OutlookIcon)}
+        {allowedInMode("machine", prefs.mode) && <RecButton onNavigate={onNavigate} />}
         <span className="mx-1 h-5 w-px bg-line" />
         {right}
       </div>

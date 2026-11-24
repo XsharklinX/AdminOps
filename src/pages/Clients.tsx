@@ -155,7 +155,7 @@ export function Clients() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar cliente…"
+                data-typefilter placeholder="Buscar cliente…"
                 className="w-full rounded-md border border-line bg-panel py-2 pr-3 pl-8 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50"
               />
             </div>

@@ -165,9 +165,12 @@ struct Enriched {
 
 /// Una sola llamada a PowerShell: lista tareas de inicio de sesión y resuelve
 /// editor/descripción del ejecutable de cada entrada (incluidas las tareas).
-fn enrich(items: &[StartupItem]) -> Result<Enriched, String> {
+/// Con `probe` también se mira el ejecutable de cada entrada (editor, descripción):
+/// es lo lento. Sin él solo se listan las tareas, que basta para contar.
+fn enrich(items: &[StartupItem], probe: bool) -> Result<Enriched, String> {
     let probes: Vec<Probe> = items.iter().map(|i| Probe { i: &i.id, c: &i.command }).collect();
     let json = crate::ps::ps_escape(&serde_json::to_string(&probes).unwrap());
+    let probe = if probe { "$true" } else { "$false" };
     let script = format!(
         r#"
 $items = [System.Collections.ArrayList]::new()
@@ -194,7 +197,7 @@ while ($pending.Count) {{
 }}
 $tasks = @($tasks)
 $sh = New-Object -ComObject WScript.Shell
-$info = @(foreach ($it in $items) {{
+$info = @(foreach ($it in @(if ({probe}) {{ $items }})) {{
   $c = [Environment]::ExpandEnvironmentVariables("$($it.c)").Trim()
   $p = $null
   if ($c.StartsWith('"')) {{ $end = $c.IndexOf('"', 1); if ($end -gt 1) {{ $p = $c.Substring(1, $end - 1) }} }}
@@ -215,8 +218,18 @@ ConvertTo-Json -InputObject ([pscustomobject]@{{ tasks = $tasks; info = $info }}
 }
 
 fn list() -> Result<Vec<StartupItem>, String> {
+    list_with(true)
+}
+
+/// Cuántas entradas están activas. Para las medidas (antes/después de quitar algo del
+/// inicio): no hace falta saber de qué empresa es cada una, así que no se miran los ejecutables.
+pub fn enabled_count() -> Result<usize, String> {
+    Ok(list_with(false)?.iter().filter(|i| i.enabled).count())
+}
+
+fn list_with(probe: bool) -> Result<Vec<StartupItem>, String> {
     let mut items = collect_local();
-    let enriched = enrich(&items)?;
+    let enriched = enrich(&items, probe)?;
     for t in enriched.tasks {
         items.push(StartupItem {
             id: format!("task|{}|{}", t.path, t.name),
@@ -291,8 +304,43 @@ fn approved_bytes(enabled: bool) -> Vec<u8> {
     b
 }
 
+/// Para «Ver el comando»: nombre, equivalente en PowerShell y si pide administrador
+/// de lo que hace «Quitar del inicio» con esa entrada. Es aproximado: AdminOps escribe
+/// en el registro directamente.
+pub(crate) fn disable_doc(id: &str) -> Result<(String, String, bool), String> {
+    let item = list()?.into_iter().find(|i| i.id == id).ok_or("La entrada ya no existe")?;
+    let q = ps::ps_literal;
+    // El nombre va en comentarios y en el título: sin saltos de línea (si no, lo que siguiera se ejecutaría).
+    let title = ps::ps_comment(&item.name);
+    let body = if let Some((key, name)) = &item.approved {
+        let ps_key = key.replacen('\\', ":\\", 1);
+        [
+            format!("# «{}» deja de arrancar con Windows. No se borra nada: se marca como", title),
+            "# desactivado, igual que en el Administrador de tareas (pestaña Inicio).".into(),
+            format!("$key = {}", q(&ps_key)),
+            format!("$name = {}", q(name)),
+            "# La clave de StartupApproved puede no existir todavía".into(),
+            "if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }".into(),
+            "# El primer byte impar (03) significa «desactivado»".into(),
+            "$bytes = [byte[]](3,0,0,0,0,0,0,0,0,0,0,0)".into(),
+            "New-ItemProperty -Path $key -Name $name -PropertyType Binary -Value $bytes -Force | Out-Null".into(),
+        ]
+        .join("\n")
+    } else if let Some((path, name)) = &item.task {
+        [
+            format!("# «{}» es una tarea programada que se lanza al iniciar sesión: se desactiva", title),
+            "# (no se borra, así se puede volver a activar).".into(),
+            format!("Disable-ScheduledTask -TaskPath {} -TaskName {} | Out-Null", q(path), q(name)),
+        ]
+        .join("\n")
+    } else {
+        return Err("Tipo de entrada desconocido".into());
+    };
+    Ok((title, body, item.needs_admin))
+}
+
 #[tauri::command(async)]
-pub fn set_startup_enabled(id: String, enabled: bool, state: State<'_, TweakState>) -> Result<(), String> {
+pub fn set_startup_enabled(id: String, enabled: bool, state: State<'_, TweakState>) -> Result<Option<String>, String> {
     // El id solo sirve para buscar: se vuelve a listar y se usa la entrada real.
     let item = list()?.into_iter().find(|i| i.id == id).ok_or("La entrada ya no existe")?;
     if item.needs_admin && !crate::elevation::is_elevated() {
@@ -300,6 +348,7 @@ pub fn set_startup_enabled(id: String, enabled: bool, state: State<'_, TweakStat
     }
     let title = format!("Inicio: {} {}", if enabled { "activar" } else { "desactivar" }, item.name);
     let mut e = entry(Op::Apply, None, &title);
+    let pre = crate::measure::before(Some("inicio"));
     let result = if let Some((key, name)) = &item.approved {
         let previous = registry::read_raw(key, name);
         let raw = registry::RawValue { vtype: 3, bytes: approved_bytes(enabled) };
@@ -314,8 +363,10 @@ pub fn set_startup_enabled(id: String, enabled: bool, state: State<'_, TweakStat
     match result {
         Ok(backups) => {
             e.backups = backups;
+            e.measure = pre.and_then(crate::measure::Before::finish);
+            let text = e.measure.as_ref().map(crate::measure::Measure::text);
             state.log(e);
-            Ok(())
+            Ok(text)
         }
         Err(err) => {
             e.ok = false;

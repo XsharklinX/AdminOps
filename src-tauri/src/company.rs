@@ -78,11 +78,16 @@ pub fn merge_settings(current: &Value, file: &CompanyFile) -> Value {
     out
 }
 
+/// Tickets e Inventario web están apagados de momento (igual que `WEB_TICKETS` en src/lib/features.ts):
+/// sus portales no se importan, porque no se verían en ningún sitio.
+const WEB_TICKETS: bool = false;
+
 /// Portales del archivo que aún no están (se comparan por dirección).
 pub fn new_portals<'a>(file: &'a CompanyFile, existing: &[Value]) -> Vec<&'a serde_json::Map<String, Value>> {
     let norm = |u: &str| u.trim().trim_end_matches('/').to_lowercase();
     file.portals
         .iter()
+        .filter(|p| WEB_TICKETS || matches!(p.get("kind").and_then(Value::as_str), Some("mail" | "teams")))
         .filter(|p| {
             let url = p.get("url").and_then(Value::as_str).unwrap_or("");
             !url.is_empty() && !existing.iter().any(|e| norm(e["url"].as_str().unwrap_or("")) == norm(url))
@@ -207,12 +212,13 @@ mod tests {
 
     #[test]
     fn import_merges_and_skips_existing_portals() {
-        let f = build(&json!({ "company": "Soporte DB", "currency": "RD$" }), &[json!({ "name": "Tickets", "url": "https://Tickets.example.com" }), json!({ "name": "Correo", "url": "https://outlook.office.com/mail/" })]);
+        let f = build(&json!({ "company": "Soporte DB", "currency": "RD$" }), &[json!({ "name": "Tickets", "url": "https://Tickets.example.com", "kind": "mail" }), json!({ "name": "Correo", "url": "https://outlook.office.com/mail/", "kind": "mail" }), json!({ "name": "Intranet", "url": "https://intranet.example.com/", "kind": "" })]);
         let cur = json!({ "technician": "Ana", "company": "", "currency": "€", "watchWindows": false });
         let m = merge_settings(&cur, &f);
         assert_eq!((m["technician"].as_str(), m["company"].as_str(), m["currency"].as_str()), (Some("Ana"), Some("Soporte DB"), Some("RD$")));
         let existing = vec![json!({ "url": "https://tickets.example.com/" })];
         let fresh = new_portals(&f, &existing);
+        // La que ya estaba (misma dirección) no se repite, y la de Tickets no se importa mientras esté apagado.
         assert_eq!(fresh.len(), 1);
         assert_eq!(fresh[0]["name"], "Correo");
     }

@@ -1,11 +1,13 @@
-import { Building2, CheckCircle2, Download, Eye, EyeOff, ListPlus, Loader2, PackagePlus, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, TriangleAlert, X, XCircle } from "lucide-react";
+import { Building2, Download, Eye, EyeOff, ListPlus, Loader2, PackagePlus, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, TriangleAlert } from "lucide-react";
 import { bytes } from "../lib/format";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
+import { InstallQueue } from "../components/InstallQueue";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, ErrorState, Loading, Modal, inputClass, softBtn } from "../components/ui";
-import { appsApi, type AppCatalog, type CatalogApp, type CatalogView, type InstallResult } from "../lib/api";
+import { appsApi, installQueueApi, logQuietly, onInstallItem, type AppCatalog, type CatalogApp, type CatalogView, type InstallItem } from "../lib/api";
 import { catalogCounts, isVisible } from "../lib/catalogView";
+import { isFinished, mergeItem, summaryText } from "../lib/installQueue";
 
 const CATEGORY: Record<string, string> = {
   browser: "Navegadores",
@@ -36,9 +38,10 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
   const [query, setQuery] = useState("");
   const [extra, setExtra] = useState<CatalogApp[]>([]);
   const [searching, setSearching] = useState(false);
-  const [running, setRunning] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [results, setResults] = useState<InstallResult[] | null>(null);
+  /** Las filas de la tanda en curso o recién terminada (una por programa). */
+  const [queue, setQueue] = useState<InstallItem[]>([]);
+  const running = queue.some((i) => !isFinished(i));
   const [saving, setSaving] = useState(false);
   /** Categoría que se está viendo (null: todas). */
   const [category, setCategory] = useState<string | null>(null);
@@ -126,20 +129,42 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
       danger: !!pre && (!pre.online || !pre.winget),
     });
     if (!ok) return;
-    setRunning(true);
-    setResults(null);
     try {
-      const r = await appsApi.install(selected);
-      setResults(r);
-      const good = r.filter((x) => x.ok).length;
-      toast(good === r.length ? "ok" : "info", `${good} de ${r.length} programas instalados.`);
-      setSelected((s) => s.filter((a) => r.some((x) => x.id === a.id && !x.ok)));
+      setQueue(await installQueueApi.enqueue(selected));
     } catch (e) {
       toast("error", String(e));
-    } finally {
-      setRunning(false);
-      loadInstalled();
     }
+  };
+
+  // Al volver a la pantalla, las filas siguen donde estaban; cada cambio llega como evento. Lo que ya se
+  // instaló (o se saltó) sale de la selección; lo que falló se queda para poder reintentarlo.
+  useEffect(() => {
+    // Primero se escucha y después se pide el estado: un evento que llegue entre las dos cosas no se pierde.
+    const off = onInstallItem((item) => {
+      setQueue((q) => mergeItem(q, item));
+      if (item.state === "done" || item.state === "skipped") setSelected((s) => s.filter((a) => a.id !== item.id));
+    });
+    void installQueueApi
+      .snapshot()
+      .then((items) => setQueue((q) => items.reduce(mergeItem, q)))
+      .catch(logQuietly("Install"));
+    return off;
+  }, []);
+
+  // Al terminar la tanda: se vuelve a mirar qué está instalado y se avisa con el resumen.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      loadInstalled();
+      const summary = summaryText(queue);
+      if (summary) toast(queue.some((i) => i.state === "failed") ? "info" : "ok", summary);
+    }
+    wasRunning.current = running;
+  }, [running, queue, loadInstalled, toast]);
+
+  const closeQueue = () => {
+    setQueue([]);
+    void installQueueApi.clear().catch(logQuietly("Install"));
   };
 
   const deleteList = async (id: string, name: string) => {
@@ -346,27 +371,7 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
         </p>
       )}
 
-      {results && (
-        <div className="mb-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-medium">Resultado</h3>
-            <button onClick={() => setResults(null)} className="text-mute hover:text-ink">
-              <X size={14} />
-            </button>
-          </div>
-          <ul className="space-y-1 text-xs">
-            {results.map((r) => (
-              <li key={r.id} className="flex items-start gap-2">
-                {r.ok ? <CheckCircle2 size={13} className="mt-px shrink-0 text-ok" /> : <XCircle size={13} className="mt-px shrink-0 text-bad" />}
-                <span className="text-ink">{r.name}</span>
-                <span className={`min-w-0 flex-1 truncate ${r.ok ? "text-dim" : "text-bad"}`} title={r.message}>
-                  {r.message}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <InstallQueue items={queue} onClose={closeQueue} />
 
       {/* Categorías: de un vistazo cuántos hay en cada una, y ver solo una. */}
       {categories.length > 1 && (

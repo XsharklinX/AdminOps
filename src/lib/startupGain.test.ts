@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StartupItem } from "./api";
-import { gains, measured, secsText } from "./startupGain";
+import { forHost, gains, measured, secsText } from "./startupGain";
 
 const item = (name: string, command: string, enabled = true): StartupItem => ({ id: name, name, command, location: "", source: "registry", enabled, needsAdmin: false, publisher: null, description: null, target: command.split(" ")[0] });
 
@@ -32,5 +32,18 @@ describe("lo que se gana quitando programas de inicio", () => {
     expect(measured(boots, { at: Date.parse("2026-10-17T00:00:00Z") / 1000, avgMs: 1, estimateMs: 1, names: [] })).toBeNull();
     expect(secsText(130000)).toBe("2 min 10 s");
     expect(secsText(41000)).toBe("41 s");
+  });
+
+  it("el apunte de otro equipo (viajó en el USB) no vale", () => {
+    const b = { at: 1, avgMs: 1, estimateMs: 1, names: ["Teams"], host: "PC-A" };
+    expect(forHost(b, "PC-A")).toBe(b);
+    expect(forHost(b, "pc-a")).toBe(b);
+    expect(forHost(b, "PC-B")).toBeNull();
+    // Sin nombre de equipo no se puede decidir: se acepta.
+    expect(forHost(b, "")).toBe(b);
+    // Los apuntes viejos no llevan equipo.
+    const viejo = { at: 1, avgMs: 1, estimateMs: 1, names: [] };
+    expect(forHost(viejo, "PC-B")).toBe(viejo);
+    expect(forHost(null, "PC-B")).toBeNull();
   });
 });

@@ -1,13 +1,13 @@
 // Miniatura de AdminOps para Ajustes → Apariencia: se pinta con los mismos
 // colores de la app, así que enseña al momento el tema y el color elegidos, y
 // además el tamaño, la densidad de la barra lateral y el ancho de las pantallas.
-import { usePrefs, ZOOMS } from "../../lib/prefs";
+import { effectiveZoom, usePrefs, ZOOMS } from "../../lib/prefs";
 
 const ROWS = { compact: 5, normal: 4, comfortable: 3 } as const;
 
 export function AppPreview() {
   const prefs = usePrefs();
-  const scale = prefs.zoom;
+  const scale = effectiveZoom(prefs);
   const rows = ROWS[prefs.sidebar.density as keyof typeof ROWS] ?? 4;
   const centered = prefs.pageWidth === "limited";
   const bar = (w: string, accent = false) => <div className={`h-1.5 rounded-full ${accent ? "bg-neon" : "bg-line-2"}`} style={{ width: w }} />;
@@ -16,7 +16,7 @@ export function AppPreview() {
     <div className="rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-3">
       <div className="mb-2 flex items-baseline justify-between text-xs">
         <span className="font-medium text-ink">Así se verá</span>
-        <span className="text-mute">{ZOOMS.find((z) => z.value === prefs.zoom)?.label ?? "Normal"}</span>
+        <span className="text-mute">{ZOOMS.find((z) => z.value === scale)?.label ?? "Normal"}</span>
       </div>
       <div className="flex h-44 overflow-hidden rounded-lg border border-line bg-void" aria-hidden>
         {/* Barra lateral: columna de áreas y su lista */}

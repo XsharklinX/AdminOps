@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import type { PageId } from "../components/Sidebar";
 import { getTheme, onThemeApplied } from "./theme";
+import { zoomFor } from "./zoom";
 
 export type Accent = "blue" | "teal" | "violet" | "orange" | "green" | "graphite" | "contrast";
 
@@ -78,8 +79,10 @@ export type CommMode = "ask" | "adminops" | "browser" | "app";
 export interface Prefs {
   mode: AppMode;
   accent: Accent;
-  /** Tamaño de toda la interfaz (zoom de la ventana). */
+  /** Tamaño de toda la interfaz (zoom de la ventana): el general, para los monitores sin uno propio. */
   zoom: number;
+  /** El tamaño elegido en cada monitor (por el nombre del monitor). */
+  zoomByMonitor: Record<string, number>;
   reduceMotion: boolean;
   /** "last": la última página visitada. */
   startPage: "last" | PageId;
@@ -124,7 +127,7 @@ export interface Prefs {
 }
 
 const KEY = "adminops.prefs";
-const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: false, sounds: false, soundVolume: 0.5, celebrate: true, demo: false, aura: true, stateShapes: true, tips: true };
+const DEFAULTS: Prefs = { mode: "admin", accent: "blue", zoom: 1, zoomByMonitor: {}, reduceMotion: false, startPage: "dashboard", refreshMs: 2000, layout: null, shortcuts: {}, sidebar: DEFAULT_SIDEBAR, pageLabels: {}, diagnoseOnOpen: false, preloadPortals: true, portalZoom: 1, comms: { teams: "ask", mail: "ask" }, panel: { order: [], hidden: [], widths: {} }, pageWidth: "full", pageTabs: false, sounds: false, soundVolume: 0.5, celebrate: true, demo: false, aura: true, stateShapes: true, tips: true };
 
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string }> = {
   blue: { label: "Azul", dark: "#5b8def", light: "#2459c9" },
@@ -137,10 +140,13 @@ export const ACCENTS: Record<Accent, { label: string; dark: string; light: strin
 };
 
 export const ZOOMS = [
+  { value: 0.8, label: "80 %" },
   { value: 0.9, label: "Pequeño" },
   { value: 1, label: "Normal" },
   { value: 1.1, label: "Grande" },
   { value: 1.25, label: "Muy grande" },
+  { value: 1.4, label: "140 %" },
+  { value: 1.5, label: "150 %" },
 ];
 
 let cache: Prefs | null = null;
@@ -156,6 +162,11 @@ export function getPrefs(): Prefs {
   }
   if (!ACCENTS[p.accent]) p.accent = "blue";
   if (!ZOOMS.some((z) => z.value === p.zoom)) p.zoom = 1;
+  const byMon: Record<string, number> = {};
+  if (p.zoomByMonitor && typeof p.zoomByMonitor === "object") {
+    for (const [k, v] of Object.entries(p.zoomByMonitor)) if (ZOOMS.some((z) => z.value === v)) byMon[k] = v;
+  }
+  p.zoomByMonitor = byMon;
   if (p.pageWidth !== "limited") p.pageWidth = "full";
   // Rediseño de la navegación (1.2.10): la tira de pantallas abiertas se apaga una
   // vez para todos. Quien la quiera la vuelve a encender en Ajustes → Navegación.
@@ -223,7 +234,34 @@ export function applyAppearance(p: Prefs = getPrefs()) {
   root.classList.toggle("plain-states", !p.stateShapes);
   // Las pantallas leen este tope (max-w-(--page-max)): sin él usan toda la ventana.
   root.style.setProperty("--page-max", p.pageWidth === "limited" ? "72rem" : "none");
-  invoke("set_ui_zoom", { scale: p.zoom }).catch(() => {});
+  invoke("set_ui_zoom", { scale: effectiveZoom(p) }).catch(() => {});
+}
+
+/** En qué monitor está la ventana (null: no se sabe). Lo pone `ZoomKeys` al abrir y al cambiar de monitor. */
+let monitorName: string | null = null;
+
+export function setMonitorName(name: string | null) {
+  monitorName = name;
+}
+
+/** El tamaño que se aplica ahora: el del monitor en el que está la ventana o, si no tiene, el general. */
+export function effectiveZoom(p: Prefs = getPrefs()): number {
+  return zoomFor(p.zoom, p.zoomByMonitor, monitorName);
+}
+
+/** Cambia el tamaño para el monitor actual (o el general si no se sabe cuál es). */
+export function setZoomHere(z: number) {
+  const p = getPrefs();
+  if (monitorName) setPrefs({ zoomByMonitor: { ...p.zoomByMonitor, [monitorName]: z } });
+  else setPrefs({ zoom: z });
+}
+
+/** Elegir un tamaño en Ajustes: pasa a ser el general y deja sin tamaño propio a este monitor. */
+export function setZoomGeneral(z: number) {
+  const p = getPrefs();
+  const { ...by } = p.zoomByMonitor;
+  if (monitorName) delete by[monitorName];
+  setPrefs({ zoom: z, zoomByMonitor: by });
 }
 
 /** Lo que lleva el aviso «adminops-prefs»: cómo estaban antes (para «Deshacer» en Ajustes). */
@@ -256,7 +294,7 @@ export function usePrefs(): Prefs {
 /** Rectángulo de un elemento en píxeles de la ventana (con el zoom aplicado), para las vistas web incrustadas. */
 export function windowRect(el: HTMLElement) {
   const r = el.getBoundingClientRect();
-  const z = getPrefs().zoom;
+  const z = effectiveZoom();
   return { x: r.left * z, y: r.top * z, width: r.width * z, height: r.height * z };
 }
 

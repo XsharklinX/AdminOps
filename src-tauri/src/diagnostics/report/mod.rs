@@ -164,21 +164,25 @@ fn build(c: &Ctx) -> String {
                         if !work.is_empty() {
                             h.push_str("<table><thead><tr><th>Fecha</th><th>Acción</th><th>Detalle</th></tr></thead>");
                             for e in &work {
+                                let note = e.message.as_deref().map(|m| format!(" <span class=muted>— {}</span>", esc(m))).unwrap_or_default();
+                                let measure = e.measure.as_ref().map(|m| format!(" <b>({})</b>", esc(&m.text()))).unwrap_or_default();
                                 let _ = write!(
                                     h,
-                                    "<tr><td class=nowrap>{}</td><td class=nowrap>{}</td><td>{}{}</td></tr>",
+                                    "<tr><td class=nowrap>{}</td><td class=nowrap>{}</td><td>{}{note}{measure}</td></tr>",
                                     fmt_ts(e.timestamp),
                                     op_label(e.op),
-                                    esc(&e.title),
-                                    e.message.as_deref().map(|m| format!(" <span class=muted>— {}</span>", esc(m))).unwrap_or_default()
+                                    esc(&e.title)
                                 );
                             }
                             h.push_str("</table>");
                         }
                     } else {
-                        let mut seen: Vec<&str> = Vec::new();
+                        let mut seen: Vec<String> = Vec::new();
                         for e in &work {
-                            let t = if e.op == Op::RestorePoint { "Punto de restauración creado antes de los cambios" } else { e.title.as_str() };
+                            let mut t = if e.op == Op::RestorePoint { "Punto de restauración creado antes de los cambios".to_string() } else { e.title.clone() };
+                            if let Some(m) = &e.measure {
+                                t = format!("{t} ({})", m.text());
+                            }
                             if !seen.contains(&t) {
                                 seen.push(t);
                             }
@@ -365,6 +369,12 @@ fn report_html(app: &tauri::AppHandle, state: &TweakState, input: &ReportInput, 
         number,
         since,
     });
+    // La grabación del fallo mandada «Al informe» (G4): antes de las firmas.
+    let clips = crate::faultrec::report_html(&crate::faultrec::report_clips(app));
+    let html = match (clips.is_empty(), html.find("<div class=sign>")) {
+        (false, Some(at)) => format!("{}{clips}{}", &html[..at], &html[at..]),
+        _ => html,
+    };
     Ok((html, cur))
 }
 
@@ -462,13 +472,14 @@ fn journal_html(entries: &[Entry], host: &str, settings: &Settings) -> String {
         } else {
             "Correcto"
         };
+        let note = e.message.as_deref().filter(|m| !m.trim().is_empty()).map(|m| format!(" <span class=muted>— {}</span>", esc(m))).unwrap_or_default();
+        let measure = e.measure.as_ref().map(|m| format!(" <b>({})</b>", esc(&m.text()))).unwrap_or_default();
         let _ = write!(
             h,
-            "<tr><td class=nowrap>{}</td><td class=nowrap>{}</td><td>{}{}</td><td class=nowrap>{result}</td></tr>",
+            "<tr><td class=nowrap>{}</td><td class=nowrap>{}</td><td>{}{note}{measure}</td><td class=nowrap>{result}</td></tr>",
             fmt_ts(e.timestamp),
             op_label(e.op),
-            esc(&e.title),
-            e.message.as_deref().filter(|m| !m.trim().is_empty()).map(|m| format!(" <span class=muted>— {}</span>", esc(m))).unwrap_or_default()
+            esc(&e.title)
         );
     }
     let _ = write!(

@@ -1,3 +1,4 @@
+import { WEB_TICKETS } from "../../lib/features";
 import { Globe, Mail, MessagesSquare, Ticket, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
@@ -16,7 +17,7 @@ const KIND = {
 
 const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.5];
 
-/** Ajustes de los portales (Tickets, inventario web, Correo y Teams) en un solo sitio. */
+/** Ajustes de los portales (Correo y Teams; también Tickets e inventario web si están encendidos) en un solo sitio. */
 export function PortalSettings({
   s,
   set,
@@ -32,7 +33,12 @@ export function PortalSettings({
   const [portals, setPortals] = useState<Portal[] | null>(null);
   const toast = useToast();
 
-  const load = () => portalsApi.list().then(setPortals).catch(() => setPortals([]));
+  // Con Tickets e Inventario web apagados (lib/features.ts) solo se enseñan los de Correo y Teams.
+  const load = () =>
+    portalsApi
+      .list()
+      .then((l) => setPortals(WEB_TICKETS ? l : l.filter((p) => p.kind === "mail" || p.kind === "teams")))
+      .catch(() => setPortals([]));
   useEffect(() => {
     void load();
   }, []);
@@ -53,7 +59,7 @@ export function PortalSettings({
       <Card title="Cómo se abren los portales">
         <Row
           title="Precargar el último portal"
-          sub="Carga en segundo plano el último portal usado de Tickets, Inventario web, Correo y Teams unos segundos después de abrir AdminOps, para que al entrar ya esté listo. Los de sesión privada nunca se precargan."
+          sub="Carga en segundo plano el último portal usado de Correo o Teams unos segundos después de abrir AdminOps, para que al entrar ya esté listo. Los de sesión privada nunca se precargan."
         >
           <Toggle checked={prefs.preloadPortals} onChange={(v) => setPrefs({ preloadPortals: v })} />
         </Row>
@@ -112,7 +118,7 @@ export function PortalSettings({
           <p className="text-sm text-mute">Leyendo…</p>
         ) : portals.length === 0 ? (
           <p className="text-sm text-mute">
-            Todavía no hay ninguno. Añádelos desde Soporte → Tickets, Soporte → Inventario, o desde los iconos de Correo y Teams de la barra de arriba.
+            Todavía no hay ninguno. Se añaden desde los iconos de Correo y Teams de la barra de arriba.
           </p>
         ) : (
           <ul className="divide-y divide-line/60">

@@ -139,10 +139,21 @@ pub fn restore(t: Option<&Tweak>, backups: &[Backup], task: Option<&Task>) -> Re
             Backup::Task { path, name, was_enabled } => super::startup::set_task_enabled(path, name, *was_enabled),
             Backup::Appx { name, store_id: Some(id) } => super::appx::reinstall(name, id, task),
             Backup::Appx { name, store_id: None } => Err(format!("{name} no se puede reinstalar automáticamente")),
+            Backup::Languages { list } => crate::kbdlang::restore_languages(list),
+            Backup::OneDrivePause { exe, sid, .. } => crate::onedrive::resume(exe, sid.as_deref()),
+            Backup::ScanFolder { created_user, firewall, share_existed, share_access, folder_created, user_prev, client_sid } => {
+                crate::scanfolder::undo_entry(*created_user, firewall, *share_existed, share_access, *folder_created, user_prev.as_ref(), client_sid.as_deref())
+            }
+            Backup::SmbSigning { previous } => crate::scanfolder::restore_signing(*previous),
+            Backup::NetworkCategory { interface_index, previous } => crate::scanfolder::restore_network_category(*interface_index, previous),
         };
         if let Err(e) = r {
             errors.push(e);
         }
+    }
+    // Si se devolvió el atajo de cambio de idioma, Windows tiene que enterarse (si no, no hasta otro inicio de sesión).
+    if backups.iter().any(|b| matches!(b, Backup::Registry { path, .. } if path.eq_ignore_ascii_case(crate::kbdlang::TOGGLE_KEY))) {
+        crate::kbdlang::apply_toggle_change();
     }
     if errors.is_empty() { Ok(()) } else { Err(errors.join(" · ")) }
 }

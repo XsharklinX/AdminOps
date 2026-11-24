@@ -1,7 +1,7 @@
 import { Keyboard, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
-import { NAV, type PageId } from "../../components/Sidebar";
+import { NAV, type PageId, DISABLED_PAGES } from "../../components/Sidebar";
 import { Button, Card } from "../../components/ui";
 import { comboOf, RESERVED, setPrefs, usePrefs } from "../../lib/prefs";
 
@@ -58,7 +58,7 @@ export function ShortcutEditor() {
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <select value={page} onChange={(e) => setPage(e.target.value as PageId)} className="rounded-md border border-line bg-void/60 px-3 py-1.5 text-sm text-ink outline-none">
-          {NAV.map((n) => (
+          {NAV.filter((n) => !DISABLED_PAGES.includes(n.id)).map((n) => (
             <option key={n.id} value={n.id}>
               {n.label}
             </option>

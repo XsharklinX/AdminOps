@@ -111,6 +111,10 @@ pub struct Tweak {
     /// Forzar que requiera admin (para scripts; registro HKLM y servicios lo infieren solos).
     #[serde(default)]
     pub admin: bool,
+    /// Qué mide al ejecutarse (`espacio`, `cola`, `ping`, `servicio:<nombre>`…): se lee antes y
+    /// después y el aviso dice la diferencia. Ver `measure.rs`. Sin esto, no se mide nada.
+    #[serde(default)]
+    pub measure: Option<String>,
     #[serde(default)]
     pub registry: Vec<RegistryAction>,
     #[serde(default)]

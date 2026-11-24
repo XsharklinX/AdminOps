@@ -1,12 +1,14 @@
-import { CircleCheck, CircleX, Eye, EyeOff, Loader2, Pause, Play, RefreshCw, Search, TriangleAlert, Wrench } from "lucide-react";
+import { CircleCheck, CircleX, Download, Eye, EyeOff, Loader2, Pause, Play, RefreshCw, Search, TriangleAlert, Wrench } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { FreshNote } from "../components/FreshNote";
 import { readCached } from "../lib/cachedRead";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Loading } from "../components/ui";
+import { UpdateFailure } from "../components/UpdateFailure";
+import { Bar, Button, Card, Loading } from "../components/ui";
 import { bytes, fullDate } from "../lib/format";
-import { toolboxApi, tweaksApi, updateApi, type PendingUpdate, type UpdateHistoryEntry } from "../lib/api";
+import { onUpdateProgress, toolboxApi, tweaksApi, updateApi, type PendingUpdate, type UpdateHistoryEntry, type UpdateProgress } from "../lib/api";
+import { progressText, showsBar } from "../lib/wuRow";
 
 const RESULT = {
   ok: { label: "Instalada", icon: CircleCheck, color: "text-ok" },
@@ -26,6 +28,9 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [onlyFailed, setOnlyFailed] = useState(false);
+  /** Lo que lleva cada actualización mientras se descarga e instala (por id). */
+  const [progress, setProgress] = useState<Record<string, UpdateProgress>>({});
+  const [installing, setInstalling] = useState(false);
   const toast = useToast();
 
   const [historyAt, setHistoryAt] = useState<number | null>(null);
@@ -44,6 +49,33 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => onUpdateProgress((p) => setProgress((cur) => ({ ...cur, [p.id]: p }))), []);
+
+  // Si al abrir la pestaña ya hay una instalación en marcha (se salió y se volvió), se enseña como en marcha
+  // y se espera a que termine: así no se lanza otra encima.
+  useEffect(() => {
+    let alive = true;
+    let timer: number | undefined;
+    const poll = async () => {
+      const running = await updateApi.installRunning().catch(() => false);
+      if (!alive) return;
+      if (running) {
+        setInstalling(true);
+        timer = window.setTimeout(() => void poll(), 2000);
+      } else {
+        setInstalling((was) => {
+          if (was) load();
+          return false;
+        });
+      }
+    };
+    void poll();
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
   }, [load]);
 
   const pause = async (days: number) => {
@@ -67,6 +99,24 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setSearching(false);
+    }
+  };
+
+  const install = async () => {
+    const ids = (pending ?? []).filter((u) => !u.hidden).map((u) => u.id);
+    if (ids.length === 0) return;
+    setProgress({});
+    setInstalling(true);
+    try {
+      const done = await updateApi.install(ids);
+      const ok = done.filter((p) => p.phase === "done" || p.phase === "reboot").length;
+      const reboot = done.some((p) => p.phase === "reboot");
+      toast(ok === ids.length ? "ok" : "info", `${ok} de ${ids.length} actualizaciones instaladas${reboot ? ". Pide reiniciar." : "."}`);
+      load();
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setInstalling(false);
     }
   };
 
@@ -139,9 +189,16 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
         title="Pendientes"
         className="col-span-12 lg:col-span-7"
         right={
-          <Button kind="ghost" onClick={search} disabled={searching}>
-            {searching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} Buscar
-          </Button>
+          <div className="flex items-center gap-2">
+            {pending !== null && pending.some((u) => !u.hidden) && (
+              <Button onClick={install} disabled={!isAdmin || installing || searching} title={isAdmin ? undefined : "Requiere administrador"}>
+                {installing ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Instalar
+              </Button>
+            )}
+            <Button kind="ghost" onClick={search} disabled={searching || installing}>
+              {searching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} Buscar
+            </Button>
+          </div>
         }
       >
         {searching ? (
@@ -157,26 +214,44 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
           </p>
         ) : (
           <div className="max-h-72 space-y-1 overflow-y-auto">
-            {pending.map((u) => (
-              <div key={u.id} className={`flex items-center gap-3 rounded-md px-2 py-1.5 ${u.hidden ? "opacity-50" : ""}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-ink" title={u.title}>
-                    {u.title}
+            {installing && <TaskStatus task="wu-install" active fallback="Instalando actualizaciones…" className="mb-2" />}
+            {pending.map((u) => {
+              const p = progress[u.id];
+              const waiting = installing && !u.hidden && !p;
+              return (
+                <div key={u.id} className={`rounded-md px-2 py-1.5 ${u.hidden ? "opacity-50" : ""}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm text-ink" title={u.title}>
+                        {u.title}
+                      </div>
+                      <div className="text-[11px] text-mute">
+                        {[u.kb, u.driver ? "driver" : null, u.size ? bytes(u.size) : null, u.hidden ? "oculta" : null].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    {(p || waiting) && (
+                      <span className={`shrink-0 text-xs ${p?.phase === "failed" ? "text-bad" : p?.phase === "done" ? "text-ok" : p?.phase === "reboot" ? "text-warn" : "text-neon"}`}>
+                        {p ? progressText(p) : "En cola"}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => toggleHidden(u)}
+                      disabled={!isAdmin || busy !== null || installing}
+                      className="rounded p-1.5 text-mute hover:text-ink disabled:opacity-30"
+                      title={u.hidden ? "Volver a mostrar" : "Ocultar: Windows no la instalará"}
+                    >
+                      {busy === u.id ? <Loader2 size={14} className="animate-spin" /> : u.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
                   </div>
-                  <div className="text-[11px] text-mute">
-                    {[u.kb, u.driver ? "driver" : null, u.size ? bytes(u.size) : null, u.hidden ? "oculta" : null].filter(Boolean).join(" · ")}
-                  </div>
+                  {p && showsBar(p) && (
+                    <div className="mt-1.5">
+                      <Bar value={p.percent ?? 0} color="var(--color-neon)" />
+                    </div>
+                  )}
+                  {p?.phase === "failed" && p.code && <UpdateFailure code={p.code} explanation={p.explanation ?? null} isAdmin={isAdmin} />}
                 </div>
-                <button
-                  onClick={() => toggleHidden(u)}
-                  disabled={!isAdmin || busy !== null}
-                  className="rounded p-1.5 text-mute hover:text-ink disabled:opacity-30"
-                  title={u.hidden ? "Volver a mostrar" : "Ocultar: Windows no la instalará"}
-                >
-                  {busy === u.id ? <Loader2 size={14} className="animate-spin" /> : u.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
@@ -217,10 +292,15 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
                     <span className="shrink-0 text-xs text-mute">{when(h.date)}</span>
                     <span className={`w-20 shrink-0 text-right text-xs ${r.color}`}>{r.label}</span>
                   </div>
-                  {h.result !== "ok" && h.code && (
-                    <p className="mt-0.5 ml-6 text-xs text-dim">
-                      <span className="font-mono text-mute">{h.code}</span> {h.explanation ?? "Error sin explicación conocida: busca el código en la web de Microsoft."}
-                    </p>
+                  {h.result !== "ok" && h.code && (h.result === "failed" || h.result === "partial") ? (
+                    <UpdateFailure code={h.code} explanation={h.explanation} isAdmin={isAdmin} />
+                  ) : (
+                    h.result !== "ok" &&
+                    h.code && (
+                      <p className="mt-0.5 ml-6 text-xs text-dim">
+                        <span className="font-mono text-mute">{h.code}</span> {h.explanation ?? "Error sin explicación conocida: busca el código en la web de Microsoft."}
+                      </p>
+                    )
                   )}
                 </div>
               );

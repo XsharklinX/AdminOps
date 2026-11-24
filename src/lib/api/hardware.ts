@@ -103,6 +103,138 @@ export const hwApi = {
   openNotices: () => invoke<void>("open_third_party_notices"),
 };
 
+// ---------- Dispositivos conectados (Hardware → Conectados) ----------
+
+export interface ConnectedDevice {
+  /** Id de instancia de Windows. */
+  id: string;
+  name: string;
+  /** La clase en español (Audio, Cámaras, USB…). */
+  class: string;
+  manufacturer: string;
+  status: "ok" | "noDriver" | "error";
+  /** Código de error de Windows (0: ninguno). */
+  code: number;
+  /** El estado dicho en una frase. */
+  problem: string;
+  driverVersion: string | null;
+  /** AAAA-MM-DD. */
+  driverDate: string | null;
+  system: boolean;
+}
+
+export interface ConnectedList {
+  devices: ConnectedDevice[];
+  /** Cuántos del sistema se ocultaron. */
+  hidden: number;
+}
+
+export interface RecentChange {
+  kind: "arrived" | "removed";
+  /** Milisegundos desde 1970. */
+  at: number;
+  device: ConnectedDevice;
+}
+
+export const connectedApi = {
+  list: (showAll: boolean) => invoke<ConnectedList>("connected_list", { showAll }),
+  recent: () => invoke<RecentChange[]>("connected_recent"),
+  /** `scan` (buscar driver en Windows Update), `restart` o `enable`. Pide administrador. */
+  action: (action: "scan" | "restart" | "enable", id: string) => invoke<string>("connected_action", { action, id }),
+};
+
+// ---------- Pantallas y monitores (Estado del equipo → Pantallas) ----------
+
+export interface DisplayMonitor {
+  /** Ruta del dispositivo de Windows. */
+  id: string;
+  /** «LG 24MK430». */
+  name: string;
+  maker: string;
+  model: string;
+  /** Número de pantalla de Windows. */
+  number: number;
+  width: number;
+  height: number;
+  /** Posición en el escritorio (píxeles). */
+  x: number;
+  y: number;
+  hz: number;
+  /** Lo más que admite, si se sabe. */
+  maxHz: number | null;
+  nativeWidth: number | null;
+  nativeHeight: number | null;
+  /** HDMI, DisplayPort, VGA, Interna… */
+  connection: string;
+  /** Escala de Windows en porcentaje. */
+  scale: number;
+  primary: boolean;
+  /** 0, 90, 180 o 270. */
+  rotation: number;
+}
+
+export interface DisplayList {
+  monitors: DisplayMonitor[];
+  /** Dos monitores enseñan lo mismo. */
+  duplicated: boolean;
+  /** Un cambio sin confirmar: se deshace solo al llegar la hora. */
+  pending: { untilMs: number; title: string } | null;
+}
+
+export interface DisplayChange {
+  message: string;
+  /** Cuándo vuelve atrás solo (ms desde 1970). */
+  untilMs: number;
+  seconds: number;
+}
+
+export const displaysApi = {
+  list: () => invoke<DisplayList>("displays_list"),
+  /** `native` (con el id del monitor), `extend` o `clone`. Deja 15 s para confirmar. */
+  apply: (action: "native" | "extend" | "clone", id?: string) => invoke<DisplayChange>("display_apply", { action, id: id ?? null }),
+  confirm: () => invoke<string>("display_confirm"),
+  undo: () => invoke<string>("display_undo"),
+  restartDriver: () => invoke<string>("display_restart_driver"),
+};
+
+// ---------- Teclado e idioma (Estado del equipo → Teclado e idioma) ----------
+
+export interface KbdRow {
+  /** Etiqueta del idioma (es-DO). */
+  tag: string;
+  language: string;
+  /** «Latinoamericano», «Inglés (EE. UU.)»… */
+  layout: string;
+  klid: string | null;
+  langId: number;
+  /** Es la que escribe ahora. */
+  active: boolean;
+}
+
+export interface KbdState {
+  rows: KbdRow[];
+  languageCount: number;
+  /** País de Windows (DO, ES…). */
+  region: string;
+  /** `1` Alt+Mayús, `2` Ctrl+Mayús, `3` ninguno, `4` acento grave. */
+  shortcut: { code: string; label: string };
+  hasSpanish: boolean;
+  /** AdminOps está abierto con otra cuenta: estos son los idiomas del cliente y no se pueden cambiar. */
+  otherUser: boolean;
+  /** El idioma de Windows que se queda en la lista sin teclado (sin paquete en español), si lo hay. */
+  kept: string | null;
+  /** Aviso para la confirmación: quitar el idioma de Windows puede cambiarlo a Español. */
+  warning: string | null;
+  /** Por qué un idioma se queda sin teclado. */
+  note: string | null;
+}
+
+export const kbdApi = {
+  state: () => invoke<KbdState>("kbd_state"),
+  /** Deja solo el primer español y quita el atajo. `entryId`: la entrada del diario, para deshacer. */
+  onlySpanish: () => invoke<{ message: string; entryId: number }>("kbd_only_spanish"),
+};
+
 // ---------- Herramientas, usuarios y Wi-Fi (v0.11) ----------
 
 export type ToolGroup = "console" | "admin" | "diag" | "panel" | "settings" | "folders" | "boot" | "remote";

@@ -4,7 +4,7 @@ import { CheckCircle2, CircleAlert, DatabaseBackup, FolderOutput, Loader2, Penci
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, EmptyState, inputClass, Loading, Modal } from "../components/ui";
+import { Button, Card, EmptyState, inputClass, Intro, Loading, Modal } from "../components/ui";
 import { backupsApi, disksApi, type BackupSet, type BackupStatus } from "../lib/api";
 
 const TONE = {
@@ -72,10 +72,10 @@ export function Backups() {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-60 flex-1 text-sm text-dim">
+        <Intro id="data:backups" className="min-w-60 flex-1">
           Que exista una copia no basta. Aquí se comprueba que es <b className="font-medium text-ink">reciente</b>, que está en <b className="font-medium text-ink">otro disco</b>, que <b className="font-medium text-ink">cubre lo importante</b> y que un archivo de
           prueba <b className="font-medium text-ink">se puede leer</b>. Lo que falla aparece en «Hoy» y en el informe del cliente.
-        </p>
+        </Intro>
         {sets.length > 0 && (
           <Button kind="secondary" onClick={() => void check(null)} disabled={busy !== null}>
             {busy === "all" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Comprobar todas

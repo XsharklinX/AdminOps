@@ -2,6 +2,7 @@
 // casilla que se marca sola al hacerlo y el botón que lleva a cada sitio.
 // Desaparece al completarlo o al ocultarlo. Solo en modo administrador (en
 // modo usuario el Panel lo ve el cliente).
+import { WEB_TICKETS } from "../lib/features";
 import { Check, ChevronRight, Rocket, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useCompanyImport } from "./CompanyConfig";
@@ -40,7 +41,7 @@ export function FirstSteps() {
     ]);
     setSteps([
       { id: "company", title: "Tus datos y los de la empresa", why: "Salen en los informes y presupuestos.", done: !!s?.company.trim() && !!s?.technician.trim(), go: () => goToPage("settings", "reports") },
-      { id: "portals", title: "Tickets, Correo y Teams", why: "Los portales de la empresa dentro de AdminOps.", done: portals.length > 0, go: () => goToPage("settings", "portals") },
+      { id: "portals", title: "Correo y Teams", why: "Outlook y Teams web dentro de AdminOps.", done: portals.some((p) => WEB_TICKETS || p.kind === "mail" || p.kind === "teams"), go: () => goToPage("settings", "portals") },
       { id: "lock", title: "Bloqueo con PIN", why: "Protege la app y, en el pendrive, tus contraseñas guardadas.", done: !!lock?.enabled, go: () => goToPage("settings", "security") },
       { id: "backup", title: "Copia automática", why: "Si pierdes el pendrive o el equipo, no pierdes nada.", done: !!backup?.enabled, go: () => goToPage("settings", "data") },
     ]);

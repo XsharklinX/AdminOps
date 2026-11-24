@@ -8,7 +8,7 @@
 
 [🇪🇸 Español](README.md) · 🇬🇧 **English**
 
-[![Version](https://img.shields.io/badge/version-1.1.11-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
+[![Version](https://img.shields.io/badge/version-1.4.0-22d3ee?style=flat-square)](https://github.com/XsharklinX/AdminOps/releases)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square&logo=windows)](#requirements)
 [![Built with Tauri](https://img.shields.io/badge/Tauri%202-Rust%20%2B%20React-a855f7?style=flat-square&logo=tauri)](docs/DEVELOPMENT.md)
 
@@ -39,9 +39,9 @@ which client.
 | Area | Main features |
 | --- | --- |
 | **Home** | Live dashboard. Guided troubleshooting. Step-by-step service session with a **PDF report** comparing before and after. |
-| **Machine** | Diagnostics ranked by severity. Hardware and temperatures. Security score. Reversible Windows tweaks. Processes grouped by program. Disks: space, health, repair and file rescue. Network: router and Wi‑Fi, devices, speed test, repair and tools. User data: migration, encrypted vault, secure erase and recovery. Change journal, exportable to PDF and Excel. |
-| **Support** | Calendar. Teams and mail inside the app. Contacts. Ticketing site and web inventory, used like a browser. Own inventory. Domain people and clients. Step-by-step solutions. |
-| **Apps** | Update, bulk-install and uninstall programs; Windows Update; remove preinstalled apps; templates to prepare a new PC. |
+| **Machine** | Diagnostics ranked by severity. Hardware and temperatures. Security score. Reversible Windows tweaks. Processes grouped by program. Disks: space (with a map, and in seconds as administrator by reading the disk index, like WizTree), health, repair and file rescue. Network: router and Wi‑Fi, devices, speed test, repair and tools. User data: migration, encrypted vault, secure erase and recovery. Record the fault: a screen video with Windows errors, hangs and CPU or disk spikes marked at their second. Displays, keyboard layouts and newly plugged devices. Network usage per program. Change journal, exportable to PDF and Excel. |
+| **Support** | Calendar. Teams and mail inside the app. Contacts. Own inventory. Domain people and clients. Step-by-step solutions. |
+| **Apps** | Update, bulk-install and uninstall programs; Windows Update with each failure explained and its fix; remove preinstalled apps; templates to prepare a new PC that carry on after a restart. Scan to folder for networked RICOH and EPSON devices. |
 | **Administration** | Office workstations, local users, accounts and domain, printers, shared folders, remote access, Windows tools and keyboard shortcuts. |
 
 ## Download

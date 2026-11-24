@@ -54,7 +54,18 @@ pub fn hidden(program: impl AsRef<std::ffi::OsStr>) -> Command {
     cmd
 }
 
-fn kill_tree(pid: u32) {
+/// Anota un proceso de `task` para que «Cancelar» lo pueda terminar (lo usa `conpty`).
+pub(crate) fn track(task: &str, pid: u32) {
+    RUNNING.lock().unwrap_or_else(|e| e.into_inner()).entry(task.to_string()).or_default().push(pid);
+}
+
+pub(crate) fn untrack(task: &str, pid: u32) {
+    if let Some(v) = RUNNING.lock().unwrap_or_else(|e| e.into_inner()).get_mut(task) {
+        v.retain(|p| *p != pid);
+    }
+}
+
+pub(crate) fn kill_tree(pid: u32) {
     let _ = hidden("taskkill.exe")
         .args(["/T", "/F", "/PID", &pid.to_string()])
         .stdout(Stdio::null())
@@ -213,7 +224,7 @@ pub fn powershell_opts(script: &str, opts: Opts) -> Result<String, String> {
     run_with_input(cmd, "PowerShell", &summary(script), opts, Some(full))
 }
 
-pub use crate::psquote::{ps_escape, ps_literal};
+pub use crate::psquote::{ps_comment, ps_escape, ps_literal};
 
 /// Línea de PowerShell que define `$var` como SecureString con una contraseña,
 /// sin que aparezca legible en el script ni en el registro: es el formato de
@@ -263,6 +274,143 @@ pub fn exec_opts(program: &str, args: &[&str], opts: Opts) -> Result<String, Str
     run(cmd, program, &args.join(" "), opts)
 }
 
+/// Parte la salida de un proceso en líneas por `\n` y por `\r` (las barras de progreso
+/// de winget reescriben la misma línea con `\r`). Un carácter multibyte nunca se corta:
+/// `\r` y `\n` no aparecen dentro de una secuencia UTF-8.
+#[derive(Default)]
+pub struct LineSplitter {
+    pending: Vec<u8>,
+}
+
+impl LineSplitter {
+    pub fn push(&mut self, chunk: &[u8]) -> Vec<String> {
+        let mut out = Vec::new();
+        for &b in chunk {
+            if b == b'\n' || b == b'\r' {
+                self.flush(&mut out);
+            } else {
+                self.pending.push(b);
+            }
+        }
+        out
+    }
+
+    /// Lo que queda al cerrarse la salida.
+    pub fn finish(&mut self) -> Vec<String> {
+        let mut out = Vec::new();
+        self.flush(&mut out);
+        out
+    }
+
+    fn flush(&mut self, out: &mut Vec<String>) {
+        if !self.pending.is_empty() {
+            let line = String::from_utf8_lossy(&self.pending).trim_end().to_string();
+            if !line.trim().is_empty() {
+                out.push(line);
+            }
+            self.pending.clear();
+        }
+    }
+}
+
+/// Resultado de `stream`: código de salida y lo que escribió por el canal de errores.
+pub struct Streamed {
+    pub code: Option<i32>,
+    pub stderr: String,
+}
+
+/// Ejecuta un proceso entregando su salida **línea a línea** según llega (para barras de
+/// progreso). Mismo límite de tiempo y cancelación que el resto (`opts.task`).
+pub fn stream(mut cmd: Command, input: Option<String>, opts: Opts, on_line: &mut dyn FnMut(&str)) -> Result<Streamed, String> {
+    if let Some(t) = opts.task {
+        if is_cancelled(t) {
+            return Err(CANCELLED_MSG.into());
+        }
+    }
+    cmd.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() }).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let start = Instant::now();
+    let mut child = cmd.spawn().map_err(|e| format!("No se pudo iniciar el proceso: {e}"))?;
+    let pid = child.id();
+    if let Some(t) = opts.task {
+        RUNNING.lock().unwrap_or_else(|e| e.into_inner()).entry(t.to_string()).or_default().push(pid);
+    }
+    if let (Some(text), Some(mut stdin)) = (input, child.stdin.take()) {
+        std::thread::spawn(move || {
+            use std::io::Write;
+            let _ = stdin.write_all(text.as_bytes());
+        });
+    }
+    let mut out_pipe = child.stdout.take().unwrap();
+    let mut err_pipe = child.stderr.take().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    let out_h = std::thread::spawn(move || {
+        let mut split = LineSplitter::default();
+        let mut buf = [0u8; 4096];
+        while let Ok(n) = out_pipe.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+            for l in split.push(&buf[..n]) {
+                if tx.send(l).is_err() {
+                    return;
+                }
+            }
+        }
+        for l in split.finish() {
+            let _ = tx.send(l);
+        }
+    });
+    let err_h = std::thread::spawn(move || {
+        let mut v = Vec::new();
+        let _ = err_pipe.read_to_end(&mut v);
+        v
+    });
+
+    let mut timed_out = false;
+    loop {
+        match rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(line) => on_line(&line),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        if opts.timeout.is_some_and(|t| start.elapsed() > t) {
+            timed_out = true;
+            kill_tree(pid);
+            break;
+        }
+    }
+    let status = child.wait().ok();
+    let _ = out_h.join();
+    while let Ok(line) = rx.try_recv() {
+        on_line(&line);
+    }
+    if let Some(t) = opts.task {
+        if let Some(v) = RUNNING.lock().unwrap_or_else(|e| e.into_inner()).get_mut(t) {
+            v.retain(|p| *p != pid);
+        }
+    }
+    let stderr = String::from_utf8_lossy(&err_h.join().unwrap_or_default()).trim().to_string();
+    if opts.task.is_some_and(is_cancelled) {
+        return Err(CANCELLED_MSG.into());
+    }
+    if timed_out {
+        return Err(format!("El proceso tardó más de {} s y se detuvo.", opts.timeout.map_or(0, |t| t.as_secs())));
+    }
+    Ok(Streamed { code: status.and_then(|s| s.code()), stderr })
+}
+
+/// Como `powershell_opts`, pero entregando cada línea de salida según llega. Siempre en
+/// un proceso propio (cancelable).
+pub fn powershell_stream(script: &str, opts: Opts, on_line: &mut dyn FnMut(&str)) -> Result<Streamed, String> {
+    let full = format!(
+        "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='Stop';         [Console]::OutputEncoding=[Text.Encoding]::UTF8;
+{script}"
+    );
+    let mut cmd = hidden("powershell.exe");
+    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", STDIN_BOOTSTRAP]);
+    stream(cmd, Some(full), opts, on_line)
+}
+
 /// Deja solo el mensaje útil de un error de PowerShell: sin CLIXML, sin la
 /// posición en el script ("At line:5 char:25 + ... ~~~~") ni CategoryInfo.
 /// Mensajes claros para los bloqueos típicos de un equipo de empresa.
@@ -308,6 +456,27 @@ pub fn clean_error(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn splits_lines_on_cr_and_lf_without_cutting_characters() {
+        let mut sp = LineSplitter::default();
+        // La barra de progreso reescribe la línea con \r; «█» son 3 bytes y llega partido.
+        let mut got = sp.push(b"Found Git\r\n  \xE2\x96");
+        got.extend(sp.push(b"\x88  12%\r  \xE2\x96\x88\xE2\x96\x88  40%\r\n"));
+        got.extend(sp.push(b"ultima sin salto"));
+        got.extend(sp.finish());
+        assert_eq!(got, vec!["Found Git", "  █  12%", "  ██  40%", "ultima sin salto"]);
+    }
+
+    #[test]
+    fn stream_delivers_lines_and_exit_code() {
+        let mut lines = Vec::new();
+        let mut cmd = hidden("cmd.exe");
+        cmd.args(["/C", "echo uno& echo dos& exit 7"]);
+        let r = stream(cmd, None, Opts { timeout: Some(Duration::from_secs(20)), task: None }, &mut |l| lines.push(l.to_string())).unwrap();
+        assert_eq!(lines, vec!["uno", "dos"]);
+        assert_eq!(r.code, Some(7));
+    }
 
     #[test]
     fn cleans_powershell_errors() {

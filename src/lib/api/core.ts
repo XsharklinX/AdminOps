@@ -9,7 +9,7 @@ export async function invoke<T>(command: string, args?: Record<string, unknown>)
   if (getPrefs().demo) {
     const demo = await import("../demo");
     if (demo.demoBlocks(command)) throw demo.DEMO_BLOCKED;
-    const answer = demo.demoAnswer(command);
+    const answer = demo.demoAnswer(command, args);
     if (answer !== undefined) return answer as T;
   }
   try {

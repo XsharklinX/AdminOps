@@ -285,7 +285,7 @@ export function Tools({ isAdmin }: { isAdmin: boolean }) {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar entre las herramientas: services, red, bios, impresoras, ncpa.cpl…"
+              data-typefilter placeholder="Buscar entre las herramientas: services, red, bios, impresoras, ncpa.cpl…"
               className="h-9 w-full rounded-lg border border-line bg-panel pr-3 pl-9 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/60"
             />
           </div>
