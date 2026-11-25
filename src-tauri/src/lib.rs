@@ -65,6 +65,8 @@ mod smartio;
 mod smartx;
 mod toast;
 mod evtwatch;
+mod games;
+mod safestart;
 mod ocr;
 mod discovery;
 mod quicknote;
@@ -296,36 +298,43 @@ pub fn run() {
                     let _ = w.minimize();
                 }
             }
-            // Carga en segundo plano los módulos de PowerShell más lentos (Defender,
-            // BitLocker), para que el primer diagnóstico del día no pague esa carga.
-            security::warm_up();
-            // Vigilancia de errores de Windows (Ajustes → General).
-            boottime::step("Vigilancia de errores de Windows", || winwatch::start(app.handle().clone()));
-            // Vigilancia de dispositivos clave de la red (solo si hay alguno marcado).
-            boottime::step("Vigilancia de la red", || officemap::start(app.handle().clone()));
-            // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
-            agenda::start(app.handle().clone());
-            disks::start_watch(app.handle().clone());
+            // Dos cierres de golpe seguidos: se abre a salvo, sin nada en segundo plano (ver safestart.rs).
+            let safe = boottime::step("¿Se cerró bien la última vez?", || safestart::begin(app.handle())).safe;
+            if !safe {
+                // Carga en segundo plano los módulos de PowerShell más lentos (Defender,
+                // BitLocker), para que el primer diagnóstico del día no pague esa carga.
+                security::warm_up();
+                // Vigilancia de errores de Windows (Ajustes → General).
+                boottime::step("Vigilancia de errores de Windows", || winwatch::start(app.handle().clone()));
+                // Vigilancia de dispositivos clave de la red (solo si hay alguno marcado).
+                boottime::step("Vigilancia de la red", || officemap::start(app.handle().clone()));
+                // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
+                agenda::start(app.handle().clone());
+                disks::start_watch(app.handle().clone());
+            }
             uxio::watch_drops(app.handle());
-            backupio::start(app.handle().clone());
-            alertrulesio::start(app.handle().clone());
-            // Sin prisa y en orden, cuando la primera pantalla ya está pintada (o a los 20 s):
-            // el historial de rendimiento de 7 días (una muestra por minuto mientras AdminOps está abierta)
-            // y lo apuntado para la noche (superficie de un disco, reparar Windows…).
-            let late = app.handle().clone();
-            std::thread::spawn(move || {
-                window_state::wait_until_ready(std::time::Duration::from_secs(20));
-                perfhistory::start(late.clone());
-                // Una foto al día del equipo para «¿Qué cambió?».
-                whatchanged::start(late.clone());
-                nightjobs::start(late);
-            });
-            appbackup::start(app.handle().clone());
+            if !safe {
+                backupio::start(app.handle().clone());
+                alertrulesio::start(app.handle().clone());
+                // Sin prisa y en orden, cuando la primera pantalla ya está pintada (o a los 20 s):
+                // el historial de rendimiento de 7 días (una muestra por minuto mientras AdminOps está abierta)
+                // y lo apuntado para la noche (superficie de un disco, reparar Windows…).
+                let late = app.handle().clone();
+                std::thread::spawn(move || {
+                    window_state::wait_until_ready(std::time::Duration::from_secs(20));
+                    perfhistory::start(late.clone());
+                    // Una foto al día del equipo para «¿Qué cambió?».
+                    whatchanged::start(late.clone());
+                    nightjobs::start(late);
+                });
+                appbackup::start(app.handle().clone());
+            }
             // Nota de llamada con Ctrl+Alt+N, aunque AdminOps esté minimizado.
             quicknote::start(app.handle().clone());
             // AdminOps en miniatura con Ctrl+Alt+A.
             mini::start(app.handle().clone());
-            // Lo que se enchufa y se quita (Hardware → Conectados).
+            // Lo que se enchufa y se quita (Hardware → Conectados). También a salvo: su ventana oculta
+            // es la que avisa a Pantallas de que cambió un monitor.
             connected::start(app.handle().clone());
             // El aviso de que cambió la pantalla lo da la misma ventana oculta; aquí se guarda a quién avisar.
             displays::start(app.handle().clone());
@@ -341,6 +350,9 @@ pub fn run() {
             // Limpieza de datos antiguos, si está activada (en segundo plano).
             let handle = app.handle().clone();
             std::thread::spawn(move || {
+                if safestart::is_safe() {
+                    return;
+                }
                 use tauri::Manager;
                 // Recorre carpetas: se deja para cuando la app ya esté abierta.
                 std::thread::sleep(std::time::Duration::from_secs(20));
@@ -967,12 +979,21 @@ pub fn run() {
             testuser::create_test_user,
             testuser::delete_test_user,
             culprit::bisect_note,
+            appcare::previous_version,
+            appcare::rollback_previous,
+            safestart::safe_start_info,
+            safestart::session_page,
+            safestart::safe_start_leave,
+            safestart::safe_start_report,
         ]))
         .build(context)
         .expect("error while building tauri application")
         .run(|app, event| {
             // Salir por cualquier camino (cerrar, reiniciar con administrador…): si había un cambio de pantalla sin confirmar, se deshace.
             if let tauri::RunEvent::Exit = event {
+                // Salió bien: la próxima vez arranca normal (ver safestart.rs). Lo primero: si Windows
+                // o un instalador matan el proceso mientras se cierra lo demás, ya no cuenta como fallo.
+                safestart::end_clean();
                 displays::restore_pending_on_exit(app);
                 netusage::shutdown();
                 scanfolder::shutdown();

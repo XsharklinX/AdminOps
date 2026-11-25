@@ -45,6 +45,62 @@ export function ViewCommand({ id, context, className = "", icon = false }: { id:
   );
 }
 
+/**
+ * «Ver el comando ▾» que despliega el comando debajo de la fila (sin cajón), con
+ * «Copiar el comando». Se lee al desplegar, no antes.
+ */
+export function InlineCommand({ id, context, className = "" }: { id: string; context?: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [cmd, setCmd] = useState<ActionCommand | null>(null);
+  const [failed, setFailed] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
+    if (!open || cmd) return;
+    let vivo = true;
+    setFailed(false);
+    actionsApi
+      .command(id, context)
+      .then((c) => vivo && setCmd(c))
+      .catch(() => vivo && setFailed(true));
+    return () => {
+      vivo = false;
+    };
+  }, [open, cmd, id, context]);
+
+  const copy = async () => {
+    if (!cmd) return;
+    try {
+      await navigator.clipboard.writeText(cmd.script);
+      toast("ok", "Comando copiado");
+    } catch {
+      toast("error", "No se pudo copiar.");
+    }
+  };
+
+  return (
+    <div className={className}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="text-xs text-mute hover:text-ink hover:underline">
+        {open ? "Ver el comando ▴" : "Ver el comando ▾"}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {failed && <p className="text-xs text-bad">No se pudo leer el comando.</p>}
+          {!cmd && !failed && <Loading />}
+          {cmd && (
+            <>
+              <Code script={cmd.script} />
+              <Button kind="secondary" onClick={() => void copy()}>
+                <Copy size={14} /> Copiar el comando
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CommandDrawer({ id, context, onClose }: { id: string; context?: string; onClose: () => void }) {
   const [cmd, setCmd] = useState<ActionCommand | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -5,24 +5,30 @@
 // limpia (como un equipo donde se abre por primera vez), y se conecta a su
 // WebView2 por el puerto de depuración para:
 //   1. comprobar que arranca y pinta en menos de 15 s;
-//   2. recorrer todas las pantallas en los dos temas, sin «Algo falló», sin
-//      pantallas vacías y sin errores en la consola (capturas en tests/exe/out);
+//   2. recorrer todas las pantallas y cada una de sus secciones en los dos
+//      temas, sin «Algo falló», sin pantallas vacías y sin errores en la
+//      consola (capturas en tests/exe/out);
 //   3. abrir un portal de prueba (un servidor que levanta la propia prueba) y
 //      comprobar que carga, que se oculta al salir de Tickets y que al volver
 //      conserva la sesión;
 //   4. «¿Se puede pulsar?»: tras el portal, ir a Ajustes y hacer un clic de
 //      ratón de verdad (no simulado dentro de la página): si algo invisible
 //      tapa la ventana, el clic no llega y la prueba falla;
-//   5. cerrar la ventana y comprobar que no quedan procesos.
+//   5. grabar 5 s con «Grabar el fallo» y comprobar que el vídeo se guarda;
+//   6. cerrar la ventana y comprobar que no quedan procesos (ni AdminOps ni WebView2).
 // Son los fallos que llegaron en la 1.1.6: la capa invisible, la ventana negra
 // del portable y el modo claro con el fondo negro.
 //
 //   node tests/exe/exe.mjs                    (el portable de release/v<versión>)
 //   node tests/exe/exe.mjs --exe ruta.exe     (un .exe suelto; se copia con lhm/)
-//   node tests/exe/exe.mjs --quick            (solo arranque, portal, clic y cierre)
+//   node tests/exe/exe.mjs --quick            (solo arranque, portal, clic, grabación y cierre)
+//   node tests/exe/exe.mjs --admin            (como administrador: Windows pregunta una vez, UAC)
 //
 // Solo consulta: no pulsa nada que cambie el equipo. El .exe de release pide
-// administrador; si esta terminal no lo es, Windows pregunta una vez (UAC).
+// administrador; la prueba lo abre sin pedirlo (`__COMPAT_LAYER=RunAsInvoker`,
+// solo para este proceso), así no se queda esperando en la ventana de UAC y
+// puede correr en cada build sin nadie delante. Lo que necesita administrador
+// sale en la app como «requiere administrador», que no es un fallo.
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -38,6 +44,7 @@ mkdirSync(out, { recursive: true });
 const args = process.argv.slice(2);
 const opt = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
 const quick = args.includes("--quick");
+const asAdmin = args.includes("--admin");
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const failures = [];
 const fail = (what, detail) => failures.push(`${what}${detail ? `: ${detail}` : ""}`);
@@ -95,11 +102,14 @@ const baseArgs = conf.app?.windows?.[0]?.additionalBrowserArgs ?? "";
 const cdpPort = 9300 + Math.floor(Math.random() * 500);
 const webviewData = join(work, "webview2");
 const env = { ...process.env, WEBVIEW2_USER_DATA_FOLDER: webviewData, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `${baseArgs} --remote-debugging-port=${cdpPort}`.trim() };
+// Sin --admin: se abre sin pedir administrador aunque el manifiesto lo pida (solo este proceso; el .exe no cambia).
+if (!asAdmin) env.__COMPAT_LAYER = "RunAsInvoker";
 
 const started = Date.now();
 let elevatedLaunch = false;
 let pid = await launch();
 async function launch() {
+  if (asAdmin) return launchElevated();
   try {
     const child = spawn(exe, [], { env, detached: true, stdio: "ignore" });
     await new Promise((ok, ko) => {
@@ -109,13 +119,16 @@ async function launch() {
     child.unref();
     return child.pid;
   } catch (e) {
-    // Pide administrador (código 740): se abre elevado con las mismas variables.
-    log(`El .exe pide administrador (${e.code}); Windows va a preguntar.`);
-    elevatedLaunch = true;
-    const ps = `$env:WEBVIEW2_USER_DATA_FOLDER='${webviewData}'; $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='${env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS}'; (Start-Process -FilePath '${exe}' -PassThru).Id | Out-File -Encoding ascii '${join(work, "pid.txt")}'`;
-    execFileSync("powershell", ["-NoProfile", "-Command", `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-Command',"${ps.replace(/"/g, '`"')}"`]);
-    return Number(readFileSync(join(work, "pid.txt"), "utf8").trim());
+    console.error(`No se pudo abrir el .exe sin pedir administrador (${e.code ?? e.message}). Para probarlo como administrador: --admin.`);
+    process.exit(1);
   }
+}
+function launchElevated() {
+  log("Como administrador: Windows va a preguntar (UAC).");
+  elevatedLaunch = true;
+  const ps = `$env:WEBVIEW2_USER_DATA_FOLDER='${webviewData}'; $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='${env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS}'; (Start-Process -FilePath '${exe}' -PassThru).Id | Out-File -Encoding ascii '${join(work, "pid.txt")}'`;
+  execFileSync("powershell", ["-NoProfile", "-Command", `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-Command',"${ps.replace(/"/g, '`"')}"`]);
+  return Number(readFileSync(join(work, "pid.txt"), "utf8").trim());
 }
 
 // Si algo revienta a medias, se cierra igual el programa y cuenta como fallo.
@@ -183,7 +196,31 @@ const alias = (() => {
   const block = src.slice(start, src.indexOf("};", start));
   return Object.fromEntries([...block.matchAll(/^\s*([a-z]+):\s*\["([a-z]+)"/gm)].map((m) => [m[1], m[2]]));
 })();
-const go = (id) => page.evaluate((p) => window.dispatchEvent(new CustomEvent("adminops:navigate", { detail: { page: p, focus: null } })), id);
+// Las secciones (pestañas) de cada pantalla, de src/lib/sections.ts. Las que dependen de algo apagado
+// (`...(WEB_TICKETS ? [...] : [])`) no se leen: no empiezan la línea con «{ id:».
+function sections() {
+  const src = readFileSync(join(root, "src", "lib", "sections.ts"), "utf8");
+  const start = src.indexOf("export const SECTIONS");
+  const block = src.slice(start, src.indexOf("\n};", start));
+  const map = {};
+  let current = null;
+  for (const line of block.split(/\r?\n/)) {
+    const pageMatch = /^ {2}([a-z]+): \[/.exec(line);
+    if (pageMatch) current = map[pageMatch[1]] = [];
+    const item = /^\s*\{ id: "([a-z0-9-]+)", label: "([^"]+)"/.exec(line);
+    if (item && current) current.push({ id: item[1], label: item[2] });
+  }
+  return map;
+}
+const go = (id, focus = null) => page.evaluate(([p, f]) => window.dispatchEvent(new CustomEvent("adminops:navigate", { detail: { page: p, focus: f } })), [id, focus]);
+// Solo las que se ven: las pantallas y secciones que siguen abiertas por detrás (ocultas) tienen sus propias pestañas.
+const selectedTabs = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[role="tab"][aria-selected="true"]')]
+      .filter((t) => t.checkVisibility())
+      .map((t) => t.textContent.trim())
+      .join(" › "),
+  );
 const shown = () =>
   page.evaluate(() => {
     const el = [...document.querySelectorAll("[data-page]")].find((e) => !e.hidden);
@@ -201,26 +238,42 @@ if (!quick) {
     await page.evaluate((t) => localStorage.setItem("adminops.theme", t), theme);
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector("main", { timeout: 15000 }).catch(() => fail(`tema ${theme}`, "no volvió a pintar al recargar"));
+    const secs = sections();
+    let visited = 0;
     for (const p of pages()) {
       if (["tickets", "mail", "teams"].includes(p)) continue; // portales: se prueban aparte
-      const before = errors.length;
-      await go(p);
-      await sleep(900);
-      const s = await shown();
-      try {
-        await page.screenshot({ path: join(out, `${theme}-${p}.png`), timeout: 10000 });
-      } catch {
-        fail(`${theme} › ${p}`, "la captura no termina en 10 s (la ventana no pinta)");
+      // Sin secciones, la pantalla tal cual; con ellas, cada sección (la primera es la que abre la pantalla).
+      const stops = secs[p]?.length ? secs[p].map((x) => x.id) : [null];
+      let prevTabs = null;
+      for (const section of stops) {
+        const where = section ? `${theme} › ${p} › ${section}` : `${theme} › ${p}`;
+        const before = errors.length;
+        await go(p, section);
+        await sleep(section ? 700 : 900);
+        const s = await shown();
+        try {
+          await page.screenshot({ path: join(out, `${theme}-${p}${section ? `-${section}` : ""}.png`), timeout: 10000 });
+        } catch {
+          fail(where, "la captura no termina en 10 s (la ventana no pinta)");
+        }
+        visited++;
+        const lum = luminance(s.bg);
+        const fresh = errors.slice(before);
+        if (s.id !== (alias[p] ?? p)) fail(where, `se ve «${s.id}»`);
+        if (s.empty) fail(where, "vacía");
+        if (s.crashed) fail(where, "«Algo falló»");
+        if (s.theme !== theme) fail(where, `el tema aplicado es «${s.theme}»`);
+        if (theme === "light" && lum < 0.5) fail(where, `fondo oscuro en modo claro (${s.bg})`);
+        if (fresh.length) fail(where, fresh.slice(0, 3).join(" · "));
+        // Ir a otra sección tiene que cambiar la pestaña elegida (si la pantalla tiene pestañas).
+        if (section) {
+          const tabs = await selectedTabs();
+          if (prevTabs !== null && tabs && tabs === prevTabs) fail(where, `no cambió de sección (sigue en «${tabs}»)`);
+          prevTabs = tabs;
+        }
       }
-      const lum = luminance(s.bg);
-      const fresh = errors.slice(before);
-      if (s.id !== (alias[p] ?? p)) fail(`${theme} › ${p}`, `se ve «${s.id}»`);
-      if (s.empty) fail(`${theme} › ${p}`, "vacía");
-      if (s.crashed) fail(`${theme} › ${p}`, "«Algo falló»");
-      if (s.theme !== theme) fail(`${theme} › ${p}`, `el tema aplicado es «${s.theme}»`);
-      if (theme === "light" && lum < 0.5) fail(`${theme} › ${p}`, `fondo oscuro en modo claro (${s.bg})`);
-      if (fresh.length) fail(`${theme} › ${p}`, fresh.slice(0, 3).join(" · "));
     }
+    log(`Pantallas y secciones (tema ${theme}): ${visited}.`);
   }
 }
 
@@ -298,6 +351,24 @@ if (!clicked) {
 }
 await page.evaluate(() => document.getElementById("prueba-clic")?.remove());
 
+// ── 7. Grabar el fallo: 5 s del monitor principal, sin clics ni micrófono ──
+{
+  const invoke = (cmd, a) => page.evaluate(([c, x]) => window.__TAURI_INTERNALS__.invoke(c, x), [cmd, a]);
+  try {
+    await invoke("faultrec_start", { monitor: null, opts: { input: false, mic: false } });
+    await sleep(5000);
+    const rec = await invoke("faultrec_stop", {});
+    if (!rec || rec.secs < 3) fail("grabación", `el vídeo dura ${rec?.secs ?? 0} s (se esperaban unos 5)`);
+    else if (!(rec.bytes > 0)) fail("grabación", "el vídeo se guardó vacío");
+    else log(`Grabación: ${Number(rec.secs).toFixed(1)} s, ${Math.round(rec.bytes / 1024)} KB.`);
+    if (rec?.id) await invoke("faultrec_delete", { id: rec.id }).catch((e) => fail("grabación", `no se pudo borrar: ${e?.message ?? e}`));
+  } catch (e) {
+    fail("grabación", String(e?.message ?? e).split(/\r?\n/)[0]);
+    await invoke("faultrec_stop", {}).catch(() => {});
+  }
+  await sleep(800);
+}
+
 function realClick(x, y) {
   // Proceso consciente de los PPP para que las coordenadas sean píxeles reales.
   const ps = `Add-Type @'
@@ -322,7 +393,8 @@ if ($w -and $w -ne [IntPtr]::Zero) { [C]::keybd_event(0x12,0,0,[IntPtr]::Zero); 
 $p = New-Object C+P; $p.X = ${x}; $p.Y = ${y}
 $h = [C]::WindowFromPoint($p); $r = [C]::GetAncestor($h, 2); $o = 0; [C]::GetWindowThreadProcessId($r, [ref]$o) | Out-Null
 $sb = New-Object System.Text.StringBuilder 256; [C]::GetClassName($h, $sb, 256) | Out-Null
-[C]::mouse_event(2,0,0,0,[IntPtr]::Zero); [C]::mouse_event(4,0,0,0,[IntPtr]::Zero)
+# Solo si debajo está AdminOps: si la persona está usando el equipo, el clic no cae en su ventana.
+if ($o -eq ${pid}) { [C]::mouse_event(2,0,0,0,[IntPtr]::Zero); [C]::mouse_event(4,0,0,0,[IntPtr]::Zero) }
 "$o|$($sb.ToString())"`;
   const [p, cls] = execFileSync("powershell", ["-NoProfile", "-Command", ps], { encoding: "utf8" }).trim().split("|");
   return { pid: Number(p), cls: cls ?? "" };
@@ -361,6 +433,13 @@ async function finish() {
       left = count();
     }
     if (left !== "0") fail("cierre", `quedaron ${left} procesos de WebView2 abiertos 10 s después de cerrar`);
+    // Ni el programa ni ninguna ventana suya (el contador de la grabación, la capa de la zona…).
+    const mine = `Get-CimInstance Win32_Process -Filter "Name='AdminOps.exe'" | Where-Object ExecutablePath -like '${work.replace(/'/g, "''")}*'`;
+    const ours = execFileSync("powershell", ["-NoProfile", "-Command", `@(${mine}).Count`], { encoding: "utf8" }).trim();
+    if (ours !== "0") {
+      fail("cierre", `quedaron ${ours} procesos de AdminOps abiertos`);
+      execFileSync("powershell", ["-NoProfile", "-Command", `${mine} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`], { stdio: "ignore" });
+    }
   }
   portal.close();
   log(`Portal de prueba: ${visits} visitas.`);

@@ -431,6 +431,8 @@ pub struct AppEvent {
     pub event_id: u32,
     /// El primer dato del evento: el archivo del programa («EXCEL.EXE»).
     pub program: String,
+    /// La ruta del .exe si el evento la trae (vacía si no): para saber si es un juego.
+    pub path: String,
 }
 
 fn between<'a>(s: &'a str, open: &str, close: &str) -> Option<&'a str> {
@@ -451,11 +453,25 @@ pub fn parse_event_xml(xml: &str) -> Option<AppEvent> {
     let rest = &xml[id_at..];
     let event_id: u32 = between(rest, ">", "</EventID>")?.trim().parse().ok()?;
     let data = &xml[xml.find("<EventData")?..];
-    let d = data.find("<Data")?;
-    let after = &data[d..];
-    let program = unescape(between(after, ">", "</Data>")?.trim());
+    // Todos los `Data`: el primero es el programa; la ruta del .exe va más adelante (el 11.º en un 1000, el 6.º en un 1002).
+    let mut values: Vec<String> = Vec::new();
+    let mut rest = data;
+    while let Some(d) = rest.find("<Data") {
+        let after = &rest[d..];
+        let Some(v) = between(after, ">", "</Data>") else { break };
+        // `<Data/>` vacío: `between` cogería hasta el siguiente cierre.
+        let tag_end = after.find('>').unwrap_or(0);
+        let empty = after[..tag_end].ends_with('/');
+        values.push(if empty { String::new() } else { unescape(v.trim()) });
+        rest = &after[tag_end + 1..];
+        if values.len() >= 16 {
+            break;
+        }
+    }
+    let program = values.first()?.clone();
     let program: String = program.rsplit(['\\', '/']).next().unwrap_or(&program).trim().to_string();
-    (!program.is_empty()).then_some(AppEvent { record_id, event_id, program })
+    let path = crate::games::exe_path_in(values.iter().map(String::as_str)).unwrap_or_default();
+    (!program.is_empty()).then_some(AppEvent { record_id, event_id, program, path })
 }
 
 /// Pregunta al registro Application cada vez que se le pide.
@@ -592,12 +608,12 @@ mod tests {
         // Ya con el prefijo, no se duplica.
         assert_eq!(hang_trigger("app:excel.exe", "Excel", 1_000).key, "app:excel.exe");
         // Misma clave que la que «No volver a grabar por esto» guarda desde un error de aplicación.
-        let ev = AppEvent { record_id: 1, event_id: 1002, program: "EXCEL.EXE".into() };
+        let ev = AppEvent { record_id: 1, event_id: 1002, program: "EXCEL.EXE".into(), path: String::new() };
         assert_eq!(event_trigger(&ev, 2_000).key, t.key);
     }
 
     fn hung(key: &str, name: &str) -> HungApp {
-        HungApp { key: key.into(), name: name.into() }
+        HungApp { key: key.into(), name: name.into(), game: false }
     }
 
     fn trig(key: &str, at_ms: u64) -> Trigger {
@@ -641,7 +657,7 @@ mod tests {
         assert_eq!(program_label("EXCEL.EXE"), "Excel");
         assert_eq!(program_label("C:\\Program Files\\Outlook\\OUTLOOK.EXE"), "Outlook");
         assert_eq!(program_label(""), "Programa");
-        let ev = AppEvent { record_id: 1, event_id: 1000, program: "EXCEL.EXE".into() };
+        let ev = AppEvent { record_id: 1, event_id: 1000, program: "EXCEL.EXE".into(), path: String::new() };
         let t = event_trigger(&ev, 5000);
         assert_eq!((t.key.as_str(), t.text.as_str(), t.short.as_str()), ("app:excel.exe", "Error de aplicación · Excel", "Excel falló"));
         let hang = event_trigger(&AppEvent { event_id: 1002, ..ev }, 5000);
@@ -892,9 +908,13 @@ mod tests {
     #[test]
     fn lee_un_evento_de_error_de_aplicacion() {
         let xml = "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Application Error'/><EventID Qualifiers='0'>1000</EventID><Level>2</Level><TimeCreated SystemTime='2026-11-23T14:42:11.123Z'/><EventRecordID>48211</EventRecordID><Channel>Application</Channel></System><EventData><Data>EXCEL.EXE</Data><Data>16.0.17328.20068</Data></EventData></Event>";
-        assert_eq!(parse_event_xml(xml), Some(AppEvent { record_id: 48211, event_id: 1000, program: "EXCEL.EXE".into() }));
+        assert_eq!(parse_event_xml(xml), Some(AppEvent { record_id: 48211, event_id: 1000, program: "EXCEL.EXE".into(), path: String::new() }));
         let hang = "<Event><System><EventID>1002</EventID><EventRecordID>7</EventRecordID></System><EventData><Data Name='AppName'>Mi &amp; Programa.exe</Data></EventData></Event>";
-        assert_eq!(parse_event_xml(hang), Some(AppEvent { record_id: 7, event_id: 1002, program: "Mi & Programa.exe".into() }));
+        assert_eq!(parse_event_xml(hang), Some(AppEvent { record_id: 7, event_id: 1002, program: "Mi & Programa.exe".into(), path: String::new() }));
+        // Un 1002 de un juego: la ruta va en el 6.º dato, tras uno vacío.
+        let game = r"<Event><System><EventID>1002</EventID><EventRecordID>9</EventRecordID></System><EventData><Data>Hades.exe</Data><Data>1.0</Data><Data/><Data>01d9</Data><Data>01da</Data><Data>D:\SteamLibrary\steamapps\common\Hades\Hades.exe</Data></EventData></Event>";
+        let ev = parse_event_xml(game).unwrap();
+        assert_eq!((ev.program.as_str(), ev.path.as_str()), ("Hades.exe", r"D:\SteamLibrary\steamapps\common\Hades\Hades.exe"));
         // Sin datos, sin número de registro o roto: nada.
         assert_eq!(parse_event_xml("<Event><System><EventID>1000</EventID><EventRecordID>7</EventRecordID></System></Event>"), None);
         assert_eq!(parse_event_xml("<Event><System><EventID>1000</EventID></System><EventData><Data>X</Data></EventData></Event>"), None);

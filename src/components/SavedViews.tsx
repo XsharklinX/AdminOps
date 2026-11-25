@@ -3,11 +3,14 @@
 // arriba de la lista. Un clic y vuelve a estar. Se guardan por pantalla.
 import { BookmarkPlus, Pin, X } from "lucide-react";
 import { useState } from "react";
+import { applyLayout, captureLayout, type TableLayout } from "../lib/tableViews";
 
 export interface SavedView<T> {
   name: string;
   value: T;
   pinned: boolean;
+  /** Columnas, orden y ordenación de la tabla al guardar. Las vistas antiguas no lo tienen. */
+  layout?: TableLayout;
 }
 
 const key = (scope: string) => `adminops.views.${scope}`;
@@ -30,15 +33,31 @@ function storeViews<T>(scope: string, views: SavedView<T>[]) {
 }
 
 /** Añade o sustituye una vista por su nombre; las fijadas van primero. */
-export function upsertView<T>(views: SavedView<T>[], name: string, value: T): SavedView<T>[] {
+export function upsertView<T>(views: SavedView<T>[], name: string, value: T, layout?: TableLayout): SavedView<T>[] {
   const old = views.find((v) => v.name === name);
-  const next = [...views.filter((v) => v.name !== name), { name, value, pinned: old?.pinned ?? false }];
+  const view: SavedView<T> = { name, value, pinned: old?.pinned ?? false };
+  if (layout) view.layout = layout;
+  const next = [...views.filter((v) => v.name !== name), view];
   return next.sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export function SavedViews<T>({ scope, current, onApply, isDefault }: { scope: string; current: T; onApply: (value: T) => void; /** Sin filtros: no tiene sentido guardarla. */ isDefault: boolean }) {
+export function SavedViews<T>({
+  scope,
+  current,
+  onApply,
+  isDefault,
+  table,
+}: {
+  scope: string;
+  current: T;
+  onApply: (value: T) => void;
+  /** Sin filtros: no tiene sentido guardarla. */
+  isDefault: boolean;
+  /** Nombre (`resizable`) de la DataTable de la pantalla: la vista recuerda también sus columnas, orden y ordenación. */
+  table?: string;
+}) {
   const [views, setViews] = useState(() => loadViews<T>(scope));
   const [naming, setNaming] = useState<string | null>(null);
   const save = (list: SavedView<T>[]) => {
@@ -51,7 +70,11 @@ export function SavedViews<T>({ scope, current, onApply, isDefault }: { scope: s
         const on = same(v.value, current);
         return (
           <span key={v.name} className={`group/view flex items-center rounded-full border text-xs ${on ? "border-neon/60 bg-neon/10 text-ink" : "border-line text-dim"}`}>
-            <button onClick={() => onApply(v.value)} className="py-0.5 pr-1 pl-2.5 hover:text-ink" title="Aplicar esta vista">
+            <button onClick={() => {
+                onApply(v.value);
+                applyLayout(table, v.layout);
+              }}
+              className="py-0.5 pr-1 pl-2.5 hover:text-ink" title="Aplicar esta vista">
               {v.pinned && <Pin size={10} className="mr-1 inline text-neon" fill="currentColor" />}
               {v.name}
             </button>
@@ -74,7 +97,7 @@ export function SavedViews<T>({ scope, current, onApply, isDefault }: { scope: s
           onSubmit={(e) => {
             e.preventDefault();
             const n = naming.trim();
-            if (n) save(upsertView(views, n, current));
+            if (n) save(upsertView(views, n, current, captureLayout(table)));
             setNaming(null);
           }}
           className="flex items-center gap-1"
@@ -91,8 +114,8 @@ export function SavedViews<T>({ scope, current, onApply, isDefault }: { scope: s
           />
         </form>
       ) : (
-        !isDefault &&
-        !views.some((v) => same(v.value, current)) && (
+        // Con tabla, una vista también vale si solo cambian columnas u ordenación: se puede guardar con los filtros por defecto.
+        (table ? true : !isDefault && !views.some((v) => same(v.value, current))) && (
           <button onClick={() => setNaming("")} className="flex items-center gap-1 rounded-full border border-dashed border-line-2 px-2.5 py-0.5 text-xs text-mute hover:border-neon/50 hover:text-ink" title="Guardar estos filtros con un nombre">
             <BookmarkPlus size={11} /> Guardar vista
           </button>

@@ -20,6 +20,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { InlineCommand } from "../components/ActionCommand";
 import { useConfirm, useToast } from "../components/feedback";
 import { Button, Card, Explain, smallBtn } from "../components/ui";
 import { api, appApi, logQuietly, measureApi, toolsApi, tweaksApi, type Duplicates, type Measure, type Freeable, type SpaceEntry, type SpaceFolder, type SpaceView } from "../lib/api";
@@ -42,6 +43,13 @@ const CLEANER: Record<string, string> = {
   "windows-temp": "cleanup.windows-temp",
   "update-cache": "cleanup.windows-update-cache",
   "user-temp": "cleanup.user-temp",
+};
+
+/** De qué ajuste o limpieza del catálogo sale el comando de cada sitio (para «Ver el comando»). */
+const COMMAND: Record<string, string> = {
+  ...CLEANER,
+  "recycle-bin": "cleanup.recycle-bin",
+  hibernation: "performance.hibernation",
 };
 
 const SORTS: [FolderSort, string][] = [
@@ -817,6 +825,7 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
                     <span className="ml-auto shrink-0 font-mono text-sm text-neon">{bytes(f.size)}</span>
                   </div>
                   <p className="text-[11px] text-mute">{f.detail}</p>
+                  {COMMAND[f.key] && <InlineCommand id={COMMAND[f.key]} className="mt-1" />}
                 </div>
               </li>
             ))}

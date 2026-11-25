@@ -7,6 +7,7 @@ import { moved, toggled, visibleIds, type ColInfo, type ColSaved } from "../lib/
 import { useFrozenOrder, usePointerHold, useReorderFlip } from "../lib/liveOrder";
 import { usePageMemory } from "../lib/pageMemory";
 import { useRowWindow } from "../lib/rowWindow";
+import { layoutOf, registerTable, sanitizeLayout } from "../lib/tableViews";
 import { matchesFilter, nodeText, TYPEFILTER_EVENT, type TypeFilterDetail } from "../lib/typeFilter";
 import { SlideMark } from "./SlideMark";
 
@@ -186,6 +187,21 @@ export function DataTable<T>({
       /* dura esta sesión */
     }
   };
+  // Las vistas guardadas de la pantalla leen y ponen columnas, orden y ordenación (solo tablas con nombre).
+  const layoutLive = useRef({ infos, saved, sort, columns, saveColset, setSort });
+  layoutLive.current = { infos, saved, sort, columns, saveColset, setSort };
+  useEffect(() => {
+    if (!resizable) return;
+    return registerTable(resizable, {
+      get: () => layoutOf(layoutLive.current.infos, layoutLive.current.saved, layoutLive.current.sort),
+      apply: (raw) => {
+        const live = layoutLive.current;
+        const layout = sanitizeLayout(raw, live.columns.map((c) => c.id));
+        if (layout.cols) live.saveColset(layout.cols);
+        if (layout.sort !== undefined) live.setSort(layout.sort);
+      },
+    });
+  }, [resizable]);
   const [colMenu, setColMenu] = useState<{ x: number; y: number } | null>(null);
   const [dragCol, setDragCol] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<{ id: string; after: boolean } | null>(null);

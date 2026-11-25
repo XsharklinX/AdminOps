@@ -101,6 +101,12 @@ struct SetupInfo {
     install_dir: String,
     /// La versión instalada es más nueva: no se permite "actualizar" hacia atrás.
     downgrade: bool,
+    /// Abierto por AdminOps con `--volver` («Volver a la versión anterior»): sí se deja
+    /// instalar esta versión, más antigua, encima de la instalada.
+    rollback: bool,
+    /// Abierto por AdminOps con `--actualizar` (la ventana de «Versión nueva»): actualiza la
+    /// instalación que hay, sin preguntar nada, y vuelve a abrir AdminOps al terminar.
+    auto: bool,
     /// Se encontró AdminOps en otra unidad (el pendrive) sin registrar en este equipo.
     found_on_drive: bool,
     app_running: bool,
@@ -112,9 +118,15 @@ fn setup_info() -> SetupInfo {
     // pendrive puede haber cambiado de letra).
     let current = installed().filter(|(_, d)| d.join("adminops.exe").is_file());
     let other = if current.is_none() { installed_on_other_drive() } else { None };
+    let older = current.as_ref().is_some_and(|(v, _)| is_downgrade(v, VERSION));
+    let volver = std::env::args().any(|a| a == "--volver");
+    let actualizar = std::env::args().any(|a| a == "--actualizar");
     SetupInfo {
+        // Solo encima de una instalación que ya existe y más antigua o igual: nunca instala de cero ni baja de versión.
+        auto: actualizar && !volver && current.is_some() && !older,
         version: VERSION.into(),
-        downgrade: current.as_ref().is_some_and(|(v, _)| is_downgrade(v, VERSION)),
+        downgrade: older && !volver,
+        rollback: older && volver,
         install_dir: current.as_ref().map(|(_, d)| d.clone()).or_else(|| other.clone()).unwrap_or_else(default_dir).display().to_string(),
         installed_version: current.map(|(v, _)| v),
         found_on_drive: other.is_some(),
@@ -155,7 +167,18 @@ struct Progress {
 fn stop_app(dir: &Path) {
     use std::os::windows::process::CommandExt;
     const NO_WINDOW: u32 = 0x0800_0000;
-    let _ = std::process::Command::new("taskkill.exe").args(["/F", "/T", "/IM", "adminops.exe"]).creation_flags(NO_WINDOW).status();
+    // Abierto por AdminOps (`--actualizar`, `--volver`), este instalador es parte de su árbol de
+    // procesos: con /T se cerraría a sí mismo. Primero se le da tiempo a cerrarse sola (lo hace en
+    // cuanto ve el instalador en marcha) y, si hay que forzarla, solo a ella.
+    let from_app = std::env::args().any(|a| a == "--actualizar" || a == "--volver");
+    if from_app {
+        let start = Instant::now();
+        while app_running() && start.elapsed() < Duration::from_secs(20) {
+            std::thread::sleep(Duration::from_millis(300));
+        }
+    }
+    let tree: &[&str] = if from_app { &["/F", "/IM", "adminops.exe"] } else { &["/F", "/T", "/IM", "adminops.exe"] };
+    let _ = std::process::Command::new("taskkill.exe").args(tree).creation_flags(NO_WINDOW).status();
     let d = dir.display().to_string().replace('\'', "''");
     // También el navegador interno de AdminOps (msedgewebview2 con su perfil):
     // si queda vivo, el AdminOps nuevo se engancha a él y Correo y Teams no cargan.

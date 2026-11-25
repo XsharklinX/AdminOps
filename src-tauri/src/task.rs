@@ -78,6 +78,7 @@ impl Task {
     pub fn new(app: &tauri::AppHandle, key: impl Into<String>) -> Self {
         let key = key.into();
         ps::finish_task(&key); // por si quedó marcada de una cancelación anterior
+        ps::task_started(&key);
         let task = Task { app: Some(app.clone()), name: default_name(&key).into(), key, started: Instant::now() };
         task.announce();
         task
@@ -125,6 +126,9 @@ impl Drop for Task {
     fn drop(&mut self) {
         let cancelled = ps::is_cancelled(&self.key);
         ps::finish_task(&self.key);
+        if self.app.is_some() {
+            ps::task_ended(&self.key);
+        }
         if let Some(app) = &self.app {
             let elapsed = self.started.elapsed();
             let _ = app.emit("task-finished", Lifecycle { task: &self.key, name: &self.name, seconds: elapsed.as_secs(), cancelled });

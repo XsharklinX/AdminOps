@@ -568,7 +568,12 @@ fn save(app: &tauri::AppHandle, a: &Active, done: capture::Done, started: Starte
 
 /// Para la grabación, cierra el MP4 y guarda las marcas. Lo llaman «Parar», los dos minutos y el cierre de AdminOps;
 /// si ya terminó (o está terminando) otro, devuelve su resultado.
+/// Lo que dice el aviso de abrir a salvo si AdminOps se cierra de golpe grabando o vigilando.
+const SAFE_RECORDING: &str = "grabando la pantalla (Grabar el fallo)";
+pub(crate) const SAFE_WATCHING: &str = "vigilando la pantalla (Grabar el fallo)";
+
 fn finish(app: &tauri::AppHandle, quiet: bool) -> Result<Meta, String> {
+    crate::safestart::activity(SAFE_RECORDING, false);
     let _g = lock(&FINISH);
     let mut active = lock(&ACTIVE);
     let Some(mut a) = active.take() else {
@@ -766,6 +771,9 @@ pub fn faultrec_start(app: tauri::AppHandle, monitor: Option<String>, opts: Opti
     let r = start_recording(app.clone(), monitor, opts);
     if paused && r.is_err() {
         vigil::resume_after_recording(&app);
+    }
+    if r.is_ok() {
+        crate::safestart::activity(SAFE_RECORDING, true);
     }
     r
 }
@@ -1302,18 +1310,28 @@ pub fn faultrec_delete(app: tauri::AppHandle, id: String) -> Result<(), String> 
 /// teclas. Estado: ver `faultrec_watch_status`.
 #[tauri::command(async)]
 pub fn faultrec_watch_start(app: tauri::AppHandle, monitor: Option<String>, opts: Option<vigil::WatchOptions>) -> Result<vigil::WatchStatus, String> {
-    vigil::start(&app, monitor, opts)
+    let r = vigil::start(&app, monitor, opts);
+    if r.is_ok() {
+        crate::safestart::activity(SAFE_WATCHING, true);
+    }
+    r
 }
 
 /// Apaga Vigilar y suelta toda la memoria.
 #[tauri::command(async)]
 pub fn faultrec_watch_stop(app: tauri::AppHandle) -> vigil::WatchStatus {
+    crate::safestart::activity(SAFE_WATCHING, false);
     vigil::stop(&app)
 }
 
 #[tauri::command(async)]
 pub fn faultrec_watch_status(app: tauri::AppHandle) -> vigil::WatchStatus {
-    vigil::status(&app)
+    let st = vigil::status(&app);
+    // Si Vigilar se apagó solo (captura caída), deja de constar para el aviso de abrir a salvo.
+    if !st.on && !st.paused_for_recording {
+        crate::safestart::activity(SAFE_WATCHING, false);
+    }
+    st
 }
 
 /// «¡Acaba de pasar!»: guarda el último minuto como una grabación (`origin` «replay») y avisa con `faultrec://done`.

@@ -43,22 +43,24 @@ foreach ($name in 'adminops.exe', 'adminops-setup.exe') {
 Write-Host "Comprobado: los ejecutables no contienen rutas del equipo de compilación."
 
 # Prueba sobre el programa compilado (el portable recién empaquetado) y prueba de rapidez.
-# Si algo falla, la carpeta de la versión se renombra para que no se distribuya por error.
-# ADMINOPS_SKIP_EXE_TEST=1 la salta (solo para compilar sin estar delante: pide UAC).
-if ($env:ADMINOPS_SKIP_EXE_TEST -ne '1') {
-  Push-Location $root
-  try {
-    node tests/exe/exe.mjs
-    $exeOk = -not $LASTEXITCODE
-    node tests/perf/budget.mjs
-    $perfOk = -not $LASTEXITCODE
-  } finally {
-    Pop-Location
-  }
-  if (-not ($exeOk -and $perfOk)) {
-    $version = (Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
-    $dir = Join-Path $root "release\v$version"
-    Rename-Item $dir "v$version-NO-DISTRIBUIR" -ErrorAction SilentlyContinue
-    throw "La versión no pasó la prueba sobre el programa compilado o la de rapidez. Ver arriba."
-  }
+# Siempre: la prueba abre el .exe sin pedir administrador (no se queda en la ventana de UAC),
+# así que no hace falta nadie delante. Si algo falla, la carpeta de la versión se renombra
+# para que no se distribuya por error.
+if ($env:ADMINOPS_SKIP_EXE_TEST) {
+  Write-Warning "ADMINOPS_SKIP_EXE_TEST ya no salta nada: la prueba del .exe corre en cada build."
+}
+Push-Location $root
+try {
+  node tests/exe/exe.mjs
+  $exeOk = -not $LASTEXITCODE
+  node tests/perf/budget.mjs
+  $perfOk = -not $LASTEXITCODE
+} finally {
+  Pop-Location
+}
+if (-not ($exeOk -and $perfOk)) {
+  $version = (Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
+  $dir = Join-Path $root "release\v$version"
+  Rename-Item $dir "v$version-NO-DISTRIBUIR" -ErrorAction SilentlyContinue
+  throw "La versión no pasó la prueba sobre el programa compilado o la de rapidez. Ver arriba."
 }

@@ -553,7 +553,8 @@ fn evaluate(d: &Diagnostics) -> Vec<Finding> {
                 .proof(disk_proof),
             );
         }
-        for c in s.crashes.iter().filter(|c| c.count >= 5) {
+        // Los juegos no: muchos dejan un error al salir con Alt+F4 aunque no falle nada.
+        for c in s.crashes.iter().filter(|c| c.count >= 5 && !c.game) {
             f.push(
                 finding(Warn, "Estabilidad", format!("{} se ha cerrado inesperadamente {} veces", c.app, c.count), None)
                     .with(vec![stability_detail(), tool("Monitor de confiabilidad", Tool::Reliability)])

@@ -203,7 +203,12 @@
     $("ver").textContent = "v" + info.version;
     $("dir").value = info.installDir;
     if (info.installedVersion) {
-      if (info.downgrade) {
+      if (info.rollback) {
+        // Desde AdminOps, «Volver a la versión anterior».
+        $("w-title").textContent = `Volver a la versión ${info.version}`;
+        $("w-lead").textContent = `Está instalada la ${info.installedVersion} y se vuelve a la ${info.version}. Tus datos, clientes y ajustes se conservan.`;
+        $("install").textContent = `Volver a la ${info.version}`;
+      } else if (info.downgrade) {
         $("w-title").textContent = "Ya tienes una versión más nueva";
         $("w-lead").textContent = `Está instalada la ${info.installedVersion} y este instalador es de la ${info.version}.`;
         blocked = true;
@@ -226,6 +231,11 @@
     }
     if (info.appRunning) note("warn", "AdminOps está abierto: se cerrará para continuar.");
     refresh();
+    // Desde la ventana de «Versión nueva» de AdminOps: se actualiza sin más pasos y se vuelve a abrir.
+    if (info.auto) {
+      $("launch").checked = true;
+      doInstall();
+    }
   }
 
   // No se instala sin aceptar los términos (ni una versión más vieja encima de una más nueva).
@@ -248,7 +258,7 @@
 
   async function doInstall() {
     show("s-progress");
-    $("p-title").textContent = info && info.installedVersion && !info.downgrade ? "Actualizando AdminOps…" : "Instalando AdminOps…";
+    $("p-title").textContent = info && info.auto ? `Actualizando AdminOps a la ${info.version}…` : info && info.rollback ? `Volviendo a la ${info.version}…` : info && info.installedVersion && !info.downgrade ? "Actualizando AdminOps…" : "Instalando AdminOps…";
     nextTip();
     const tipTimer = setInterval(nextTip, 4500);
     try {

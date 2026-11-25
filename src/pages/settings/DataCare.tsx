@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
 import { Button, Card, Toggle } from "../../components/ui";
-import { appcareApi, type DataUsage, logQuietly, type UpdateInfo } from "../../lib/api";
+import { appcareApi, type DataUsage, logQuietly, type PreviousVersion, type UpdateInfo } from "../../lib/api";
 import { bytes } from "../../lib/format";
 import { TaskStatus } from "../../components/TaskStatus";
 import { Row, selectClass, type SettingsProps } from "./shared";
@@ -21,7 +21,33 @@ export function DataCare({ s, set, part }: SettingsProps & { part: "data" | "upd
   /** La versión nueva que se puede instalar desde aquí (null: no hay, o no se ha buscado). */
   const [ready, setReady] = useState<UpdateInfo | null>(null);
   const [installing, setInstalling] = useState(false);
+  /** La versión anterior guardada al actualizar, para poder volver (1.5). */
+  const [previous, setPrevious] = useState<PreviousVersion | null>(null);
+  /** Ya vio el aviso de que la anterior no lee algunos datos de esta. */
+  const [dataWarned, setDataWarned] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
   const toast = useToast();
+  useEffect(() => {
+    if (part !== "updates") return;
+    appcareApi.previous().then(setPrevious).catch(logQuietly("SettingsPage"));
+  }, [part]);
+
+  const goBack = async () => {
+    if (!previous) return;
+    if (!previous.compatible && !dataWarned) {
+      setDataWarned(true);
+      return;
+    }
+    setRollingBack(true);
+    try {
+      const v = await appcareApi.rollback(!previous.compatible);
+      setUpdate(`Se abrió el instalador de la ${v}. Pulsa «Volver a la ${v}»: AdminOps se cierra sola y tus datos se conservan.`);
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setRollingBack(false);
+    }
+  };
   const load = useCallback(() => {
     appcareApi
       .usage()
@@ -71,8 +97,8 @@ export function DataCare({ s, set, part }: SettingsProps & { part: "data" | "upd
     }
   };
 
-  // Descarga la versión nueva y abre su instalador: el instalador cierra
-  // AdminOps, actualiza y conserva los datos. Nada se instala en silencio.
+  // Descarga la versión nueva y la instala sola: el instalador cierra AdminOps,
+  // actualiza conservando los datos y la vuelve a abrir.
   const install = async () => {
     setInstalling(true);
     try {
@@ -85,8 +111,10 @@ export function DataCare({ s, set, part }: SettingsProps & { part: "data" | "upd
           : ` Huella SHA-256 comprobada${r.verified === "both" ? " con dos fuentes" : ""}: ${r.sha256.slice(0, 12)}…`;
       setUpdate(
         (r.how === "installer"
-          ? "Descargada. Acepta el aviso de Windows y pulsa «Actualizar» en el instalador: AdminOps se cierra sola en cuanto el instalador se abre, y tus datos se conservan."
-          : "Descargada en tu carpeta de Descargas (se abrió). Cierra AdminOps y descomprime el .zip encima de la carpeta del portable: tus datos se conservan.") + check,
+          ? "Descargada. Se está instalando: AdminOps se cierra en un momento y vuelve a abrirse sola al terminar. Tus datos se conservan."
+          : r.how === "portable"
+            ? "Descargada. AdminOps se cierra para cambiar de versión y vuelve a abrirse sola en unos segundos. Tus datos se conservan."
+            : "Descargada en tu carpeta de Descargas (se abrió), pero esta carpeta del portable no se puede cambiar sola. Cierra AdminOps y descomprime el .zip encima de la carpeta del portable: tus datos se conservan.") + check,
       );
     } catch (e) {
       toast("error", String(e));
@@ -210,6 +238,24 @@ export function DataCare({ s, set, part }: SettingsProps & { part: "data" | "upd
           {update && <span className="min-w-0 flex-1 text-xs text-dim">{update}</span>}
         </div>
         <TaskStatus task="update" active={installing} fallback="Descargando la versión nueva…" className="mt-2" />
+        {previous && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-ink">Versión anterior guardada</p>
+              <p className="text-xs text-dim">
+                <span className="font-mono text-ink">{previous.version}</span> · Setup comprobado con SHA256 · {bytes(previous.size)}
+              </p>
+              <p className={`text-xs ${previous.compatible ? "text-ok" : "text-warn"}`}>
+                {previous.compatible
+                  ? "Tus datos sirven en las dos versiones"
+                  : `Esta versión cambió algunos datos que la ${previous.version} no sabe leer: lo que hayas hecho desde que actualizaste podría no verse al volver.`}
+              </p>
+            </div>
+            <Button kind="ghost" onClick={() => void goBack()} disabled={rollingBack || installing}>
+              {!previous.compatible && dataWarned ? `Volver igualmente a la ${previous.version}` : `Volver a la ${previous.version}`}
+            </Button>
+          </div>
+        )}
       </Card>
       )}
     </>

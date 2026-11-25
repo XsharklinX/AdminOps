@@ -107,7 +107,14 @@ pero **no se han ejecutado contra el dominio de la empresa**: eso solo se puede 
   pestañas: la tira tiene scroll horizontal y eso recortaba el recuadro. Ahora se coloca fijo en la
   ventana, hacia la izquierda si no cabe, y se cierra al hacer scroll o cambiar el tamaño.
 
-### Tanda 1.4 — plan en PROGRESS.md (elegida el 2026-11-20, sin empezar)
+### Tanda 1.5 — plan en PROGRESS.md (elegida el 2026-11-24, sin empezar)
+
+7 de las 14 ideas del catálogo «Ideas para AdminOps 1.5»: «Ver el comando» en todas partes, las vistas
+guardadas recuerdan las columnas, Ctrl+K abre con «Lo de siempre», Teams y Correo con su icono en todas
+partes, abrir a salvo tras dos cierres malos, volver a la versión anterior y la prueba del .exe completa
+en cada build. Las otras 7, **no**: no volver a proponerlas.
+
+### Tanda 1.4 — publicada como v1.4.0 el 2026-11-24
 
 21 de las 30 ideas del catálogo «Ideas para AdminOps 1.4»: A1 atrás y adelante, A2 letras con Alt,
 A3 escribir para filtrar, A4 columnas a tu gusto, A5 listas quietas bajo el ratón, A8 Ctrl + / −,

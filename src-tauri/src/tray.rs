@@ -172,12 +172,18 @@ fn run_fix_from_tray(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     run_fix_now(app, id)
 }
 
-/// El arreglo en sí, con sus avisos.
-fn run_fix_now(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
-    let catalog_id = match id {
+/// El id del catálogo de ajustes para un arreglo de la bandeja: casi todos son el mismo,
+/// salvo «repair.network-renew», que es «repair.ip-renew».
+pub(crate) fn catalog_id(id: &str) -> &str {
+    match id {
         "repair.network-renew" => "repair.ip-renew",
         _ => id,
-    };
+    }
+}
+
+/// El arreglo en sí, con sus avisos.
+fn run_fix_now(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    let catalog_id = catalog_id(id);
     let label = FIXES.iter().find(|(f, _)| *f == id).map(|(_, l)| *l).unwrap_or(id);
 
     // El modo auditoría bloquea cualquier cambio; el aviso lo explica sin intentar nada.

@@ -12,7 +12,8 @@ use std::time::Duration;
 
 /// Carpetas que no se copian: caché del navegador interno (enorme y se regenera),
 /// registros y restos de restauraciones anteriores.
-const SKIP_DIRS: &[&str] = &["webview", "EBWebView", "logs", "antes-de-restaurar"];
+/// `version-anterior`: el Setup guardado para volver (es de este equipo y pesa varios MB).
+const SKIP_DIRS: &[&str] = &["webview", "EBWebView", "logs", "antes-de-restaurar", "version-anterior"];
 const MARKER: &str = "adminops-copia.json";
 const PREFS: &str = "preferencias.json";
 const LAST: &str = "ultima-copia.txt";

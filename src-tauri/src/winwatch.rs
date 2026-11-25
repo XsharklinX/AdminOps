@@ -51,6 +51,9 @@ pub struct Alert {
     /// Lo que lo arregla, si AdminOps puede hacerlo (botón en la campana y en la notificación).
     #[serde(default)]
     pub fix: Option<AlertFix>,
+    /// Va a la campana ya leído y sin notificación de Windows (un juego que se cerró con error al salir).
+    #[serde(default)]
+    pub quiet: bool,
 }
 
 /// Un arreglo de un aviso: una acción del catálogo (`tweak`) o de Solucionar problemas (`trouble`).
@@ -137,7 +140,7 @@ fn script(since_iso: &str) -> String {
          $r = @($out | Sort-Object TimeCreated | ForEach-Object {{\n\
            $m = \"$($_.Message)\"; $first = ($m -split \"`n\" | Where-Object {{ $_.Trim() }} | Select-Object -First 1)\n\
            [pscustomobject]@{{ provider = \"$($_.ProviderName)\"; id = [int]$_.Id; time = $_.TimeCreated.ToUniversalTime().ToString('o')\n\
-             props = @($_.Properties | Select-Object -First 8 | ForEach-Object {{ \"$($_.Value)\" }}); message = \"$first\".Trim()\n\
+             props = @($_.Properties | Select-Object -First 12 | ForEach-Object {{ \"$($_.Value)\" }}); message = \"$first\".Trim()\n\
              disk = if ($_.ProviderName -eq 'disk' -and \"$($_.Properties[0].Value)\" -match 'Harddisk(\\d+)') {{ \"$((Get-Disk -Number ([int]$Matches[1]) -ErrorAction SilentlyContinue).FriendlyName)\" }} else {{ '' }} }}\n\
          }})\n\
          ConvertTo-Json -InputObject $r -Depth 3 -Compress",
@@ -164,6 +167,12 @@ fn disk_name(e: &RawEvent) -> String {
     } else {
         format!("Disco {n}")
     }
+}
+
+/// Un cierre (1000) o cuelgue (1002) de un juego: la ruta del .exe va en los datos del evento.
+fn is_game_event(e: &RawEvent) -> bool {
+    let path = crate::games::exe_path_in(e.props.iter().map(String::as_str));
+    crate::games::is_game(&prop(e, 0), path.as_deref())
 }
 
 /// Traduce un evento a un aviso (None si no merece aviso).
@@ -298,6 +307,30 @@ fn to_alert(e: &RawEvent) -> Option<Alert> {
             "Revisa temperaturas en Hardware, limpia el polvo y usa el cargador original.",
             Some("hardware"),
         ),
+        ("Application Error" | "Application Hang", 1000 | 1002) if is_game_event(e) => {
+            let app = prop(e, 0);
+            if app.is_empty() {
+                return None;
+            }
+            let hang = e.id == 1002;
+            Alert {
+                read: true,
+                quiet: true,
+                ..a(
+                    "info",
+                    format!("{}:{}", if hang { "hang" } else { "crash" }, app.to_lowercase()),
+                    if hang { format!("{app} dejó de responder (juego)") } else { format!("{app} se cerró con un error (juego)") },
+                    String::new(),
+                    if hang {
+                        "Es un juego: es normal que se quede sin responder un momento al cargar o al cambiar de ventana, y que se cierre a mano. Por eso no se avisa."
+                    } else {
+                        "Es un juego: muchos dejan este error al salir con Alt+F4 o al cerrarlos a mano, aunque no haya pasado nada. Por eso no se avisa."
+                    },
+                    "Si se cierra solo en plena partida, actualiza el juego, verifica sus archivos desde su tienda y actualiza el driver de la gráfica.",
+                    Some("hardware"),
+                )
+            }
+        }
         ("Application Error", 1000) => {
             let app = prop(e, 0);
             if app.is_empty() {
@@ -387,7 +420,8 @@ fn merge(store: &mut Store, fresh: Vec<Alert>) -> Vec<Alert> {
         if let Some(existing) = store.alerts.iter_mut().find(|x| x.key == a.key && a.time.saturating_sub(x.time) < 6 * 3600) {
             existing.count += 1;
             existing.time = existing.time.max(a.time);
-            existing.read = false;
+            // Un juego que vuelve a cerrarse con error no vuelve a marcar la campana.
+            existing.read = existing.read && a.quiet;
             continue;
         }
         a.id = format!("{:x}-{}", a.time, store.alerts.len());
@@ -496,7 +530,7 @@ fn new_bad_devices(store: &mut Store, devices: &[BadDevice]) -> Vec<BadDevice> {
 fn notify(app: &tauri::AppHandle, a: &Alert) {
     use tauri_plugin_notification::NotificationExt;
     let focused = app.get_webview_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false);
-    if focused {
+    if focused || a.quiet {
         return;
     }
     // Ajustes → General: de todos, solo de los graves o de ninguno. A la campana llegan siempre.
@@ -651,13 +685,14 @@ pub fn start(app: tauri::AppHandle) {
                             log::info!("Aviso de Windows: {} {}", a.title, a.detail);
                             let _ = app.emit("windows-alert", a);
                         }
-                        // Una notificación de Windows por pasada como mucho (la más grave).
-                        if let Some(a) = new.iter().min_by_key(|a| match a.level.as_str() {
+                        // Una notificación de Windows por pasada como mucho (la más grave). Los juegos no cuentan.
+                        let loud: Vec<&Alert> = new.iter().filter(|a| !a.quiet).collect();
+                        if let Some(a) = loud.iter().copied().min_by_key(|a| match a.level.as_str() {
                             "bad" => 0,
                             "warn" => 1,
                             _ => 2,
                         }) {
-                            if a.level != "info" || new.len() == 1 {
+                            if a.level != "info" || loud.len() == 1 {
                                 notify(&app, a);
                             }
                         }
@@ -780,6 +815,27 @@ mod tests {
         assert!(wu.detail.starts_with("0x80070643"));
         assert!(to_alert(&ev("Application Error", 1000, &[], "")).is_none());
         assert!(to_alert(&ev("Otro", 1, &[], "")).is_none());
+    }
+
+    #[test]
+    fn a_game_closing_with_an_error_goes_quietly() {
+        let path = r"D:\SteamLibrary\steamapps\common\Hades\Hades.exe";
+        let crash = to_alert(&ev("Application Error", 1000, &["Hades.exe", "1.0", "5f1a", "ntdll.dll", "10.0", "abc", "c0000005", "0x1234", "1a2b", "01d9", path], "")).unwrap();
+        assert!(crash.quiet && crash.read);
+        assert_eq!(crash.key, "crash:hades.exe");
+        assert_eq!(crash.title, "Hades.exe se cerró con un error (juego)");
+        let hang = to_alert(&ev("Application Hang", 1002, &["Hades.exe", "1.0", "1a2b", "01d9", "01da", path], "")).unwrap();
+        assert!(hang.quiet && hang.read);
+        assert_eq!(hang.key, "hang:hades.exe");
+        // Un programa normal sigue avisando.
+        let excel = to_alert(&ev("Application Error", 1000, &["EXCEL.EXE", "16.0", "0", "mso.dll", "16.0", "0", "c0000005", "0x1", "1", "1", r"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE"], "")).unwrap();
+        assert!(!excel.quiet && !excel.read);
+        // Que se repita no vuelve a marcar la campana.
+        let mut s = Store::default();
+        assert_eq!(merge(&mut s, vec![Alert { time: 1000, ..crash.clone() }]).len(), 1);
+        assert!(s.alerts[0].read);
+        merge(&mut s, vec![Alert { time: 1500, ..crash }]);
+        assert!(s.alerts[0].read && s.alerts[0].count == 2);
     }
 
     #[test]

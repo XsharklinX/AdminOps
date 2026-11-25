@@ -305,38 +305,57 @@ fn approved_bytes(enabled: bool) -> Vec<u8> {
 }
 
 /// Para «Ver el comando»: nombre, equivalente en PowerShell y si pide administrador
-/// de lo que hace «Quitar del inicio» con esa entrada. Es aproximado: AdminOps escribe
-/// en el registro directamente.
-pub(crate) fn disable_doc(id: &str) -> Result<(String, String, bool), String> {
+/// de lo que hace «Quitar del inicio» (`enabled = false`) o «Activar» (`enabled = true`)
+/// con esa entrada. Es aproximado: AdminOps escribe en el registro directamente.
+pub(crate) fn toggle_doc(id: &str, enabled: bool) -> Result<(String, String, bool), String> {
     let item = list()?.into_iter().find(|i| i.id == id).ok_or("La entrada ya no existe")?;
+    let (body, title) = doc_body(&item, enabled)?;
+    Ok((title, body, item.needs_admin))
+}
+
+/// El PowerShell y el título (sin saltos de línea) de activar o desactivar una entrada.
+fn doc_body(item: &StartupItem, enabled: bool) -> Result<(String, String), String> {
     let q = ps::ps_literal;
     // El nombre va en comentarios y en el título: sin saltos de línea (si no, lo que siguiera se ejecutaría).
     let title = ps::ps_comment(&item.name);
     let body = if let Some((key, name)) = &item.approved {
         let ps_key = key.replacen('\\', ":\\", 1);
+        // El mismo primer byte que escribe `set_startup_enabled` (02 activado, 03 desactivado).
+        let first = approved_bytes(enabled)[0];
+        let (intro, byte_note) = if enabled {
+            (format!("# «{title}» vuelve a arrancar con Windows. Se marca como activado,"), format!("# El primer byte par ({first:02}) significa «activado»"))
+        } else {
+            (format!("# «{title}» deja de arrancar con Windows. No se borra nada: se marca como"), format!("# El primer byte impar ({first:02}) significa «desactivado»"))
+        };
         [
-            format!("# «{}» deja de arrancar con Windows. No se borra nada: se marca como", title),
-            "# desactivado, igual que en el Administrador de tareas (pestaña Inicio).".into(),
+            intro,
+            if enabled { "# igual que en el Administrador de tareas (pestaña Inicio).".into() } else { "# desactivado, igual que en el Administrador de tareas (pestaña Inicio).".to_string() },
             format!("$key = {}", q(&ps_key)),
             format!("$name = {}", q(name)),
             "# La clave de StartupApproved puede no existir todavía".into(),
             "if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }".into(),
-            "# El primer byte impar (03) significa «desactivado»".into(),
-            "$bytes = [byte[]](3,0,0,0,0,0,0,0,0,0,0,0)".into(),
+            byte_note,
+            if enabled {
+                format!("$bytes = [byte[]]({first},0,0,0,0,0,0,0,0,0,0,0)")
+            } else {
+                // Igual que AdminOps: estado 03 y, detrás, la marca de tiempo de ahora (8 bytes, FILETIME)
+                format!("$bytes = [byte[]]({first},0,0,0) + [BitConverter]::GetBytes([DateTime]::UtcNow.ToFileTimeUtc())")
+            },
             "New-ItemProperty -Path $key -Name $name -PropertyType Binary -Value $bytes -Force | Out-Null".into(),
         ]
         .join("\n")
     } else if let Some((path, name)) = &item.task {
+        let (verb, what) = if enabled { ("Enable", "se activa de nuevo") } else { ("Disable", "se desactiva") };
         [
-            format!("# «{}» es una tarea programada que se lanza al iniciar sesión: se desactiva", title),
-            "# (no se borra, así se puede volver a activar).".into(),
-            format!("Disable-ScheduledTask -TaskPath {} -TaskName {} | Out-Null", q(path), q(name)),
+            format!("# «{title}» es una tarea programada que se lanza al iniciar sesión: {what}"),
+            if enabled { "# (no se había borrado, solo estaba desactivada).".to_string() } else { "# (no se borra, así se puede volver a activar).".to_string() },
+            format!("{verb}-ScheduledTask -TaskPath {} -TaskName {} | Out-Null", q(path), q(name)),
         ]
         .join("\n")
     } else {
         return Err("Tipo de entrada desconocido".into());
     };
-    Ok((title, body, item.needs_admin))
+    Ok((body, title))
 }
 
 #[tauri::command(async)]
@@ -386,6 +405,50 @@ mod tests {
         assert_eq!(on.len(), 12);
         assert_eq!(on[0] & 1, 0);
         assert_eq!(off[0] & 1, 1);
+        // Desactivado: 03 00 00 00 y 8 bytes de marca de tiempo; activado: 02 y todo ceros.
+        assert_eq!(on, [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(off.len(), 12);
+        assert_eq!(&off[..4], &[3, 0, 0, 0]);
+        let stamp = u64::from_le_bytes(off[4..12].try_into().unwrap());
+        assert!(stamp > 116_444_736_000_000_000, "la marca de tiempo debe ser posterior a 1970 (FILETIME)");
+    }
+
+    fn item(approved: bool) -> super::StartupItem {
+        super::StartupItem {
+            id: "x".into(),
+            name: "Mi programa\nWrite-Host peligro".into(),
+            command: "c".into(),
+            location: "l".into(),
+            source: if approved { "registry" } else { "task" },
+            enabled: true,
+            needs_admin: false,
+            publisher: None,
+            description: None,
+            target: None,
+            approved: approved.then(|| (r"HKCU\Software\Test".to_string(), "Mi programa".to_string())),
+            task: (!approved).then(|| (r"\".to_string(), "Tarea".to_string())),
+        }
+    }
+
+    #[test]
+    fn el_comando_de_activar_y_desactivar_coincide_con_lo_que_se_escribe() {
+        for approved in [true, false] {
+            let (off, _) = super::doc_body(&item(approved), false).unwrap();
+            let (on, _) = super::doc_body(&item(approved), true).unwrap();
+            assert_ne!(off, on);
+            for l in off.lines().chain(on.lines()) {
+                assert!(!l.trim_start().starts_with("Write-Host"), "una línea se escapó del comentario: {l:?}");
+            }
+            assert!(crate::ps::parse_errors(&off).trim().is_empty());
+            assert!(crate::ps::parse_errors(&on).trim().is_empty());
+            if approved {
+                // Desactivar: 03 00 00 00 + 8 bytes de marca de tiempo (como `approved_bytes`); activar: 02 y 11 ceros.
+                assert!(off.contains("$bytes = [byte[]](3,0,0,0) + [BitConverter]::GetBytes([DateTime]::UtcNow.ToFileTimeUtc())"));
+                assert!(on.contains("$bytes = [byte[]](2,0,0,0,0,0,0,0,0,0,0,0)"));
+            } else {
+                assert!(off.contains("Disable-ScheduledTask") && on.contains("Enable-ScheduledTask"));
+            }
+        }
     }
 
     /// Lee el Inicio real del equipo (solo lectura): `cargo test -- --ignored --nocapture`

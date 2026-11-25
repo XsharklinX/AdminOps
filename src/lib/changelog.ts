@@ -18,6 +18,22 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.1",
+    title: "Actualizar sin salir de AdminOps, abrir a salvo y volver a la versión anterior",
+    added: [
+      "Actualizar sin salir: cuando hay versión nueva, AdminOps abre una ventana con sus novedades. «Actualizar ahora» la descarga, comprueba su huella SHA-256 y la instala sola: el instalador trabaja sin preguntar nada y AdminOps vuelve a abrirse al terminar. En la versión portable también: se cambia al cerrarse y se vuelve a abrir. «Más tarde» la deja en la barra lateral. Funciona a partir de la próxima versión: esta 1.4.1 todavía se instala con el instalador de siempre.",
+      "Volver a la versión anterior (en la versión instalada): a partir de la próxima actualización, AdminOps guarda antes el instalador de la versión que tenías, y Ajustes → Actualizaciones enseña «Volver a la X» si la nueva da problemas. Tus datos se conservan.",
+      "Abrir a salvo: si AdminOps se cierra de golpe dos veces seguidas, la siguiente vez abre sin nada en segundo plano y dice qué estaba haciendo, con «Seguir a salvo», «Abrir normal» y «Copiar el informe del fallo». Apagar o reiniciar Windows no cuenta.",
+      "Ctrl+K abre con «Lo de siempre»: las 5 acciones que más usas a esa hora del día en este equipo, con cuántas veces este mes y Alt+1…5 para lanzarlas.",
+      "Las vistas guardadas recuerdan también las columnas (cuáles se ven, su orden, la ordenación y el filtro) en Programas, Dispositivos, Inicio y Conectados.",
+      "«Ver el comando» también en los limpiadores de Espacio, en el interruptor de cada programa de Inicio y en los arreglos de la bandeja.",
+      "Teams y Correo con su icono también en «Enviar a…», en la ficha de Personas y en Ajustes → Portales y correo.",
+    ],
+    fixed: [
+      "Los juegos ya no avisan cuando se cierran con Alt+F4 o se quedan colgados al salir: van a la campana sin notificación, no cuentan en Diagnóstico y Vigilar no graba por ellos.",
+    ],
+  },
+  {
     version: "1.4.0",
     title: "Grabar el fallo, pantallas, escanear a carpeta y quién se come Internet",
     added: [

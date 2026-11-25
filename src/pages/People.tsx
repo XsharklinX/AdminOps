@@ -16,7 +16,6 @@ import {
   KeyRound,
   Loader2,
   LockOpen,
-  MessagesSquare,
   Monitor,
   Search,
   ShieldAlert,
@@ -30,6 +29,7 @@ import { useToast } from "../components/feedback";
 import { Button, Card, EmptyState, inputClass, Modal } from "../components/ui";
 import { logQuietly, casesApi, contactsApi, officeApi, peopleApi, portalsApi, type Case, type LapsPassword, type Person, type PersonHit, type RecoveryKey } from "../lib/api";
 import { openCase } from "../lib/currentCase";
+import { TeamsIcon } from "../components/BrandIcons";
 import { Avatar } from "../components/contacts/Avatar";
 import { ReviewMachine } from "../components/ReviewMachine";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -388,7 +388,7 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
           </Button>
           {p.mail && (
             <Button kind="ghost" onClick={() => void teams()}>
-              <MessagesSquare size={14} /> Teams
+              <TeamsIcon size={14} /> Teams
             </Button>
           )}
         </div>

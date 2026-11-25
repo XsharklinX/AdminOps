@@ -275,7 +275,7 @@ export function ErrorLogCard() {
                   {g.message}
                 </span>
                 <span className="block truncate text-xs text-mute">
-                  {g.source === "orden" ? "Orden" : "Pantalla"} · {g.place} · última {ago(g.last)} · v{g.version}
+                  {g.source === "orden" ? "Orden" : g.source === "cierre" ? "Cierre de golpe" : "Pantalla"} · {g.place} · última {ago(g.last)} · v{g.version}
                 </span>
               </span>
             </li>

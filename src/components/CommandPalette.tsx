@@ -1,10 +1,11 @@
-import { AppWindow, BookOpen, Bug, CheckCircle2, Circle, CornerDownLeft, FileText, Lightbulb, ListTree, Loader2, Mail, MessagesSquare, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, XCircle, Zap } from "lucide-react";
+import { AppWindow, BookOpen, Bug, CheckCircle2, Circle, CornerDownLeft, FileText, Lightbulb, ListTree, Loader2, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, XCircle, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, allowedInMode, isPageId, navLabel, pageLabel, visibleAreas, type Area, type PageId } from "./Sidebar";
 import type { Badge } from "../lib/machineState";
 import { usePrefs } from "../lib/prefs";
 import { navKey, PAGE_KEYWORDS, parseNavKey, sectionsOf } from "../lib/sections";
 import { useToast } from "./feedback";
+import { OutlookIcon, TeamsIcon } from "./BrandIcons";
 import { logQuietly, contactsApi, errorsApi, lanApi, libraryApi, officeApi, toolboxApi, tweaksApi, type Contact, type ErrorInfo, type Solution, type TextTemplate, type ToolboxView } from "../lib/api";
 import { openCase } from "../lib/currentCase";
 import { completePhrase, recognize, type Recognized } from "../lib/recognize";
@@ -18,6 +19,7 @@ import { openComm } from "../lib/comms";
 import { didYouMean, fuzzyHas, tokens } from "../lib/palette";
 import { loadRecent, loadPhrases, execute, auditBlocked, auditBlockedText, runSteps, stepsSummary, undoSteps, useQuickEntries, useQuickSteps, type QuickEntry, type QuickResult, type Recent, type StepState } from "../lib/quickActions";
 import { EXPERT_ENTRIES } from "./expert/paletteEntries";
+import { altIndex, habitAllowed, loadUses, noteUse, slotOf, slotTitle, timesThisMonth, topFor } from "../lib/ctrlkHabits";
 
 /** Páginas del catálogo de ajustes, por categoría. */
 const CATEGORY_PAGE: Record<string, PageId> = {
@@ -339,6 +341,16 @@ export function CommandPalette({
     return [...doing, ...(smart.sure ? [...smart.entries, ...found] : [...found, ...smart.entries])].slice(0, 40);
   }, [entries, query, smart, codeHit, quick]);
 
+  // «Lo de siempre»: las acciones más usadas en esta franja del día, solo las que Ctrl+K ofrece ahora.
+  const habits = useMemo(() => {
+    if (!open) return [];
+    const byKey = new Map(entries.map((e) => [e.key, e]));
+    const expertPage = (id: string) => EXPERT_ENTRIES.find((x) => x.id === id)?.page;
+    const pageAllowed = (p: string) => isPageId(p) && allowedInMode(p, prefs.mode);
+    return topFor(loadUses(), slotOf(new Date()), Date.now(), (k) => byKey.has(k) && habitAllowed(k, prefs.mode, pageAllowed, expertPage)).map((h) => ({ entry: byKey.get(h.key)!, count: h.count }));
+  }, [open, entries, prefs.mode]);
+  const habitsTitle = slotTitle(slotOf(new Date()));
+
   // Palabras que conoce Ctrl+K, para «¿Quisiste decir…?» cuando no encuentra nada.
   const vocabulary = useMemo(() => {
     const v = new Set<string>();
@@ -426,6 +438,7 @@ export function CommandPalette({
       void runQuick(e.quick);
       return;
     }
+    noteUse(e.key);
     onClose();
     const r = e.run();
     if (r instanceof Promise) r.then((m) => typeof m === "string" && m && toast("ok", m)).catch((err) => toast("error", `${e.title}: ${err}`));
@@ -443,13 +456,13 @@ export function CommandPalette({
   const desc = (p: PageId) => (NAV.find((n) => n.id === p)?.help ?? "").split(/(?<=\.)\s/)[0];
   const pins = prefs.sidebar.favorites.filter((k) => isPageId(parseNavKey(k).page) && allowedInMode(parseNavKey(k).page, prefs.mode));
   const tone = (b: Badge | undefined) => (!b ? "" : b.tone === "bad" ? "text-bad" : b.tone === "warn" ? "text-warn" : b.tone === "ok" ? "text-ok" : "text-dim");
-  const fixed: { page: PageId; Icon: typeof Mail }[] = (
+  const fixed: { page: PageId; Icon: typeof Wrench | null }[] = (
     [
       { page: "tools", Icon: Wrench },
-      { page: "teams", Icon: MessagesSquare },
-      { page: "mail", Icon: Mail },
+      { page: "teams", Icon: null },
+      { page: "mail", Icon: null },
       { page: "settings", Icon: SettingsIcon },
-    ] as { page: PageId; Icon: typeof Mail }[]
+    ] as { page: PageId; Icon: typeof Wrench | null }[]
   ).filter((f) => allowedInMode(f.page, prefs.mode));
 
   const areaCard = (a: Area) => {
@@ -535,7 +548,13 @@ export function CommandPalette({
                 // ↑/↓ recorren las últimas frases: con la caja vacía y mientras se siga en una de ellas.
                 const phrases = loadPhrases();
                 const browsing = histPos.current >= 0 && query === phrases[histPos.current];
-                if (e.key === "Tab" && !e.shiftKey) {
+                const alt = e.altKey && !e.ctrlKey && !e.metaKey ? altIndex(e.code, query, habits.length) : null;
+                if (alt !== null) {
+                  // Alt+1…5 sin texto: la acción de «Lo de siempre», igual que si se eligiera.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  pick(habits[alt].entry);
+                } else if (e.key === "Tab" && !e.shiftKey) {
                   const c = completePhrase(query);
                   if (c) {
                     e.preventDefault();
@@ -674,6 +693,24 @@ export function CommandPalette({
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {habits.length > 0 && (
+              <>
+                <div className="mb-2 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">{habitsTitle}</div>
+                <div className="mb-5">
+                  {habits.map((h, i) => (
+                    <button key={h.entry.key} onClick={() => pick(h.entry)} className="flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left hover:border-neon/60 hover:bg-neon/10">
+                      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-panel-2">{icon(h.entry.kind)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-ink">{h.entry.title}</span>
+                        {h.entry.subtitle && <span className="block truncate text-[11.5px] text-mute">{h.entry.subtitle}</span>}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-mute tabular">{i === 0 ? timesThisMonth(h.count) : h.count}</span>
+                      <kbd className="shrink-0 rounded border border-line-2 px-1 font-mono text-[10.5px] text-dim">Alt+{i + 1}</kbd>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {recent.length > 0 && (
               <>
                 <div className="mb-2 font-mono text-[10.5px] tracking-[0.08em] text-mute uppercase">Hace poco</div>
@@ -736,7 +773,7 @@ export function CommandPalette({
                       className="flex items-center gap-2.5 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2 text-left transition-colors hover:border-neon/60"
                     >
                       <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel-2 text-ink">
-                        <Icon size={15} strokeWidth={1.7} />
+                        {page === "teams" ? <TeamsIcon size={15} /> : page === "mail" ? <OutlookIcon size={15} /> : Icon && <Icon size={15} strokeWidth={1.7} />}
                       </span>
                       <span className="min-w-0">
                         <b className="block truncate text-[13px] font-semibold text-ink">{pageLabel(page)}</b>

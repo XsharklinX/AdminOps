@@ -32,6 +32,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Explain, Intro } from "../components/ui";
+import { SavedViews } from "../components/SavedViews";
 import { logQuietly, lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
 import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
 import { DataTable } from "../components/DataTable";
@@ -358,6 +359,9 @@ export function Devices() {
       {scan && (
         <Card title={`${all.length} dispositivos${fresh ? ` · ${fresh} nuevos` : ""}`}>
           {scan.truncated && <p className="mb-3 text-xs text-warn">La red es grande: se revisó solo el bloque de 254 direcciones de este equipo.</p>}
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <SavedViews scope="devices" table="devices" current={{ kindFilter }} isDefault={kindFilter === "all"} onApply={(v) => setKindFilter(v.kindFilter)} />
+          </div>
           {kindCounts.size > 1 && (
             <div className="mb-3 flex flex-wrap gap-1.5">
               <button onClick={() => setKindFilter("all")} className={`rounded-full px-2.5 py-0.5 text-xs ${kindFilter === "all" ? "bg-panel-2 text-ink" : "text-dim hover:text-ink"}`}>

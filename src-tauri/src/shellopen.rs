@@ -64,6 +64,29 @@ pub fn protocol_registered(scheme: &str) -> bool {
     }
 }
 
+/// Abre un programa con argumentos. Si el programa pide administrador, Windows enseña su aviso (UAC).
+pub fn run_with_args(program: &str, args: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::Shell::ShellExecuteW;
+        use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+        let (verb, file, params) = (wide("open"), wide(program), wide(args));
+        // SAFETY: cadenas terminadas en cero, vivas durante la llamada.
+        let r = unsafe { ShellExecuteW(std::ptr::null_mut(), verb.as_ptr(), file.as_ptr(), params.as_ptr(), std::ptr::null(), SW_SHOWNORMAL) };
+        if r as isize > 32 {
+            Ok(())
+        } else {
+            Err(format!("No se pudo abrir el instalador (código {}).", r as isize))
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (program, args);
+        Err("Solo en Windows.".into())
+    }
+}
+
 #[cfg(windows)]
 fn shell_execute(uri: &str) -> Result<(), String> {
     use windows_sys::Win32::UI::Shell::ShellExecuteW;

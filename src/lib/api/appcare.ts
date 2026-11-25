@@ -56,10 +56,27 @@ export const appcareApi = {
   cleanup: (months: number, journal: boolean, snapshots: boolean, reports: boolean) =>
     invoke<{ journal: number; snapshots: number; reports: number; freed: number }>("data_cleanup", { months, journal, snapshots, reports }),
   checkUpdate: () => invoke<UpdateInfo>("check_update"),
-  /** Descarga la versión nueva y abre su instalador ("installer") o enseña el .zip ("portable"), comprobando su huella SHA-256. */
-  installUpdate: () => invoke<{ how: "installer" | "portable"; verified: "both" | "one" | "none"; sha256: string }>("install_update"),
+  /**
+   * Descarga la versión nueva, comprueba su huella SHA-256 y la instala sola: "installer" (el instalador
+   * actualiza sin preguntar y vuelve a abrir AdminOps), "portable" (se cambia al cerrarse y se vuelve a
+   * abrir) o "portable-manual" (la carpeta no se puede cambiar: se enseña el .zip).
+   */
+  installUpdate: () => invoke<{ how: "installer" | "portable" | "portable-manual"; verified: "both" | "one" | "none"; sha256: string }>("install_update"),
   openRelease: (url: string) => invoke<void>("open_release_page", { url }),
+  /** El Setup de la versión anterior, guardado al actualizar (null si no hay uno que sirva). */
+  previous: () => invoke<PreviousVersion | null>("previous_version"),
+  /** Abre el instalador de la versión anterior en modo «volver». Devuelve su versión. */
+  rollback: (acceptData: boolean) => invoke<string>("rollback_previous", { acceptData }),
 };
+
+/** La versión anterior guardada para poder volver (1.5). */
+export interface PreviousVersion {
+  version: string;
+  size: number;
+  savedAt: number;
+  /** Los datos de ahora los lee también la versión anterior. */
+  compatible: boolean;
+}
 
 // ---------- Errores de Windows (vigilancia) ----------
 
@@ -77,6 +94,8 @@ export interface WindowsAlert {
   read: boolean;
   /** Lo que lo arregla, si AdminOps puede hacerlo. */
   fix: AlertFix | null;
+  /** Sin notificación ni mensaje: un juego que se cerró con error (suele ser al salir con Alt+F4). */
+  quiet?: boolean;
 }
 
 export interface AlertFix {

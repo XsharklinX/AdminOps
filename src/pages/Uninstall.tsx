@@ -19,6 +19,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
+import { SavedViews } from "../components/SavedViews";
 import { Button, Modal, ErrorState, Loading, iconBtn } from "../components/ui";
 import { DataTable, type Column } from "../components/DataTable";
 import { bytes, friendlyPath } from "../lib/format";
@@ -354,6 +355,18 @@ export function Uninstall({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <SavedViews
+          scope="programs"
+          table="programs"
+          current={{ filter, query, hideComponents, hideMicrosoft }}
+          isDefault={filter === "all" && !query.trim() && hideComponents && !hideMicrosoft}
+          onApply={(v) => {
+            setFilter(v.filter);
+            setQuery(v.query);
+            setHideComponents(v.hideComponents);
+            setHideMicrosoft(v.hideMicrosoft);
+          }}
+        />
         {FILTERS.map((f) => (
           <button
             key={f.id}

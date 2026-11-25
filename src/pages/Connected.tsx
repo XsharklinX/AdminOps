@@ -5,6 +5,7 @@ import { ViewCommand } from "../components/ActionCommand";
 import { NeedsAdmin } from "../components/AdminBanner";
 import { DataTable, type Column } from "../components/DataTable";
 import { useToast } from "../components/feedback";
+import { SavedViews } from "../components/SavedViews";
 import { Button, ErrorState, Loading, Toggle, iconBtn } from "../components/ui";
 import { connectedApi, type ConnectedDevice, type ConnectedList, type RecentChange } from "../lib/api";
 import { ACTION_LABEL, actionsFor, ago, buildRows, summary, type ConnectedRow, type DeviceAction } from "../lib/connected";
@@ -148,6 +149,7 @@ export function Connected({ isAdmin }: { isAdmin: boolean }) {
     <div className="mx-auto max-w-(--page-max) p-6">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <p className="text-sm text-dim">{summary(list.devices)}</p>
+        <SavedViews scope="connected" table="connected" current={{ showAll }} isDefault={!showAll} onApply={(v) => setShowAll(v.showAll)} />
         <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
           <Toggle checked={showAll} onChange={setShowAll} label="Ver todos" />
           <button onClick={() => void load()} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">

@@ -90,7 +90,12 @@ pub fn record(groups: &mut Vec<Group>, source: &str, place: &str, message: &str,
         return;
     }
     let place: String = place.chars().take(60).collect();
-    let source = if source == "orden" { "orden" } else { "pantalla" };
+    // «cierre»: AdminOps se cerró de golpe (ver safestart.rs).
+    let source = match source {
+        "orden" => "orden",
+        "cierre" => "cierre",
+        _ => "pantalla",
+    };
     let k = key(source, &place, message);
     if let Some(g) = groups.iter_mut().find(|g| key(&g.source, &g.place, &g.message) == k) {
         g.count = g.count.saturating_add(1);

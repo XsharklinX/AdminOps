@@ -134,6 +134,15 @@ fn keep_awake(on: bool) {
 }
 
 fn run_one(app: &tauri::AppHandle, q: &Queued) -> Outcome {
+    // Si AdminOps se cierra de golpe a medias, el aviso de abrir a salvo dirá cuál era (ver safestart.rs).
+    let doing = format!("haciendo la tarea nocturna «{}»", q.title);
+    crate::safestart::activity(&doing, true);
+    let out = run_one_inner(app, q);
+    crate::safestart::activity(&doing, false);
+    out
+}
+
+fn run_one_inner(app: &tauri::AppHandle, q: &Queued) -> Outcome {
     let started = now();
     // En modo auditoría AdminOps solo mira: lo que cambia el equipo no se hace.
     if crate::audit::audit_mode() && q.job == Job::Repair {

@@ -42,6 +42,23 @@ impl<'a> Opts<'a> {
 /// Procesos en curso por tarea, y tareas que el usuario canceló.
 static RUNNING: LazyLock<Mutex<HashMap<String, Vec<u32>>>> = LazyLock::new(Default::default);
 static CANCELLED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
+/// Tareas en marcha (un `Task` vivo), con o sin procesos: las que trabajan en Rust (una
+/// descarga) también se pueden cancelar, porque miran `task.cancelled()` en su bucle.
+static LIVE: LazyLock<Mutex<HashMap<String, usize>>> = LazyLock::new(Default::default);
+
+pub(crate) fn task_started(task: &str) {
+    *LIVE.lock().unwrap_or_else(|e| e.into_inner()).entry(task.to_string()).or_insert(0) += 1;
+}
+
+pub(crate) fn task_ended(task: &str) {
+    let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(n) = live.get_mut(task) {
+        *n = n.saturating_sub(1);
+        if *n == 0 {
+            live.remove(task);
+        }
+    }
+}
 
 /// `Command` que no abre ventana de consola.
 pub fn hidden(program: impl AsRef<std::ffi::OsStr>) -> Command {
@@ -77,7 +94,13 @@ pub(crate) fn kill_tree(pid: u32) {
 pub fn cancel(task: &str) -> bool {
     let pids = RUNNING.lock().unwrap_or_else(|e| e.into_inner()).get(task).cloned().unwrap_or_default();
     if pids.is_empty() {
-        return false;
+        // Sin procesos: se marca si la tarea está en marcha (su bucle lo ve y para).
+        if !LIVE.lock().unwrap_or_else(|e| e.into_inner()).contains_key(task) {
+            return false;
+        }
+        CANCELLED.lock().unwrap_or_else(|e| e.into_inner()).insert(task.to_string());
+        log::warn!("Cancelando tarea {task}");
+        return true;
     }
     CANCELLED.lock().unwrap_or_else(|e| e.into_inner()).insert(task.to_string());
     log::warn!("Cancelando tarea {task} (pids {pids:?})");

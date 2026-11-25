@@ -574,7 +574,7 @@ pub(super) fn technical_sections(h: &mut String, d: &Diagnostics) {
         if !s.crashes.is_empty() {
             h.push_str("<h3>Aplicaciones que fallan</h3><table><thead><tr><th>Aplicación</th><th class=num>Veces</th><th class=num>Último fallo</th></tr></thead>");
             for cr in &s.crashes {
-                let _ = write!(h, "<tr><td>{}</td><td class=num>{}</td><td class=num>{}</td></tr>", esc(&cr.app), cr.count, fmt_iso(&cr.last));
+                let _ = write!(h, "<tr><td>{}{}</td><td class=num>{}</td><td class=num>{}</td></tr>", esc(&cr.app), if cr.game { " (juego)" } else { "" }, cr.count, fmt_iso(&cr.last));
             }
             h.push_str("</table>");
         }

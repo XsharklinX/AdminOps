@@ -11,6 +11,104 @@ local sí); un solo técnico; sin datos personales en la interfaz; textos en esp
 con lint, typecheck, pruebas de Rust y de interfaz, y `npm run test:exe` + `npm run test:perf` con un
 .exe de depuración. Antes de cambiar algo visual que no esté ya en la maqueta, enseñar el antes y el después.
 
+## 1.4.1 — BUILD EN CURSO (2026-11-25) · leer esto primero
+
+David decidió el número: **1.4.1** (no 1.5.0). Lleva la tanda 1.5 entera, lo de los juegos y la
+**actualización automática** que pidió hoy: «cuando haya actualización, que muestre una ventana para
+actualizar y que se actualice ahí automáticamente, que no te lleve a GitHub».
+
+### Hecho
+- Actualizar sin salir — comprobado con cargo test 868, vitest 487, tsc, eslint y clippy (app e
+  instalador); el script del portable probado de verdad con exes de prueba y ruta con comilla.
+  Sin comprobar: una actualización real de principio a fin (necesita la 1.4.1 publicada y otra después).
+  - `src/components/UpdateDialog.tsx` (nuevo, + test): novedades, «Actualizar ahora», barra de progreso,
+    «Cancelar», «Seguir en segundo plano». Siempre montada (no pierde la descarga al cerrar o bloquear).
+    App.tsx la abre sola si `installable`; el aviso de la barra lateral la reabre.
+  - `appcare.rs install_update`: instalador con `run_with_args(out, "--actualizar")` (hereda la
+    elevación, sin UAC); portable: `stage_portable` + `swap_portable_on_exit` (PowerShell oculto espera
+    al PID, copia exe y lhm, relanza; si no puede, enseña el .zip → "portable-manual"). Candado
+    `UpdateBusy`, `read_timeout` 30 s.
+  - `installer`: `setup_info.auto` (`--actualizar`, hay instalación, no baja de versión) → la UI instala
+    sola y reabre AdminOps; `stop_app` desde AdminOps espera 20 s a que se cierre y no usa `taskkill /T`.
+  - `ps.rs`/`task.rs`: las tareas sin procesos (descargas) ya se pueden cancelar (LIVE).
+- Revisión de Opus hecha (5 hallazgos + 2 posibles), todos arreglados y repasadas las pruebas.
+- Versión 1.4.1 en package.json, tauri.conf.json, Cargo.toml y badges del README; entrada en
+  `src/lib/changelog.ts`; notas `docs/notas-1.4.1.md` (433 ES / 421 EN caracteres).
+- Ojo: de la 1.4.0 a la 1.4.1 aún se actualiza con el instalador de siempre (lo hace el código de la
+  1.4.0); lo automático y «volver a la anterior» valen desde la 1.4.1 → siguiente. Ya lo dicen los textos.
+
+### Pendiente (en orden)
+1. Ver si terminó la build lanzada a las 7:55 (`npm run build:release`, log en el scratchpad de la sesión
+   10d1a6dd: `build141.log`). Si no terminó o falló: relanzarla desde `F:\Programacion\AdminOps`
+   (con `$env:SHARKCOST_PEDIDA=1`, David la pidió). Comprobar `release/v1.4.1` con sus 4 archivos.
+2. Publicar: `npm run publish:release` (commit «Versión 1.4.1», push, release v1.4.1). Decisión de David:
+   tras cada build pedida se publica sin volver a preguntar.
+3. David la prueba en el PC; las «sin comprobar» de la tanda 1.5 siguen (abrir a salvo con dos cierres
+   reales, volver a la anterior con dos versiones).
+
+### Para retomar
+Las pruebas de vitest hay que lanzarlas desde `F:\` en mayúscula (PowerShell `Set-Location 'F:\Programacion\AdminOps'`):
+con `f:` en minúscula fallan todas por cargar dos copias de vitest. No es fallo del código.
+
+## Tanda 1.5 (elegida el 2026-11-24, SIN EMPEZAR)
+Catálogo «Ideas para AdminOps 1.5»: https://claude.ai/artifact/LeSCHP4JFfEi5fdJcW4kVp (fuente
+`ideas-adminops-15.html` y `build15.py` en el scratchpad de la sesión 6e25bd71). Las ventanas
+antes/ahora del artifact son lo aprobado: hacerlas así y a fondo. Base: la 1.4.0 publicada (2f34258).
+
+**SÍ (7):**
+- [ ] **1 «Ver el comando» en todas partes**: lo que faltaba de B1. Limpiadores de Espacio (cada fila
+      con «Ver el comando ▾» y «Copiar el comando»), el interruptor de cada programa de Inicio y los
+      arreglos de la bandeja (`tray.rs`).
+- [ ] **2 Las vistas guardadas recuerdan las columnas**: unir A4 (columnas a tu gusto, DataTable) con
+      SavedViews. Cada vista guarda columnas visibles, orden, ordenación y filtro. Las vistas ya
+      guardadas, sin columnas, siguen abriendo con las de siempre.
+- [ ] **4 Ctrl+K abre con «Lo de siempre»**: sin escribir, las 5 acciones más usadas en esa franja
+      del día (mañana/tarde), contadas en este equipo, con «N veces este mes» y Alt+1…5. Al escribir,
+      Ctrl+K como ahora. Solo acciones que funcionan de verdad (igual que el resto de Ctrl+K).
+- [ ] **5 Teams y Correo con su icono también fuera de la barra**: `BrandIcons.tsx` (TeamsIcon,
+      OutlookIcon) en CommOpener («Enviar a…»), ficha de Personas y Ajustes → Portales y correo.
+- [x] **10 Si se cierra mal dos veces, abre a salvo** — HECHA 2026-11-24 (sin commit, sin verla en la app).
+      `safestart.rs` + `SafeStart.tsx`; `session.json` con abierta/pid/arranque/pantalla/actividades; un cierre
+      malo no cuenta si Windows se reinició después ni si aquella AdminOps sigue viva. A salvo se saltan:
+      winwatch, officemap, agenda, disks watch, backupio, alertrules, perfhistory, whatchanged, nightjobs,
+      appbackup, connected, auto_cleanup y security::warm_up. Actividades: grabar, vigilar, tarea nocturna.
+      Errorlog con origen «cierre». Antes:: marcar «abierta» al arrancar y «cerrada bien»
+      al salir; dos cierres malos seguidos → abrir sin vigilar (faultrec), sin monitor en vivo ni tareas
+      nocturnas, con la banda «se cerró de golpe dos veces… estaba haciendo X» y «Seguir a salvo /
+      Abrir normal / Copiar el informe del fallo» (registro de errores, `errorlog.rs`).
+- [x] **11 Volver a la versión anterior** — HECHA 2026-11-24 (sin commit, sin probar con dos versiones).
+      `install_update` guarda antes el Setup de la versión instalada (descargado de su release y comprobado
+      con SHA256) en `version-anterior/`; `DATA_FORMAT` en appcare.rs (súbelo si una versión cambia datos
+      que la anterior no lee). El instalador acepta `--volver` (deja bajar de versión); tauri.conf
+      `allowDowngrades: true`. Solo funciona desde 1.5 → siguiente (la 1.4.0 no guarda nada). Antes:: el actualizador (`appcare.rs`) guarda el Setup de la versión
+      instalada antes de actualizar (comprobado con SHA256). Ajustes → Actualizaciones: «Volver a la
+      X» y aviso si la nueva cambió datos que la anterior no sabe leer.
+- [x] **12 La prueba del .exe, completa en cada build** — HECHA el 2026-11-24, sin commit.
+      En vez de tocar el manifiesto: el .exe se abre con `__COMPAT_LAYER=RunAsInvoker` (solo ese
+      proceso, el .exe no cambia; `--admin` para probarlo elevado con UAC). Recorre las pantallas y
+      cada sección de `src/lib/sections.ts` en los dos temas (98 por tema), comprueba que la pestaña
+      visible cambia, graba 5 s (`faultrec_start/stop`, y borra el vídeo) y al cerrar mira que no
+      quede ningún AdminOps.exe ni WebView2 de la carpeta de prueba. `build-release.ps1` la pasa
+      siempre: ADMINOPS_SKIP_EXE_TEST ya no salta nada (solo avisa).
+      **Comprobado con**: `node tests/exe/exe.mjs` sobre el portable 1.4.0 desde una terminal sin
+      administrador: arranque 2,0 s, 98+98, grabación de 5,0 s, «✓ Todo bien», ningún proceso vivo.
+      Dos falsos fallos de la propia prueba arreglados (pestañas de pantallas/secciones ocultas).
+
+**NO (no volver a proponerlas):** 3 caso en espera, 6 directivas explicadas, 7 certificados que caducan,
+8 recorrido Wi-Fi, 9 programa que pide administrador, 13 capturas comparadas, 14 el plan tras unirse al
+dominio (el fallo conocido de B3 queda como está: el plan se recoge al abrir AdminOps).
+
+Orden propuesto: 12 primero (así todo lo demás se prueba con el .exe), luego 10 y 11, y al final 1, 2,
+4 y 5. Versión: decidir con David al pedir la build.
+
+**Para retomar:** las 7 de la tanda 1.5 HECHAS (2026-11-24), sin commit y sin verlas en la app. Dos revisiones
+de Opus: todos sus hallazgos arreglados (vistas guardadas ya en Programas, Dispositivos, Inicio y Conectados;
+«Lo de siempre» respeta el modo; Alt+1..5 con e.code y sin chocar; huella de la versión anterior en HKLM
+y archivo bloqueado al ejecutar; «Abrir normal» con request_restart; lanzadores Epic/Rockstar no son juego).
+Comprobado: cargo test 867, clippy limpio, vitest 485, tsc, instalador 4/4, test:exe --quick sobre el 1.4.0.
+Falta: pasada de Opus sobre los últimos arreglos antes de la build, novedades (changelog.ts) y guía al
+decidir la versión, y la build cuando David la pida (test:exe completo ya corre en ella).
+
 ## Estado
 - 2026-11-20: **Fases 0, 1, 2 y 3 hechas, en la carpeta principal SIN commit** (sobre badb39d).
   Hecho por oficiales en worktrees y pasado como parche; revisado por Opus (11 fallos + 3 posibles,
@@ -198,9 +296,9 @@ con lint, typecheck, pruebas de Rust y de interfaz, y `npm run test:exe` + `npm 
   grabación, la 8 es el botón ya hecho). **Espera su elección.** Pendiente pedido por David: Teams y Correo
   con su icono oficial en la barra de arriba (en las maquetas ya sale así).
 ## Tanda «más claro + grabación» (elegida el 2026-11-23, tras la build 1.4.0 sin publicar)
-Artifact https://claude.ai/artifact/A4eEutFgCGn7krrrqHsdPj. David: SÍ a 1, 2, 4, 7, 8–16. **Sin decidir (no es
-un no; no volver a empujarlas en esta tanda): 3 resumen único arriba, 5 Inicio «¿Qué le pasa?», 6 lo avanzado
-aparte.** Las maquetas del artifact son lo aprobado. Número de versión: decidir con David al pedir la build
+Artifact https://claude.ai/artifact/A4eEutFgCGn7krrrqHsdPj. David: SÍ a 1, 2, 4, 7, 8–16. **NO (2026-11-24:
+lo que deja sin decidir es un no; no volver a proponerlas): 3 resumen único arriba, 5 Inicio «¿Qué le pasa?»,
+6 lo avanzado aparte.** Las maquetas del artifact son lo aprobado. Número de versión: decidir con David al pedir la build
 (la 1.4.0 compilada aún no está publicada). Añadidos suyos:
 - Grabación automática (10) **desactivada de serie** y nada molesta: «No volver a grabar por esto» (por
   programa/código de error), límite por programa y tiempo, un solo aviso que agrupa, nunca 10 notificaciones.
@@ -375,6 +473,6 @@ Fases:
 ## Decisiones del autor
 - 2026-11-20: Sí a A1, A2, A3, A4, A5, A8, A9, A10, B1, B2, B3, B4, C2, C4, C5, D2, D3, D5, D6, D7, D8.
 - A10: el icono **«El equipo vivo»** (ventana con pulso), de los tres bocetos.
-- Sin elegir (no son un «no»; no volver a empujarlas en esta tanda): A6 ventana que recuerda su sitio,
-  A7 sacar a otra ventana, B5 scripts con formulario, B6 pendrive al día, C1 lo que creció, C3 informe
-  con portada, D1 mapa Wi-Fi, D4 certificados y hora, D9 quién no deja dormir.
+- NO (2026-11-24: lo que deja sin elegir es un no; no volver a proponerlas): A6 ventana que recuerda su
+  sitio, A7 sacar a otra ventana, B5 scripts con formulario, B6 pendrive al día, C1 lo que creció, C3
+  informe con portada, D1 mapa Wi-Fi, D4 certificados y hora, D9 quién no deja dormir.

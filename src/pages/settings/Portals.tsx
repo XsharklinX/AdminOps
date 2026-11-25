@@ -1,5 +1,6 @@
 import { WEB_TICKETS } from "../../lib/features";
-import { Globe, Mail, MessagesSquare, Ticket, TriangleAlert } from "lucide-react";
+import { Globe, Ticket, TriangleAlert } from "lucide-react";
+import { OutlookIcon, TeamsIcon } from "../../components/BrandIcons";
 import { useEffect, useState } from "react";
 import { useToast } from "../../components/feedback";
 import { Button, Card, inputClass, Toggle } from "../../components/ui";
@@ -11,8 +12,8 @@ import type { PageId } from "../../components/Sidebar";
 const KIND = {
   "": { label: "Tickets", icon: Ticket, page: "tickets" as PageId },
   inventory: { label: "Inventario web", icon: Globe, page: "inventory" as PageId },
-  mail: { label: "Correo", icon: Mail, page: "mail" as PageId },
-  teams: { label: "Teams", icon: MessagesSquare, page: "teams" as PageId },
+  mail: { label: "Correo", icon: OutlookIcon, page: "mail" as PageId },
+  teams: { label: "Teams", icon: TeamsIcon, page: "teams" as PageId },
 };
 
 const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.5];

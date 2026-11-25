@@ -21,7 +21,7 @@ import { useMachineState } from "./lib/machineState";
 import { sectionLabel, sectionsOf } from "./lib/sections";
 import { setTabsSlot } from "./lib/tabsSlot";
 import { PageIdContext, requestSection, useCurrentSections } from "./lib/sectionState";
-import { casesApi, knowledgeApi, logQuietly, api, programsApi, securityApi, updateApi, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { casesApi, knowledgeApi, logQuietly, api, safeStartApi, programsApi, securityApi, updateApi, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { analyze, analyzeQuick } from "./lib/diagRun";
@@ -31,6 +31,8 @@ import { NAVIGATE_EVENT, ONBOARDING_EVENT } from "./lib/navigate";
 import { appStarted, appStartMs, codeLoaded, onPerfChange, pageLoads, pageOpened, pagePainted } from "./lib/perf";
 import { Dashboard } from "./pages/Dashboard";
 import { AuditBanner } from "./components/AuditMode";
+import { SafeStartBanner } from "./components/SafeStart";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { PrivacyBanner } from "./components/PrivacyMode";
 import { PageHelp } from "./components/PageHelp";
 import { TasksIndicator } from "./components/TasksIndicator";
@@ -334,6 +336,11 @@ export default function App() {
     });
     return off;
   }, []);
+  // Abrir a salvo: si AdminOps se cierra de golpe, se sabrá en qué pantalla estaba (ver safestart.rs).
+  useEffect(() => {
+    const t = window.setTimeout(() => safeStartApi.page(pageLabel(page)).catch(logQuietly("App")), 800);
+    return () => window.clearTimeout(t);
+  }, [page]);
   // Diálogos compartidos que llevan a otra página (p. ej. enviar el informe con el Correo).
   useEffect(() => {
     const f = (e: Event) => {
@@ -479,13 +486,19 @@ export default function App() {
   }, []);
   const [sessionActive, setSessionActive] = useState(false);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  // La ventana de «Versión nueva»: sale sola una vez por arranque y se vuelve a abrir desde la barra lateral.
+  const [updateOpen, setUpdateOpen] = useState(false);
   // Aviso de versión nueva (Ajustes → General), unos segundos después de abrir.
   useEffect(() => {
     const t = window.setTimeout(() => {
       workApi
         .settings()
         .then((s) => (s.checkUpdates ? appcareApi.checkUpdate() : null))
-        .then((u) => u?.newer && setUpdate(u))
+        .then((u) => {
+          if (!u?.newer) return;
+          setUpdate(u);
+          if (u.installable) setUpdateOpen(true);
+        })
         .catch(logQuietly("App"));
       // No corre prisa: que no compita con las primeras lecturas del Panel.
     }, 30_000);
@@ -582,6 +595,8 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       // Bloqueada: ningún atajo actúa por debajo de la pantalla de bloqueo.
       if (lockedRef.current) return;
+      // Alguien ya lo atendió (p. ej. Alt+1…5 de Ctrl+K): no se vuelve a interpretar.
+      if (e.defaultPrevented) return;
       // Atajos propios (Ajustes → Navegación). Mientras se asigna uno, no actúan.
       const combo = comboOf(e);
       const target = combo && !document.body.dataset.recordingShortcut ? getPrefs().shortcuts[combo] : undefined;
@@ -646,7 +661,7 @@ export default function App() {
   }, [goHistory]);
 
   // Escribir sin tener el foco en un campo filtra la lista de la pantalla.
-  useTypeToFilter(() => locked !== false || paletteOpen || workshop || onboarding || aboutOpen || helpOpen || findOpen || alertsOpen || caseDialog);
+  useTypeToFilter(() => locked !== false || paletteOpen || workshop || onboarding || aboutOpen || helpOpen || findOpen || alertsOpen || caseDialog || updateOpen);
 
   useEffect(() => {
     trackBoot("permisos", api.isAdmin()).then(setIsAdmin).catch(() => setIsAdmin(false));
@@ -828,13 +843,13 @@ export default function App() {
     if (p === "knowledge") return <Knowledge focus={p === page ? focus : null} onNavigate={navigate} />;
     if (p === "recipes") return <RecipesAndProfiles isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "stations") return <Workstations />;
-    if (p === "inventory") return <InventoryPage covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "inventory") return <InventoryPage covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || updateOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "users") return <AccountsAndDomain isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
     if (p === "printers") return <PrintersAndShares isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
-    if (p === "tickets") return <Tickets split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
-    if (p === "mail") return <Tickets kind="mail" split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
-    if (p === "teams") return <Tickets kind="teams" split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} />;
-    if (p === "router") return <MyNetwork isAdmin={!!isAdmin} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || locked !== false || p !== page} focus={p === page ? focus : null} />;
+    if (p === "tickets") return <Tickets split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || updateOpen || locked !== false || p !== page} />;
+    if (p === "mail") return <Tickets kind="mail" split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || updateOpen || locked !== false || p !== page} />;
+    if (p === "teams") return <Tickets kind="teams" split={split} onSplit={setSplit} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || updateOpen || locked !== false || p !== page} />;
+    if (p === "router") return <MyNetwork isAdmin={!!isAdmin} covered={aboutOpen || helpOpen || paletteOpen || onboarding || alertsOpen || caseDialog || updateOpen || locked !== false || p !== page} focus={p === page ? focus : null} />;
     if (p === "remote") return <Remote isAdmin={!!isAdmin} />;
     if (p === "settings") return <SettingsPage appInfo={appInfo} onNavigate={(x: PageId) => navigate(x)} focus={p === page ? focus : null} />;
     if (category) return <TweaksPage category={category} isAdmin={!!isAdmin} focus={p === page ? focus : null} />;
@@ -877,10 +892,12 @@ export default function App() {
           sessionActive={sessionActive}
           onLock={lock?.enabled ? () => setLocked(true) : undefined}
           update={update}
+          onUpdate={() => setUpdateOpen(true)}
           recent={recent}
         />
         <main className="flex min-w-0 flex-1 flex-col">
           <DemoBanner />
+          <SafeStartBanner />
           <AuditBanner />
           <PrivacyBanner />
           <CaseBar onOpenChange={setCaseDialog} />
@@ -976,6 +993,7 @@ export default function App() {
           <WorkshopScreen onClose={() => setWorkshop(false)} host={machine.ctx?.computerName ?? ""} />
         </Suspense>
       )}
+      {update && <UpdateDialog info={update} open={updateOpen && locked === false} onClose={() => setUpdateOpen(false)} />}
       <BootBar />
       <PlanResume />
       <KeyTips disabled={locked !== false} />

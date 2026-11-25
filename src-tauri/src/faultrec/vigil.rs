@@ -350,7 +350,9 @@ fn watch_main(app: Option<tauri::AppHandle>, shared: Arc<Shared>) {
         let mut triggers: Vec<Trigger> = Vec::new();
         if settings.enabled {
             if settings.hang {
-                for (key, name) in hang.observe(t, &s.hung) {
+                // Los juegos no: se quedan sin responder al cargar y se cierran con Alt+F4 sin que falle nada.
+                let hung: Vec<_> = s.hung.iter().filter(|h| !h.game).cloned().collect();
+                for (key, name) in hang.observe(t, &hung) {
                     triggers.push(auto::hang_trigger(&key, &name, at_ms));
                 }
             }
@@ -361,6 +363,10 @@ fn watch_main(app: Option<tauri::AppHandle>, shared: Arc<Shared>) {
             }
             if settings.app_error && n.is_multiple_of(auto::EVENT_POLL_SECS) {
                 for ev in events.poll() {
+                    if crate::games::is_game(&ev.program, Some(ev.path.as_str()).filter(|p| !p.is_empty())) {
+                        log::debug!("Vigilar: {} es un juego; no se graba por su cierre", ev.program);
+                        continue;
+                    }
                     triggers.push(auto::event_trigger(&ev, at_ms));
                 }
             }
@@ -738,7 +744,10 @@ pub fn resume_after_recording(app: &tauri::AppHandle) {
     }
     match start(app, monitor, Some(opts)) {
         Ok(_) => log::info!("Vigilar vuelve a encenderse tras la grabación"),
-        Err(e) => log::warn!("Vigilar no pudo volver a encenderse tras la grabación: {e}"),
+        Err(e) => {
+            log::warn!("Vigilar no pudo volver a encenderse tras la grabación: {e}");
+            crate::safestart::activity(crate::faultrec::SAFE_WATCHING, false);
+        }
     }
 }
 

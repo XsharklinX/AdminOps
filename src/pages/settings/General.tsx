@@ -4,6 +4,7 @@ import { CheckCircle2, Download, HardDrive, Sparkles, Upload } from "lucide-reac
 import { useEffect, useState } from "react";
 import { NAV, DISABLED_PAGES } from "../../components/Sidebar";
 import { useToast } from "../../components/feedback";
+import { ViewCommand } from "../../components/ActionCommand";
 import { Button, Card, Explain, inputClass, resetIntros, Toggle } from "../../components/ui";
 import { openOnboarding } from "../../lib/navigate";
 import { appcareApi, configApi, logQuietly, type Settings, storageApi, type StorageInfo } from "../../lib/api";
@@ -130,15 +131,18 @@ function TrayFixes({ s, set }: SettingsProps) {
       <p className="mb-2 text-sm text-ink">Arreglos rápidos en el menú del icono</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {TRAY_FIXES.map((f) => (
-          <label key={f.id} className="flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={effective.has(f.id)}
-              onChange={() => toggle(f.id)}
-              className="accent-[var(--color-neon)]"
-            />
-            {f.label}
-          </label>
+          <div key={f.id} className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={effective.has(f.id)}
+                onChange={() => toggle(f.id)}
+                className="accent-[var(--color-neon)]"
+              />
+              {f.label}
+            </label>
+            <ViewCommand id={f.id} icon />
+          </div>
         ))}
       </div>
       <p className="mt-2 text-xs text-dim">Los activados aparecen al hacer clic derecho en el icono junto al reloj. El modo auditoría los bloquea igual que en la app.</p>

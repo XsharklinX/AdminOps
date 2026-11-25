@@ -39,7 +39,7 @@ const DEV_ID: &str = r"USB\VID_046D&PID_C52B\5&2A";
 
 /// Acciones que no son del catálogo (para las pruebas: cada una tiene que poder construirse).
 #[cfg(test)]
-const EXTRA_IDS: &[&str] = &["net.repair-quick", "net.repair-deep", "printer.clear-queue", "startup.disable", "restore-point", "device.scan", "device.restart", "device.enable", "display.native", "display.extend", "display.clone", "display.restart-driver", "kbd.only-spanish", "unsaved.copy", "scan.setup", "scan.password", "scan.private", "scan.signing", "scan.shortcut", "onedrive.pause"];
+const EXTRA_IDS: &[&str] = &["net.repair-quick", "net.repair-deep", "printer.clear-queue", "startup.disable", "startup.enable", "restore-point", "device.scan", "device.restart", "device.enable", "display.native", "display.extend", "display.clone", "display.restart-driver", "kbd.only-spanish", "unsaved.copy", "scan.setup", "scan.password", "scan.private", "scan.signing", "scan.shortcut", "onedrive.pause"];
 
 fn ps_path(path: &str) -> String {
     path.replacen('\\', ":\\", 1)
@@ -199,6 +199,8 @@ fn adapter_names() -> String {
 /// Construye el comando de una acción. `context` es el dato que hace falta para
 /// rellenarlo (la impresora, la entrada del inicio).
 pub fn build(state: &TweakState, id: &str, context: Option<&str>) -> Result<ActionCommand, String> {
+    // Los arreglos de la bandeja usan su propio id; «Renovar la IP» es la del catálogo (igual que en `tray::run_fix_now`).
+    let id = crate::tray::catalog_id(id);
     if let Ok(t) = state.find(id) {
         let (script, approximate) = tweak_script(t);
         return Ok(ActionCommand { id: t.id.clone(), name: t.name.clone(), script, approximate, admin: t.needs_admin(), measure: t.measure.clone(), file_name: file_name(&t.name) });
@@ -252,10 +254,12 @@ pub fn build(state: &TweakState, id: &str, context: Option<&str>) -> Result<Acti
             let (name, script) = crate::unsaved::action_script(context.unwrap_or(""))?;
             Ok(make(name, script, true, false, None))
         }
-        "startup.disable" => {
+        "startup.disable" | "startup.enable" => {
+            let enable = id == "startup.enable";
             let item = context.filter(|c| !c.trim().is_empty()).ok_or("Falta el programa del inicio.")?;
-            let (name, script, admin) = crate::tweaks::startup::disable_doc(item)?;
-            Ok(make(&format!("Quitar del inicio: {name}"), format!("# Quitar del inicio\n\n{script}\n"), true, admin, Some("inicio".into())))
+            let (name, script, admin) = crate::tweaks::startup::toggle_doc(item, enable)?;
+            let verb = if enable { "Activar en el inicio" } else { "Quitar del inicio" };
+            Ok(make(&format!("{verb}: {name}"), format!("# {verb}\n\n{script}\n"), true, admin, Some("inicio".into())))
         }
         "restore-point" => {
             let script = "# Crear un punto de restauración\n\n\
@@ -442,7 +446,7 @@ mod tests {
         for id in EXTRA_IDS {
             let ctx = match *id {
                 "printer.clear-queue" => Some("HP-Recepción"),
-                "startup.disable" => continue, // necesita una entrada real del inicio
+                "startup.disable" | "startup.enable" => continue, // necesita una entrada real del inicio
                 "device.scan" | "device.restart" | "device.enable" => Some(DEV_ID),
                 "display.native" => Some("1920x1080"),
                 "unsaved.copy" => Some(r"C:\Users\Ana\AppData\Roaming\Microsoft\Excel\Libro1.xar"),
@@ -465,6 +469,27 @@ mod tests {
         for (id, script) in scripts {
             let errors = crate::ps::parse_errors(&script);
             assert!(errors.trim().is_empty(), "{id}: {errors}");
+        }
+    }
+
+    /// Los comandos que enseñan «Espacio», «Inicio» y los arreglos de la bandeja de Ajustes:
+    /// cada id da un script no vacío que empieza con un comentario en español.
+    #[test]
+    fn los_ids_de_espacio_inicio_y_bandeja_tienen_comando() {
+        let st = state();
+        let mut ids: Vec<String> = ["cleanup.windows-temp", "cleanup.windows-update-cache", "cleanup.user-temp", "cleanup.recycle-bin", "performance.hibernation"].iter().map(|s| s.to_string()).collect();
+        ids.extend(crate::tray::tray_fixes_available().into_iter().map(|(id, _)| id));
+        for id in &ids {
+            let c = build(&st, id, None).unwrap_or_else(|e| panic!("{id}: {e}"));
+            assert!(c.script.starts_with("# "), "{id}: no empieza con un comentario:\n{}", c.script);
+            assert!(c.script.lines().count() > 1 && !c.script.trim().is_empty(), "{id}");
+        }
+        // «Renovar la IP» de la bandeja es la del catálogo.
+        assert_eq!(build(&st, "repair.network-renew", None).unwrap().id, crate::tray::catalog_id("repair.network-renew"));
+        assert_eq!(crate::tray::catalog_id("repair.network-renew"), "repair.ip-renew");
+        // Inicio: sin entrada no hay comando (y el error está en español).
+        for id in ["startup.enable", "startup.disable"] {
+            assert_eq!(build(&st, id, None).unwrap_err(), "Falta el programa del inicio.");
         }
     }
 

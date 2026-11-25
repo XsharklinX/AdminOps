@@ -134,6 +134,7 @@ const BLOCKED: &[&str] = &[
     "enable_file_sharing",
     // Descarga la versión nueva y abre su instalador
     "install_update",
+    "rollback_previous",
     "share_grant",
     "share_revoke",
     "map_network_drive",
@@ -361,7 +362,7 @@ const SAFE: &[&str] = &[
     "partition_layout", "partition_backup", "partition_backups", "partition_find_lost",
     "carve_scan", "carve_found", "carve_preview", "disk_clone_live", "disk_clone_last",
     // el caso en tres tonos (solo redacta texto)
-    "case_tones", "life_report", "parts_advice", "media_in_use", "describe_file", "reveal_path", "open_dropped_pdf", "compose_mail", "tweak_preview", "error_lookup", "error_codes", "mail_domain_check", "autoruns_list", "crash_report", "stress_run", "stress_live", "stress_history", "perf_insights", "event_digest", "learned_record", "learned_stats", "escalation_pack", "save_text_file", "open_text_file", "vulnerable_programs", "rescue_status", "outbound_list", "error_log_record", "error_log_list", "error_log_report", "error_log_clear", "alert_rules_get", "alert_rules_templates", "alert_rules_save", "alert_rules_reading", "backups_get", "backups_status", "backups_defaults", "backups_save", "backups_check",
+    "case_tones", "life_report", "parts_advice", "media_in_use", "describe_file", "reveal_path", "open_dropped_pdf", "compose_mail", "tweak_preview", "error_lookup", "error_codes", "mail_domain_check", "autoruns_list", "crash_report", "stress_run", "stress_live", "stress_history", "perf_insights", "event_digest", "learned_record", "learned_stats", "escalation_pack", "save_text_file", "open_text_file", "vulnerable_programs", "rescue_status", "outbound_list", "error_log_record", "error_log_list", "error_log_report", "error_log_clear", "previous_version", "safe_start_info", "session_page", "safe_start_leave", "safe_start_report", "alert_rules_get", "alert_rules_templates", "alert_rules_save", "alert_rules_reading", "backups_get", "backups_status", "backups_defaults", "backups_save", "backups_check",
     // etiquetas con QR (crean un PDF en la carpeta de informes)
     "label_qr", "label_sheet",
     // workflow

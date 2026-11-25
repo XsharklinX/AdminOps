@@ -523,6 +523,7 @@ export function Sidebar({
   sessionActive,
   onLock,
   update,
+  onUpdate,
   recent = [],
 }: {
   active: PageId;
@@ -534,6 +535,8 @@ export function Sidebar({
   /** Abre «Todo AdminOps» (el mapa y el buscador). */
   onLock?: () => void;
   update?: UpdateInfo | null;
+  /** Abre la ventana de «Versión nueva» (descargar e instalar sin salir de AdminOps). */
+  onUpdate?: () => void;
   recent?: PageId[];
 }) {
   const prefs = usePrefs();
@@ -758,12 +761,12 @@ export function Sidebar({
 
         {update && (
           <button
-            onClick={() => goToPage("settings", "about")}
+            onClick={() => (update.installable && onUpdate ? onUpdate() : goToPage("settings", "about"))}
             className="mx-2.5 mb-2 flex flex-col gap-0.5 rounded-lg border border-neon/40 bg-neon/5 px-3 py-2.5 text-left transition-colors hover:border-neon"
-            title={update.notes || "Ver la versión nueva en Ajustes → Acerca de"}
+            title={update.installable ? "Ver novedades e instalar sin salir de AdminOps" : "Ver la versión nueva en Ajustes → Acerca de"}
           >
             <span className="text-xs text-neon">Versión {update.latest} disponible</span>
-            <span className="text-[13px] text-ink">Ver novedades y descargar</span>
+            <span className="text-[13px] text-ink">{update.installable ? "Ver novedades y actualizar" : "Ver novedades y descargar"}</span>
           </button>
         )}
         {sessionActive && sb.showSession && (

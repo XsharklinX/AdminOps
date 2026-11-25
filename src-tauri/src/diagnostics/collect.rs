@@ -86,6 +86,12 @@ pub struct AppCrash {
     pub app: String,
     pub count: u32,
     pub last: String,
+    /// Ruta del .exe que da el evento (solo para saber si es un juego; no se enseña).
+    #[serde(default, skip_serializing)]
+    pub path: String,
+    /// Es un juego: muchos dejan este error al salir con Alt+F4. No cuenta como avería.
+    #[serde(default)]
+    pub game: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -146,7 +152,8 @@ $bug = @($sys | Where-Object {{ $_.Id -eq 1001 -and ($_.ProviderName -like '*WER
 $kp = @($sys | Where-Object {{ $_.Id -eq 41 -and $_.ProviderName -eq 'Microsoft-Windows-Kernel-Power' }} | ForEach-Object {{ $_.TimeCreated.ToString('o') }})
 $app = @(Get-WinEvent -FilterHashtable @{{ LogName = 'Application'; ProviderName = 'Application Error', 'Application Hang'; StartTime = $since }} -ErrorAction SilentlyContinue)
 $crashes = @($app | Where-Object {{ $_.Id -in 1000, 1002 }} | Group-Object {{ "$($_.Properties[0].Value)" }} | Sort-Object Count -Descending | Select-Object -First 10 | ForEach-Object {{
-  [pscustomobject]@{{ app = $_.Name; count = $_.Count; last = ($_.Group | Sort-Object TimeCreated -Descending)[0].TimeCreated.ToString('o') }}
+  $path = @($_.Group[0].Properties | ForEach-Object {{ "$($_.Value)" }} | Where-Object {{ $_ -match '^[a-zA-Z]:[\\/].*\.exe$' }})[0]
+  [pscustomobject]@{{ app = $_.Name; count = $_.Count; last = ($_.Group | Sort-Object TimeCreated -Descending)[0].TimeCreated.ToString('o'); path = "$path" }}
 }})
 $dumps = $null
 try {{
@@ -184,6 +191,9 @@ ConvertTo-Json -Depth 4 -Compress -InputObject ([pscustomobject]@{{
         log::warn!("Windows anotó {} cierre(s) o cuelgue(s) de {} en {} días (el último, {})", c.count, c.app, s.days, c.last);
     }
     s.crashes = others;
+    for c in &mut s.crashes {
+        c.game = crate::games::is_game(&c.app, Some(c.path.as_str()).filter(|p| !p.is_empty()));
+    }
     let dir = std::path::PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into())).join("Minidump");
     for d in s.minidumps.iter_mut().flatten().take(10) {
         d.analysis = super::minidump::analyze_file(&dir.join(&d.name));

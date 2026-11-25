@@ -73,7 +73,8 @@ export interface Stability {
   days: number;
   bugchecks: { time: string; code: string; name: string | null; hint: string | null }[];
   unexpectedShutdowns: string[];
-  crashes: { app: string; count: number; last: string }[];
+  /** `game`: es un juego (muchos dejan un error al salir con Alt+F4; no cuenta como avería). */
+  crashes: { app: string; count: number; last: string; game?: boolean }[];
   minidumps:
     | {
         name: string;

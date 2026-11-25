@@ -34,6 +34,8 @@ pub struct HungApp {
     pub key: String,
     /// El nombre que se le enseña al técnico («Microsoft Excel»).
     pub name: String,
+    /// Es un juego: se quedan sin responder al cargar y se cierran a mano; no se graba por eso.
+    pub game: bool,
 }
 
 /// Lo medido en un segundo: lo que se guarda y los programas colgados con su clave.
@@ -134,7 +136,8 @@ impl Sampler {
             .filter(|pid| *pid != own)
             .map(|pid| {
                 let id = self.idents.identify(pid);
-                HungApp { key: id.key, name: id.name }
+                let game = crate::games::is_game(&id.key, id.path.as_deref());
+                HungApp { key: id.key, name: id.name, game }
             })
             .collect();
         hung_apps.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.key.cmp(&b.key)));

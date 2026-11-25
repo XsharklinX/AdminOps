@@ -999,7 +999,7 @@ export function Diagnostics({
                       bad: s.unexpectedShutdowns.length >= 2,
                     },
                     {
-                      n: s.crashes.reduce((a, c) => a + c.count, 0),
+                      n: s.crashes.filter((c) => !c.game).reduce((a, c) => a + c.count, 0),
                       label: "Cierres de apps",
                       bad: false,
                     },
@@ -1032,10 +1032,18 @@ export function Diagnostics({
                         <span className="min-w-0 flex-1 truncate text-ink">
                           {c.app}
                         </span>
+                        {c.game && (
+                          <span
+                            className="text-[11px] text-mute"
+                            title="Es un juego: muchos dejan este error al salir con Alt+F4 o al cerrarlos a mano. No cuenta como avería."
+                          >
+                            juego
+                          </span>
+                        )}
                         <span className="text-xs text-mute">
                           {date(c.last)}
                         </span>
-                        <span className="w-8 text-right font-mono text-xs text-warn">
+                        <span className={`w-8 text-right font-mono text-xs ${c.game ? "text-mute" : "text-warn"}`}>
                           ×{c.count}
                         </span>
                       </div>

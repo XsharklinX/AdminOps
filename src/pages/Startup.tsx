@@ -1,11 +1,13 @@
 import { StartupGain } from "../components/StartupGain";
 import { FileWarning, RefreshCw, Search } from "lucide-react";
 import { AutorunsCard } from "../components/expert";
+import { ViewCommand } from "../components/ActionCommand";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { Switch } from "../components/TweakCard";
 import { systemApi, type StartupItem } from "../lib/api";
 import { BootCard } from "../components/Maintenance";
+import { SavedViews } from "../components/SavedViews";
 import { useOnJournalChange } from "../lib/journalEvents";
 import { ErrorState, Loading, iconBtn } from "../components/ui";
 import { DataTable, type Column } from "../components/DataTable";
@@ -126,8 +128,11 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
       cell: (i) => {
         const blocked = i.needsAdmin && !isAdmin;
         return (
-          <span className="inline-flex" title={blocked ? "Requiere administrador" : undefined}>
-            <Switch on={i.enabled} disabled={blocked} busy={busy === i.id} onClick={() => void toggle(i)} />
+          <span className="inline-flex items-center gap-1">
+            <ViewCommand id={i.enabled ? "startup.disable" : "startup.enable"} context={i.id} icon />
+            <span className="inline-flex" title={blocked ? "Requiere administrador" : undefined}>
+              <Switch on={i.enabled} disabled={blocked} busy={busy === i.id} onClick={() => void toggle(i)} />
+            </span>
           </span>
         );
       },
@@ -138,10 +143,20 @@ export function Startup({ isAdmin }: { isAdmin: boolean }) {
     <div className="mx-auto max-w-(--page-max) p-6">
       <BootCard />
       <StartupGain items={items} isAdmin={isAdmin} onChanged={() => void load()} />
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <p className="text-sm text-dim">
           <span className="font-mono text-neon">{enabled}</span> de {items.length} arrancan con Windows
         </p>
+        <SavedViews
+          scope="startup"
+          table="startup"
+          current={{ query, hideMicrosoft }}
+          isDefault={!query.trim() && !hideMicrosoft}
+          onApply={(v) => {
+            setQuery(v.query);
+            setHideMicrosoft(v.hideMicrosoft);
+          }}
+        />
         <div className="relative ml-auto w-72 min-w-40 shrink">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-mute" />
           <input

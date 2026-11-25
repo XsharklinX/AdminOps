@@ -63,10 +63,12 @@ export function AlertCenter({
     let batch: WindowsAlert[] = [];
     let timer: number | undefined;
     const un = listen<WindowsAlert>("windows-alert", (e) => {
-      batch.push(e.payload);
+      // Un juego que se cerró con error va a la campana sin mensaje.
+      if (!e.payload.quiet) batch.push(e.payload);
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         load();
+        if (batch.length === 0) return;
         const worst = batch.find((a) => a.level === "bad") ?? batch[0];
         const more = batch.length > 1 ? ` (y ${batch.length - 1} más en la campana)` : "";
         toast(worst.level === "bad" ? "error" : "info", `${worst.title}${worst.detail ? ` · ${worst.detail}` : ""}${more}`);

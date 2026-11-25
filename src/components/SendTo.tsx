@@ -1,7 +1,8 @@
 // «Enviar a…» desde cualquier tarjeta: un único botón para llevar lo que ves a
 // donde haga falta: portapapeles (texto, tabla para Excel o imagen), las notas
 // del caso abierto, un correo o un mensaje de Teams.
-import { ClipboardCopy, FileSpreadsheet, Images, LifeBuoy, Mail, MessagesSquare, Send } from "lucide-react";
+import { ClipboardCopy, FileSpreadsheet, Images, LifeBuoy, Send } from "lucide-react";
+import { OutlookIcon, TeamsIcon } from "./BrandIcons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { casesApi, logQuietly, uxApi } from "../lib/api";
 import { copyAsImage, NO_CAPTURE } from "../lib/copyImage";
@@ -73,7 +74,7 @@ export function SendTo({ target, title }: { target: () => HTMLElement | null; ti
     },
     {
       label: "Enviar por correo",
-      icon: <Mail size={13} />,
+      icon: <OutlookIcon size={13} />,
       run: () => {
         const body = `${title}\n${text()}`;
         void navigator.clipboard.writeText(body).catch(logQuietly("SendTo"));
@@ -82,7 +83,7 @@ export function SendTo({ target, title }: { target: () => HTMLElement | null; ti
     },
     {
       label: "Enviar por Teams",
-      icon: <MessagesSquare size={13} />,
+      icon: <TeamsIcon size={13} />,
       run: () =>
         navigator.clipboard.writeText(`${title}\n${text()}`).then(() => {
           openComm("teams");
