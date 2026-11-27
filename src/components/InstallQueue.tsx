@@ -7,6 +7,7 @@ import { bytes } from "../lib/format";
 import { canCloseAndGo, initial, isFinished, needsDecision, statusText, summaryText } from "../lib/installQueue";
 import { useConfirm, useToast } from "./feedback";
 import { Bar, Button } from "./ui";
+import { WingetDoctor, wingetSuspect } from "./WingetDoctor";
 
 const STATE_COLOR: Record<InstallItem["state"], string> = {
   queued: "text-mute",
@@ -111,7 +112,7 @@ function Row({ item }: { item: InstallItem }) {
 }
 
 /** Todas las filas de la tanda y, cuando termina, el resumen de arriba. */
-export function InstallQueue({ items, onClose }: { items: InstallItem[]; onClose: () => void }) {
+export function InstallQueue({ items, onClose, isAdmin = false }: { items: InstallItem[]; onClose: () => void; isAdmin?: boolean }) {
   if (items.length === 0) return null;
   const summary = summaryText(items);
   return (
@@ -124,6 +125,8 @@ export function InstallQueue({ items, onClose }: { items: InstallItem[]; onClose
           </button>
         )}
       </div>
+      {/* Cuando lo que falla es winget y no los programas: por qué, repararlo y reintentar. */}
+      {items.every(isFinished) && wingetSuspect(items) && <WingetDoctor items={items} isAdmin={isAdmin} />}
       <ul className="divide-y divide-line/60">
         {items.map((i) => (
           <Row key={i.id} item={i} />

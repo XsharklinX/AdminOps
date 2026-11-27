@@ -1,11 +1,12 @@
-import { BadgeCheck, Bluetooth, Cloud, Compass, Gauge, Globe, Mail, MailWarning, Monitor, Printer, RefreshCcwDot, Usb, UserX, Volume2, Wifi, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Bluetooth, Camera, Cloud, Compass, Gauge, Globe, Mail, MailWarning, Monitor, Printer, RefreshCcwDot, Usb, UserX, Volume2, Wifi, type LucideIcon } from "lucide-react";
 import type { Symptom } from "./api";
 
 // Síntomas de «Solucionar problemas» (también en la búsqueda global).
 export const SYMPTOMS: { id: Symptom; title: string; hint: string; icon: LucideIcon; keywords: string }[] = [
   { id: "internet", title: "No hay Internet", hint: "No cargan las webs, «sin Internet», cortes", icon: Globe, keywords: "red conexion internet navegar dns router proxy" },
   { id: "wifi", title: "La Wi-Fi no funciona", hint: "No aparece, no conecta o se corta", icon: Wifi, keywords: "wifi wireless inalambrica tarjeta" },
-  { id: "audio", title: "No suena", hint: "Sin sonido, altavoz con una X, micrófono", icon: Volume2, keywords: "audio sonido altavoces auriculares microfono volumen" },
+  { id: "audio", title: "No se oye o no me oyen", hint: "Sin sonido, micrófono en Teams, cascos", icon: Volume2, keywords: "audio sonido altavoces auriculares cascos microfono volumen teams llamada no me oyen" },
+  { id: "camera", title: "No me ven", hint: "La cámara en Teams: negra, no aparece, otra cámara", icon: Camera, keywords: "camara webcam video no me ven teams zoom imagen negra" },
   { id: "bluetooth", title: "Bluetooth", hint: "No aparece, no empareja o no conecta", icon: Bluetooth, keywords: "bluetooth auriculares raton teclado emparejar" },
   { id: "display", title: "Pantalla o monitor", hint: "Monitor sin imagen, parpadeos, resolución", icon: Monitor, keywords: "pantalla monitor grafica video hdmi resolucion negra" },
   { id: "printer", title: "No imprime", hint: "Cola atascada, sin conexión, predeterminada", icon: Printer, keywords: "impresora imprimir cola spooler" },

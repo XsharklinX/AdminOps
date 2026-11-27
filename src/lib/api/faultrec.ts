@@ -229,6 +229,11 @@ export const faultRecApi = {
   justHappened: () => invoke<FaultRecording>("faultrec_just_happened"),
   /** La miniatura de la lista (JPEG como data URL; se hace una vez y se guarda junto al vídeo). */
   thumb: (id: string) => invoke<string>("faultrec_thumb", { id }),
+  /** Al caso abierto; devuelve si ya estaba en él. */
+  attachCase: (id: string) => invoke<boolean>("faultrec_attach_case", { id }),
+  /** El vídeo como archivo al portapapeles. */
+  copyFile: (id: string) => invoke<void>("faultrec_copy_file", { id }),
+  openFile: (id: string) => invoke<void>("faultrec_open_file", { id }),
   /** «Al informe»: tres fotogramas del trozo y sus marcas, para el PDF del cliente. */
   toReport: (id: string, fromMs: number, toMs: number) => invoke<unknown>("faultrec_to_report", { id, fromMs: Math.round(fromMs), toMs: Math.round(toMs) }),
   reportRemove: (id: string) => invoke<void>("faultrec_report_remove", { id }),

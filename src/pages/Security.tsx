@@ -24,6 +24,8 @@ import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, Card, Explain, Loading, Modal } from "../components/ui";
 import { TweaksPage } from "./TweaksPage";
+import { UsbCard } from "../components/UsbCard";
+import { WebNotifCard } from "../components/WebNotifCard";
 import { securityApi, toolboxApi, toolsApi, type BitlockerVolume, type SecurityAudit, type SecurityCheck, type SuspiciousItem } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
@@ -174,7 +176,9 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
       <BitlockerCard isAdmin={isAdmin} />
       <SecurityDeepCard isAdmin={isAdmin} onNavigate={(p) => onNavigate(p)} />
       <SuspiciousCard isAdmin={isAdmin} />
+      <UsbCard isAdmin={isAdmin} />
       <ExtensionsCard />
+      <WebNotifCard />
 
       <div>
         <h2 className="mb-1 px-1 text-[11px] font-semibold text-dim">Ajustes de seguridad</h2>

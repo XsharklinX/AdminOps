@@ -168,6 +168,31 @@ const BLOCKED: &[&str] = &[
     "wipe_free_space",
     "recover_install",
     "recover_run",
+    // El cohete borra temporales y vacía memoria.
+    "rocket_boost",
+    "rocket_deep_clean",
+    "rocket_restart_hung",
+    "rocket_prepare_call",
+    "rocket_set_startup",
+    // Predeterminados para usuarios nuevos (DISM), permisos de cámara y activar/desactivar cámaras.
+    "defapps_apply_new_users",
+    "cam_allow",
+    "cam_enable",
+    // Mueve ventanas de otros programas; bloquea los avisos de webs en los ajustes del navegador.
+    "bring_windows",
+    "web_notifications_remove",
+    // Energía: cambia el plan activo del equipo.
+    "power_set",
+    // Audio: predeterminado, volumen y permisos de micrófono. winget: lo reinstala y restablece orígenes.
+    "audio_use",
+    "audio_allow_mic",
+    "winget_repair",
+    // Programas predeterminados: la directiva del equipo.
+    "defapps_apply",
+    "defapps_remove_policy",
+    // Memorias USB: directivas de almacenamiento extraíble.
+    "usb_set",
+    "usb_allow_for",
 ];
 
 /// Comandos revisados uno a uno que **no cambian el equipo del cliente**: leen,
@@ -271,6 +296,21 @@ const SAFE: &[&str] = &[
     "list_followups", "add_followup", "set_followup_done", "snooze_followup", "delete_followup",
     "open_quick_note", "close_quick_note", "open_screen_clip", "redact_clipboard_image",
     "open_adminops_mini", "close_adminops_mini",
+    // el cohete: su ventanita, su modo (ajuste de AdminOps) y abrir AdminOps
+    "rocket_size", "rocket_peek", "rocket_memory", "rocket_dock_state", "rocket_deep_scan", "rocket_startup_enabled", "rocket_set_mode", "rocket_open_main",
+    // energía (lectura)
+    "power_state", "power_profiles", "power_wake",
+    // audio (escuchar y un pitido no cambian nada) y winget (comprobar)
+    "audio_view", "audio_listen", "audio_beep", "winget_check",
+    // programas predeterminados: leer, la elección de la oficina (datos de AdminOps) y abrir Configuración
+    "defapps_view", "defapps_set_office", "defapps_open_settings",
+    "usb_state", "usb_history",
+    // escucharte (graba y reproduce, no cambia nada), la cámara (lectura) y la barra del cohete
+    "audio_echo", "cam_view", "rocket_bar", "bar_fixes", "bar_open_comm",
+    // abrir Asistencia rápida; la grabación al caso (datos de AdminOps), copiarla al portapapeles y abrirla
+    "bar_quick_assist", "bar_screen_clip", "faultrec_attach_case", "faultrec_copy_file", "faultrec_open_file",
+    // ventanas fuera de la pantalla y avisos de webs (solo leer)
+    "lost_windows", "web_notifications",
     // bandeja: lista de arreglos (lectura) y lo que queda en modo portable (lectura)
     "tray_fixes_available", "portable_leftovers", "portable_cleanup",
     // cases

@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { faultRecApi, FAULTREC_DONE_EVENT, FAULTREC_OPEN_EVENT, FAULTREC_TICK_EVENT, type FaultRecDone } from "../lib/api";
 import { logQuietly } from "../lib/api/core";
 import { clock, getRecOptions } from "../lib/faultrec";
-import { RecordIcon } from "./BrandIcons";
+import { RecDot } from "./BrandIcons";
 import { useToast } from "./feedback";
 import type { PageId } from "./Sidebar";
 
@@ -105,7 +105,7 @@ export function RecButton({ onNavigate }: { onNavigate: (page: PageId, section?:
         title="Grabando la pantalla · clic para parar y ver la grabación"
         aria-label={`Grabando ${clock(secs)}. Parar`}
       >
-        {busy ? <Loader2 size={13} className="animate-spin" /> : <span className="size-2 shrink-0 animate-pulse rounded-full bg-ok" aria-hidden />}
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <RecDot size={14} recording />}
         {clock(secs)}
       </button>
     );
@@ -123,7 +123,7 @@ export function RecButton({ onNavigate }: { onNavigate: (page: PageId, section?:
       }
       aria-label={watching ? "Vigilando. Guardar el último minuto" : "Grabar la pantalla"}
     >
-      {busy ? <Loader2 size={16} className="animate-spin" /> : <RecordIcon size={19} />}
+      {busy ? <Loader2 size={16} className="animate-spin" /> : <RecDot size={19} />}
       {watching && !busy && <span className="absolute top-1 right-1 size-2 animate-pulse rounded-full bg-ok ring-2 ring-void" aria-hidden />}
     </button>
   );

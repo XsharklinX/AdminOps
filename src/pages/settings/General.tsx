@@ -7,7 +7,7 @@ import { useToast } from "../../components/feedback";
 import { ViewCommand } from "../../components/ActionCommand";
 import { Button, Card, Explain, inputClass, resetIntros, Toggle } from "../../components/ui";
 import { openOnboarding } from "../../lib/navigate";
-import { appcareApi, configApi, logQuietly, type Settings, storageApi, type StorageInfo } from "../../lib/api";
+import { appcareApi, configApi, logQuietly, rocketApi, type Settings, storageApi, type StorageInfo } from "../../lib/api";
 import { exportPrefs, importPrefs, setPrefs, usePrefs } from "../../lib/prefs";
 import { DataSafety } from "./DataSafety";
 import { AutoBackup } from "./AutoBackup";
@@ -90,6 +90,34 @@ export function StartWindow({ s, set }: SettingsProps) {
           <Toggle checked={s.trayIcon} onChange={(v) => set({ trayIcon: v })} />
         </Row>
         {s.trayIcon && <TrayFixes s={s} set={set} />}
+        <Row
+          title="Cohete de «Optimizar ya»"
+          sub="Una burbuja con un cohete que se puede mover a cualquier sitio. Al tocarla libera memoria, borra temporales de más de un día y vacía la caché DNS, sin cerrar nada de lo que estás usando. En el escritorio se queda siempre encima, también con AdminOps minimizada, y se esconde sola con una presentación o un vídeo a pantalla completa. Clic derecho en el cohete para cambiarlo de sitio u ocultarlo."
+        >
+          <select value={s.rocket ?? "desktop"} onChange={(e) => set({ rocket: e.target.value as "desktop" | "app" | "off" })} className={selectClass}>
+            <option value="desktop">En el escritorio</option>
+            <option value="app">Solo dentro de AdminOps</option>
+            <option value="off">Oculto</option>
+          </select>
+        </Row>
+        {(s.rocket ?? "desktop") !== "off" && (
+          <>
+            <Row title="Tamaño del cohete" sub="Pegado a un borde de la pantalla se queda medio escondido y casi transparente; sale entero al acercar el ratón.">
+              <select value={s.rocketSize ?? "m"} onChange={(e) => set({ rocketSize: e.target.value as "s" | "m" | "l" })} className={selectClass}>
+                <option value="s">Pequeño</option>
+                <option value="m">Normal</option>
+                <option value="l">Grande</option>
+              </select>
+            </Row>
+            <Row
+              title="Que despegue solo cuando haga falta"
+              sub="Si la memoria pasa del 90 % durante dos minutos, o el equipo lleva un rato sin usarse con la memoria alta, el cohete optimiza solo y lo dice en la burbuja. Nunca con una presentación, un vídeo a pantalla completa o el micrófono en uso; como mucho una vez cada media hora."
+            >
+              <Toggle checked={!!s.rocketAuto} onChange={(v) => set({ rocketAuto: v })} />
+            </Row>
+            {(s.rocket ?? "desktop") === "desktop" && <RocketStartup />}
+          </>
+        )}
         <Row title="Actualización del Panel" sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo.">
           <select value={prefs.refreshMs} onChange={(e) => setPrefs({ refreshMs: Number(e.target.value) })} className={selectClass}>
             <option value={1000}>Cada segundo</option>
@@ -422,6 +450,35 @@ function Autostart() {
       sub="Minimizada en la barra de tareas, sin pedir permiso de administrador cada vez. En modo portable, si mueves la carpeta, vuelve a activarlo."
     >
       <Toggle checked={!!on} disabled={on === null} onChange={(v) => toggle(v)} />
+    </Row>
+  );
+}
+
+/** «El cohete arranca con Windows»: una tarea al iniciar sesión que abre solo el cohete, sin AdminOps entera. */
+function RocketStartup() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const toast = useToast();
+  useEffect(() => {
+    rocketApi.startupEnabled().then(setOn, () => setOn(false));
+  }, []);
+  return (
+    <Row
+      title="El cohete arranca con Windows"
+      sub="Al iniciar sesión aparece solo el cohete, aunque no abras AdminOps. «Abrir AdminOps» en su menú abre la aplicación entera. Al salir de AdminOps, el cohete se queda."
+    >
+      <Toggle
+        checked={!!on}
+        disabled={on === null}
+        onChange={(v) =>
+          rocketApi.setStartup(v).then(
+            () => {
+              setOn(v);
+              toast("ok", v ? "El cohete arrancará con Windows." : "El cohete ya no arranca con Windows.");
+            },
+            (e) => toast("error", String(e)),
+          )
+        }
+      />
     </Row>
   );
 }

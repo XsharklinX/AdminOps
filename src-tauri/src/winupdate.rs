@@ -156,6 +156,28 @@ pub fn update_pause(days: u32, tweaks: State<'_, TweakState>) -> Result<(), Stri
     result
 }
 
+/// Pausa unas horas (para una llamada): mismo registro que la pausa por días de Configuración.
+/// Si ya había una pausa más larga, se deja la que hay.
+pub fn pause_hours(hours: i64, tweaks: &TweakState) -> Result<(), String> {
+    if !crate::elevation::is_elevated() {
+        return Err("Requiere ejecutar AdminOps como administrador.".into());
+    }
+    let now = chrono::Utc::now();
+    let end = now + chrono::Duration::hours(hours);
+    let current = crate::tweaks::registry::read_string(UX, "PauseUpdatesExpiryTime").and_then(|u| chrono::DateTime::parse_from_rfc3339(&u).ok());
+    if current.is_some_and(|c| c > end) {
+        return Ok(());
+    }
+    let fmt = |d: chrono::DateTime<chrono::Utc>| d.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let (start, end) = (fmt(now), fmt(end));
+    let result = PAUSE_VALUES.iter().try_for_each(|v| {
+        let value = if v.contains("Start") { &start } else { &end };
+        crate::tweaks::registry::write(UX, v, crate::tweaks::model::RegKind::String, &crate::tweaks::model::RegData::Str(value.clone()))
+    });
+    tweaks.record(Op::Run, &format!("Windows Update: pausar {hours} horas"), &result);
+    result
+}
+
 // ---------- Pendientes y ocultas ----------
 
 #[derive(Serialize, Deserialize, Debug)]

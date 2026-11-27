@@ -43,6 +43,14 @@ export interface Settings {
   brandColor?: string;
   /** Servicios de Internet apagados en Ajustes → Seguridad. */
   netOff?: string[];
+  /** El cohete de «Optimizar ya»: en el escritorio, dentro de AdminOps o oculto. */
+  rocket?: "desktop" | "app" | "off";
+  /** Tamaño del cohete: pequeño, normal o grande. */
+  rocketSize?: "s" | "m" | "l";
+  /** Despega solo con la memoria alta o el equipo sin usar. */
+  rocketAuto?: boolean;
+  /** Herramientas de la barra del cohete, en su orden (null: todas). */
+  rocketTools?: string[] | null;
 }
 
 export interface CatalogItem {

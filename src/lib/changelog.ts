@@ -18,6 +18,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.5.0",
+    title: "La barra del cohete, arreglos de oficina y la cámara",
+    added: [
+      "La barra del cohete: vive en el borde de la pantalla y asoma medio cohete con una flecha; al tocarla sale con Optimizar ya (mantenerlo pulsado: a fondo), Grabar pantalla (rojo; verde mientras graba; al parar: al caso, copiar o abrir), Captura, Velocidad de internet, Nota de llamada, Mini monitor, Arreglos rápidos, Datos del equipo para copiar, Asistencia rápida, Teams, Correo y AdminOps. Se esconde sola, Ctrl+Alt+T la saca y el lápiz la personaliza.",
+      "El cohete: anillo con la memoria en uso, desglose de lo que se llevó cada programa, «a fondo» (Windows Update, papelera de más de 30 días, miniaturas y caché de navegadores cerrados), aviso de programa que no responde, preparar una llamada, despegue automático opcional y arranque con Windows sin abrir AdminOps.",
+      "Energía: cuándo se apaga la pantalla y se suspende, en una frase, con perfiles de un clic.",
+      "«No se oye o no me oyen»: cada micrófono con su barra de voz en vivo, usar el bueno para todo, permisos y «Escúchate» (graba 5 s y te lo reproduce). «No me ven»: vista previa de cada cámara, permisos y desactivar la que sobra.",
+      "winget: si no está listo se dice al entrar en Instalar y se repara solo.",
+      "Programas predeterminados como en la oficina (en dominio y para los usuarios nuevos), memorias USB permitidas, solo lectura o bloqueadas (con «Permitir 15 minutos» y las que se han conectado), avisos falsos de webs y ventanas perdidas fuera de la pantalla.",
+    ],
+  },
+  {
     version: "1.4.1",
     title: "Actualizar sin salir de AdminOps, abrir a salvo y volver a la versión anterior",
     added: [

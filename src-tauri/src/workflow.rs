@@ -83,6 +83,15 @@ pub struct Settings {
     pub brand_color: String,
     /// Servicios de Internet que se apagaron en Ajustes → Seguridad (ver `outbound`).
     pub net_off: Vec<String>,
+    /// El cohete de «Optimizar ya»: desktop (siempre encima en el escritorio) | app (dentro de
+    /// AdminOps) | off. Ver `rocket`.
+    pub rocket: String,
+    /// Tamaño del cohete: s | m | l.
+    pub rocket_size: String,
+    /// Despega solo con la memoria alta un rato o el equipo sin usar (nunca en llamada ni presentación).
+    pub rocket_auto: bool,
+    /// Herramientas de la barra del cohete y su orden. Sin configurar (None): todas, en su orden de fábrica.
+    pub rocket_tools: Option<Vec<String>>,
 }
 
 /// ¿Es un color #rrggbb?
@@ -239,6 +248,10 @@ impl Default for Settings {
             tagline: String::new(),
             brand_color: String::new(),
             net_off: vec![],
+            rocket: "desktop".into(),
+            rocket_size: "m".into(),
+            rocket_auto: false,
+            rocket_tools: None,
         }
     }
 }
@@ -292,6 +305,15 @@ pub fn save_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), St
     if !["risky", "always", "never"].contains(&settings.restore_points.as_str()) {
         return Err("Opción de puntos de restauración no válida.".into());
     }
+    if settings.rocket_tools.as_deref().is_some_and(|t| !crate::rocketbar::valid_tools(t)) {
+        return Err("Herramientas de la barra no válidas.".into());
+    }
+    if !["s", "m", "l"].contains(&settings.rocket_size.as_str()) {
+        return Err("Tamaño del cohete no válido.".into());
+    }
+    if !crate::rocket::valid_mode(&settings.rocket) {
+        return Err("Modo del cohete no válido.".into());
+    }
     let allowed_fixes: std::collections::HashSet<String> = crate::tray::fixes_available_ids();
     if settings.tray_fixes.iter().flatten().any(|id| !allowed_fixes.contains(id)) {
         return Err("Hay arreglos de la bandeja que no existen.".into());
@@ -300,7 +322,24 @@ pub fn save_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), St
     crate::window_state::set_close_minimizes(settings.close_minimizes);
     crate::tray::set_visible(&app, settings.tray_icon);
     crate::tray::refresh(&app);
-    crate::paths::write_json(&settings_path(&app), &settings)
+    let rocket_changed = settings_on_disk(&app).is_none_or(|old| old.rocket != settings.rocket || old.rocket_size != settings.rocket_size);
+    crate::paths::write_json(&settings_path(&app), &settings)?;
+    if rocket_changed {
+        // Otro tamaño: la ventanita se vuelve a abrir con él.
+        crate::rocket::reopen(&app, &settings.rocket);
+    }
+    Ok(())
+}
+
+fn settings_on_disk(app: &tauri::AppHandle) -> Option<Settings> {
+    std::fs::read(settings_path(app)).ok().and_then(|b| serde_json::from_slice(&b).ok())
+}
+
+/// El cohete cambia su propio modo desde su menú («Dentro de AdminOps», «Ocultar»).
+pub fn set_rocket_mode(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
+    let mut s = settings(app);
+    s.rocket = mode.into();
+    crate::paths::write_json(&settings_path(app), &s)
 }
 
 // ---------- Presupuesto / recibo ----------

@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type PageId } from "../components/Sidebar";
 import { Card, ErrorState, Loading, Toggle } from "../components/ui";
 import { PerfPanel } from "../components/PerfPanel";
-import { type AppInfo, type Settings, workApi } from "../lib/api";
+import { listen } from "@tauri-apps/api/event";
+import { type AppInfo, type Settings, workApi, ROCKET_MODE_EVENT, type RocketMode } from "../lib/api";
 import { PortalSettings } from "./settings/Portals";
 import { findSettings, LEGACY_SECTIONS, SECTIONS, type SettingsSection } from "./settings/catalog";
 import { LockSettings } from "./settings/LockSettings";
@@ -91,6 +92,16 @@ export function SettingsPage({
     const t = window.setTimeout(() => void flush(), 600);
     return () => window.clearTimeout(t);
   }, [s, flush]);
+  // El cohete cambia su modo desde su propio menú: que el siguiente guardado de aquí no lo pise.
+  useEffect(() => {
+    const off = listen<RocketMode>(ROCKET_MODE_EVENT, (e) => {
+      if (pending.current) pending.current = { ...pending.current, rocket: e.payload };
+      setS((cur) => (cur && cur.rocket !== e.payload ? { ...cur, rocket: e.payload } : cur));
+    });
+    return () => {
+      void off.then((f) => f());
+    };
+  }, []);
   // Al salir de Ajustes no se pierde lo último que se tocó.
   useEffect(() => () => void flush(), [flush]);
   useEffect(() => {

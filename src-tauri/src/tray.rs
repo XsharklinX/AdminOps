@@ -49,7 +49,7 @@ fn ask_ui(app: &tauri::AppHandle, action: &str) {
 }
 
 /// Qué arreglos rápidos están activados en Ajustes → General.
-fn enabled_fixes(app: &tauri::AppHandle) -> Vec<String> {
+pub(crate) fn enabled_fixes(app: &tauri::AppHandle) -> Vec<String> {
     let settings = crate::workflow::settings(app);
     match settings.tray_fixes {
         // Sin configurar: los cuatro de fábrica.
@@ -63,6 +63,8 @@ fn enabled_fixes(app: &tauri::AppHandle) -> Vec<String> {
 fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>, fixes: &[String]) -> tauri::Result<Menu<R>> {
     let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
     let open = item("open", "Abrir AdminOps")?;
+    let rocket_go = item("rocket-go", "Optimizar ya (Ctrl+Alt+O)")?;
+    let rocket_show = item("rocket-show", "Enseñar el cohete")?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let quick = item("quick-scan", "Análisis rápido")?;
     let note = item("note", "Nota de llamada")?;
@@ -77,7 +79,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>, fixes: &[String]) ->
             fix_items.push(item(&format!("fix:{id}"), label)?);
         }
     }
-    let mut refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&open, &sep1, &quick, &note, &monitor, &alerts, &sep2];
+    let mut refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&open, &rocket_go, &rocket_show, &sep1, &quick, &note, &monitor, &alerts, &sep2];
     for f in &fix_items {
         refs.push(f);
     }
@@ -97,6 +99,15 @@ fn build(app: &tauri::AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show_main(app),
+            "rocket-go" => crate::rocketplus::launch(app),
+            "rocket-show" => {
+                // Escondido u oculto en Ajustes: vuelve al escritorio.
+                if !crate::rocket::force_show(app) {
+                    if let Err(e) = crate::rocket::rocket_set_mode(app.clone(), "desktop".into()) {
+                        log::warn!("{e}");
+                    }
+                }
+            }
             "note" => {
                 if let Err(e) = crate::quicknote::open(app) {
                     log::warn!("{e}");

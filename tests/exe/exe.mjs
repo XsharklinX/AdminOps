@@ -77,7 +77,7 @@ mkdirSync(dataDir, { recursive: true });
 // datos de AdminOps instalado en este equipo (storage::migrate_if_needed), con
 // sus portales y ajustes como «Al cerrar, minimizar», y la prueba deja de ser limpia.
 // «onboarded»: sin él sale el asistente de inicio, que tapa la ventana y deja el portal escondido.
-writeFileSync(join(dataDir, "settings.json"), JSON.stringify({ onboarded: true }));
+writeFileSync(join(dataDir, "settings.json"), JSON.stringify({ onboarded: true, rocket: "off" }));
 
 // ── 2. Portal de prueba: una página con sesión (cookie) y un contador ──────
 let visits = 0;

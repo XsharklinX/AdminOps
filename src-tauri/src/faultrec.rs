@@ -1239,6 +1239,55 @@ pub fn faultrec_export(app: tauri::AppHandle, id: String, from_ms: u64, to_ms: u
     Ok(Some(Exported { path: out.to_string_lossy().into_owned(), ms }))
 }
 
+// ---------- Al parar, desde la barra del cohete ----------
+
+/// «Al caso»: la grabación pasa al caso abierto (así no se borra al cerrar AdminOps y sale en el caso).
+/// Devuelve si ya estaba en él.
+#[tauri::command(async)]
+pub fn faultrec_attach_case(app: tauri::AppHandle, id: String) -> Result<bool, String> {
+    if !valid_id(&id) {
+        return Err("Grabación desconocida.".into());
+    }
+    let open = crate::cases::open_case_id(&app).ok_or("No hay ningún caso abierto: abre uno en AdminOps y vuelve a probar.")?;
+    let d = dir(&app);
+    let mut meta = read_meta(&meta_file(&d, &id)).ok_or("Esa grabación ya no está.")?;
+    if meta.case_id.as_deref() == Some(open.as_str()) {
+        return Ok(true);
+    }
+    meta.case_id = Some(open);
+    write_meta(&d, &meta)?;
+    Ok(false)
+}
+
+/// «Copiar»: el vídeo, como archivo, al portapapeles (para pegarlo en Teams, el correo o una carpeta). Se copia
+/// antes a la carpeta temporal con un nombre legible, que es el que verá quien lo reciba.
+#[tauri::command(async)]
+pub fn faultrec_copy_file(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    if !valid_id(&id) {
+        return Err("Grabación desconocida.".into());
+    }
+    let d = dir(&app);
+    let meta = read_meta(&meta_file(&d, &id)).ok_or("Esa grabación ya no está.")?;
+    let out_dir = std::env::temp_dir().join("AdminOps");
+    std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+    let out = out_dir.join(export_name(meta.started, 0));
+    std::fs::copy(video_file(&d, &id), &out).map_err(|e| format!("No se pudo preparar el vídeo: {e}"))?;
+    crate::rocketbar::copy_file_to_clipboard(&out)
+}
+
+/// «Abrir»: el vídeo con el reproductor de Windows, como el usuario.
+#[tauri::command(async)]
+pub fn faultrec_open_file(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    if !valid_id(&id) {
+        return Err("Grabación desconocida.".into());
+    }
+    let f = video_file(&dir(&app), &id);
+    if !f.exists() {
+        return Err("Esa grabación ya no está.".into());
+    }
+    crate::shellopen::open(&f.to_string_lossy())
+}
+
 /// Lo que va en el informe: los trozos mandados de las grabaciones del caso abierto (o, sin caso, de las que no
 /// tienen caso), de la más antigua a la más nueva.
 pub fn report_clips(app: &tauri::AppHandle) -> Vec<ReportClip> {

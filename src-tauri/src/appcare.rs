@@ -763,6 +763,11 @@ fn close_when_installer_runs_holding(app: tauri::AppHandle, installer: String, h
     });
 }
 
+/// ¿Se está instalando una actualización? (Al cerrarse por ella no se deja el cohete abierto.)
+pub fn updating() -> bool {
+    UPDATING.load(std::sync::atomic::Ordering::Acquire)
+}
+
 /// Candado de `install_update`: se suelta al terminar, salga bien o mal.
 struct UpdateBusy;
 

@@ -68,6 +68,7 @@ export const SECTIONS: Partial<Record<PageId, Section[]>> = {
     { id: "install", label: "Instalar", keywords: "descargar instalar programa catalogo" },
     { id: "uninstall", label: "Desinstalar", keywords: "quitar eliminar programa restos" },
     { id: "bloatware", label: "Bloatware", keywords: "apps preinstaladas basura store" },
+    { id: "defaults", label: "Predeterminados", keywords: "programas predeterminados pdf navegador abrir con asociaciones csv" },
   ],
   users: [
     { id: "users", label: "Usuarios de este equipo", keywords: "usuario local contraseña administrador crear cuenta" },

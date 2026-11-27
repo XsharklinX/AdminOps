@@ -107,7 +107,18 @@ mod shares;
 mod applock;
 mod appcare;
 mod winwatch;
+mod audiofix;
+mod defapps;
+mod power;
 mod remote;
+mod rocket;
+mod rocketplus;
+mod usbpolicy;
+mod camfix;
+mod lostwin;
+mod rocketbar;
+mod webnotif;
+mod wingetfix;
 mod accounts;
 mod appbackup;
 mod audit;
@@ -183,7 +194,13 @@ pub fn run() {
     // Procesos del navegador interno que quedaron vivos de una sesión anterior:
     // si siguen con el perfil abierto, las vistas nuevas se enganchan a ellos y
     // no arrancan nunca (ver webview_orphans.rs).
-    let orphans = boottime::step("Navegador de sesiones anteriores", webview_orphans::kill_orphans);
+    // `--rocket`: solo la ventanita del cohete, con AdminOps cerrada (arranca con Windows).
+    // No toca los procesos del navegador interno: podrían ser los de una AdminOps abierta.
+    let rocket_only = args.iter().any(|a| a == "--rocket");
+    if rocket_only {
+        rocketplus::mark_rocket_only();
+    }
+    let orphans = if rocket_only { 0 } else { boottime::step("Navegador de sesiones anteriores", webview_orphans::kill_orphans) };
     if orphans > 0 {
         std::env::set_var("ADMINOPS_ORPHANS", orphans.to_string());
     }
@@ -224,7 +241,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .on_window_event(|window, event| {
-            if window.label() != "main" {
+            // El cohete: se guarda dónde lo dejan.
+            if window.label() == rocket::LABEL {
+                if let tauri::WindowEvent::Moved(p) = event {
+                    rocket::on_moved(window.app_handle(), p.x, p.y);
+                }
+                return;
+            }
+            if window.label() != "main" || rocketplus::rocket_only() {
                 return;
             }
             // Queda por escrito cómo y cuándo se cierra. Sin esto, una app que
@@ -252,6 +276,9 @@ pub fn run() {
                     log::info!("Ventana destruida a los {} ms", boottime::since_start_ms());
                     minimon::close(window.app_handle());
                     mini::close(window.app_handle());
+                    rocket::close(window.app_handle());
+                    // Si el cohete arranca con Windows, se queda él solo al cerrar AdminOps.
+                    rocketplus::leave_rocket_behind(window.app_handle());
                     // Un cambio de pantalla sin confirmar se deshace antes de salir.
                     displays::restore_pending_on_exit(window.app_handle());
                     // La sesión de ETW y la espera de un escaneo se paran con la ventana.
@@ -282,6 +309,23 @@ pub fn run() {
             }
             let state =boottime::step("Catálogo de ajustes e historial", || tweaks::TweakState::new(app.handle()));
             app.manage(state);
+            if rocketplus::rocket_only() {
+                // Solo el cohete: sin ventana principal ni nada en segundo plano. Primero el cohete y luego
+                // se quita la principal: si en algún momento no quedara ninguna ventana, el proceso se cerraría.
+                if let Err(e) = rocket::open(app.handle()) {
+                    log::warn!("Solo el cohete: {e}");
+                    std::process::exit(1);
+                }
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.destroy();
+                }
+                rocketplus::start_hotkey(app.handle().clone());
+                rocketbar::start_hotkey(app.handle().clone());
+                rocketplus::start_brain(app.handle().clone());
+                rocketplus::watch_full(app.handle().clone());
+                return Ok(());
+            }
+            rocketplus::mark_full_running();
             boottime::step("Tamaño y posición de la ventana", || window_state::restore(app.handle()));
             // La ventana se crea oculta y se enseña cuando la interfaz ya tiene
             // algo pintado, para que nunca se vea un rectángulo negro.
@@ -322,6 +366,10 @@ pub fn run() {
                 let late = app.handle().clone();
                 std::thread::spawn(move || {
                     window_state::wait_until_ready(std::time::Duration::from_secs(20));
+                    // El cohete en el escritorio (Ajustes → General).
+                    if workflow::settings(&late).rocket == "desktop" {
+                        rocket::apply_mode(&late, "desktop");
+                    }
                     perfhistory::start(late.clone());
                     // Una foto al día del equipo para «¿Qué cambió?».
                     whatchanged::start(late.clone());
@@ -333,6 +381,10 @@ pub fn run() {
             quicknote::start(app.handle().clone());
             // AdminOps en miniatura con Ctrl+Alt+A.
             mini::start(app.handle().clone());
+            // El cohete: Ctrl+Alt+O, programa colgado y despegue automático.
+            rocketplus::start_hotkey(app.handle().clone());
+                rocketbar::start_hotkey(app.handle().clone());
+            rocketplus::start_brain(app.handle().clone());
             // Lo que se enchufa y se quita (Hardware → Conectados). También a salvo: su ventana oculta
             // es la que avisa a Pantallas de que cambió un monitor.
             connected::start(app.handle().clone());
@@ -441,6 +493,56 @@ pub fn run() {
             quicknote::open_screen_clip,
             quicknote::redact_clipboard_image,
             mini::open_adminops_mini,
+            rocket::rocket_boost,
+            rocket::rocket_size,
+            rocket::rocket_peek,
+            rocket::rocket_memory,
+            rocket::rocket_dock_state,
+            rocketplus::rocket_deep_scan,
+            rocketplus::rocket_deep_clean,
+            rocketplus::rocket_restart_hung,
+            rocketplus::rocket_prepare_call,
+            rocketplus::rocket_startup_enabled,
+            rocketplus::rocket_set_startup,
+            lostwin::lost_windows,
+            audiofix::audio_echo,
+            defapps::defapps_apply_new_users,
+            camfix::cam_view,
+            camfix::cam_allow,
+            camfix::cam_enable,
+            rocket::rocket_bar,
+            rocketbar::bar_fixes,
+            rocketbar::bar_open_comm,
+            rocketbar::bar_quick_assist,
+            rocketbar::bar_screen_clip,
+            faultrec::faultrec_attach_case,
+            faultrec::faultrec_copy_file,
+            faultrec::faultrec_open_file,
+            lostwin::bring_windows,
+            webnotif::web_notifications,
+            webnotif::web_notifications_remove,
+            rocket::rocket_set_mode,
+            rocket::rocket_open_main,
+            power::power_state,
+            power::power_profiles,
+            power::power_set,
+            power::power_wake,
+            audiofix::audio_view,
+            audiofix::audio_listen,
+            audiofix::audio_beep,
+            audiofix::audio_use,
+            audiofix::audio_allow_mic,
+            wingetfix::winget_check,
+            wingetfix::winget_repair,
+            defapps::defapps_view,
+            defapps::defapps_set_office,
+            defapps::defapps_apply,
+            defapps::defapps_remove_policy,
+            defapps::defapps_open_settings,
+            usbpolicy::usb_state,
+            usbpolicy::usb_history,
+            usbpolicy::usb_set,
+            usbpolicy::usb_allow_for,
             mini::close_adminops_mini,
             portals::portal_nav,
             portals::portal_open_window,

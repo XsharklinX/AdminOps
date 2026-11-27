@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "rocket",
+  "description": "El cohete de «Optimizar ya» se puede arrastrar a cualquier sitio de la pantalla (no tiene marco).",
+  "windows": ["rocket"],
+  "permissions": ["core:window:allow-start-dragging"]
+}

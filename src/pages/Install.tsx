@@ -3,6 +3,7 @@ import { bytes } from "../lib/format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { InstallQueue } from "../components/InstallQueue";
+import { WingetDoctor } from "../components/WingetDoctor";
 import { TaskStatus } from "../components/TaskStatus";
 import { Button, ErrorState, Loading, Modal, inputClass, softBtn } from "../components/ui";
 import { appsApi, installQueueApi, logQuietly, onInstallItem, type AppCatalog, type CatalogApp, type CatalogView, type InstallItem } from "../lib/api";
@@ -371,7 +372,9 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
         </p>
       )}
 
-      <InstallQueue items={queue} onClose={closeQueue} />
+      {/* Antes de instalar: si winget no está listo, se dice y se repara aquí, no tras doce fallos. */}
+      {queue.length === 0 && <WingetDoctor items={[]} isAdmin={isAdmin} quiet />}
+      <InstallQueue items={queue} onClose={closeQueue} isAdmin={isAdmin} />
 
       {/* Categorías: de un vistazo cuántos hay en cada una, y ver solo una. */}
       {categories.length > 1 && (

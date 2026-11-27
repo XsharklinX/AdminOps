@@ -21,7 +21,7 @@ import { useMachineState } from "./lib/machineState";
 import { sectionLabel, sectionsOf } from "./lib/sections";
 import { setTabsSlot } from "./lib/tabsSlot";
 import { PageIdContext, requestSection, useCurrentSections } from "./lib/sectionState";
-import { casesApi, knowledgeApi, logQuietly, api, safeStartApi, programsApi, securityApi, updateApi, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo } from "./lib/api";
+import { casesApi, knowledgeApi, logQuietly, api, safeStartApi, programsApi, securityApi, updateApi, appApi, appcareApi, lockApi, noteApi, portalsApi, systemApi, troubleshootApi, tweaksApi, workApi, type AppInfo, type LockStatus, type TargetUser, type UpdateInfo, type RocketMode, ROCKET_LAUNCH_EVENT } from "./lib/api";
 import { PageActiveContext } from "./lib/pageActive";
 import { comboOf, getPrefs, usePrefs } from "./lib/prefs";
 import { analyze, analyzeQuick } from "./lib/diagRun";
@@ -32,6 +32,8 @@ import { appStarted, appStartMs, codeLoaded, onPerfChange, pageLoads, pageOpened
 import { Dashboard } from "./pages/Dashboard";
 import { AuditBanner } from "./components/AuditMode";
 import { SafeStartBanner } from "./components/SafeStart";
+import { RocketInApp, useRocketMode } from "./components/Rocket";
+import { emit } from "@tauri-apps/api/event";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { PrivacyBanner } from "./components/PrivacyMode";
 import { PageHelp } from "./components/PageHelp";
@@ -457,6 +459,15 @@ export default function App() {
     return () => window.removeEventListener(PALETTE_EVENT, f);
   }, []);
   const [onboarding, setOnboarding] = useState(false);
+  // El cohete de «Optimizar ya»: dentro de AdminOps solo en modo «app» (el del escritorio es otra ventana).
+  const [rocketInit, setRocketInit] = useState<RocketMode | null>(null);
+  useEffect(() => {
+    workApi
+      .settings()
+      .then((s) => setRocketInit(s.rocket ?? "desktop"))
+      .catch(logQuietly("App.rocket"));
+  }, []);
+  const rocketMode = useRocketMode(rocketInit);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [targetUser, setTargetUser] = useState<TargetUser | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
@@ -762,6 +773,12 @@ export default function App() {
       },
       // Síntomas: abren «Solucionar problemas» y lo comprueban.
       ...SYMPTOMS.map((s) => ({ id: `trouble:${s.id}`, title: `Solucionar: ${s.title}`, subtitle: s.hint, keywords: `${s.keywords} problema arreglar no funciona`, run: () => navigate("troubleshoot", s.id) })),
+      ...(rocketMode === "desktop" || rocketMode === "app"
+        ? [{ id: "rocket", title: "Optimizar ya", subtitle: "El cohete: memoria, temporales y DNS, sin cerrar nada", keywords: "cohete optimizar acelerar limpiar memoria ram temporales rapido lento", run: () => void emit(ROCKET_LAUNCH_EVENT) }]
+        : []),
+      { id: "lostwin", title: "Traer ventanas perdidas a la pantalla", subtitle: "Solucionar problemas → Pantalla o monitor", keywords: "ventana fuera pantalla monitor desaparecio perdida segundo monitor mover traer", run: () => navigate("troubleshoot", "display") },
+      { id: "go:usb",title: "Memorias USB: bloquear o solo lectura", subtitle: "Este equipo → Seguridad", keywords: "usb pendrive memoria bloquear solo lectura copiar datos almacenamiento extraible", run: () => navigate("security") },
+      { id: "go:defaults", title: "Programas predeterminados", subtitle: "Programas → Predeterminados", keywords: "pdf adobe navegador chrome edge abrir con asociacion csv excel predeterminado", run: () => navigate("apps", "defaults") },
       { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },
       { id: "wifistate", title: "Estado de la Wi-Fi", subtitle: "Reiniciar la tarjeta, ahorro de energía, adaptadores fantasma", keywords: "wifi tarjeta adaptador driver codigo 10", run: () => navigate("network") },
       // Páginas que ahora son pestañas de otra: se siguen encontrando por su nombre.
@@ -795,7 +812,7 @@ export default function App() {
         ["printers", "Impresoras y escáneres", "impresora anadir"],
       ].map(([uri, title, kw]) => ({ id: `open:${uri}`, title, subtitle: "Abre Configuración de Windows", keywords: kw, run: () => troubleshootApi.fix(`open:ms-settings:${uri}`) })),
     ],
-    [isAdmin, navigate],
+    [isAdmin, navigate, rocketMode],
   );
 
   const areaTabsRef = useRef<HTMLDivElement>(null);
@@ -1000,6 +1017,7 @@ export default function App() {
       <ZoomKeys disabled={locked !== false} />
       <Tour version={appInfo?.version ?? ""} />
       <CelebrateLayer />
+      {rocketMode === "app" && locked === false && <RocketInApp />}
       <PortableExit appInfo={appInfo} />
       <ContextMenu />
       <DropLayer onNavigate={goTo} />

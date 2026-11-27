@@ -2,52 +2,7 @@
 // cosa esté en un solo sitio (Red, Usuarios y cuentas, Inventario, Optimizar
 // Windows…).
 import { WEB_TICKETS } from "../lib/features";
-import {
-  BookCopy,
-  DatabaseBackup,
-  ClipboardList,
-  Cog,
-  Download,
-  EyeOff,
-  FileText,
-  Gauge,
-  GitCompare,
-  MessageCircleQuestion,
-  Globe,
-  Activity,
-  Building2,
-  Cpu,
-  Usb,
-  Video,
-  FolderKey,
-  HardDrive,
-  History as HistoryIcon,
-  Keyboard,
-  Languages,
-  Layers,
-  Monitor,
-  Network as NetworkIcon,
-  Printer,
-  ScanLine,
-  UserRound,
-  Lock,
-  Package,
-  PackageMinus,
-  PlayCircle,
-  Power,
-  Radar,
-  Router as RouterIcon,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Stethoscope,
-  Store,
-  Trash2,
-  Undo2,
-  Wrench,
-  X,
-  Users,
-} from "lucide-react";
+import { BookCopy, DatabaseBackup, ClipboardList, Cog, Download, EyeOff, FileText, Gauge, GitCompare, MessageCircleQuestion, Globe, Activity, Building2, Cpu, Usb, Video, FolderKey, HardDrive, History as HistoryIcon, Keyboard, Languages, Layers, Monitor, Network as NetworkIcon, Printer, ScanLine, UserRound, Lock, Package, PackageMinus, PlayCircle, Power, Radar, Router as RouterIcon, Search, ShieldCheck, Sparkles, Stethoscope, Store, Trash2, Undo2, Wrench, X, Users, FileCheck2 } from "lucide-react";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { Loading } from "../components/ui";
 import { lazyTab } from "../lib/lazyTab";
@@ -68,6 +23,7 @@ const KeyboardPage = lazyTab(() => import("./Keyboard"), "Keyboard");
 const History = lazyTab(() => import("./History"), "History");
 const Security = lazyTab(() => import("./Security"), "Security");
 const Bloatware = lazyTab(() => import("./Bloatware"), "Bloatware");
+const DefaultApps = lazyTab(() => import("./DefaultApps"), "DefaultApps");
 const Domain = lazyTab(() => import("./Domain"), "Domain");
 const Family = lazyTab(() => import("./Family"), "Family");
 const Install = lazyTab(() => import("./Install"), "Install");
@@ -236,7 +192,7 @@ function Tabbed<T extends string>({
   );
 }
 
-type AppsTab = "update" | "winupdate" | "install" | "uninstall" | "bloatware";
+type AppsTab = "update" | "winupdate" | "install" | "uninstall" | "bloatware" | "defaults";
 const APPS: PageTab<AppsTab>[] = [
   {
     id: "update",
@@ -268,6 +224,12 @@ const APPS: PageTab<AppsTab>[] = [
     icon: <Store size={14} />,
     help: "Apps preinstaladas de Microsoft Store que se pueden quitar, con una recomendación para cada una.",
   },
+  {
+    id: "defaults",
+    label: "Predeterminados",
+    icon: <FileCheck2 size={14} />,
+    help: "Qué programa abre los PDF, la web, los CSV, Word, Excel, las imágenes y el correo, y ponerlo como en la oficina.",
+  },
 ];
 
 /** Todo lo que se hace con los programas del equipo, en un solo sitio. */
@@ -291,6 +253,8 @@ export function Apps({
           <Install isAdmin={isAdmin} />
         ) : t === "uninstall" ? (
           <Uninstall isAdmin={isAdmin} />
+        ) : t === "defaults" ? (
+          <DefaultApps isAdmin={isAdmin} />
         ) : (
           <Bloatware isAdmin={isAdmin} />
         )

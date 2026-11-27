@@ -11,7 +11,215 @@ local sí); un solo técnico; sin datos personales en la interfaz; textos en esp
 con lint, typecheck, pruebas de Rust y de interfaz, y `npm run test:exe` + `npm run test:perf` con un
 .exe de depuración. Antes de cambiar algo visual que no esté ya en la maqueta, enseñar el antes y el después.
 
-## 1.4.1 — BUILD EN CURSO (2026-11-25) · leer esto primero
+## 1.5.0 — BUILD RELANZADA (26 nov, noche). Falló la 1ª por test:exe (David tocaba la AdminOps de prueba) y
+por la prueba de rapidez (referencia actualizada a propósito). HECHOS del feedback: 1 pestaña con flecha
+(22×64, rkb-tab), 2 GRACE_MS 1200 tras abrir + dock_check nunca con WIDE, 3 se abre a la altura de la pestaña
+(BAR_Y = su centro) y sitio de partida a 1/4 de la pantalla, 4 no_frame() tras show/set_size/pantalla completa,
+6 captura con bar_screen_clip (ms-screenclip o Win+Mayús+S), 8 bar_quick_assist (enlace, Tienda, quickassist.exe
+o instalarla con winget 9P7BP5VNWKX5), errores de la barra en un panel «msg», «Nota de llamada» → «Notas» en la
+barra. PENDIENTES del feedback: 5 comprobar cada opción del clic derecho, 7 sección Notas en AdminOps, 9 audio
+del equipo en las grabaciones, 10 artifacts de grabaciones y Panel + quitar «Panel». Tras la build: publish:release.
+Catálogo «Grabaciones y Panel» publicado (https://claude.ai/artifact/LQ5aLFLor7Vif1mKGGMWMG; fuente ideas4.js + build17.py en el scratchpad de la sesión 04fd3dcd): 8 de grabación (audio del equipo, pasos escritos, zoom al clic, dibujar, cámara en esquina, pausar, para enviar/GIF, marcar con Ctrl+Alt+M) y Panel A/B/C + quitar «Panel» de la columna. ELEGIDO (26 nov): SÍ 1 audio del equipo (loopback, pista propia), 4 dibujar en pantalla mientras graba, 5 cámara en
+una esquina, 6 pausar y seguir, 7 «para enviar» (720p 15 fps ~4 MB + GIF corto), 8 marcar con Ctrl+Alt+M. NO: 2 pasos
+escritos, 3 zoom al clic, Panel A/B/C y quitar «Panel» (el Panel se queda como está).
+Siguiente catálogo pedido: mejorar mucho la velocidad de internet de la barra (cómo se ve y cómo enseña lo que mide),
+las otras herramientas y el cohete. Publicado «Barra: velocidad y cohete» (https://claude.ai/artifact/WxueRvBqdmhTBqhABXi9Kb; fuente bar3.js + build_bar3.py en el scratchpad de la sesión 04fd3dcd): velocímetro en vivo con fases, lo contratado, cable o Wi-Fi y gráfico por horas, memoria bajando en vivo con lista ✓, empezar el día ligero, el cohete dice qué le pasa al equipo, controles de grabar en la barra, datos para el ticket. Espera su elección.
+FEEDBACK ORIGINAL:
+1. Escondida: solo una FLECHA en el borde (no el cohete). 2. Al tocar, la barra se abre y se esconde al instante:
+arreglar (guardar 800 ms tras abrir; dock_check nunca con WIDE; ver on_moved). 3. Se abre siempre abajo: debe
+abrirse donde se dejó (BAR_Y) y el sitio por defecto más arriba (que se vean todas). 4. NUNCA debe salir con marco
+de ventana (le salió con barra de título y X): forzar set_decorations(false)/shadow tras show, set_size y
+fullscreen. 5. Clic derecho: cada opción tiene que hacer lo suyo (probar todas). 6. Captura no funciona
+(open_screen_clip desde la ventana rocket). 7. «Nota de llamada» → «Notas»: notas libres y una sección en AdminOps
+para verlas todas (cuaderno/galería). 8. Asistencia rápida: ms-quick-assist: no existe en su equipo → abrir
+quickassist.exe (System32) o instalarla con winget (MicrosoftCorporationII.QuickAssist) y decírselo. 9. Grabar
+también el audio del equipo (loopback) como opción. 10. Ideas: grabaciones «x100» (artifact) y mejorar el aspecto
+del Panel (artifact) y quitar la opción «Panel».
+
+Versión 1.5.0 (package.json, tauri.conf.json, Cargo.toml), changelog.ts y docs/notas-1.5.0.md (355/342). Sin la revisión de Opus (David pidió la build con el uso al 98 %): hacerla después. Tras la build: npm run publish:release. Log: build150.log en el scratchpad de la sesión 04fd3dcd.
+
+## Tanda 1.6 «arreglos de oficina» + cohete (elegida el 2026-11-26) · leer esto primero
+
+Del catálogo «AdminOps, arreglos de oficina» (https://claude.ai/artifact/BGt9sKjsAYaotDh4XwfWLh;
+fuente `adminops-arreglos.html` en el scratchpad de la sesión 29328136). Las ventanas ANTES/AHORA son
+lo aprobado. **SÍ:** 1 «No me oyen en Teams», 4 suspensión y pantalla por perfiles, 5 reparar winget,
+7 programas predeterminados, 11 memorias USB. **NO:** 2, 3, 6, 8, 9, 10, 12 (no volver a proponerlas).
+Además pidió el **cohete «Optimizar ya»**: burbuja redonda movible, siempre activa en el escritorio o
+dentro de la app; al tocarla, animación de un cohete subiendo dentro del círculo y optimiza sin
+afectar al uso (memoria, temporales y demás).
+
+Orden: C cohete → 4 energía → 1 audio → 5 winget → 7 predeterminados → 11 USB → revisión de Opus.
+Base: 1.4.1 publicada (ae7db8d). Sin commit ni build hasta que David lo pida.
+
+### Hecho
+- **C · cohete** (sin commit). `src-tauri/src/rocket.rs` (nuevo): `rocket_boost` vacía el conjunto
+  de trabajo de los procesos (salta el de delante, dwm, audiodg, csrss…), la caché en espera de baja
+  prioridad (NtSetSystemInformation 80/5, solo admin), temporales de >1 día del usuario destino y de
+  Windows\Temp, informes WER de >7 días (no sigue enlaces; tope 6 s) y `ipconfig /flushdns`.
+  Ventana `rocket` transparente, sin marco, siempre encima, fuera de la barra de tareas; recuerda la
+  posición (`rocket.json`, guardada 700 ms después de soltarla), vuelve a su sitio si el monitor ya no
+  está, se esconde sola con pantalla completa (SHQueryUserNotificationState) y se despliega hacia el
+  lado con sitio (`rocket_wide`) para el resultado o el menú (clic derecho: Abrir AdminOps, Solo en
+  AdminOps, Ocultar). Ajuste `rocket` (desktop|app|off, por defecto desktop) en Ajustes → General →
+  La ventana. Modo app: `RocketInApp` en App.tsx, arrastrable, posición en localStorage. Ctrl+K
+  «Optimizar ya» (evento `rocket://launch`). `rocket_boost` en BLOCKED del modo auditoría.
+  Interfaz: `src/components/Rocket.tsx`, `src/lib/rocket.ts` (+ test), CSS `rk-*` al final de
+  `index.css`, capacidad `capabilities/rocket.json`.
+  Comprobado: cargo clippy, cargo test (3 nuevas + audit), tsc, eslint, vitest de la frase.
+
+  **Visto en el .exe de depuración** (guion `rk/test-rocket.mjs` en el scratchpad de la sesión 04fd3dcd):
+  ventana transparente, menú, vuelo, resultado («1.6 GB de memoria liberados y 1019.7 MB de
+  temporales borrados · Sin cerrar nada · 8 s»), vuelve a su sitio; modo app: se ve y se arrastra.
+  Arreglado tras verlo: menú partido en dos líneas (WIDE_W 344), Escape global, tope de temporales 6 s,
+  la burbuja de dentro va por debajo de los diálogos (z-30).
+- **4 energía** (sin commit): `power.rs` (powrprof: pantalla, suspensión, hibernar y tapa del plan
+  activo; perfiles office/present/always/dock; `power_wake` con powercfg) + `PowerCard.tsx` en
+  Optimizar Windows → Rendimiento, `lib/power.ts` (+ test). Comprobado: lectura real en este PC desde el exe.
+- **1 audio** (sin commit): `audiofix.rs` (WASAPI: lista con volumen y predeterminado, escucha todos los
+  micros 12 s con picos en vivo `audio://levels`, pitido por altavoz, IPolicyConfig para el
+  predeterminado en los 3 papeles, volumen y silencio, permisos ConsentStore HKLM/usuario/NonPackaged/
+  MSTeams) + `AudioCard.tsx` en Solucionar problemas → «No se oye o no me oyen», `lib/audio.ts` (+ test).
+  Features nuevas de `windows`: Win32_Media_Audio_Endpoints, Win32_UI_Shell_PropertiesSystem.
+- **5 winget** (sin commit): `wingetfix.rs` (versión, prueba `winget show`, reparar: registrar
+  DesktopAppInstaller, módulo Microsoft.WinGet.Client + Repair-WinGetPackageManager, source reset) +
+  `WingetDoctor.tsx` en la cola de instalación cuando los fallos apuntan a winget; reintenta los fallidos.
+- **7 predeterminados** (sin commit): `defapps.rs` + pestaña Programas → Predeterminados
+  (`pages/DefaultApps.tsx`), Ctrl+K. En dominio: XML + directiva DefaultAssociationsConfiguration;
+  fuera: «Cambiar» abre ms-settings:defaultapps?registeredAppMachine|User=… (Microsoft: la directiva
+  solo vale con dominio). Elección de la oficina en `defapps.json` por nombre de programa.
+- **11 USB** (Rust; interfaz en la línea de abajo): `usbpolicy.rs` (RemovableStorageDevices Deny_Read/Write/Execute
+  en discos extraíbles y WPD + StorageDevicePolicies WriteProtect; «Permitir N min» con tarea
+  programada de SYSTEM que vuelve a lo de antes). Comprobado: clippy y 2 pruebas.
+- Todo registrado en lib.rs y en audit.rs (BLOCKED/SAFE). clippy limpio, cargo test de los módulos,
+  tsc, eslint y vitest de las frases.
+
+- **11 USB, interfaz** (sin commit): `UsbCard.tsx` en Este equipo → Seguridad (Permitidas / Solo
+  lectura / Bloqueadas, qué se puede y qué no, «Permitir 15 minutos» con la hora de vuelta), Ctrl+K.
+  Comprobado: lectura del estado en el exe de depuración (sin admin no se cambia nada).
+- **Cohete 2** (las 10 elegidas, sin commit):
+  1 desglose: `Boost.apps` (memoria que soltó cada programa, K32GetProcessMemoryInfo antes y después;
+  nombres conocidos en `app_label`) y `Boost.folders`; tocar el resultado abre «Lo que se llevó».
+  2 anillo de memoria (`rocket_memory` cada 3 s; verde, ámbar ≥80, rojo ≥90; late y «Memoria al N %:
+  tócame» tras 2 min ≥90). 3 se pega al borde (a menos de 40 px al soltarlo: medio escondido,
+  0,55 de opacidad, asoma con el ratón; `rocket_peek`, `DOCK_EVENT`) y tamaño s/m/l (`rocketSize`,
+  zoom del documento). La ventanita crece hacia donde hay sitio, también hacia arriba (`rocket_size`).
+  4 «a fondo» manteniendo pulsado 650 ms: `rocket_deep_scan`/`rocket_deep_clean` (descargas de Windows
+  Update >1 día, Optimización de distribución, papelera >30 días leyendo los $I, miniaturas), con
+  casillas y «Liberar X». 5 `--rocket`: proceso solo con el cohete (destruye main en setup; se retira
+  si se abre AdminOps entera, mutex Local\AdminOps-ventana-principal; al salir de AdminOps se queda si
+  la tarea de inicio existe); Ajustes «El cohete arranca con Windows» (tarea al iniciar sesión, RunLevel
+  Highest). 6 Ctrl+Alt+O (RegisterHotKey id 4) y en el menú del reloj «Optimizar ya» y «Enseñar el
+  cohete». 7 programa colgado (vigilante cada 2 s con `waitchain::hung_pids` y la ventana de delante;
+  a los 10 s burbuja roja, «Esperar» o «Cerrar y volver a abrir» como el usuario). 9 «Preparar una
+  llamada» en el menú (aligera, OneDrive y Windows Update en pausa 2 h, micrófono de las llamadas).
+  11 «Que despegue solo» (`rocketAuto`, apagado por defecto: ≥90 % 2 min o ≥80 % con 15 min sin
+  usar; nunca con pantalla completa ni micrófono en uso; cada 30 min como mucho; nota en la burbuja).
+  12 cada despegue, «a fondo», cierre de colgado y preparar llamada van al diario con antes/después de
+  memoria: salen en el caso abierto y en el informe.
+  Comprobado en el exe de depuración (guion `rk/test2.mjs` y `test3.mjs` en el scratchpad de la sesión
+  04fd3dcd): anillo, menú de 6, mantener pulsado → «a fondo» (sin admin lo dice), despegue 2,2 GB +
+  651 MB, desglose por programa, predeterminados leídos, USB y winget responden. cargo test 884, clippy
+  limpio, vitest 500, tsc y eslint.
+  Sin comprobar: pegarse al borde (no se puede arrastrar desde la prueba), Ctrl+Alt+O, colgado real,
+  preparar llamada, despegue automático y `--rocket` (los prueba David). Visto una vez y no reproducido:
+  tras abrir y cerrar el menú, mantener pulsado acabó en un despegue normal.
+
+- **Revisión de Opus** (26 nov, NO APROBÓ; todo arreglado y comprobado): clean_dir ya no entra si la
+  carpeta raíz es un enlace o una unión y no sale de ella (prueba con unión real); Windows\Temp a 7 días;
+  la vuelta de «Permitir 15 minutos» va dentro de la tarea (-EncodedCommand), sin archivo; `--rocket` abre
+  el cohete en el setup antes de quitar la principal (comprobado: queda vivo con una sola ventana);
+  mantener pulsado ya no despega (Intro/Espacio por onKeyDown en vez de onClick con detail 0; comprobado
+  en la secuencia que fallaba); temporizador de fase aparte; «a fondo» y «cerrar y reabrir» se cierran
+  solos o con botón y el error sale en rojo; modo auditoría también para Ctrl+Alt+O, el menú del reloj y
+  el despegue automático; la tarea de inicio es del usuario de la sesión (si no es administrador, se abre
+  con RunAsInvoker por cmd); comandos de la tarea en async; Ctrl+Alt+O se reintenta 15 s; estado de
+  pegado al montar (`rocket_dock_state`); «Realtek(R) Audio» bien recortado; ANCHOR limpio al cerrar;
+  defapps no pisa una directiva de IT y protege la carpeta del XML con icacls; la hibernación vuelve al
+  dejar «nunca se suspende»; cerrar y reabrir comprueba que es el mismo programa y que sigue colgado; al
+  cerrarse por una actualización no se deja el cohete; la tarjeta USB avisa de los discos de copia.
+  cargo test 887, clippy limpio, vitest 500, tsc y eslint.
+
+- **Ronda «antes de la nueva versión»** (sin commit). Hechas por mí: 2 «Escúchate» (`audio_echo` en audiofix.rs:
+  graba N s en mono 48 kHz y lo reproduce por el altavoz elegido; `EchoTest` en AudioCard.tsx); 3 winget
+  comprobado al entrar en Instalar (`WingetDoctor quiet`, una vez por sesión); 4 «Como en la oficina para los
+  usuarios nuevos» (`defapps_apply_new_users`: XML protegido + `dism /Online /Import-DefaultAppAssociations`;
+  botón en DefaultApps.tsx); 7 cámara (`camfix.rs`: cámaras por Get-PnpDevice, permisos webcam, quién la usa,
+  `cam_enable` con pnputil; `CameraCard.tsx` con vista previa getUserMedia; síntoma nuevo «No me ven» en
+  symptoms.ts y Symptom). tsc y eslint limpios. **FALTA registrar** en lib.rs (`mod camfix;` y los comandos
+  audio_echo, defapps_apply_new_users, cam_view, cam_allow, cam_enable) y clasificarlos en audit.rs
+  (BLOCKED: defapps_apply_new_users, cam_allow, cam_enable; SAFE: audio_echo, cam_view), cuando acabe el oficial.
+  Encargadas al oficial (Sonnet, en segundo plano): 10 ventanas perdidas (lostwin.rs, LostWindows.tsx),
+  6 historial USB (usb_history), 8 avisos de webs (webnotif.rs, WebNotifCard.tsx), 5 caché de navegadores en
+  «a fondo». Revisar su diff.
+
+- **Registrado y compilado** (26 nov, noche): mod camfix y rocketbar; comandos audio_echo,
+  defapps_apply_new_users, cam_view/allow/enable, rocket_bar, bar_fixes, bar_open_comm, bar_quick_assist,
+  faultrec_attach_case/copy_file/open_file; Ctrl+Alt+T (`rocketbar::start_hotkey`) en setup completo y solo-cohete.
+  Lo del oficial (lostwin.rs + LostWindows.tsx en síntoma «display», usb_history + lista en UsbCard,
+  webnotif.rs + WebNotifCard en Seguridad, caché de navegadores en «a fondo») compila y pasa; SU DIFF NO LO HE
+  REVISADO AÚN. cargo test 899, clippy limpio, vitest 500, tsc y eslint limpios.
+- **Barra, segunda ronda** (sin probar en el exe salvo lo dicho): herramientas nuevas speed (toolsApi.speedtest +
+  historial; insignia verde con la última bajada), card (sheetApi.get: equipo, IP, usuario, serie, modelo con
+  «Copiar» y «Copiar todo»; tarda ~12 s), help (`ms-quick-assist:`), al parar de grabar panel «recdone»
+  (miniatura, Al caso / Copiar como archivo CF_HDROP / Abrir), vistazo al dejar el ratón 600 ms sobre el cohete
+  (componente `Glance` con get_live_metrics cada segundo). Pedido después y hecho: scroll en la lista de
+  herramientas si no caben (alto máx. = pantalla), lápiz «Personalizar la barra» abajo del todo, botón de
+  grabar rojo (verde y latiendo mientras graba) con `RecDot` en BrandIcons, también en RecButton de la cabecera;
+  los nombres de las herramientas van en `title` (la etiqueta propia se recortaba). setTool ya solo recoloca la
+  ventana cuando cambia el panel (antes el vistazo se cerraba y reabría a ceros cada segundo).
+  Visto en el exe (antes de los últimos cambios): escondida medio cohete con flecha en x=1886; abierta 68×522
+  con 11 herramientas; velocidad (respondió «ya hay un test en curso» porque la app principal medía a la vez);
+  get_live_metrics y machine_sheet funcionan desde la ventana del cohete.
+
+### Pendiente (en orden)
+1. Probado en el exe (26 nov, noche): barra abierta con grabar en rojo y lápiz abajo (captura de la ventana);
+   velocidad 68/38 Mb/s y 39 ms; caben las 11 herramientas en 1080p (sin scroll). Vistazo cambiado a «ratón
+   quieto 600 ms» (onPointerMove) y se cierra al pulsar; NO comprobable con CDP (el ratón simulado queda fuera al
+   crecer la ventana): que lo pruebe David. Tampoco comprobado: se esconde a los 5 s, Ctrl+Alt+T, al parar de
+   grabar, datos del equipo completos (tarda ~12 s), personalizar y guardar.
+2. Revisar el diff del oficial (lostwin.rs, webnotif.rs, usbpolicy.rs usb_history, rocketplus.rs navegadores,
+   LostWindows.tsx, WebNotifCard.tsx, UsbCard.tsx).
+3. Revisión de Opus de todo lo nuevo antes de la build (el guardia la pide).
+4. Guardia de Sharkcost: C-SQL salta con la clase CSS `truncate` (falso positivo).
+5. Changelog, notas y versión cuando David pida la build.
+
+### Decisiones de diseño
+- Barra, más ideas (https://claude.ai/artifact/6GDf57tQu8TLugjjvh7u99, 26 nov): SÍ 1 velocidad de internet (bajada, subida, ping y últimas mediciones), 2 datos del equipo para copiar (nombre, IP, usuario, serie, modelo), 5 Asistencia rápida, 6 grabar: al parar miniatura + Al caso / Copiar / Abrir, 9 vistazo al pasar el ratón por el cohete (CPU, memoria, disco y red con línea). NO: 3 micrófono y volumen, 4 modo presentación, 7 captura con flechas, 8 arreglos con resultado.
+- Barra de herramientas (catálogo https://claude.ai/artifact/SYAM1HnAuauzkpmCU1wRZd, 26 nov). Aspecto **C · el cohete
+  con su barra**: el cohete arriba como cabeza y las herramientas colgando debajo, una sola pieza, vertical, en el
+  borde derecho. Escondida asoma medio cohete con una flechita (David pidió «que se oculte con una flecha y que al
+  tocar la flecha aparezca»). SÍ: B1 se esconde sola a los 5 s sin el ratón (espera si graba o hay resultado),
+  B3 se arrastra por el agarre a cualquier altura del borde derecho y, llevada al otro lado, se pega al izquierdo
+  (flecha al revés; recuerda dónde), B4 Ctrl+Alt+T abre y esconde (también con pantalla completa), B5 clic
+  derecho → «Personalizar»: casillas y arrastrar para ordenar, B6 botones con dato (cohete con % de memoria,
+  grabar con el tiempo, arreglos con un punto si el diagnóstico encontró algo). Herramientas SÍ: C1 optimizar
+  (toque y mantener = a fondo), C2 grabar pantalla (desplegable pantalla/ventana/zona + voz; el botón cuenta el
+  tiempo y otro clic para), C3 captura (zona al portapapeles y al caso, `open_screen_clip`), C4 nota de llamada
+  (quicknote), C5 mini monitor (minimon), C6 arreglos rápidos (los de la bandeja, `tray_fixes_available` /
+  `tray_run_fix`), C7 Teams y Correo (CommOpener), C8 abrir AdminOps. NO: B2 asoma cuando hace falta, C9 nuevo caso.
+  Plan: es la evolución de la ventana `rocket` del escritorio (mismo LABEL, mismo vigilante); modo nuevo del
+  ajuste del cohete o sustituye al cohete suelto: decidir al empezar (proponer: la barra sustituye a la burbuja
+  en modo «desktop»; la burbuja suelta sigue para «app»).
+- Catálogo «antes de la nueva versión» (https://claude.ai/artifact/6s4YnaGHyysZz2nY1Qvi67, 26 nov): SÍ 2 escúchate
+  como en una llamada, 3 winget comprobado antes de instalar, 4 predeterminados para usuarios nuevos (DISM
+  /Import-DefaultAppAssociations), 5 «a fondo» con caché de navegadores cerrados, 6 memorias USB que se han
+  conectado, 7 «no me ven»: la cámara, 8 avisos falsos de webs (notificaciones), 10 ventanas perdidas fuera de
+  la pantalla. NO: 1 despertar en claro, 9 OneDrive llena el disco, 11 el cohete avisa de reiniciar, 12 apagar
+  solo de noche. Además pidió una «barra de herramientas» (optimizar, grabar pantalla…): catálogo de ideas aparte.
+- Cohete 2 (catálogo https://claude.ai/artifact/Kfvs2oijHbD9y1ZVsBGwom, 26 nov): SÍ 1, 2, 3, 4, 5, 6, 7, 9,
+  11, 12; NO 8 (lo que más pesa con clic derecho) y 10 (doble toque arregla internet).
+- 7 predeterminados: Windows protege UserChoice (hash, y el controlador UCPD bloquea .pdf/http/https),
+  así que se hará con la directiva «archivo de asociaciones predeterminadas» (XML de
+  `DefaultAssociationsConfiguration`), que Windows aplica al iniciar sesión. Decírselo así a David.
+- 11 USB: «tu pendrive de AdminOps permitido» no se puede hacer con las directivas de almacenamiento
+  extraíble (no admiten excepciones por dispositivo sin Intune). Alternativa: «Permitir 15 minutos»
+  con vuelta atrás programada. Decírselo a David.
+
+## 1.4.1 — PUBLICADA (2026-11-25) · leer esto primero
+
+Build hecha a las 12:57 (la de las 7:55 se cortó sin error de código; relanzada). test:exe y test:perf
+pasan. Publicada: commit ae7db8d «Versión 1.4.1» en claude/great-mayer-m7kpmy,
+https://github.com/XsharklinX/AdminOps/releases/tag/v1.4.1. Pendientes 1 y 2 de abajo: HECHOS.
 
 David decidió el número: **1.4.1** (no 1.5.0). Lleva la tanda 1.5 entera, lo de los juegos y la
 **actualización automática** que pidió hoy: «cuando haya actualización, que muestre una ventana para

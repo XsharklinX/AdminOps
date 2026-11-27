@@ -65,3 +65,14 @@ export function RecordIcon({ size = 18, className }: Props) {
     </svg>
   );
 }
+
+/** El botón de grabar: un punto rojo en su aro; verde y latiendo mientras graba (la barra del cohete y la cabecera). */
+export function RecDot({ size = 18, recording = false, className }: Props & { recording?: boolean }) {
+  const c = recording ? "#3ecf8e" : "#f2706b";
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className} aria-hidden>
+      <circle cx="12" cy="12" r="10" fill={c} fillOpacity="0.16" stroke={c} strokeWidth="1.6" />
+      <circle cx="12" cy="12" r="5.2" fill={c} className={recording ? "animate-pulse" : undefined} />
+    </svg>
+  );
+}

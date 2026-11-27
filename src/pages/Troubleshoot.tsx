@@ -6,6 +6,9 @@ import { Responsible } from "../components/Responsible";
 import { Card, Intro } from "../components/ui";
 import { TweaksPage } from "./TweaksPage";
 import { troubleshootApi, type TroubleFinding, type TroubleFix } from "../lib/api";
+import { AudioCard } from "../components/AudioCard";
+import { CameraCard } from "../components/CameraCard";
+import { LostWindows } from "../components/LostWindows";
 import { SYMPTOMS } from "../lib/symptoms";
 import type { Symptom } from "../lib/api";
 import { MailDomainCard } from "../components/MailDomainCard";
@@ -33,8 +36,8 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
     const n = ++seq.current;
     setSymptom(s);
     rememberSymptom(s);
-    // El correo del dominio se revisa con su propia tarjeta (pide el dominio).
-    if (s === "mail") {
+    // El correo del dominio y la cámara se revisan con su propia tarjeta.
+    if (s === "mail" || s === "camera") {
       setFindings(null);
       setChecking(false);
       setError(null);
@@ -111,12 +114,15 @@ export function Troubleshoot({ isAdmin, focus, onNavigate }: { isAdmin: boolean;
         </div>
       </Card>
 
+      {current?.id === "audio" && <AudioCard />}
+      {current?.id === "camera" && <CameraCard isAdmin={isAdmin} />}
+      {current?.id === "display" && <LostWindows />}
       {current?.id === "mail" && (
         <div className="col-span-12">
           <MailDomainCard />
         </div>
       )}
-      {current && current.id !== "mail" && (
+      {current && current.id !== "mail" && current.id !== "camera" && (
         <Card
           title={current.title}
           icon={<current.icon size={14} />}
