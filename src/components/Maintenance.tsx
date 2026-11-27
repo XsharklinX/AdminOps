@@ -2,7 +2,7 @@ import { CalendarClock, HardDriveUpload, Loader2, Timer, Trash2 } from "lucide-r
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
-import { Button, Card, Modal, Loading } from "./ui";
+import { Button, Card, Modal, Loading, Notice } from "./ui";
 import { bytes } from "../lib/format";
 import { logQuietly, maintenanceApi, type BootAnalysis, type MaintenanceSchedule } from "../lib/api";
 
@@ -42,7 +42,7 @@ export function BootCard() {
           <div className="col-span-12 md:col-span-8">
             <div className="mb-1 text-[11px] text-mute">Lo que más lo retrasa (últimos 60 días)</div>
             {data.culprits.length === 0 ? (
-              <p className="text-sm text-ok">Windows no ha detectado nada que ralentice el arranque.</p>
+              <Notice tone="ok">Windows no ha detectado nada que ralentice el arranque.</Notice>
             ) : (
               <div className="pane-sm space-y-0.5 overflow-y-auto">
                 {data.culprits.map((c) => (

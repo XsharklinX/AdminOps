@@ -66,3 +66,21 @@ describe("qué va al registro de errores de la app", () => {
     expect(isUnexpected("invalid args `x` for command y")).toBe(false);
   });
 });
+
+describe("el diccionario de errores de Windows", () => {
+  it("traduce los códigos que salen de verdad y conserva el código", () => {
+    expect(humanError("x", "Error 0x800F081F al instalar KB5046617")).toMatch(/componentes.*\(0x800f081f\)/);
+    expect(humanError("x", "os error 740")).toMatch(/modo técnico/);
+    expect(humanError("x", "os error 1219: Multiple connections to a server")).toMatch(/otro usuario/);
+    expect(humanError("x", "Operation could not be completed (error 0x00000709)")).toMatch(/predeterminada/);
+    expect(humanError("x", "winget falló: 0x8A15000F")).toMatch(/Reparar winget/);
+  });
+  it("cada familia lleva a su arreglo", () => {
+    expect(explainError(humanError("x", "0x8024402c")).fix).toBe("update");
+    expect(explainError(humanError("x", "0x0000011b")).fix).toBe("printer");
+    expect(explainError(humanError("x", "0x8a150011")).fix).toBe("winget");
+    expect(explainError(humanError("x", "os error 740")).fix).toBe("admin");
+    // Un mensaje de AdminOps sobre su propia actualización no lleva a Windows Update.
+    expect(explainError("No se pudo comprobar si hay una actualización de AdminOps").fix).not.toBe("update");
+  });
+});

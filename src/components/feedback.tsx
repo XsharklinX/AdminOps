@@ -27,9 +27,12 @@ interface Toast {
 /** El botón de salida de un error, si AdminOps puede hacer algo por ti. */
 export function errorExit(text: string, ex: Explained): { label: string; run: () => void } | null {
   if (/en uso por otro programa|being used by another process|est[aá] abierto/i.test(text)) return { label: "Ver qué programas están abiertos", run: () => goToPage("processes") };
-  if (ex.fix === "admin") return { label: "Reiniciar AdminOps como administrador", run: () => void api.relaunchAsAdmin() };
+  if (ex.fix === "admin") return { label: "Pasar a modo técnico (administrador)", run: () => void api.relaunchAsAdmin() };
   if (ex.fix === "space") return { label: "Liberar espacio", run: () => goToPage("space", "space") };
   if (ex.fix === "network") return { label: "Comprobar la conexión", run: () => goToPage("troubleshoot", "internet") };
+  if (ex.fix === "update") return { label: "Abrir Windows Update", run: () => goToPage("apps", "winupdate") };
+  if (ex.fix === "printer") return { label: "Abrir Impresoras", run: () => goToPage("printers", "printers") };
+  if (ex.fix === "winget") return { label: "Abrir Instalar", run: () => goToPage("apps", "install") };
   return null;
 }
 

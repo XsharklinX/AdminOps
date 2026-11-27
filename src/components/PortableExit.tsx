@@ -2,7 +2,7 @@
 import { AlertCircle, HardDrive, Loader2, RotateCw, Trash2, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { logQuietly, workApi, type AppInfo } from "../lib/api";
-import { Button, Modal } from "./ui";
+import { Button, Modal, Notice } from "./ui";
 import { useToast } from "./feedback";
 import { useCallback } from "react";
 
@@ -104,7 +104,7 @@ export function PortableExit({ appInfo }: { appInfo: AppInfo | null }) {
           <AlertCircle size={16} className="mt-0.5 shrink-0 text-bad" />
           <p>Algunas cosas no se han podido quitar. Puedes reintentarlo o salir igualmente.</p>
         </div>
-        {cleanupError && <p className="mb-3 text-sm text-bad">{cleanupError}</p>}
+        {cleanupError && <Notice tone="error" where="Salida portátil" className="mb-3">{cleanupError}</Notice>}
         <div className="space-y-2 rounded-lg border border-line bg-panel-2 p-3">
           {cleanupFailed.map((f, i) => (
             <div key={i} className="text-sm text-ink">

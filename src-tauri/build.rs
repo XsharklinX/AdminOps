@@ -1,15 +1,8 @@
 fn main() {
-    // En release el .exe exige administrador (UAC al abrir). En debug no, para
-    // que `tauri dev` pueda lanzarlo desde una terminal sin elevar.
-    // ADMINOPS_ASINVOKER=1 compila la versión final sin exigir administrador,
-    // solo para medir rendimiento sin UAC. Nunca para distribuir.
-    let bench = std::env::var("ADMINOPS_ASINVOKER").as_deref() == Ok("1");
-    println!("cargo:rerun-if-env-changed=ADMINOPS_ASINVOKER");
-    let manifest = if std::env::var("PROFILE").as_deref() == Ok("release") && !bench {
-        include_str!("manifests/admin.manifest")
-    } else {
-        include_str!("manifests/dev.manifest")
-    };
+    // AdminOps se abre SIN administrador (cualquier usuario del equipo, instalada o portable). El administrador
+    // solo se pide al pasar a «Modo técnico» dentro de la app (elevation::relaunch_as_admin, con UAC). Desde la
+    // 1.5.2; antes la versión final lo exigía al abrir.
+    let manifest = include_str!("manifests/app.manifest");
     println!("cargo:rerun-if-changed=manifests");
 
     // El selector de archivos (tauri-plugin-dialog) importa TaskDialogIndirect,

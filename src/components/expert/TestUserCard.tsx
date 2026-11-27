@@ -5,7 +5,7 @@
 import { Loader2, ShieldAlert, Trash2, UserPlus, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../feedback";
-import { Card, smallBtn, softBtn } from "../ui";
+import { Card, smallBtn, softBtn, Notice } from "../ui";
 import { diagnoseApi, type TestUser } from "../../lib/api";
 import { Copyable } from "../Copyable";
 
@@ -90,7 +90,7 @@ export function TestUserCard({ isAdmin }: { isAdmin: boolean }) {
       <p className="mb-3 text-xs text-dim">
         Crea un usuario local de prueba, entra con él y prueba lo que falla. Si con él funciona, el problema está en el perfil de la persona; si no, en el equipo. Es una cuenta de este equipo (no del dominio), con una contraseña de un solo uso; se borra sola a las 24 h.
       </p>
-      {error && <p className="mb-2 text-sm text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Usuario de prueba" className="mb-2">{error}</Notice>}
 
       {user === undefined ? (
         <p className="flex items-center gap-2 text-sm text-mute">

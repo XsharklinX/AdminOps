@@ -23,6 +23,15 @@ export function QuickDial({ items, actions: a }: { items: Contact[]; actions: Co
           <div
             key={c.id}
             onClick={() => a.open(c)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                a.open(c);
+              }
+            }}
             className="group flex cursor-pointer items-center gap-2.5 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2.5 transition-colors hover:border-neon/40"
           >
             <Avatar c={c} size={34} />

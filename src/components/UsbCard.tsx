@@ -1,11 +1,11 @@
 import { Check, Clock, History, Loader2, Usb, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { casesApi } from "../lib/api";
-import { usbApi, type UsbMode, type UsbSeen, type UsbState } from "../lib/api/usb";
+import { usbApi, type HiddenUsb, type UsbMode, type UsbSeen, type UsbState } from "../lib/api/usb";
 import { caseChanged } from "../lib/currentCase";
 import { appendNote } from "../lib/sendTo";
 import { useToast } from "./feedback";
-import { Button, Card } from "./ui";
+import { Button, Card, Notice } from "./ui";
 
 const MODES: { id: UsbMode; label: string }[] = [
   { id: "allowed", label: "Permitidas" },
@@ -36,6 +36,10 @@ export function UsbCard({ isAdmin }: { isAdmin: boolean }) {
   // Las que se han conectado alguna vez: se piden al pulsar, porque tarda unos segundos.
   const [seen, setSeen] = useState<UsbSeen[] | null>(null);
   const [seenBusy, setSeenBusy] = useState(false);
+  // «Meto la memoria y no aparece»: sin letra, o con la letra de una unidad de red que la tapa.
+  const [hidden, setHidden] = useState<HiddenUsb[] | null>(null);
+  const [hiddenBusy, setHiddenBusy] = useState(false);
+  const [fixed, setFixed] = useState<string[] | null>(null);
   const toast = useToast();
 
   const load = useCallback(() => {
@@ -61,6 +65,29 @@ export function UsbCard({ isAdmin }: { isAdmin: boolean }) {
       toast("error", String(e));
     } finally {
       setBusy(false);
+    }
+  };
+  // «Meto la memoria y no aparece»: sin letra, o con la letra de una unidad de red que la tapa.
+  const checkHidden = async () => {
+    setHiddenBusy(true);
+    setFixed(null);
+    try {
+      setHidden(await usbApi.hidden());
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setHiddenBusy(false);
+    }
+  };
+  const fixHidden = async () => {
+    setHiddenBusy(true);
+    try {
+      setFixed(await usbApi.fixLetters());
+      setHidden(await usbApi.hidden());
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setHiddenBusy(false);
     }
   };
   const loadSeen = async () => {
@@ -109,7 +136,7 @@ export function UsbCard({ isAdmin }: { isAdmin: boolean }) {
             type="button"
             role="radio"
             aria-checked={st.mode === m.id}
-            disabled={disabled}
+            disabled={disabled || (!!st.portableDrive && m.id !== "allowed")}
             onClick={() => st.mode !== m.id && void run(usbApi.set(m.id), m.id === "allowed" ? "Memorias USB permitidas." : m.id === "readonly" ? "Memorias USB en solo lectura." : "Memorias USB bloqueadas.")}
             className={`rounded-md px-2 py-1.5 text-sm transition-colors disabled:opacity-60 ${st.mode === m.id ? (m.id === "allowed" ? "bg-panel-2 text-ink" : m.id === "readonly" ? "bg-warn/15 text-warn" : "bg-bad/15 text-bad") : "text-dim hover:text-ink"}`}
           >
@@ -134,7 +161,37 @@ export function UsbCard({ isAdmin }: { isAdmin: boolean }) {
             ? "Vuelven solas a como estaban, aunque se cierre AdminOps o se reinicie el equipo."
             : "Se deshace igual de fácil. Una memoria que ya estaba puesta: sácala y vuelve a meterla."}
         </span>
-        {!isAdmin && <span className="text-xs text-warn">Hace falta abrir AdminOps como administrador.</span>}
+        {!isAdmin && <span className="text-xs text-warn">Hace falta modo técnico (administrador).</span>}
+      </div>
+      {st.portableDrive && (
+        <Notice tone="warn" className="mt-3">
+          AdminOps se está ejecutando desde la memoria {st.portableDrive}. Windows bloquea todas las memorias por igual, así que aquí solo se pueden permitir: para bloquearlas, ábrela instalada en este equipo.
+        </Notice>
+      )}
+      <div className="mt-4 border-t border-line/60 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm text-ink">¿Una memoria conectada no aparece en el Explorador?</div>
+          <Button size="sm" kind="secondary" disabled={hiddenBusy} onClick={checkHidden}>
+            {hiddenBusy ? <Loader2 size={13} className="animate-spin" /> : <Usb size={13} />} {hidden ? "Volver a mirar" : "Mirar"}
+          </Button>
+        </div>
+        {hidden && hidden.length === 0 && !fixed && <p className="mt-2 text-sm text-mute">Todas las memorias conectadas tienen su letra y se ven.</p>}
+        {hidden && hidden.length > 0 && (
+          <div className="mt-2 space-y-2">
+            <ul className="divide-y divide-line/60 rounded-lg border border-line px-3">
+              {hidden.map((h) => (
+                <li key={`${h.disk}-${h.partition}`} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                  <span className="min-w-0 truncate text-ink">{h.name}</span>
+                  <span className="shrink-0 text-xs text-warn">{h.reason === "sin-letra" ? "sin letra de unidad" : `${h.reason} la tapa una unidad de red`}</span>
+                </li>
+              ))}
+            </ul>
+            <Button size="sm" disabled={hiddenBusy || !isAdmin} onClick={fixHidden}>
+              Darles una letra libre y abrirla
+            </Button>
+          </div>
+        )}
+        {fixed && fixed.length > 0 && <Notice tone="ok" className="mt-2">Listo: {fixed.join(" · ")}.</Notice>}
       </div>
       <div className="mt-4 border-t border-line/60 pt-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

@@ -160,13 +160,49 @@ fn is_writable(dir: &std::path::Path) -> bool {
 /// administrador): por eso se fija una propia bajo el perfil de ESTE usuario, y
 /// si no se puede escribir, se cae a la carpeta temporal. Portable la lleva al USB.
 pub fn installed_webview_dir() -> Option<PathBuf> {
+    // Modo técnico con la cuenta de otro (el técnico puso su contraseña en el PC de un usuario): esa cuenta puede no
+    // tener su perfil cargado del todo en este equipo y WebView2 no abre su carpeta («can't read and write to its data
+    // directory»). Se usa una carpeta de este equipo para esa cuenta, en ProgramData, que el administrador siempre
+    // puede escribir.
+    let elevated = crate::elevation::is_elevated();
+    if elevated && elevated_as_other_user() {
+        if let (Some(pd), Some(own)) = (std::env::var_os("ProgramData").map(PathBuf::from), crate::target_user::own_sid()) {
+            let dir = pd.join("AdminOps").join("WebView").join(own);
+            // Cerrada: solo SYSTEM, los administradores y esta cuenta (ProgramData deja leer y crear a cualquiera, y
+            // ahí van la caché y los datos de los portales del técnico). Si alguien la creó antes, deja de ser suya.
+            if is_writable(&dir) && lock_to_admins(&dir, own) && is_writable(&dir.join("EBWebView")) {
+                return Some(dir);
+            }
+        }
+    }
     let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from)?;
-    let preferred = local.join("AdminOps").join("WebView");
-    if is_writable(&preferred) {
+    // Modo técnico en una carpeta aparte: la de modo usuario puede seguir abierta un momento por la instancia que se
+    // cierra, y WebView2 no comparte su carpeta entre un proceso elevado y otro que no lo está.
+    let preferred = local.join("AdminOps").join(if elevated { "WebView-tecnico" } else { "WebView" });
+    // También la subcarpeta que crea WebView2: si quedó de otra cuenta, la de arriba se puede escribir y esta no.
+    if is_writable(&preferred) && is_writable(&preferred.join("EBWebView")) {
         return Some(preferred);
     }
     let fallback = std::env::temp_dir().join("AdminOps").join("WebView");
-    is_writable(&fallback).then_some(fallback)
+    if is_writable(&fallback) && is_writable(&fallback.join("EBWebView")) {
+        return Some(fallback);
+    }
+    // Última salida: una carpeta nueva que no puede estar heredada de nadie.
+    let fresh = std::env::temp_dir().join("AdminOps").join(format!("WebView-{}", std::process::id()));
+    is_writable(&fresh).then_some(fresh)
+}
+
+/// Deja la carpeta solo para SYSTEM, los administradores y `sid`, sin herencia, con los administradores de dueños.
+fn lock_to_admins(dir: &std::path::Path, sid: &str) -> bool {
+    let d = dir.to_string_lossy().into_owned();
+    let own = crate::ps::exec("icacls", &[&d, "/setowner", "*S-1-5-32-544", "/T", "/C", "/Q"]).is_ok();
+    let grant = format!("*{sid}:(OI)(CI)F");
+    own && crate::ps::exec("icacls", &[&d, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", &grant, "/T", "/C", "/Q"]).is_ok()
+}
+
+/// ¿Esta AdminOps se elevó con una cuenta distinta de la del usuario de la sesión?
+fn elevated_as_other_user() -> bool {
+    matches!((crate::target_user::own_sid(), crate::target_user::get()), (Some(own), Some(t)) if own != t.sid)
 }
 
 pub fn host() -> String {

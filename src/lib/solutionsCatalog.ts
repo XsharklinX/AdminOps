@@ -770,6 +770,67 @@ const CATALOG: Builtin[] = [
       },
     ],
   },
+  {
+    id: "menu-inicio",
+    title: "El menú Inicio o la barra de tareas no responden",
+    problem: "Clic en Inicio y no se abre, la búsqueda no escribe o la barra de tareas no reacciona. Lo demás funciona.",
+    solution: `1. Reinicia el menú Inicio y la barra de tareas desde AdminOps (unos 15 s; se cierran las carpetas abiertas, no los programas).
+2. Si sigue igual, cierra sesión y vuelve a entrar.
+3. Si vuelve a pasar a menudo, repara los archivos del sistema (SFC) desde Reparaciones.`,
+    tags: ["menu inicio", "barra de tareas", "no responde", "busqueda", "explorador"],
+    actions: [
+      { step: 1, kind: "fix", id: "repair.start-menu", label: "Reiniciar el menú Inicio y la barra de tareas" },
+      { step: 3, kind: "fix", id: "repair.sfc", label: "Comprobar los archivos del sistema" },
+    ],
+  },
+  {
+    id: "iconos-miniaturas",
+    title: "Iconos en blanco o miniaturas que no salen",
+    problem: "En el Escritorio o en las carpetas los iconos salen en blanco o con el dibujo equivocado, o las fotos y vídeos no enseñan su miniatura.",
+    solution: `1. Reconstruye la caché de iconos y miniaturas (unos 10 s; reinicia el Explorador, sin reiniciar el equipo).
+2. Abre otra vez la carpeta: las miniaturas se vuelven a crear al verlas.`,
+    tags: ["iconos", "blanco", "miniaturas", "fotos", "escritorio"],
+    actions: [{ step: 1, kind: "fix", id: "repair.icon-cache", label: "Reconstruir iconos y miniaturas" }],
+  },
+  {
+    id: "copiar-pegar",
+    title: "Copiar y pegar dejó de funcionar",
+    problem: "Ctrl+C y Ctrl+V no pegan nada o pegan lo de antes, sobre todo entre este equipo y un Escritorio remoto.",
+    solution: `1. Reinicia el portapapeles desde AdminOps (unos 5 s).
+2. Copia otra vez y prueba a pegar.
+3. En Escritorio remoto: comprueba en la conexión (Opciones → Recursos locales) que «Portapapeles» está marcado.`,
+    tags: ["copiar", "pegar", "portapapeles", "escritorio remoto", "rdp"],
+    actions: [{ step: 1, kind: "fix", id: "repair.clipboard", label: "Reiniciar el portapapeles" }],
+  },
+  {
+    id: "imprimir-pdf",
+    title: "Falta «Microsoft Print to PDF»",
+    problem: "Al imprimir no aparece la impresora de PDF de Windows y no se puede guardar una factura o un documento en PDF.",
+    solution: `1. Vuelve a ponerla desde AdminOps (unos 30 s; necesita modo técnico).
+2. Si dice que aparecerá al reiniciar, reinicia el equipo.`,
+    tags: ["pdf", "imprimir", "print to pdf", "impresora", "guardar pdf"],
+    actions: [{ step: 1, kind: "fix", id: "repair.print-to-pdf", label: "Volver a poner Microsoft Print to PDF" }],
+  },
+  {
+    id: "raton-inalambrico",
+    title: "El ratón o el teclado inalámbrico se cortan",
+    problem: "El ratón se queda congelado un segundo cada poco, o el teclado inalámbrico pierde letras, aunque las pilas están bien.",
+    solution: `1. Que Windows no apague para ahorrar energía el ratón, el teclado y su receptor USB.
+2. Si el receptor está enchufado detrás del equipo, un alargador USB que lo acerque a la mesa ayuda mucho (la caja metálica tapa la señal).
+3. Prueba otro puerto USB, mejor uno que no sea USB 3 (azul): interfieren con los receptores de 2,4 GHz.`,
+    tags: ["raton", "teclado", "inalambrico", "receptor", "se congela", "usb"],
+    actions: [{ step: 1, kind: "fix", id: "performance.wireless-receiver", label: "Quitar el ahorro de energía del ratón y el teclado" }],
+  },
+  {
+    id: "bloq-num",
+    title: "El teclado numérico empieza apagado",
+    problem: "Al encender el equipo, el Bloq Num está apagado y la contraseña con números sale mal sin que el usuario se dé cuenta.",
+    solution: `1. Deja el Bloq Num encendido al iniciar, también en la pantalla de inicio de sesión (al momento; se nota al reiniciar).
+2. Si el portátil no tiene teclado numérico, no lo actives: en algunos, Bloq Num convierte parte de las letras en números.
+3. Si aun así arranca apagado, mira en la BIOS la opción «NumLock» o «Boot Up NumLock State».`,
+    tags: ["bloq num", "numlock", "teclado numerico", "contraseña", "numeros"],
+    actions: [{ step: 1, kind: "fix", id: "performance.numlock", label: "Bloq Num encendido al iniciar" }],
+  },
 ];
 
 /** Lo que AdminOps sabe hacer en cada solución, por su id. */

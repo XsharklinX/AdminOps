@@ -5,7 +5,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import { InstallQueue } from "../components/InstallQueue";
 import { WingetDoctor } from "../components/WingetDoctor";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, ErrorState, Loading, Modal, inputClass, softBtn } from "../components/ui";
+import { Button, ErrorState, Loading, Modal, inputClass, softBtn, Notice } from "../components/ui";
 import { appsApi, installQueueApi, logQuietly, onInstallItem, type AppCatalog, type CatalogApp, type CatalogView, type InstallItem } from "../lib/api";
 import { catalogCounts, isVisible } from "../lib/catalogView";
 import { isFinished, mergeItem, summaryText } from "../lib/installQueue";
@@ -497,7 +497,7 @@ function SaveList({ apps, onClose, onSaved }: { apps: CatalogApp[]; onClose: () 
       onClose={onClose}
       footer={
         <>
-          {error && <p className="mr-auto text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Instalar" className="mr-auto">{error}</Notice>}
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>

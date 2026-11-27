@@ -14,6 +14,18 @@ const MAX_ENTRIES: usize = 1000;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Backup {
+    /// Memorias USB: el modo que había (allowed | readonly | blocked).
+    #[serde(rename_all = "camelCase")]
+    UsbMode { previous: String },
+    /// Energía: pantalla, suspensión y tapa que había, enchufado y con batería.
+    #[serde(rename_all = "camelCase")]
+    PowerSides { ac: crate::power::Side, dc: crate::power::Side },
+    /// Programas predeterminados: la directiva que había (None = ninguna).
+    #[serde(rename_all = "camelCase")]
+    DefaultAppsPolicy { previous: Option<String> },
+    /// Audio: el dispositivo predeterminado que había.
+    #[serde(rename_all = "camelCase")]
+    AudioDefault { id: String },
     #[serde(rename_all = "camelCase")]
     Registry { path: String, name: String, previous: Option<RawValue> },
     #[serde(rename_all = "camelCase")]

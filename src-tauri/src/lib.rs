@@ -1,6 +1,7 @@
 mod agenda;
 mod bootlog;
 mod comms;
+mod desktopicons;
 mod context;
 mod perfhistory;
 mod problems;
@@ -200,6 +201,10 @@ pub fn run() {
     // No toca los procesos del navegador interno: podrían ser los de una AdminOps abierta.
     let rocket_only = args.iter().any(|a| a == "--rocket");
     if rocket_only {
+        // Ya hay otro «solo el cohete» en esta sesión (el del inicio de sesión y el que deja AdminOps al cerrarse).
+        if !rocketplus::claim_rocket_only() {
+            std::process::exit(0);
+        }
         rocketplus::mark_rocket_only();
     }
     let orphans = if rocket_only { 0 } else { boottime::step("Navegador de sesiones anteriores", webview_orphans::kill_orphans) };
@@ -312,6 +317,10 @@ pub fn run() {
             let state =boottime::step("Catálogo de ajustes e historial", || tweaks::TweakState::new(app.handle()));
             app.manage(state);
             if rocketplus::rocket_only() {
+                // Apagado (o dentro de la app) en Ajustes: el del inicio de sesión no se queda.
+                if workflow::settings(app.handle()).rocket != "desktop" {
+                    std::process::exit(0);
+                }
                 // Solo el cohete: sin ventana principal ni nada en segundo plano. Primero el cohete y luego
                 // se quita la principal: si en algún momento no quedara ninguna ventana, el proceso se cerraría.
                 if let Err(e) = rocket::open(app.handle()) {
@@ -372,6 +381,8 @@ pub fn run() {
                     if workflow::settings(&late).rocket == "desktop" {
                         rocket::apply_mode(&late, "desktop");
                     }
+                    // La primera vez de cada usuario: el cohete arranca con Windows (la barra siempre a mano).
+                    rocketplus::ensure_default_startup(&late);
                     perfhistory::start(late.clone());
                     // Una foto al día del equipo para «¿Qué cambió?».
                     whatchanged::start(late.clone());
@@ -422,6 +433,14 @@ pub fn run() {
             boottime::startup_timing,
             boottime::log_timing,
             elevation::relaunch_as_admin,
+            elevation::relaunch_as_user,
+            rocketbar::bar_profile,
+            rocketbar::bar_ticket_extras,
+            appcare::selfcheck_after_update,
+            usbpolicy::usb_hidden,
+            winupdate::update_uninstall,
+            usbpolicy::usb_fix_letters,
+            rocketbar::bar_set_user_tools,
             metrics::get_system_info,
             metrics::get_live_metrics,
             tweaks::list_tweaks,
@@ -528,6 +547,7 @@ pub fn run() {
             bartools::bar_console,
             bartools::bar_restart,
             notebook::notes_list,
+            notebook::notes_index,
             notebook::notes_save,
             notebook::notes_delete,
             faultrec::faultrec_attach_case,
@@ -606,6 +626,7 @@ pub fn run() {
             faultrec::faultrec_resume,
             faultrec::faultrec_mark,
             faultrec::faultrec_draw,
+            faultrec::faultrec_raise_controls,
             faultrec::faultrec_camera,
             faultrec::faultrec_list,
             faultrec::faultrec_get,
@@ -1118,6 +1139,8 @@ pub fn run() {
                 // Salió bien: la próxima vez arranca normal (ver safestart.rs). Lo primero: si Windows
                 // o un instalador matan el proceso mientras se cierra lo demás, ya no cuenta como fallo.
                 safestart::end_clean();
+                // «Salir» (botón, menú del reloj) no destruye la ventana: el cohete se queda también así.
+                rocketplus::leave_rocket_behind(app);
                 displays::restore_pending_on_exit(app);
                 netusage::shutdown();
                 scanfolder::shutdown();

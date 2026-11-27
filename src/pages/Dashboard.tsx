@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActionPlan } from "../components/ActionPlan";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
-import { Bar, Button, Card, Sparkline, Loading } from "../components/ui";
+import { Bar, Button, Card, Sparkline, Loading, Notice } from "../components/ui";
 import { useLiveMetrics } from "../hooks/useLiveMetrics";
 import { tempColor, useSensors } from "../hooks/useSensors";
 import { logQuietly, api, diagApi, toolboxApi, tweaksApi, type JournalEntry, type SystemInfo } from "../lib/api";
@@ -146,7 +146,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId, focus?: s
     };
   }, [loadLatest]);
 
-  if (error && !m) return <p className="p-8 text-bad">Error leyendo métricas: {error}</p>;
+  if (error && !m) return <Notice tone="error" where="Inicio" detail={error} className="m-8">Error leyendo métricas: {error}</Notice>;
   if (!m) return <Loading page text="Leyendo el equipo…" />;
 
 

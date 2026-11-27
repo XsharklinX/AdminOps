@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { inventoryLines, MachineActions, VerdictChip } from "../components/inventory";
 import { SendReportModal } from "../components/service";
-import { Button, Card, inputClass, Tile } from "../components/ui";
+import { Button, Card, inputClass, Tile, Notice } from "../components/ui";
 import { VisitChanges } from "../components/VisitChanges";
 import { MachineCompare } from "../components/MachineCompare";
 import { logQuietly, contactsApi, diagApi, EMPTY_CLIENT_REPORT, workApi, type Client, type ClientReport, type Contact, type SessionRecord, type VisitMetrics } from "../lib/api";
@@ -471,7 +471,7 @@ export function Clients() {
                               </>
                             )}
                           </div>
-                          {s.hardwareChange && <p className="mt-1 text-xs text-warn">Hardware cambiado: {s.hardwareChange}</p>}
+                          {s.hardwareChange && <Notice tone="warn" className="mt-1">Hardware cambiado: {s.hardwareChange}</Notice>}
                           {s.notes && <p className="mt-1 line-clamp-2 text-xs text-dim">{s.notes}</p>}
                         </li>
                       ))}

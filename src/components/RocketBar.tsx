@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { api, appcareApi, diagApi, faultRecApi, FAULTREC_CAMERA_EVENT, FAULTREC_DONE_EVENT, FAULTREC_DRAW_EVENT, FAULTREC_MARKED_EVENT, FAULTREC_PAUSED_EVENT, FAULTREC_REGION_EVENT, FAULTREC_TICK_EVENT, lanApi, noteApi, notesApi, sheetApi, toolsApi, workApi, type FaultRecDone, type FaultRecWindow, type FaultRegionPicked, type Note, type SpeedResult } from "../lib/api";
 import { logQuietly } from "../lib/api/core";
 import { rocketApi, ROCKET_DOCK_EVENT } from "../lib/api/rocket";
-import { barApi, BAR_EVENT, BAR_TOOLS, DEFAULT_TOOLS, USER_TOOLS, type BarTool } from "../lib/api/rocketbar";
+import { barApi, BAR_EVENT, BAR_TOOL_EVENT, BAR_TOOLS, DEFAULT_TOOLS, TOOL_LABEL, USER_TOOLS, type BarTool } from "../lib/api/rocketbar";
 import { EXTRA_H, ExtraPanel, isExtra, type ExtraTool } from "./BarExtra";
 import { clock, pillText } from "../lib/faultrec";
 import { bytes } from "../lib/format";
@@ -24,7 +24,7 @@ import logo from "../assets/logo.svg";
 const STEP = 40; // alto de cada herramienta (botón de 36 + hueco)
 /** El pie de la barra: el lápiz (32 + 4), la flecha de esconder (28 + 4) y el remate redondeado de abajo (18). */
 const FOOT_H = 86;
-const TOOL_PANEL_H = { update: 120, menu: 150, msg: 68, rec: 228, recctl: 140, fix: 0, custom: 420, speed: 290, card: 262, recdone: 262, glance: 150, notes: 300 } as const;
+const TOOL_PANEL_H = { update: 120, menu: 150, msg: 68, rec: 228, recctl: 140, fix: 0, custom: 420, speed: 290, card: 350, recdone: 262, glance: 150, notes: 300 } as const;
 const HIDE_AFTER_MS = 5000;
 /** Personalizar: cabecera + pie (Guardar) y cada fila (la pastilla del icono mide 22 px aunque se vea al 80 %). */
 const CUSTOM_HEAD = 108;
@@ -39,28 +39,7 @@ const TAB_W = 22;
 const TAB_H = 64;
 const GRACE_MS = 1200;
 
-const LABEL: Record<BarTool, string> = {
-  rec: "Grabar pantalla",
-  clip: "Captura de pantalla",
-  note: "Notas",
-  mon: "Mini monitor",
-  fix: "Arreglos rápidos",
-  teams: "Teams",
-  mail: "Correo",
-  app: "Abrir AdminOps",
-  speed: "Velocidad de internet",
-  card: "Datos del equipo",
-  help: "Asistencia rápida",
-  contacts: "Contactos",
-  printer: "La impresora",
-  screens: "Pantallas: duplicar o extender",
-  wifi: "Wi-Fi y Bluetooth",
-  keyboard: "El teclado, en español",
-  folders: "Mis carpetas",
-  lock: "Bloquear el equipo",
-  restart: "Reiniciar sin miedo",
-  cmd: "CMD",
-};
+const LABEL = TOOL_LABEL;
 const KEY: Partial<Record<BarTool, string>> = { rec: "Ctrl+Alt+G", note: "Ctrl+Alt+N" };
 
 /** Cada herramienta con su color, como grabar o Teams: se reconoce de un vistazo sin leer. */
@@ -173,6 +152,8 @@ export function RocketBar() {
   // Los manejadores que se crean al montar leen la lista de ahora, no la de fábrica.
   const toolsRef = useRef<BarTool[]>(tools);
   toolsRef.current = tools;
+  const runRef = useRef<(t: BarTool) => Promise<void>>(async () => {});
+  const hideRef = useRef<() => void>(() => {});
   const glanceTimer = useRef(0);
   const openRef = useRef(false);
   const toolRef = useRef<ToolPanel>(null);
@@ -250,18 +231,24 @@ export function RocketBar() {
     document.documentElement.style.background = "transparent";
     document.body.style.background = "transparent";
     (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(zoom);
-    const adminP = api.isAdmin().catch(() => true);
-    void adminP.then((a) => {
-      adminRef.current = a;
-      setAdmin(a);
-      if (!a) setUpdate(null);
+    // AdminOps se abre sin elevar: lo que cuenta es si el USUARIO es administrador del equipo (su token, también por
+    // un grupo del dominio), no si esta ventana lo es.
+    const profileP = barApi.profile().catch(() => ({ admin: true, userTools: null }));
+    void profileP.then((p) => {
+      adminRef.current = p.admin;
+      setAdmin(p.admin);
+      if (!p.admin) setUpdate(null);
     });
+    const known = (list: string[]) => list.filter((t): t is BarTool => (BAR_TOOLS as readonly string[]).includes(t));
     workApi
       .settings()
       .then(async (s) => {
-        if (s.rocketTools) return setTools(s.rocketTools.filter((t): t is BarTool => (BAR_TOOLS as readonly string[]).includes(t)));
-        // Sin elegir: en el PC de un usuario sin administrador, solo lo que usa él.
-        if (!(await adminP)) setTools(USER_TOOLS);
+        // Lo que personalizó él con el lápiz (sus ajustes son suyos: cada usuario tiene los suyos).
+        if (s.rocketTools) return setTools(known(s.rocketTools));
+        // Sin elegir: un usuario que no es administrador lleva la barra que el técnico eligió para este equipo, o
+        // la de fábrica para usuarios.
+        const p = await profileP;
+        if (!p.admin) setTools(p.userTools ? known(p.userTools) : USER_TOOLS);
       })
       .catch(() => {});
     faultRecApi
@@ -287,6 +274,20 @@ export function RocketBar() {
     layout(false);
     const offs = [
       listen(BAR_EVENT, () => toggle()),
+      // Se conectó o quitó la base o un monitor: el cohete ya está en su sitio nuevo; la barra se recoge allí.
+      listen("rocket://screens", () => {
+        setTool(null);
+        setPanel(null);
+        layout(false);
+      }),
+      // Ctrl+Alt+Mayús+número: abre la barra y la herramienta de ese puesto.
+      listen<number>(BAR_TOOL_EVENT, (e) => {
+        const t = toolsRef.current[e.payload];
+        if (!t) return;
+        layout(true);
+        void runRef.current(t);
+        hideRef.current();
+      }),
       listen<"left" | "right" | null>(ROCKET_DOCK_EVENT, (e) => e.payload && setRight(e.payload === "right")),
       listen<number>(FAULTREC_TICK_EVENT, (e) => setRecSecs(e.payload)),
       // Pausar y seguir (desde aquí, desde la píldora o desde AdminOps): el panel de controles lo refleja.
@@ -439,7 +440,13 @@ export function RocketBar() {
         setTool({ kind: "card", rows: null });
         const s = await sheetApi.get();
         // La IP pública se pregunta ahora (la de la última prueba de velocidad puede ser de otra red).
-        const [net, live, pub] = await Promise.all([barApi.network().catch(() => ""), api.liveMetrics().catch(() => null), lanApi.publicIp().catch(() => null)]);
+        const [net, live, pub, extra] = await Promise.all([
+          barApi.network().catch(() => ""),
+          api.liveMetrics().catch(() => null),
+          lanApi.publicIp().catch(() => null),
+          barApi.ticketExtras().catch(() => ({ printer: "", antivirus: "", lastUpdate: "" })),
+        ]);
+        const sys = live?.disks.find((d) => /^c:/i.test(d.mount)) ?? live?.disks[0];
         const lastIp = pub?.ip ?? null;
         const days = live ? Math.floor(live.uptime / 86400) : null;
         const rows: [string, string][] = [
@@ -450,6 +457,10 @@ export function RocketBar() {
           ["Usuario", s.domain ? `${s.domain}\\${s.user}` : s.user],
           ["Windows", [s.os, s.osVersion].filter(Boolean).join(" ")],
           ["Encendido", days === null ? "" : days === 0 ? "hoy" : `${days} ${days === 1 ? "día" : "días"}`],
+          ["Impresora", extra.printer],
+          ["Antivirus", extra.antivirus],
+          ["Espacio en C:", sys ? `${bytes(sys.available)} libres de ${bytes(sys.total)}` : ""],
+          ["Última actualización", extra.lastUpdate],
           ["Número de serie", s.serial],
           ["Modelo", [s.manufacturer, s.model].filter(Boolean).join(" ")],
         ];
@@ -459,6 +470,9 @@ export function RocketBar() {
       setTool({ kind: "msg", text: String(e), ok: false });
     }
   };
+  // Los atajos (manejador creado al montar) usan el `run` de ahora, con el estado de ahora.
+  runRef.current = run;
+  hideRef.current = scheduleHide;
 
   const tucked = !open;
   const memBadge = r.mem !== null && r.mem >= 80 ? `${r.mem}%` : null;
@@ -517,13 +531,13 @@ export function RocketBar() {
               </button>
             )}
             <div className="rkb-tools" style={{ maxHeight: toolsH }}>
-            {tools.map((t) => (
+            {tools.map((t, i) => (
               <button
                 key={t}
                 type="button"
                 className={`rkb-btn ${t === "rec" && recSecs !== null ? "rkb-on" : ""}`}
                 aria-label={LABEL[t]}
-                title={`${t === "rec" && recSecs !== null ? "Controles de la grabación" : LABEL[t]}${KEY[t] ? ` (${KEY[t]})` : ""}`}
+                title={`${t === "rec" && recSecs !== null ? "Controles de la grabación" : LABEL[t]}${KEY[t] ? ` (${KEY[t]})` : ""}${i < 9 ? ` · Ctrl+Alt+Mayús+${i + 1}` : ""}`}
                 onClick={() => void run(t)}
                 onContextMenu={(e) => {
                   e.preventDefault();

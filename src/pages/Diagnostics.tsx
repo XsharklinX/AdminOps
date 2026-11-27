@@ -27,7 +27,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import type { PageId } from "../components/Sidebar";
-import { Bar, Button, Card, inputClass, Modal } from "../components/ui";
+import { Bar, Button, Card, inputClass, Modal, Notice } from "../components/ui";
 import {
   diagApi,
   logQuietly,
@@ -568,7 +568,7 @@ export function Diagnostics({
   if (error && !d)
     return (
       <div className="grid h-full place-items-center p-8 text-center">
-        <p className="text-bad">{error}</p>
+        <Notice tone="error" where="Diagnóstico">{error}</Notice>
       </div>
     );
 
@@ -625,6 +625,14 @@ export function Diagnostics({
       <li
         key={`${f.key}-${i}`}
         onClick={() => f.actions[0] && act(f.actions[0], f)}
+        tabIndex={f.actions.length > 0 ? 0 : undefined}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (f.actions[0]) act(f.actions[0], f);
+          }
+        }}
         className={`group flex gap-3 rounded-lg px-2 py-2 hover:bg-panel-2 ${f.actions.length ? "cursor-pointer" : ""}`}
         title={f.actions[0]?.label}
       >
@@ -948,7 +956,7 @@ export function Diagnostics({
           <Unavailable section={shown.system}>
             {(s) => (
               <>
-                {s.partial && <p className="mb-2 text-xs text-warn">Faltan datos (actualizaciones, antivirus, activación): {s.partial}</p>}
+                {s.partial && <Notice tone="warn" className="mb-2">Faltan datos (actualizaciones, antivirus, activación): {s.partial}</Notice>}
                 <Row label="Antivirus">
                   {s.antivirus.join(", ") || (s.partial ? <span className="text-mute">Sin comprobar</span> : <span className="text-bad">No detectado</span>)}
                 </Row>

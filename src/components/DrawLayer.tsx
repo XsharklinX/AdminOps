@@ -82,6 +82,8 @@ export function DrawLayer() {
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         e.currentTarget.setPointerCapture(e.pointerId);
+        // Al pulsarla, la capa sube encima de la píldora y la barra: se vuelven a poner arriba.
+        void faultRecApi.raiseControls().catch(logQuietly("DrawLayer.raise"));
         const s: Stroke = { pts: [[e.clientX, e.clientY]], endedAt: null };
         current.current = s;
         strokes.current.push(s);

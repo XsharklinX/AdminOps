@@ -124,6 +124,54 @@ pub struct PauseState {
     paused_until: Option<String>,
 }
 
+/// «La actualización de ayer rompió algo»: la quita (wusa, sin reiniciar solo) y pausa las actualizaciones 7 días para
+/// que no vuelva a instalarse enseguida. Devuelve qué pasó, en una frase.
+#[tauri::command(async)]
+pub fn update_uninstall(kb: String, cumulative: Option<bool>, tweaks: State<'_, TweakState>) -> Result<String, String> {
+    if !crate::elevation::is_elevated() {
+        return Err("Hace falta modo técnico (administrador) para esto.".into());
+    }
+    let kb: String = kb.trim().trim_start_matches(['K', 'B', 'k', 'b']).chars().filter(|c| c.is_ascii_digit()).collect();
+    if kb.len() < 6 {
+        return Err("Número de actualización no válido.".into());
+    }
+    let arg = format!("/kb:{kb}");
+    let status = crate::ps::hidden("wusa.exe").args(["/uninstall", &arg, "/quiet", "/norestart"]).status().map_err(|e| format!("No se pudo quitar: {e}"))?;
+    let code = status.code().unwrap_or(-1);
+    let mut r = match code {
+        0 => Ok(format!("KB{kb} quitada.")),
+        3010 => Ok(format!("KB{kb} quitada: termina al reiniciar el equipo.")),
+        2359303 => Err(format!("KB{kb} no está instalada (o no se puede quitar: algunas, como las de la pila de servicio, son permanentes).")),
+        1618 => Err("Windows está instalando otra cosa: espera a que termine y vuelve a probar.".into()),
+        c => Err(format!("Windows no dejó quitar KB{kb} (código {c}).")),
+    };
+    // Las acumulativas de Windows 11 vienen unidas a la pila de servicio y wusa no las quita: se quita su paquete
+    // (el paquete «RollupFix» que nombra esa KB) con DISM. `kb` son solo cifras (comprobado arriba).
+    // Nunca con «está instalando otra cosa» (1618): eso no es que wusa no pueda, es que hay que esperar.
+    if r.is_err() && code != 1618 && cumulative == Some(true) {
+        // Solo el paquete de ESA KB: entre los RollupFix instalados, el que la nombra en su información.
+        let script = format!(
+            "$kb = 'KB{kb}'\n\
+             $num = '{kb}'\n\
+             $p = Get-WindowsPackage -Online -ErrorAction Stop | Where-Object {{ $_.PackageName -like '*RollupFix*' -and $_.PackageState -eq 'Installed' }} | Where-Object {{ $i = Get-WindowsPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue; ($i.Description -match \"KB$num\\b\") -or ($i.SupportInformation -match \"\\b$num\\b\") }} | Select-Object -First 1\n\
+             if (-not $p) {{ throw \"No se encontró el paquete de $kb: no se puede quitar desde aquí.\" }}\n\
+             Remove-WindowsPackage -Online -PackageName $p.PackageName -NoRestart -ErrorAction Stop | Out-Null\n\
+             $p.PackageName"
+        );
+        let script = script.as_str();
+        r = crate::ps::powershell_opts(script, crate::ps::Opts { timeout: Some(std::time::Duration::from_secs(900)), task: None })
+            .map(|_| format!("KB{kb} quitada: termina al reiniciar el equipo."))
+            .map_err(|e| format!("Windows no dejó quitar KB{kb}: {}", crate::ps::clean_error(&e)));
+    }
+    tweaks.record(crate::tweaks::journal::Op::Run, &format!("Quitar la actualización KB{kb}"), &r);
+    let msg = r?;
+    // Para que no vuelva a instalarse esta noche.
+    match pause_hours(7 * 24, &tweaks) {
+        Ok(()) => Ok(format!("{msg} Actualizaciones en pausa 7 días.")),
+        Err(e) => Ok(format!("{msg} No se pudieron pausar las actualizaciones: {e}")),
+    }
+}
+
 #[tauri::command]
 pub fn update_pause_state() -> PauseState {
     let until = crate::tweaks::registry::read_string(UX, "PauseUpdatesExpiryTime").filter(|s| !s.is_empty());

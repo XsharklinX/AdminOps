@@ -4,7 +4,7 @@
 // cámara se ven en vivo y se apagan al salir de la pestaña.
 import { Camera, Keyboard, Mic, Monitor, RotateCcw, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button, Card } from "../components/ui";
+import { Button, Card, Notice } from "../components/ui";
 import { usePageActive } from "../lib/pageActive";
 
 // ---------- Pantalla ----------
@@ -249,7 +249,7 @@ function MicTest({ active }: { active: boolean }) {
           <div className="absolute top-0 h-full w-0.5 bg-ink/60" style={{ left: `${peak * 100}%` }} />
         </div>
       </div>
-      {err && <p className="mt-2 text-xs text-warn">{err}</p>}
+      {err && <Notice tone="warn" className="mt-2">{err}</Notice>}
     </Card>
   );
 }
@@ -290,7 +290,7 @@ function CameraTest({ active }: { active: boolean }) {
         </Button>
       </div>
       {on && <video ref={video} autoPlay muted playsInline className="mt-3 aspect-video w-full max-w-md rounded-lg bg-black" />}
-      {err && <p className="mt-2 text-xs text-warn">{err}</p>}
+      {err && <Notice tone="warn" className="mt-2">{err}</Notice>}
     </Card>
   );
 }

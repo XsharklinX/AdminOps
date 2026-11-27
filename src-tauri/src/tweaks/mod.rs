@@ -52,6 +52,15 @@ pub struct TweakState {
     app: Option<tauri::AppHandle>,
 }
 
+/// Como `record_app`, pero con cómo estaba antes: la entrada se puede deshacer («Volver a como estaba» en el historial).
+pub fn record_undoable<T>(app: &tauri::AppHandle, title: &str, backups: Vec<journal::Backup>, result: &Result<T, String>) {
+    use tauri::Manager;
+    if let Some(state) = app.try_state::<TweakState>() {
+        let r: Result<(), String> = result.as_ref().map(|_| ()).map_err(|e| e.clone());
+        state.log_change(title, backups, &r);
+    }
+}
+
 /// Apunta en el diario (y así en el caso y el informe) lo que hizo un comando que cambia el equipo.
 pub fn record_app<T>(app: &tauri::AppHandle, title: &str, result: &Result<T, String>) {
     use tauri::Manager;
@@ -278,6 +287,9 @@ pub struct TweakView {
     kind: Kind,
     note: Option<String>,
     reboot: bool,
+    /// Cuánto tarda: el del catálogo, o al momento / unos segundos según lo que hace.
+    eta: String,
+    closes: Option<String>,
     needs_admin: bool,
     supported: bool,
     status: Status,
@@ -306,6 +318,8 @@ fn view(state: &TweakState, t: &Tweak, status: Status) -> TweakView {
         kind: t.kind,
         note: t.note.clone(),
         reboot: t.reboot,
+        eta: t.eta.clone().unwrap_or_else(|| if t.script.is_some() { "unos segundos".into() } else { "al momento".into() }),
+        closes: t.closes.clone(),
         needs_admin: t.needs_admin(),
         supported: t.supported_on(state.build),
         status,

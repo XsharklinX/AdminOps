@@ -1,3 +1,4 @@
+import { notesApi, type Note } from "../lib/api/notebook";
 import { AppWindow, BookOpen, Bug, CheckCircle2, Circle, CornerDownLeft, FileText, Lightbulb, ListTree, Loader2, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, XCircle, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, allowedInMode, isPageId, navLabel, pageLabel, visibleAreas, type Area, type PageId } from "./Sidebar";
@@ -31,7 +32,7 @@ const CATEGORY_PAGE: Record<string, PageId> = {
   security: "security",
 };
 
-const KIND_LABEL = { error: "Código de error", smart: "Sugerido", page: "Pantalla", section: "Sección", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla", help: "Guía" };
+const KIND_LABEL = { error: "Código de error", smart: "Sugerido", page: "Pantalla", section: "Sección", tool: "Herramienta", tweak: "Ajuste", repair: "Reparación", action: "Acción", contact: "Contacto", solution: "Solución", template: "Plantilla", note: "Nota", help: "Guía" };
 
 type Kind = keyof typeof KIND_LABEL;
 
@@ -170,6 +171,7 @@ export function CommandPalette({
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [templates, setTemplates] = useState<TextTemplate[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   // Acciones que se hacen desde la caja: la que espera la segunda Intro, la que corre y su resultado.
   const [armed, setArmed] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -203,6 +205,8 @@ export function CommandPalette({
         .then((l) => vigente() && setSolutions([...l, ...BUILTIN_SOLUTIONS]))
         .catch(() => vigente() && setSolutions(BUILTIN_SOLUTIONS));
       libraryApi.list("templates").then((t) => vigente() && setTemplates(t)).catch(logQuietly("CommandPalette"));
+      // Las notas, con su texto: «tóner» encuentra la nota donde se apuntó.
+      notesApi.index().then((l) => vigente() && setNotes(l)).catch(logQuietly("CommandPalette"));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- el texto inicial solo cuenta al abrir
     [open],
@@ -276,6 +280,10 @@ export function CommandPalette({
       out.push({ key: `solution:${s.id}`, kind: "solution", title: s.title, subtitle: s.problem, search: norm(`${s.title} ${s.problem} ${s.solution} ${s.tags.join(" ")}`), run: () => onNavigate("knowledge", `solution:${s.id}`) });
     for (const t of templates)
       out.push({ key: `template:${t.id}`, kind: "template", title: t.name, subtitle: t.category || "Plantilla de texto", search: norm(`${t.name} ${t.category} ${t.body}`), run: () => onNavigate("knowledge", `template:${t.id}`) });
+    for (const n of notes) {
+      const first = n.text.split("\n").find((l) => l.trim()) ?? "";
+      out.push({ key: `note:${n.id}`, kind: "note", title: n.title || first || "Nota", subtitle: (n.title ? first : "").slice(0, 90) || "Conocimiento › Notas", search: norm(`${n.title} ${n.text}`), run: () => onNavigate("knowledge", `notebook:${n.id}:${Date.now()}`) });
+    }
     // La guía: «cómo se hace…» lleva al apartado que lo explica.
     for (const ch of GUIDE)
       for (const t of ch.topics)
@@ -445,7 +453,7 @@ export function CommandPalette({
   };
 
   const icon = (k: Kind) => {
-    const I = { error: Bug, smart: Sparkles, page: CornerDownLeft, section: ListTree, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText, help: BookOpen }[k];
+    const I = { error: Bug, smart: Sparkles, page: CornerDownLeft, section: ListTree, tool: AppWindow, tweak: SlidersHorizontal, repair: Wrench, action: Zap, contact: UserRound, solution: Lightbulb, template: FileText, note: Pin, help: BookOpen }[k];
     return <I size={14} className="shrink-0 text-neon" />;
   };
 

@@ -4,7 +4,34 @@
 type Rule = [RegExp, string];
 
 const RULES: Rule[] = [
-  [/access is denied|acceso denegado|os error 5\b|permission denied|0x80070005/i, "Windows denegó el acceso. Prueba a abrir AdminOps como administrador."],
+  // Antes que «acceso denegado»: lo concreto primero.
+  [/os error 740\b|requires elevation|requiere elevaci[oó]n|requested registry access is not allowed/i, "Hace falta modo técnico (administrador) para esto."],
+  [/os error 1223\b|operation was canceled by the user|cancelad[oa] por el usuario/i, "Cancelado en el aviso de Windows."],
+  // Windows Update.
+  [/0x800f081f|0x800f0906|0x800f0907|0x800f0950/i, "Windows no encuentra los archivos que necesita para instalarlo: sus componentes están dañados o no llega a Windows Update."],
+  [/0x8024402c|0x80244022|0x8024401c|0x80072ee2|0x80072efd|0x80072f8f/i, "Windows Update no llega a sus servidores: sin Internet, un proxy o la hora del equipo mal."],
+  [/0x800f0922/i, "Windows no pudo terminar la actualización: suele faltar espacio en la partición reservada del sistema o una VPN la bloquea."],
+  [/0x80073712/i, "Faltan o están dañados archivos de Windows Update en este equipo."],
+  [/0x80070643/i, "La instalación falló dentro de su instalador (a menudo .NET Framework o la actualización de Defender)."],
+  [/0x80240017/i, "Esa actualización no es para este equipo: ya está instalada o es de otra versión de Windows."],
+  // Cuentas y contraseñas (red, dominio, carpetas compartidas).
+  [/os error 1326\b|unknown user name or bad password|nombre de usuario o contrase[ñn]a incorrectos/i, "Usuario o contraseña incorrectos."],
+  [/os error 86\b|network password is not correct|contrase[ñn]a de red especificada no es correcta/i, "La contraseña de red no es correcta."],
+  [/os error 1219\b|multiple connections to a server|varias conexiones a un servidor/i, "Ya hay una conexión a ese servidor con otro usuario: Windows no deja dos a la vez."],
+  [/os error 1909\b|account is currently locked|cuenta (?:a la que se hace referencia )?est[aá] bloqueada/i, "La cuenta está bloqueada (demasiados intentos con la contraseña mal)."],
+  [/os error 1907\b|password must be changed|debe cambiar(?:se)? la contrase[ñn]a/i, "Hay que cambiar la contraseña antes de entrar."],
+  [/os error 1385\b|has not been granted the requested logon type/i, "Ese usuario no tiene permiso para iniciar sesión así en el otro equipo."],
+  // Impresoras.
+  [/0x00000709|\b0x709\b/i, "Windows no deja cambiar la impresora predeterminada (la tiene fijada él o lo bloquea un ajuste)."],
+  [/0x0000011b|\b0x11b\b/i, "Windows bloquea la conexión a esa impresora compartida por una protección de seguridad."],
+  [/0x00000bc4|\b0xbc4\b/i, "No se encuentran impresoras en la red: detección de redes apagada o la cola de impresión parada."],
+  // winget.
+  [/0x8a15[0-9a-f]{4}/i, "winget no pudo hacerlo: suele arreglarse con «Reparar winget» en Instalar."],
+  // Generales que salen a menudo.
+  [/0x8007000e|out of memory|memoria insuficiente/i, "Windows se quedó sin memoria para hacerlo: cierra programas y vuelve a probar."],
+  [/0x80070570|corrupt(?:ed)? and unreadable|est[aá] da[ñn]ado y no se puede leer/i, "El archivo o la carpeta está dañado y no se puede leer: conviene revisar el disco."],
+  [/is not recognized as the name of a cmdlet|no se reconoce como nombre de un cmdlet/i, "A este Windows le falta una herramienta que hace falta para esto (por su versión o su edición)."],
+  [/access is denied|acceso denegado|os error 5\b|permission denied|0x80070005/i, "Windows denegó el acceso. Prueba a pasar a modo técnico (administrador)."],
   [/being used by another process|os error 32\b|está siendo utilizado por otro proceso/i, "Un archivo está en uso por otro programa. Ciérralo y vuelve a intentarlo."],
   [/not enough space|os error 112\b|no hay espacio suficiente|disk full/i, "No queda espacio suficiente en el disco."],
   [/cannot find the (file|path)|os error [23]\b|no se puede encontrar (el archivo|la ruta)/i, "No se encuentra el archivo o la carpeta (puede que se haya movido o borrado)."],
@@ -42,8 +69,21 @@ export function humanError(command: string, error: unknown): string {
     report?.(`Comando ${command}: ${raw}`);
     return "Error interno de AdminOps. Se ha anotado en el registro técnico; si se repite, crea un paquete de soporte (Ctrl+K → «paquete de soporte»).";
   }
-  for (const [re, text] of RULES) if (re.test(raw)) return text;
+  for (const [re, text] of RULES) if (re.test(raw)) return withCode(text, raw);
   return withoutUserPaths(raw);
+}
+
+/** El código de Windows que traía el error (0x…, «error 740»), para buscarlo o dárselo a soporte. */
+export function errorCode(raw: string): string | null {
+  const hex = /0x[0-9a-f]{3,8}\b/i.exec(raw);
+  if (hex) return hex[0].toLowerCase();
+  const os = /os error (\d{2,5})\b/i.exec(raw);
+  return os ? `error ${os[1]}` : null;
+}
+
+function withCode(text: string, raw: string): string {
+  const code = errorCode(raw);
+  return code && !text.includes(code) ? `${text} (${code})` : text;
 }
 
 /**
@@ -60,12 +100,19 @@ export interface Explained {
   why: string;
   tries: string[];
   /** Algo que AdminOps puede hacer por ti: reiniciar como administrador, reintentar… */
-  fix?: "admin" | "retry" | "network" | "space";
+  fix?: "admin" | "retry" | "network" | "space" | "update" | "printer" | "winget";
 }
 
 type Explain = [RegExp, Omit<Explained, "what">];
 
 const EXPLAIN: Explain[] = [
+  [/modo técnico \(administrador\) para esto/i, { why: "Esto cambia una parte del sistema que Windows solo deja tocar a un administrador.", tries: ["Pasa a modo técnico (arriba, «Modo usuario») y vuelve a intentarlo."], fix: "admin" }],
+  [/cancelado en el aviso de windows/i, { why: "Se pulsó «No» o se cerró el aviso de permisos de Windows.", tries: ["Vuelve a intentarlo y acepta el aviso."] }],
+  [/windows update|componentes est[aá]n da[ñn]ados|terminar la actualizaci[oó]n|esa actualizaci[oó]n no es para este equipo|fall[oó] dentro de su instalador/i, { why: "Windows Update o sus componentes tienen un problema en este equipo.", tries: ["Abre Windows Update en AdminOps: explica el error y tiene «Reparar Windows Update».", "Si dice que falta espacio, libera espacio y vuelve a probar."], fix: "update" }],
+  [/usuario o contrase[ñn]a incorrectos|contrase[ñn]a de red|cambiar la contrase[ñn]a|cuenta est[aá] bloqueada|iniciar sesi[oó]n as[ií]/i, { why: "El otro equipo o el dominio no aceptan esas credenciales.", tries: ["Comprueba el usuario (con el dominio delante: OFICINA\\usuario) y la contraseña.", "Si se bloquea sola, algo en este equipo sigue usando la contraseña vieja (unidades de red, credenciales guardadas)."] }],
+  [/otro usuario: windows no deja dos/i, { why: "Windows solo admite una cuenta por servidor a la vez.", tries: ["Desconecta las unidades de red de ese servidor y vuelve a conectar con el usuario bueno.", "O usa el servidor por su IP en vez del nombre."], fix: "retry" }],
+  [/impresora/i, { why: "La impresora, su controlador o la cola de impresión de Windows tienen un problema.", tries: ["Abre Impresoras en AdminOps: vaciar la cola, reinstalar el controlador o cambiar la predeterminada."], fix: "printer" }],
+  [/winget/i, { why: "El instalador de programas de Windows (winget) no está bien en este equipo.", tries: ["En Instalar, «Reparar winget» lo pone al día y arregla sus orígenes."], fix: "winget" }],
   [/administrador|acceso denegado|access is denied|0x80070005/i, { why: "Windows protege esa parte del sistema y solo deja tocarla con permisos de administrador.", tries: ["Reinicia AdminOps como administrador.", "Si ya lo es, puede que un antivirus esté bloqueando la carpeta."], fix: "admin" }],
   [/en uso por otro programa|being used by another process/i, { why: "Otro programa tiene ese archivo abierto y Windows no deja cambiarlo mientras tanto.", tries: ["Cierra el programa que lo usa (Procesos lo muestra).", "Si no sabes cuál es, reinicia el equipo y vuelve a intentarlo."], fix: "retry" }],
   [/espacio suficiente|not enough space|disk full/i, { why: "El disco está lleno o casi lleno.", tries: ["Libera espacio en Espacio en disco.", "Vacía la papelera y los temporales."], fix: "space" }],

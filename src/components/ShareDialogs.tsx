@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { logQuietly, officeApi, usersApi, vaultApi, type Share, type ShareBackup, type ShareExplain, type ShareRight } from "../lib/api";
 import { friendlyPath } from "../lib/format";
 import { useToast } from "./feedback";
-import { Button, inputClass, Modal } from "./ui";
+import { Button, inputClass, Modal, Notice } from "./ui";
 
 const RIGHTS: [ShareRight, string][] = [
   ["Read", "Solo leer"],
@@ -69,7 +69,7 @@ export function AccessEditor({
     <Modal title={`Quién puede entrar a «${share.name}»`} onClose={onClose} width="w-[560px]">
       <div className="space-y-4">
         {share.access.length === 0 ? (
-          <p className="text-sm text-warn">Ahora mismo nadie puede entrar: la lista está vacía.</p>
+          <Notice tone="warn">Ahora mismo nadie puede entrar: la lista está vacía.</Notice>
         ) : (
           <ul className="divide-y divide-line/60 rounded-lg border border-line">
             {share.access.map((a) => {

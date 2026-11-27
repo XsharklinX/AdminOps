@@ -82,6 +82,7 @@ foreach ($d in Get-PSDrive -PSProvider FileSystem) {
 
 [[tweak]]
 id = "cleanup.delivery-optimization"
+eta = "unos 30 s"
 name = "Limpiar caché de Optimización de distribución"
 description = "Borra las actualizaciones que Windows guarda para compartir con otros equipos de la red."
 category = "cleanup"
@@ -101,6 +102,7 @@ $freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
 
 [[tweak]]
 id = "cleanup.disk-cleanup"
+eta = "5–20 min"
 timeout = 3600
 name = "Liberador de espacio (silencioso)"
 description = "Ejecuta cleanmgr con temporales, caché de miniaturas y de shaders, restos de actualizaciones y registros de instalación."
@@ -130,6 +132,7 @@ $freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
 
 [[tweak]]
 id = "cleanup.component-store"
+eta = "10–30 min"
 timeout = 0
 name = "Limpiar almacén de componentes (WinSxS)"
 description = "Elimina versiones antiguas de componentes de Windows reemplazadas por actualizaciones."
@@ -152,6 +155,7 @@ $freed = [math]::Max(0, (Get-PSDrive $drive).Free - $before)
 
 [[tweak]]
 id = "cleanup.windows-update-cache"
+eta = "unos 30 s"
 name = "Vaciar descargas de Windows Update"
 description = 'Borra SoftwareDistribution\Download. Soluciona actualizaciones atascadas o corruptas.'
 category = "cleanup"

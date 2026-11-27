@@ -352,8 +352,8 @@ export function demoAnswer(command: string, args?: Record<string, unknown>): unk
     // El cuaderno de Notas: unas de ejemplo, nunca las reales del técnico.
     case "notes_list":
       return [
-        { id: "n-demo-1", title: "Impresora de recepción", text: "Si sale «sin conexión»: apagarla 10 s y volver a encenderla.\nIP fija 192.168.1.40.", created: (now() - 3 * DAY) * 1000, updated: (now() - DAY) * 1000, pinned: true },
-        { id: "n-demo-2", title: "Llamar a contabilidad", text: "Pedir el número de serie del portátil nuevo.", created: (now() - 2 * 3600) * 1000, updated: (now() - 2 * 3600) * 1000, pinned: false },
+        { id: "n-demo-1", title: "Impresora de recepción", text: "Si sale «sin conexión»: apagarla 10 s y volver a encenderla.\nIP fija 192.168.1.40.", created: (now() - 3 * DAY) * 1000, updated: (now() - DAY) * 1000, pinned: true, images: [] },
+        { id: "n-demo-2", title: "Llamar a contabilidad", text: "Pedir el número de serie del portátil nuevo.", created: (now() - 2 * 3600) * 1000, updated: (now() - 2 * 3600) * 1000, pinned: false, images: [] },
       ];
     case "list_clients":
       return structuredClone(DEMO_CLIENTS);

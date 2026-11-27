@@ -7,7 +7,8 @@ import { useToast } from "../../components/feedback";
 import { ViewCommand } from "../../components/ActionCommand";
 import { Button, Card, Explain, inputClass, resetIntros, Toggle } from "../../components/ui";
 import { openOnboarding } from "../../lib/navigate";
-import { appcareApi, configApi, logQuietly, rocketApi, type Settings, storageApi, type StorageInfo } from "../../lib/api";
+import { api, appcareApi, configApi, logQuietly, rocketApi, type Settings, storageApi, type StorageInfo } from "../../lib/api";
+import { barApi, BAR_TOOLS, TOOL_LABEL, USER_TOOLS, type BarTool } from "../../lib/api/rocketbar";
 import { exportPrefs, importPrefs, setPrefs, usePrefs } from "../../lib/prefs";
 import { DataSafety } from "./DataSafety";
 import { AutoBackup } from "./AutoBackup";
@@ -119,6 +120,7 @@ export function StartWindow({ s, set }: SettingsProps) {
               <Toggle checked={!!s.rocketMorning} onChange={(v) => set({ rocketMorning: v })} />
             </Row>
             {(s.rocket ?? "desktop") === "desktop" && <RocketStartup />}
+            {(s.rocket ?? "desktop") === "desktop" && <UserBar />}
           </>
         )}
         <Row title="Actualización del Panel" sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo.">
@@ -457,6 +459,61 @@ function Autostart() {
   );
 }
 
+/**
+ * La barra de los usuarios de este equipo que no son administradores: el técnico elige sus herramientas (la misma para
+ * todos, en ProgramData). Lo que cada usuario personalice con su lápiz manda sobre esto.
+ */
+function UserBar() {
+  const [list, setList] = useState<BarTool[] | null>(null);
+  const [custom, setCustom] = useState(false);
+  // Es la de todos los usuarios del equipo: solo se cambia en modo técnico.
+  const [tech, setTech] = useState(false);
+  const toast = useToast();
+  useEffect(() => {
+    api.isAdmin().then(setTech, () => setTech(false));
+    barApi.profile().then(
+      (p) => {
+        const known = (p.userTools ?? []).filter((t): t is BarTool => (BAR_TOOLS as readonly string[]).includes(t));
+        setCustom(known.length > 0);
+        setList(known.length ? known : [...USER_TOOLS]);
+      },
+      () => setList([...USER_TOOLS]),
+    );
+  }, []);
+  const save = (next: BarTool[] | null) =>
+    barApi.setUserTools(next).then(
+      () => {
+        setCustom(!!next);
+        setList(next ?? [...USER_TOOLS]);
+        toast("ok", next ? "Barra de los usuarios guardada." : "Barra de los usuarios: la de fábrica.");
+      },
+      (e) => toast("error", String(e)),
+    );
+  if (!list) return null;
+  // En el orden de la barra: las marcadas primero, como quedarán.
+  const toggle = (t: BarTool, on: boolean) => {
+    const next = on ? [...list, t] : list.filter((x) => x !== t);
+    if (next.length) void save(BAR_TOOLS.filter((x) => next.includes(x)));
+  };
+  return (
+    <Row title="La barra de los usuarios de este equipo" sub={`Lo que lleva la barra de quien no es administrador${custom ? "" : " (ahora, la de fábrica)"}. Para todos los usuarios de este equipo; si alguno la personaliza con su lápiz, manda la suya.${tech ? "" : " Se cambia en modo técnico."}`}>
+      <div className="flex max-w-md flex-wrap justify-end gap-1.5">
+        {BAR_TOOLS.map((t) => (
+          <label key={t} className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${list.includes(t) ? "border-neon/50 text-ink" : "border-line-2 text-mute"}`}>
+            <input type="checkbox" className="accent-[#5b8def]" checked={list.includes(t)} disabled={!tech} onChange={(e) => toggle(t, e.target.checked)} />
+            {TOOL_LABEL[t]}
+          </label>
+        ))}
+        {custom && tech && (
+          <button type="button" className="text-xs text-mute underline-offset-2 hover:text-ink hover:underline" onClick={() => void save(null)}>
+            Volver a la de fábrica
+          </button>
+        )}
+      </div>
+    </Row>
+  );
+}
+
 /** «El cohete arranca con Windows»: una tarea al iniciar sesión que abre solo el cohete, sin AdminOps entera. */
 function RocketStartup() {
   const [on, setOn] = useState<boolean | null>(null);
@@ -467,7 +524,7 @@ function RocketStartup() {
   return (
     <Row
       title="El cohete arranca con Windows"
-      sub="Al iniciar sesión aparece solo el cohete, aunque no abras AdminOps. «Abrir AdminOps» en su menú abre la aplicación entera. Al salir de AdminOps, el cohete se queda."
+      sub="Al iniciar sesión aparece el cohete con su barra, aunque no abras AdminOps. Es de este usuario y no necesita administrador; viene puesto de fábrica. Al cerrar AdminOps, el cohete se queda siempre (también en la versión portable)."
     >
       <Toggle
         checked={!!on}

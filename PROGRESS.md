@@ -11,7 +11,64 @@ local sí); un solo técnico; sin datos personales en la interfaz; textos en esp
 con lint, typecheck, pruebas de Rust y de interfaz, y `npm run test:exe` + `npm run test:perf` con un
 .exe de depuración. Antes de cambiar algo visual que no esté ya en la maqueta, enseñar el antes y el después.
 
-## Tanda «el compendio» (elegida el 27 nov) · SIN EMPEZAR · va DESPUÉS de publicar la 1.5.1
+## ESTADO 27 nov (noche): 1.5.2 + F1, F2 y F3 de la tanda del compendio HECHAS sin commit, en verde (clippy, cargo test 919,
+tsc, eslint, vitest 503). 2.ª revisión Opus: 7 hallazgos + posibles ARREGLADOS y re-revisados: APRUEBA (y sus 3 leves
+finales arreglados). Siguiente: versión 1.5.2 (o la que decida David) + changelog + notas ES/EN, build cuando la pida, publish.
+Pendiente de decisión de David: en portable el cohete que se queda corre desde el USB (no deja expulsarlo).
+HECHO en la tanda: A3 faultrec_raise_controls; A4 posiciones por pantallas (rocket-pantallas.json, evento rocket://screens);
+A7 user_is_admin_member (token) + bar_profile; M10 barra de los usuarios (ProgramData\AdminOps\barra-usuarios.json, Ajustes →
+General); M11 Ctrl+Alt+Mayús+1…9; Q5 Notice + 100 avisos migrados (unos 50 dudosos sin migrar, lista en el informe del oficial:
+validaciones de formulario, cajas con botones y textos compuestos); A5 diccionario de errores con códigos y salida a su arreglo;
+M16 eta/closes en el catálogo (repair, cleanup) y TweakCard (los arreglos de «Resolver un problema» aún NO llevan etiqueta);
+A8 «Volver a como estaba» para USB, energía, predeterminados y audio (Backup nuevos + record_undoable); A6 con AdminOps portable
+en una memoria no deja bloquear (Windows no puede excluir una sola memoria: CAMBIO respecto a la maqueta, contárselo);
+N16 «una memoria no aparece» (sin letra o tapada por unidad de red) en Memorias USB.
+F4, F5 y F6 HECHAS también (27 nov, noche), sin commit, en verde (clippy, cargo test 919, tsc, eslint, vitest 503):
+N6 repair.start-menu, N7 icon-cache + miniaturas, N8 repair.clipboard, N10 repair.print-to-pdf, N14 performance.wireless-receiver,
+M13 performance.numlock (+ 6 soluciones en «Resolver»); N4 «Quitar esta» en el historial de Windows Update (wusa + pausa 7 días);
+N13 desktopicons.rs (COM; leer probado con 39 iconos reales; COLOCAR sin probar) en el vigilante del cohete; M12 impresora,
+antivirus, espacio C: y última actualización en Datos del equipo; M6 Ctrl+K busca en las notas y abre la nota; M4 notas con
+capturas pegadas (6 × 3 MB) y casillas «[ ]» que se marcan desde la tarjeta; Q2 nombres accesibles, clicables y cabeceras
+ordenables con teclado; Q1 tests/ui/smoke.mjs con SMOKE_WIDTH (1093 y 911 px: nada se sale); Q4 selfcheck_after_update +
+SelfCheck.tsx. TANDA DEL COMPENDIO COMPLETA. 3.ª revisión Opus (F4–F6): 5 medios + 5 leves + posibles ARREGLADOS
+(auditoría en la autocomprobación, Ctrl+K no pierde lo escrito, iconos por equipo y ruta completa, antivirus activo, ratón solo
+ratón/teclado, portapapeles y PDF honestos, notas con imágenes, acumulativas con DISM solo del paquete de esa KB); re-revisada:
+APRUEBA. TODO LISTO PARA LA BUILD 1.5.2 (falta que David la pida; preparar versión, changelog y notas ES/EN con /previo).
+Pendiente de David: si en portable el cohete se queda al cerrar (corre desde el USB).
+
+## 1.5.2 URGENTE (27 nov): abrir sin administrador + barra siempre · HECHO sin commit, en verde · 1.ª revisión arreglada
+Pedido de David: en un PC, instalada, al abrirla salía «We couldn't create the data directory …\yerlin.bonilla\AppData\LocalAdminOps\WebView\EBWebView» (el instalador elevado abría AdminOps con la cuenta del técnico). Quiere: abrir SIN administrador
+para cualquier usuario (instalada o portable), administrador solo en «Modo técnico», y la barra siempre (AdminOps cerrada,
+cualquier usuario y modo). Hecho: manifiesto asInvoker siempre (build.rs, manifests/app.manifest); el instalador abre
+AdminOps con explorer.exe; chip «Modo usuario/Modo técnico» en la cabecera (relaunch_as_admin / relaunch_as_user nuevo);
+textos «Pasar a modo técnico»; el cohete se queda SIEMPRE al cerrar (también portable; elevada → como el usuario); un solo
+«solo el cohete» por sesión (mutex); arranque con Windows por HKCU\Run «AdminOps (cohete)» sin administrador, puesto de
+fábrica la primera vez de cada usuario (cohete-arranque.txt), quita la tarea antigua en modo técnico; WebView2 en
+%ProgramData%\AdminOps\WebView\<SID> si está elevada con otra cuenta y comprobando EBWebView. Falta: arreglar lo que
+diga la revisión, versión 1.5.2 + changelog + notas, build cuando la pida, publish. Sin probar en un PC con dos cuentas.
+Ojo: en modo usuario la barra del técnico en su propio PC sale con las herramientas de usuario si no la personalizó.
+
+## Tanda «el compendio» (elegida el 27 nov) · EMPEZADA el 27 nov (David: «empieza con la F1 y F2»)
+PARA RETOMAR (27 nov, cierre pedido por David, PAUSADA): sin commit; tsc y cargo check en verde.
+- HECHO: Q5 la pieza `Notice` en src/components/ui.tsx (tone ok|warn|error|info, «Copiar el detalle» en errores).
+  FALTA migrar los ~188 mensajes sueltos text-bad/text-ok (106 archivos): el encargo al oficial se paró ANTES de tocar
+  nada; relanzarlo con el mismo prompt (qué migrar / qué no; excluir ui.tsx, feedback.tsx, RocketBar, BarExtra,
+  Rocket, RecPill, DrawLayer, CamCorner, settings/General.tsx, errors.ts).
+- HECHO (sin probar en exe): A3 comando faultrec_raise_controls (faultrec.rs, lib.rs, audit SAFE, api raiseControls) llamado en
+  cada pointerdown de DrawLayer.
+- Diseño decidido para lo que falta de F1: A7 leer el token del explorer.exe del usuario de la sesión (sysinfo por SID +
+  OpenProcessToken + TokenGroups; admin si está S-1-5-32-544 aunque sea solo-denegar) y pasarlo al script de
+  rocket_set_startup; si no se puede, la comprobación de antes. M11 atajos Ctrl+Alt+Mayús+1…9 (Ctrl+Alt = AltGr en
+  español) junto al de Ctrl+Alt+T en rocketbar.rs, evento con el índice → RocketBar abre la barra y ejecuta run(tools[i]).
+  M10 ajuste rocketUserTools (workflow.rs + work.ts + Ajustes → General junto a «El cohete arranca con Windows»); al
+  activar el arranque para otro usuario se escribe barra-usuario.json en SU %APPDATA%\com.adminops.app (target_user);
+  la barra sin admin usa: lo que personalice él (localStorage) > barra-usuario.json > USER_TOOLS. A4 rocket.json pasa a
+  un mapa por «firma» de monitores (posición, tamaño y escala de cada uno); el vigilante de pantalla completa mira la
+  firma cada 2 s y al cambiar esconde la barra (evento) y la lleva a la posición guardada de esa firma o a la de siempre.
+- F2 pendiente: A5 ampliar RULES/EXPLAIN de src/lib/errors.ts (WU 0x800f081f 0x80070002 0x8024402c 0x800f0922 0x80073712
+  0x80070643, DISM, 740, 1223, 1326, 1219, 86, impresoras 0x709 0x11b 0xbc4, winget 0x8a15…) con salida a su arreglo en
+  errorExit (feedback.tsx); M16 campo `eta` (y lo que cierra) en el modelo de tweaks (tweaks/model.rs, ~165 en
+  src-tauri/tweaks/*.toml; ya tienen `reboot`) y etiquetas en TweakCard y en Resolver.
 Catálogo https://claude.ai/artifact/Usa36hPriT2JAyAjaa6HYY (fuente adminops-compendio.html en el scratchpad de la sesión
 4862ee06). Las maquetas ANTES/AHORA de cada idea son lo aprobado. Número de versión: lo decide David.
 **SÍ (25):** A3 dibujar nunca tapa los botones · A4 barra y cohete vuelven a su sitio con la base (posición por combinación
@@ -47,11 +104,8 @@ ticket»); NO 3 cable o Wi-Fi, 6 el cohete dice qué pasa. NUEVO PEDIDO: el cohe
 HORA del navegador abierto (Chrome/Edge/Brave/Firefox), sin tocar contraseñas, historial ni sesiones antiguas
 (una web interna se cae y se arregla borrando cookies). Ojo: con el navegador abierto la base de cookies está
 bloqueada; hacerlo con el navegador cerrado o por CDP/extension; decidir al empezar.
-BUILD 1.5.1 (27 nov, noche): David la pidió; compilada (release/v1.5.1, test:exe y perf pasan) pero NO publicada: el
-guardia pidió revisión de los arreglos posteriores; el revisor Opus encontró 2 medios (alto de la barra con la lista de
-fábrica en Ctrl+Alt+T/Esc; «empezar el día» a medianoche), 3 leves y 1 posible (UAC con RunAsInvoker heredado): ARREGLADOS
-en el código, en verde. La build compilada NO los lleva: hay que recompilar (pedir permiso a David) y luego commit +
-npm run publish:release. Versión, changelog y docs/notas-1.5.1.md ya puestos.
+1.5.1 PUBLICADA (27 nov) · commit f0789ef, https://github.com/XsharklinX/AdminOps/releases/tag/v1.5.1 (test:exe se cortó
+una vez porque se tocó la ventana de prueba; repetido aparte, pasa entero). Lo de abajo es historia: sigue la tanda del compendio.
 PARA RETOMAR (27 nov, cierre): toda la tanda 1.5.1 está HECHA sin commit y sin probar en exe (checks en verde:
 clippy, cargo test 914+, tsc, eslint, vitest 501). Lo de las cookies quedó descartado por David: era la CACHÉ (hecha en
 rocket.rs). Faltan, en orden: (1) HECHO 27 nov: parte A arreglada entera (13 + posibles de código, ver ✔ en

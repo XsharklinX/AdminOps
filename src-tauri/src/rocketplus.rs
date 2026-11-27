@@ -609,11 +609,17 @@ pub fn mark_rocket_only() {
 pub fn mark_full_running() {
     #[cfg(windows)]
     {
+        use windows_sys::Win32::Security::{InitializeSecurityDescriptor, SetSecurityDescriptorDacl, SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR};
         use windows_sys::Win32::System::Threading::CreateMutexW;
         let name: Vec<u16> = MUTEX_FULL.encode_utf16().chain(Some(0)).collect();
-        // SAFETY: nombre propio; el mutex vive lo que el proceso (no se cierra a propósito).
+        // SAFETY: nombre propio; el mutex vive lo que el proceso (no se cierra a propósito). Sin lista de permisos
+        // (DACL nula): en modo técnico (elevada) el «solo el cohete» sin elevar también tiene que poder verlo.
         unsafe {
-            CreateMutexW(std::ptr::null(), 0, name.as_ptr());
+            let mut sd: SECURITY_DESCRIPTOR = std::mem::zeroed();
+            let sd_ptr = (&mut sd as *mut SECURITY_DESCRIPTOR).cast();
+            let sa = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: sd_ptr, bInheritHandle: 0 };
+            let ok = InitializeSecurityDescriptor(sd_ptr, 1) != 0 && SetSecurityDescriptorDacl(sd_ptr, 1, std::ptr::null(), 0) != 0;
+            CreateMutexW(if ok { &sa } else { std::ptr::null() }, 0, name.as_ptr());
         }
     }
 }
@@ -642,12 +648,23 @@ fn full_running() -> bool {
 
 /// En «solo el cohete»: cuando se abre AdminOps entera (que trae su propio cohete), este se retira.
 pub fn watch_full(app: tauri::AppHandle) {
-    std::thread::spawn(move || loop {
-        std::thread::sleep(Duration::from_secs(2));
-        if full_running() {
-            log::info!("Solo el cohete: AdminOps se abrió entera; este proceso se cierra.");
-            app.exit(0);
-            break;
+    // Solo cuenta una AdminOps que se abre DESPUÉS: la que dejó este cohete al cerrarse puede tardar unos segundos en
+    // terminar (cerrando una grabación…), y verla todavía no es motivo para irse.
+    std::thread::spawn(move || {
+        let mut seen_gone = !full_running();
+        let started = Instant::now();
+        loop {
+            std::thread::sleep(Duration::from_secs(2));
+            let running = full_running();
+            // Pasados 15 s, una AdminOps entera que sigue ahí no se está cerrando: está abierta, y trae su cohete.
+            if running && (seen_gone || started.elapsed() >= Duration::from_secs(15)) {
+                log::info!("Solo el cohete: AdminOps se abrió entera; este proceso se cierra.");
+                app.exit(0);
+                break;
+            }
+            if !running {
+                seen_gone = true;
+            }
         }
     });
 }
@@ -655,53 +672,141 @@ pub fn watch_full(app: tauri::AppHandle) {
 /// «Abrir AdminOps» desde «solo el cohete»: abre la entera y este proceso se cierra (ella trae su cohete).
 pub fn open_full(app: &tauri::AppHandle) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    if !crate::elevation::is_elevated() {
-        // Sin elevar (el PC de un usuario, con RunAsInvoker): se pide el administrador de forma explícita y sale el
-        // aviso de Windows (UAC) para que el técnico ponga su contraseña; mientras, la barra sigue respondiendo. Si se
-        // cancela, el cohete se queda.
-        let app = app.clone();
-        // Con el verbo «runas»: este proceso lleva __COMPAT_LAYER=RunAsInvoker en su entorno (así lo abre la
-        // tarea) y lo heredaría AdminOps entera, que se abriría sin elevar en vez de pedir el administrador.
-        std::thread::spawn(move || match crate::shellopen::run_elevated(&exe.to_string_lossy(), "") {
-            Ok(()) => app.exit(0),
-            Err(e) => log::info!("Abrir AdminOps entera sin elevar: {e} (cancelado o sin administrador)"),
-        });
-        return Ok(());
-    }
+    // AdminOps se abre sin administrador («Modo usuario»), igual que con doble clic; el administrador se pide dentro,
+    // con «Pasar a modo técnico». Este proceso se cierra: la entera trae su propio cohete.
     std::process::Command::new(exe).spawn().map_err(|e| format!("No se pudo abrir AdminOps: {e}"))?;
     app.exit(0);
     Ok(())
 }
 
-/// Al cerrar AdminOps entera: si el cohete arranca con Windows, se queda «solo el cohete».
+/// Al cerrar AdminOps entera, el cohete (con su barra) se queda en el escritorio: para cualquier usuario, instalada o
+/// portable, haya o no arranque con Windows. Nunca elevado: en modo técnico se abre como el usuario de la sesión y sin
+/// administrador (con la cuenta de otro, no puede heredarla; con la misma, no se queda elevado sin AdminOps delante).
 pub fn leave_rocket_behind(app: &tauri::AppHandle) {
-    let s = crate::workflow::settings(app);
-    if s.rocket != "desktop" || crate::paths::is_portable() || crate::appcare::updating() {
+    // Una vez por cierre (se llama al destruirse la ventana y al salir); nunca desde «solo el cohete», al relanzar
+    // (modo técnico/usuario), al salir sin dejar rastro ni en la prueba del .exe.
+    if rocket_only() || SKIP_BEHIND.load(Ordering::SeqCst) || std::env::var_os("ADMINOPS_NO_ROCKET_BEHIND").is_some() || LEFT_BEHIND.swap(true, Ordering::SeqCst) {
         return;
     }
-    // Mirar la tarea es PowerShell: fuera del hilo de las ventanas.
-    std::thread::spawn(|| {
-        if startup_enabled() {
-            let Ok(exe) = std::env::current_exe() else { return };
-            // Elevada con OTRA cuenta (el técnico puso su contraseña en el PC de un usuario estándar): el cohete que
-            // se queda no puede heredar ese administrador. Se abre como el usuario de la sesión y sin elevar, igual
-            // que la tarea de inicio de sesión.
-            let other = crate::elevation::is_elevated() && matches!((crate::target_user::own_sid(), crate::target_user::get()), (Some(own), Some(t)) if own != t.sid);
-            if other {
-                let args = format!("/c set __COMPAT_LAYER=RunAsInvoker&& start \"\" \"{}\" --rocket", exe.to_string_lossy());
-                if let Err(e) = crate::shellopen::run_as_user("cmd.exe", &args) {
-                    log::warn!("No se pudo dejar el cohete como el usuario: {e}");
-                }
-                return;
+    let s = crate::workflow::settings(app);
+    if s.rocket != "desktop" || crate::appcare::updating() {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else { return };
+    std::thread::spawn(move || {
+        let exe = exe.to_string_lossy().into_owned();
+        if crate::elevation::is_elevated() {
+            if let Err(e) = crate::shellopen::run_as_user_visible(&exe, "--rocket") {
+                log::warn!("No se pudo dejar el cohete como el usuario: {e}");
             }
-            let _ = std::process::Command::new(exe).arg("--rocket").spawn();
+        } else if let Err(e) = std::process::Command::new(&exe).arg("--rocket").spawn() {
+            log::warn!("No se pudo dejar el cohete: {e}");
         }
     });
 }
 
-fn startup_enabled() -> bool {
+static SKIP_BEHIND: AtomicBool = AtomicBool::new(false);
+static LEFT_BEHIND: AtomicBool = AtomicBool::new(false);
+
+/// Esta salida no deja el cohete (se relanza AdminOps, o se sale sin dejar rastro).
+pub fn skip_rocket_behind() {
+    SKIP_BEHIND.store(true, Ordering::SeqCst);
+}
+
+/// Un solo «solo el cohete» por sesión: el del inicio de sesión, el que deja AdminOps al cerrarse y el de una tarea
+/// antigua no se juntan. Devuelve `false` si ya hay otro (este se cierra).
+pub fn claim_rocket_only() -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
+        use windows_sys::Win32::System::Threading::CreateMutexW;
+        let name: Vec<u16> = "Local\\AdminOpsCoheteSolo".encode_utf16().chain(Some(0)).collect();
+        // SAFETY: nombre propio; el mutex vive lo que el proceso (no se cierra a propósito).
+        unsafe {
+            let h = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
+            !(h.is_null() || GetLastError() == ERROR_ALREADY_EXISTS)
+        }
+    }
+    #[cfg(not(windows))]
+    true
+}
+
+/// Dónde se apunta el arranque del cohete: el «Ejecutar al iniciar sesión» del usuario (HKCU\…\Run). No necesita
+/// administrador, así que cada usuario del equipo lo tiene aunque no lo sea.
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+const RUN_VALUE: &str = "AdminOps (cohete)";
+
+/// La clave Run del usuario de la sesión: la propia; en modo técnico con la cuenta de otro, la suya en HKU.
+#[cfg(windows)]
+fn session_run_key(write: bool) -> Result<winreg::RegKey, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_USERS, KEY_READ, KEY_WRITE};
+    let flags = if write { KEY_READ | KEY_WRITE } else { KEY_READ };
+    let other = crate::elevation::is_elevated() && matches!((crate::target_user::own_sid(), crate::target_user::get()), (Some(own), Some(t)) if own != t.sid);
+    let r = if other {
+        let sid = crate::target_user::get().map(|t| t.sid.clone()).ok_or("No se sabe qué usuario tiene la sesión abierta.")?;
+        let path = format!(r"{sid}\{RUN_KEY}");
+        if write { winreg::RegKey::predef(HKEY_USERS).create_subkey_with_flags(&path, flags).map(|(k, _)| k) } else { winreg::RegKey::predef(HKEY_USERS).open_subkey_with_flags(&path, flags) }
+    } else if write {
+        winreg::RegKey::predef(HKEY_CURRENT_USER).create_subkey_with_flags(RUN_KEY, flags).map(|(k, _)| k)
+    } else {
+        winreg::RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(RUN_KEY, flags)
+    };
+    r.map_err(|e| e.to_string())
+}
+
+fn run_value_set() -> bool {
+    #[cfg(windows)]
+    {
+        session_run_key(false).and_then(|k| k.get_value::<String, _>(RUN_VALUE).map_err(|e| e.to_string())).is_ok()
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// La tarea programada de las versiones anteriores (solo la quita un administrador).
+fn legacy_task_exists() -> bool {
     let ps = format!("if (Get-ScheduledTask -TaskName {} -ErrorAction SilentlyContinue) {{ 'si' }}", crate::ps::ps_literal(TASK));
     crate::ps::powershell(&ps).map(|s| s.trim() == "si").unwrap_or(false)
+}
+
+fn remove_legacy_task() {
+    if crate::elevation::is_elevated() {
+        let _ = crate::ps::powershell(&format!("Unregister-ScheduledTask -TaskName {} -Confirm:$false -ErrorAction SilentlyContinue", crate::ps::ps_literal(TASK)));
+    }
+}
+
+/// Tras actualizar o mover AdminOps de carpeta: si el arranque del cohete apunta a otro .exe, se corrige.
+/// `Some(true)` si lo corrigió, `Some(false)` si estaba bien, `None` si no hay arranque puesto.
+pub fn fix_startup_path() -> Option<bool> {
+    if cfg!(debug_assertions) {
+        return None;
+    }
+    #[cfg(windows)]
+    {
+        let key = session_run_key(false).ok()?;
+        let now: String = key.get_value(RUN_VALUE).ok()?;
+        let exe = std::env::current_exe().ok()?;
+        let want = format!("\"{}\" --rocket", exe.to_string_lossy());
+        if now.eq_ignore_ascii_case(&want) {
+            return Some(false);
+        }
+        Some(set_startup(true).is_ok())
+    }
+    #[cfg(not(windows))]
+    None
+}
+
+/// Queda la tarea de una versión anterior: la quita en modo técnico. `Some(true)` quitada, `Some(false)` queda.
+pub fn fix_legacy_task() -> Option<bool> {
+    if !legacy_task_exists() {
+        return None;
+    }
+    remove_legacy_task();
+    Some(!legacy_task_exists())
+}
+
+fn startup_enabled() -> bool {
+    run_value_set() || legacy_task_exists()
 }
 
 #[tauri::command(async)]
@@ -709,42 +814,89 @@ pub fn rocket_startup_enabled() -> bool {
     startup_enabled()
 }
 
-/// «El cohete arranca con Windows»: tarea al iniciar sesión, con privilegios altos (como AdminOps),
-/// que abre solo el cohete.
+/// Pone o quita el arranque del cohete al iniciar sesión, para el usuario de la sesión. Sin administrador.
+fn set_startup(enabled: bool) -> Result<(), String> {
+    if crate::paths::is_portable() {
+        return Err("En la versión portable no se puede: arrancaría desde la memoria USB, que no siempre está. Al cerrar AdminOps el cohete se queda igualmente.".into());
+    }
+    #[cfg(windows)]
+    {
+        let key = session_run_key(true)?;
+        if enabled {
+            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+            key.set_value(RUN_VALUE, &format!("\"{}\" --rocket", exe.to_string_lossy())).map_err(|e| format!("No se pudo poner el arranque: {e}"))?;
+        } else {
+            match key.delete_value(RUN_VALUE) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(format!("No se pudo quitar el arranque: {e}")),
+            }
+        }
+    }
+    // La tarea de antes arrancaría otro cohete (o lo seguiría arrancando al quitarlo): fuera, si se puede.
+    remove_legacy_task();
+    Ok(())
+}
+
+/// «El cohete arranca con Windows» (Ajustes → General): para el usuario de la sesión, sin administrador.
 #[tauri::command(async)]
 pub fn rocket_set_startup(enabled: bool) -> Result<(), String> {
-    if !crate::elevation::is_elevated() {
-        return Err("Hace falta abrir AdminOps como administrador.".into());
+    set_startup(enabled)?;
+    if !enabled && legacy_task_exists() {
+        return Err("Queda la tarea de una versión anterior, que solo se puede quitar en modo técnico.".into());
     }
-    if crate::paths::is_portable() {
-        return Err("En la versión portable no se puede: instala AdminOps en este equipo.".into());
+    Ok(())
+}
+
+/// La primera vez que un usuario abre AdminOps (instalada), el cohete queda arrancando con Windows: la barra está
+/// siempre a mano. Se apunta que ya se hizo, para respetar que luego lo quite en Ajustes.
+pub fn ensure_default_startup(app: &tauri::AppHandle) {
+    // Con el modo auditoría no se escribe nada en el equipo; tampoco en la prueba del .exe.
+    if crate::paths::is_portable() || crate::audit::active() || std::env::var_os("ADMINOPS_NO_ROCKET_BEHIND").is_some() || crate::workflow::settings(app).rocket != "desktop" {
+        return;
     }
-    let task = crate::ps::ps_literal(TASK);
-    let script = if enabled {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let exe_lit = crate::ps::ps_literal(&exe.to_string_lossy());
-        // El usuario con la sesión abierta, no la cuenta con la que se elevó AdminOps.
+    // La marca va con el usuario de la sesión (como la clave Run): si la quitó él, no se la vuelve a poner nadie.
+    if default_startup_marked() {
+        return;
+    }
+    match set_startup(true) {
+        Ok(()) => mark_default_startup(),
+        Err(e) => log::warn!("Arranque del cohete por defecto: {e}"),
+    }
+}
+
+const MARK_KEY: &str = r"Software\AdminOps";
+const MARK_VALUE: &str = "CoheteArranquePuesto";
+
+#[cfg(windows)]
+fn session_key(path: &str, write: bool) -> Result<winreg::RegKey, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_USERS, KEY_READ, KEY_WRITE};
+    let flags = if write { KEY_READ | KEY_WRITE } else { KEY_READ };
+    let other = crate::elevation::is_elevated() && matches!((crate::target_user::own_sid(), crate::target_user::get()), (Some(own), Some(t)) if own != t.sid);
+    let (root, full) = if other {
         let sid = crate::target_user::get().map(|t| t.sid.clone()).ok_or("No se sabe qué usuario tiene la sesión abierta.")?;
-        let sid = crate::ps::ps_literal(&sid);
-        // AdminOps pide administrador al abrirse: para un usuario que no lo es, se abre sin pedirlo
-        // (__COMPAT_LAYER=RunAsInvoker); el cohete funciona igual, salvo lo que necesita administrador.
-        let cmd_arg = crate::ps::ps_literal(&format!("/c set __COMPAT_LAYER=RunAsInvoker&& start \"\" \"{}\" --rocket", exe.to_string_lossy()));
-        format!(
-            "$sid = New-Object System.Security.Principal.SecurityIdentifier({sid})\n\
-             $user = $sid.Translate([System.Security.Principal.NTAccount]).Value\n\
-             $admins = @(Get-LocalGroupMember -SID 'S-1-5-32-544' -ErrorAction SilentlyContinue | ForEach-Object {{ $_.SID.Value }})\n\
-             if ($admins -contains $sid.Value) {{ $a = New-ScheduledTaskAction -Execute {exe_lit} -Argument '--rocket'; $rl = 'Highest' }}\n\
-             else {{ $a = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument {cmd_arg}; $rl = 'Limited' }}\n\
-             $t = New-ScheduledTaskTrigger -AtLogOn -User $user\n\
-             $t.Delay = 'PT15S'\n\
-             $p = New-ScheduledTaskPrincipal -UserId $sid.Value -LogonType Interactive -RunLevel $rl\n\
-             $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)\n\
-             Register-ScheduledTask -TaskName {task} -Action $a -Trigger $t -Principal $p -Settings $s -Force | Out-Null"
-        )
+        (winreg::RegKey::predef(HKEY_USERS), format!(r"{sid}\{path}"))
     } else {
-        format!("Unregister-ScheduledTask -TaskName {task} -Confirm:$false -ErrorAction SilentlyContinue")
+        (winreg::RegKey::predef(HKEY_CURRENT_USER), path.to_string())
     };
-    crate::ps::powershell(&script).map(|_| ()).map_err(|e| crate::ps::clean_error(&e))
+    let r = if write { root.create_subkey_with_flags(&full, flags).map(|(k, _)| k) } else { root.open_subkey_with_flags(&full, flags) };
+    r.map_err(|e| e.to_string())
+}
+
+fn default_startup_marked() -> bool {
+    #[cfg(windows)]
+    {
+        session_key(MARK_KEY, false).and_then(|k| k.get_value::<u32, _>(MARK_VALUE).map_err(|e| e.to_string())).is_ok()
+    }
+    #[cfg(not(windows))]
+    true
+}
+
+fn mark_default_startup() {
+    #[cfg(windows)]
+    if let Ok(k) = session_key(MARK_KEY, true) {
+        let _ = k.set_value(MARK_VALUE, &1u32);
+    }
 }
 
 #[cfg(test)]

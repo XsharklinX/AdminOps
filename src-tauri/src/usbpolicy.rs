@@ -23,6 +23,30 @@ pub struct UsbState {
     /// Hay un «Permitir 15 minutos» en marcha: cuándo vuelve (hora local, «14:35»).
     pub until: Option<String>,
     pub admin: bool,
+    /// AdminOps portable se está ejecutando desde esta memoria USB («E:»): bloquearlas la dejaría sin sus datos.
+    pub portable_drive: Option<String>,
+}
+
+/// La unidad extraíble desde la que se ejecuta AdminOps portable, si es el caso.
+pub fn portable_drive() -> Option<String> {
+    if !crate::paths::is_portable() {
+        return None;
+    }
+    let exe = std::env::current_exe().ok()?;
+    let s = exe.to_string_lossy();
+    let drive = s.get(..2).filter(|d| d.ends_with(':'))?.to_uppercase();
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
+        let root: Vec<u16> = format!("{drive}\\").encode_utf16().chain(Some(0)).collect();
+        // SAFETY: cadena terminada en cero, viva durante la llamada. 2 = DRIVE_REMOVABLE.
+        (unsafe { GetDriveTypeW(root.as_ptr()) } == 2).then_some(drive)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = drive;
+        None
+    }
 }
 
 pub fn valid_mode(m: &str) -> bool {
@@ -57,6 +81,20 @@ pub fn reg_commands(mode: &str) -> Vec<String> {
     }
     out.push(if write { format!(r#"reg add "{WRITE_PROTECT}" /v WriteProtect /t REG_DWORD /d 1 /f"#) } else { format!(r#"reg delete "{WRITE_PROTECT}" /v WriteProtect /f"#) });
     out
+}
+
+/// «Volver a como estaba» desde el historial: el modo de antes, y sin vuelta programada pendiente.
+pub fn restore_mode(previous: &str) -> Result<(), String> {
+    if !valid_mode(previous) {
+        return Err("Modo de USB no válido.".into());
+    }
+    if previous != "allowed" {
+        if let Some(d) = portable_drive() {
+            return Err(format!("AdminOps se está ejecutando desde la memoria {d}: bloquearlas la dejaría sin sus datos."));
+        }
+    }
+    cancel_task();
+    set_mode(previous)
 }
 
 fn set_mode(mode: &str) -> Result<(), String> {
@@ -111,7 +149,7 @@ fn cancel_task() {
 
 #[tauri::command]
 pub async fn usb_state() -> Result<UsbState, String> {
-    tauri::async_runtime::spawn_blocking(|| Ok(UsbState { mode: read_mode(), until: task_until(), admin: crate::elevation::is_elevated() })).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(|| Ok(UsbState { mode: read_mode(), until: task_until(), admin: crate::elevation::is_elevated(), portable_drive: portable_drive() })).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -121,14 +159,22 @@ pub async fn usb_set(app: tauri::AppHandle, mode: String) -> Result<UsbState, St
         "readonly" => "solo lectura",
         _ => "bloqueadas",
     };
+    let before = tauri::async_runtime::spawn_blocking(read_mode).await.unwrap_or_default();
     let r = usb_set_inner(mode).await;
-    crate::tweaks::record_app(&app, &format!("Memorias USB: {label}"), &r);
+    crate::tweaks::record_undoable(&app, &format!("Memorias USB: {label}"), vec![crate::tweaks::journal::Backup::UsbMode { previous: before }], &r);
     r
 }
 
 async fn usb_set_inner(mode: String) -> Result<UsbState, String> {
     if !valid_mode(&mode) {
         return Err("Modo de USB no válido.".into());
+    }
+    // Windows bloquea todas las memorias por igual (no se puede dejar fuera una): con AdminOps corriendo desde una,
+    // se quedaría sin su carpeta de datos a mitad.
+    if mode != "allowed" {
+        if let Some(d) = portable_drive() {
+            return Err(format!("AdminOps se está ejecutando desde la memoria {d}: bloquearlas la dejaría sin sus datos. Ábrela instalada en este equipo (o cópiala al disco) para bloquear las memorias."));
+        }
     }
     if !crate::elevation::is_elevated() {
         return Err("Hace falta abrir AdminOps como administrador.".into());
@@ -144,11 +190,149 @@ async fn usb_set_inner(mode: String) -> Result<UsbState, String> {
     usb_state().await
 }
 
+/// Una memoria USB conectada que no se ve en el Explorador.
+#[derive(Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HiddenUsb {
+    pub name: String,
+    /// «sin-letra» o la letra que le tapa una unidad de red («E:»).
+    pub reason: String,
+    pub disk: u32,
+    pub partition: u32,
+}
+
+/// Las unidades de red del usuario de la sesión (sus letras): en modo técnico con otra cuenta, las de su colmena.
+fn session_network_letters() -> Vec<String> {
+    #[cfg(windows)]
+    {
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_USERS};
+        let key = match crate::target_user::hkcu_redirect() {
+            Some(sid) => winreg::RegKey::predef(HKEY_USERS).open_subkey(format!("{sid}\\Network")),
+            None => winreg::RegKey::predef(HKEY_CURRENT_USER).open_subkey("Network"),
+        };
+        key.map(|k| k.enum_keys().flatten().map(|l| format!("{}:", l.to_uppercase())).collect()).unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    Vec::new()
+}
+
+const HIDDEN_SCRIPT: &str = r#"
+$out = @()
+foreach ($d in @(Get-Disk -ErrorAction SilentlyContinue | Where-Object { $_.BusType -eq 'USB' })) {
+  foreach ($p in @(Get-Partition -DiskNumber $d.Number -ErrorAction SilentlyContinue | Where-Object { $_.Type -in 'Basic','IFS','FAT32','Huge','FAT32 XINT13','XINT13' -and -not $_.IsSystem -and -not $_.IsHidden -and $_.Size -gt 50MB })) {
+    $l = if ($p.DriveLetter -and [int][char]$p.DriveLetter -ne 0) { "$($p.DriveLetter):" } else { '' }
+    $out += [pscustomobject]@{ name = $d.FriendlyName; letter = $l; disk = [int]$d.Number; partition = [int]$p.PartitionNumber }
+  }
+}
+ConvertTo-Json -Compress -InputObject @($out)
+"#;
+
+#[derive(serde::Deserialize)]
+struct UsbPart {
+    name: String,
+    letter: String,
+    disk: u32,
+    partition: u32,
+}
+
+/// Memorias conectadas que no se ven: sin letra, o con la letra de una unidad de red del usuario (la de red la tapa).
+pub fn hidden_of(parts: &[(String, String, u32, u32)], network: &[String]) -> Vec<HiddenUsb> {
+    parts
+        .iter()
+        .filter_map(|(name, letter, disk, partition)| {
+            let reason = if letter.is_empty() {
+                "sin-letra".to_string()
+            } else if network.iter().any(|n| n.eq_ignore_ascii_case(letter)) {
+                letter.clone()
+            } else {
+                return None;
+            };
+            Some(HiddenUsb { name: name.clone(), reason, disk: *disk, partition: *partition })
+        })
+        .collect()
+}
+
+fn read_parts() -> Result<Vec<(String, String, u32, u32)>, String> {
+    let out = crate::ps::powershell(HIDDEN_SCRIPT).map_err(|e| crate::ps::clean_error(&e))?;
+    let v: Vec<UsbPart> = serde_json::from_str(out.trim()).map_err(|e| format!("Respuesta inesperada: {e}"))?;
+    Ok(v.into_iter().map(|p| (p.name, p.letter, p.disk, p.partition)).collect())
+}
+
+/// «Meto la memoria y no aparece»: las memorias conectadas que el Explorador no enseña.
+#[tauri::command(async)]
+pub fn usb_hidden() -> Result<Vec<HiddenUsb>, String> {
+    // Sin administrador Windows no deja leer los discos y la lista saldría vacía («todas se ven») sin serlo.
+    if !crate::elevation::is_elevated() {
+        return Err("Hace falta modo técnico (administrador) para esto.".into());
+    }
+    Ok(hidden_of(&read_parts()?, &session_network_letters()))
+}
+
+/// Les da una letra libre (que no use nadie, tampoco una unidad de red del usuario) y abre la primera en el Explorador.
+#[tauri::command(async)]
+pub fn usb_fix_letters(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let r = fix_letters();
+    crate::tweaks::record_app(&app, "Memorias USB que no se veían: letra nueva", &r);
+    r
+}
+
+fn fix_letters() -> Result<Vec<String>, String> {
+    if !crate::elevation::is_elevated() {
+        return Err("Hace falta modo técnico (administrador) para esto.".into());
+    }
+    let network = session_network_letters();
+    let hidden = hidden_of(&read_parts()?, &network);
+    if hidden.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut used: Vec<String> = network.clone();
+    for c in b'A'..=b'Z' {
+        let l = format!("{}:", c as char);
+        if std::path::Path::new(&format!("{l}\\")).exists() {
+            used.push(l);
+        }
+    }
+    let mut done = Vec::new();
+    let mut failed: Vec<String> = Vec::new();
+    for h in &hidden {
+        let Some(free) = (b'D'..=b'Z').map(|c| format!("{}:", c as char)).find(|l| !used.iter().any(|u| u.eq_ignore_ascii_case(l))) else {
+            return Err("No queda ninguna letra libre.".into());
+        };
+        let letter = free.trim_end_matches(':').to_string();
+        let script = if h.reason == "sin-letra" {
+            format!("Set-Partition -DiskNumber {} -PartitionNumber {} -NewDriveLetter {letter} -ErrorAction Stop", h.disk, h.partition)
+        } else {
+            format!("Set-Partition -DriveLetter {} -NewDriveLetter {letter} -ErrorAction Stop", h.reason.trim_end_matches(':'))
+        };
+        match crate::ps::powershell(&script) {
+            Ok(_) => {
+                used.push(free.clone());
+                done.push(format!("{} → {free}", h.name));
+                if done.len() == 1 {
+                    let _ = crate::shellopen::open(&format!("{free}\\"));
+                }
+            }
+            // Una que falla no corta las demás: se dice cuál. Esa letra tampoco se vuelve a probar (puede estar
+            // cogida por algo que no se ve como unidad, un lector de tarjetas vacío).
+            Err(e) => {
+                used.push(free.clone());
+                failed.push(format!("«{}»: {}", h.name, crate::ps::clean_error(&e)));
+            }
+        }
+    }
+    if done.is_empty() && !failed.is_empty() {
+        return Err(format!("No se pudo dar letra a {}", failed.join("; ")));
+    }
+    done.extend(failed.into_iter().map(|f| format!("no se pudo con {f}")));
+    Ok(done)
+}
+
 /// Permite las memorias `minutes` minutos y deja programada la vuelta a lo que había.
 #[tauri::command]
 pub async fn usb_allow_for(app: tauri::AppHandle, minutes: u32) -> Result<UsbState, String> {
+    let before = tauri::async_runtime::spawn_blocking(read_mode).await.unwrap_or_default();
     let r = usb_allow_for_inner(minutes).await;
-    crate::tweaks::record_app(&app, &format!("Memorias USB permitidas {} min", minutes.clamp(1, 240)), &r);
+    crate::tweaks::record_undoable(&app, &format!("Memorias USB permitidas {} min", minutes.clamp(1, 240)), vec![crate::tweaks::journal::Backup::UsbMode { previous: before }], &r);
     r
 }
 
@@ -254,6 +438,18 @@ pub fn usb_history() -> Vec<UsbSeen> {
     }
     sort_seen(&mut out);
     out
+}
+
+#[cfg(test)]
+mod hidden_tests {
+    #[test]
+    fn memorias_que_no_se_ven() {
+        let parts = vec![("SanDisk".to_string(), String::new(), 2, 1), ("Kingston".to_string(), "E:".to_string(), 3, 1), ("Verbatim".to_string(), "F:".to_string(), 4, 1)];
+        let h = super::hidden_of(&parts, &["E:".to_string()]);
+        assert_eq!(h.len(), 2);
+        assert_eq!(h[0].reason, "sin-letra");
+        assert_eq!(h[1].reason, "E:");
+    }
 }
 
 #[cfg(test)]

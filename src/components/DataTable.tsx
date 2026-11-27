@@ -403,6 +403,17 @@ export function DataTable<T>({
               <th
                 key={c.id}
                 onClick={c.sortBy ? () => toggle(c) : undefined}
+                // Ordenar también con el teclado (Tab hasta la cabecera, Intro o Espacio).
+                tabIndex={c.sortBy ? 0 : undefined}
+                onKeyDown={
+                  c.sortBy
+                    ? (e) => {
+                        if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                        e.preventDefault();
+                        toggle(c);
+                      }
+                    : undefined
+                }
                 onDragOver={
                   dragCol
                     ? (e) => {

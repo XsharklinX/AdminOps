@@ -24,7 +24,7 @@ import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
 import { MachineSheetCard } from "../components/MachineSheetCard";
 import { BatteryCard } from "../components/BatteryCard";
-import { Card } from "../components/ui";
+import { Card, Notice } from "../components/ui";
 import { tempColor, useSensors } from "../hooks/useSensors";
 import { hwApi, type Inventory, type MemoryTest, type SmartDisk } from "../lib/api";
 import { bytes } from "../lib/format";
@@ -111,7 +111,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
 
   const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast("ok", "Copiado al portapapeles."), () => toast("error", "No se pudo copiar."));
 
-  if (invError) return <p className="p-8 text-bad">{invError}</p>;
+  if (invError) return <Notice tone="error" where="Hardware" className="m-8">{invError}</Notice>;
   if (!inv)
     return (
       <p className="flex items-center gap-2 p-8 text-sm text-dim">
@@ -153,7 +153,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
             <Row label="Número de serie">
               <span className="inline-flex items-center gap-2 font-mono text-xs">
                 {showSerial ? inv.serial ? <Copyable value={inv.serial}>{inv.serial}</Copyable> : "—" : "••••••••"}
-                <button onClick={() => setShowSerial(!showSerial)} className="text-mute hover:text-ink">
+                <button onClick={() => setShowSerial(!showSerial)} aria-label={showSerial ? "Ocultar el número de serie" : "Mostrar el número de serie"} className="text-mute hover:text-ink">
                   {showSerial ? <EyeOff size={12} /> : <Eye size={12} />}
                 </button>
               </span>
@@ -190,7 +190,7 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
             <Loader2 size={14} className="animate-spin" /> Cargando sensores…
           </p>
         )}
-        {sensorsError && <p className="text-sm text-bad">{sensorsError}</p>}
+        {sensorsError && <Notice tone="error" where="Hardware">{sensorsError}</Notice>}
         {sensors && (
           <>
             <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">

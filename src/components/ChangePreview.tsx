@@ -4,7 +4,7 @@
 import { ArrowRight, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { tweaksApi, type TweakPreview } from "../lib/api";
-import { Loading } from "./ui";
+import { Loading, Notice } from "./ui";
 
 export function ChangePreview({ ids, compact = false }: { ids: string[]; compact?: boolean }) {
   const [data, setData] = useState<TweakPreview[] | null>(null);
@@ -21,7 +21,7 @@ export function ChangePreview({ ids, compact = false }: { ids: string[]; compact
       alive = false;
     };
   }, [key]);
-  if (error) return <p className="text-xs text-bad">{error}</p>;
+  if (error) return <Notice tone="error" where="Vista previa de cambios">{error}</Notice>;
   if (!data) return <Loading text="Leyendo los valores de ahora…" />;
   const lines = data.flatMap((t) => t.lines.map((l) => ({ ...l, tweak: t.name })));
   const unchanged = lines.filter((l) => l.before === l.after).length;

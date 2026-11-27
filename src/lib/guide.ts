@@ -880,7 +880,7 @@ export interface GlossaryEntry {
 }
 
 export const GLOSSARY: GlossaryEntry[] = [
-  { term: "Administrador", def: "Cuenta de Windows con permiso para cambiar el sistema. AdminOps necesita abrirse con una para aplicar cambios." },
+  { term: "Administrador", def: "Cuenta de Windows con permiso para cambiar el sistema. AdminOps se abre sin ella («Modo usuario»); para aplicar cambios del sistema se pasa a «Modo técnico», que la pide." },
   { term: "Ajuste", def: "Un cambio concreto de la configuración de Windows que AdminOps sabe aplicar y deshacer." },
   { term: "Autorrecuperación", def: "Las copias que Word, Excel y PowerPoint guardan solas cada pocos minutos. Sirven para rescatar un documento que se cerró sin guardar." },
   { term: "BitLocker", def: "El cifrado de discos de Windows. Si el disco está cifrado y se pierde la clave de recuperación, los datos no se pueden leer." },

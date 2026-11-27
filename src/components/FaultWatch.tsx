@@ -8,7 +8,7 @@ import { faultRecApi, type FaultAutoSettings, type FaultWatchStatus } from "../l
 import { logQuietly } from "../lib/api/core";
 import { bufferPercent, REPLAY_SECS, watchSince } from "../lib/faultrec";
 import { useToast } from "./feedback";
-import { Button, Card, Toggle } from "./ui";
+import { Button, Card, Toggle, Notice } from "./ui";
 
 const TRIGGERS: { key: "hang" | "appError" | "busy"; label: string }[] = [
   { key: "hang", label: "Un programa deja de responder" },
@@ -168,7 +168,7 @@ export function FaultWatch({ monitorId, input, onSaved }: { monitorId: string; i
               </div>
             )}
             {(status.skippedToday ?? 0) > 0 && <p className="text-xs text-mute">Hoy no se guardaron {status.skippedToday} más por los límites.</p>}
-            {!status.on && <p className="text-xs text-warn">Solo funciona mientras se vigila.</p>}
+            {!status.on && <Notice tone="warn">Solo funciona mientras se vigila.</Notice>}
           </div>
         )}
       </div>

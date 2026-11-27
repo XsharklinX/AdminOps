@@ -97,6 +97,9 @@ export function Knowledge({
     }
   });
   const [openId, setOpenId] = useState<string | null>(null);
+  // Desde Ctrl+K: la nota que hay que abrir en el cuaderno.
+  const [noteId, setNoteId] = useState<string | null>(null);
+  const clearNoteId = useCallback(() => setNoteId(null), []);
 
   const choose = (t: Tab) => {
     setTab(t);
@@ -138,6 +141,11 @@ export function Knowledge({
       choose("templates");
       setOpenId(id ?? null);
     } else if (kind === "notes") choose("notes");
+    else if (kind === "notebook") {
+      choose("notebook");
+      // «id:sello» (el sello solo hace que pedir la misma nota otra vez se note).
+      setNoteId(id.split(":")[0] || null);
+    }
   }, [focus]);
 
   const current = TABS.find((t) => t.id === tab)!;
@@ -165,7 +173,7 @@ export function Knowledge({
       )}
       {tab === "templates" && <Templates openId={openId} />}
       {tab === "notes" && <Notes />}
-      {tab === "notebook" && <Notebook />}
+      {tab === "notebook" && <Notebook openId={noteId} onOpened={clearNoteId} />}
     </div>
   );
 }

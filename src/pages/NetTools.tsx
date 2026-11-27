@@ -2,7 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Calculator, CircleCheck, Mail, FileText, Loader2, Play, RefreshCw, Route, Save, Search, Server, Square, Undo2, Waypoints } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, inputClass, Loading } from "../components/ui";
+import { Button, Card, inputClass, Loading, Notice } from "../components/ui";
 import { netApi, type DnsAdapter, type PortEntry, type Probe } from "../lib/api";
 import { DataTable } from "../components/DataTable";
 import { NeedsAdmin } from "../components/AdminBanner";
@@ -84,11 +84,11 @@ function SubnetCalc() {
             {same ? "Sí: se ven directamente, sin pasar por el router." : "No: están en redes distintas; para verse hace falta un router entre ellas."}
           </p>
         )}
-        {other.trim() && same === null && s && <p className="mt-2 text-xs text-warn">Esa no es una IP válida.</p>}
+        {other.trim() && same === null && s && <Notice tone="warn" className="mt-2">Esa no es una IP válida.</Notice>}
       </Card>
       <Card title="La red">
         {!s ? (
-          <p className="text-sm text-warn">Escribe una IP (cuatro números del 0 al 255 separados por puntos) y una máscara válida (255.255.255.0) o un prefijo (24).</p>
+          <Notice tone="warn">Escribe una IP (cuatro números del 0 al 255 separados por puntos) y una máscara válida (255.255.255.0) o un prefijo (24).</Notice>
         ) : (
           <>
             {row("Red", `${s.network}/${s.prefix}`)}
@@ -199,7 +199,7 @@ function ProbePanel() {
           )}
         </div>
       </div>
-      {error && <p className="mb-3 text-sm text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Red" className="mb-3">{error}</Notice>}
       {target && (
         <p className="mb-2 text-xs text-mute">
           {mode === "ping" ? "Ping a" : "Ruta hasta"} <span className="text-ink">{target.target}</span>

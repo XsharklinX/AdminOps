@@ -8,7 +8,7 @@ import { CASE_CHANGED_EVENT, caseChanged } from "../lib/currentCase";
 import { areaPath, axisTicks, bucketMax, caseNote, clock, eraseWhen, getRecOptions, inputLine, inputOverlay, KIND_STYLE, lengthLabel, markLine, markPercent, marksCount, MAX_SECS, monitorLabel, originLabel, pickRecording, rangeLabel, recSummary, regionLabel, remaining, seekTime, setRecOptions, sortedMarks, tracksOf, videoBox, whenLabel, type RecOptions, type RecTarget } from "../lib/faultrec";
 import { usePageActive } from "../lib/pageActive";
 import { useConfirm, useToast } from "./feedback";
-import { Button, Card, ErrorState, Intro, Loading, inputClass, Toggle } from "./ui";
+import { Button, Card, ErrorState, Intro, Loading, inputClass, Toggle, Notice } from "./ui";
 import { FaultWatch } from "./FaultWatch";
 import { timeOfDay } from "../lib/format";
 
@@ -428,7 +428,7 @@ function Result({ detail, onAgain, onDelete, onBack }: { detail: FaultRecordingD
         <ClipBar detail={detail} sel={sel} onClear={() => setSel(null)} />
       </div>
 
-      {rec.note && <p className="mt-2 text-xs text-warn">{rec.note}</p>}
+      {rec.note && <Notice tone="warn" className="mt-2">{rec.note}</Notice>}
 
       {marks.length === 0 ? (
         <p className="mt-3 text-[13px] text-dim">No se apuntó nada raro mientras se grababa: ni errores, ni programas colgados, ni picos de procesador o de disco.</p>

@@ -10,9 +10,46 @@ export const DEFAULT_TOOLS: BarTool[] = ["rec", "clip", "speed", "note", "mon", 
 export const USER_TOOLS: BarTool[] = ["rec", "clip", "speed", "note", "help", "mail", "teams"];
 
 /** Ctrl+Alt+T: saca o esconde la barra. */
+/** El nombre de cada herramienta de la barra (el aviso del botón, Personalizar y Ajustes). */
+export const TOOL_LABEL: Record<BarTool, string> = {
+  rec: "Grabar pantalla",
+  clip: "Captura de pantalla",
+  note: "Notas",
+  mon: "Mini monitor",
+  fix: "Arreglos rápidos",
+  teams: "Teams",
+  mail: "Correo",
+  app: "Abrir AdminOps",
+  speed: "Velocidad de internet",
+  card: "Datos del equipo",
+  help: "Asistencia rápida",
+  contacts: "Contactos",
+  printer: "La impresora",
+  screens: "Pantallas: duplicar o extender",
+  wifi: "Wi-Fi y Bluetooth",
+  keyboard: "El teclado, en español",
+  folders: "Mis carpetas",
+  lock: "Bloquear el equipo",
+  restart: "Reiniciar sin miedo",
+  cmd: "CMD",
+};
+
 export const BAR_EVENT = "rocket://bar";
+/** Ctrl+Alt+Mayús+1…9: la herramienta de ese puesto (0 a 8). */
+export const BAR_TOOL_EVENT = "rocket://tool";
+
+/** Qué barra le toca a quien la abre: administrador del equipo (completa) o usuario (la elegida por el técnico). */
+export interface BarProfile {
+  admin: boolean;
+  userTools: string[] | null;
+}
 
 export const barApi = {
+  profile: () => invoke<BarProfile>("bar_profile"),
+  /** Impresora predeterminada, antivirus (y si está al día) y última actualización de Windows. */
+  ticketExtras: () => invoke<{ printer: string; antivirus: string; lastUpdate: string }>("bar_ticket_extras"),
+  /** Ajustes → la barra de los usuarios de este equipo; null vuelve a la de fábrica. */
+  setUserTools: (tools: string[] | null) => invoke<void>("bar_set_user_tools", { tools }),
   /** Los arreglos rápidos activos (los del menú del reloj): [id, nombre]. */
   fixes: () => invoke<[string, string][]>("bar_fixes"),
   openComm: (kind: "teams" | "mail" | "outlook") => invoke<void>("bar_open_comm", { kind }),

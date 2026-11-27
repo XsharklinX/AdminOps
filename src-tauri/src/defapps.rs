@@ -245,8 +245,16 @@ pub fn build_xml(choices: &[(&[&str], String, &BTreeMap<String, String>)]) -> (S
 /// asociaciones quedaron puestas. Se aplica al volver a iniciar sesión.
 #[tauri::command]
 pub async fn defapps_apply(app: tauri::AppHandle) -> Result<usize, String> {
+    let before = crate::tweaks::registry::read_string(POLICY_KEY, POLICY_VALUE);
+    // Si ya apuntaba al archivo de AdminOps (aplicado antes), ese archivo se sobrescribe: volver a «como estaba» no
+    // cambiaría nada. Entonces no se ofrece deshacer.
+    let own = before.as_deref().is_some_and(|b| policy_file().is_some_and(|f| std::path::Path::new(b) == f));
     let r = defapps_apply_inner(app.clone()).await;
-    crate::tweaks::record_app(&app, "Programas predeterminados como en la oficina", &r);
+    if own {
+        crate::tweaks::record_app(&app, "Programas predeterminados como en la oficina", &r);
+    } else {
+        crate::tweaks::record_undoable(&app, "Programas predeterminados como en la oficina", vec![crate::tweaks::journal::Backup::DefaultAppsPolicy { previous: before }], &r);
+    }
     r
 }
 
@@ -340,9 +348,24 @@ pub async fn defapps_apply_new_users(app: tauri::AppHandle) -> Result<usize, Str
 /// Quita la directiva de AdminOps (lo predeterminado vuelve a ser cosa de cada usuario).
 #[tauri::command]
 pub fn defapps_remove_policy(app: tauri::AppHandle) -> Result<(), String> {
+    let before = crate::tweaks::registry::read_string(POLICY_KEY, POLICY_VALUE);
     let r = defapps_remove_policy_inner();
-    crate::tweaks::record_app(&app, "Programas predeterminados: quitada la directiva de AdminOps", &r);
+    crate::tweaks::record_undoable(&app, "Programas predeterminados: quitada la directiva de AdminOps", vec![crate::tweaks::journal::Backup::DefaultAppsPolicy { previous: before }], &r);
     r
+}
+
+/// «Volver a como estaba» desde el historial: la directiva de antes (o ninguna). El archivo de AdminOps se queda: sin
+/// la directiva apuntándolo, Windows no lo usa.
+pub fn restore_policy(previous: Option<&str>) -> Result<(), String> {
+    match previous {
+        Some(p) => crate::tweaks::registry::write(POLICY_KEY, POLICY_VALUE, crate::tweaks::model::RegKind::String, &crate::tweaks::model::RegData::Str(p.to_string())),
+        None => {
+            if crate::tweaks::registry::read_string(POLICY_KEY, POLICY_VALUE).is_some() {
+                crate::tweaks::registry::delete(POLICY_KEY, POLICY_VALUE)?;
+            }
+            Ok(())
+        }
+    }
 }
 
 fn defapps_remove_policy_inner() -> Result<(), String> {

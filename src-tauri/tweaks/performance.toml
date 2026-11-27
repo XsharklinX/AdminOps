@@ -278,3 +278,62 @@ powercfg.exe /setdcvalueindex SCHEME_CURRENT 0012ee47-9041-4b5d-9b77-535fba8b144
 powercfg.exe /setactive SCHEME_CURRENT
 if ($LASTEXITCODE) { throw "powercfg devolvió $LASTEXITCODE" }
 '''
+
+[[tweak]]
+id = "performance.wireless-receiver"
+name = "Ratón y teclado inalámbricos sin cortes"
+description = "Windows deja de apagar para ahorrar energía los ratones, teclados y sus receptores USB. Arregla el ratón que se congela un segundo cada poco."
+category = "performance"
+risk = "low"
+admin = true
+note = "Si el receptor está detrás del equipo, un alargador USB que lo acerque a la mesa también ayuda mucho."
+
+[tweak.script]
+detect = '''
+$ids = @(); foreach ($d in @(Get-PnpDevice -PresentOnly -Class Mouse, Keyboard -ErrorAction SilentlyContinue)) { $ids += $d.InstanceId; $p = (Get-PnpDeviceProperty -InstanceId $d.InstanceId -KeyName DEVPKEY_Device_Parent -ErrorAction SilentlyContinue).Data; if ($p) { $ids += $p } }
+$hid = @(Get-CimInstance -Namespace root\wmi -ClassName MSPower_DeviceEnable -ErrorAction SilentlyContinue | Where-Object { $ids -contains ($_.InstanceName -replace '_\d+$', '') })
+"$(($hid.Count -gt 0) -and -not ($hid | Where-Object { $_.Enable }))"
+'''
+apply = '''
+# Solo los ratones y teclados y lo que los conecta (el receptor USB o el concentrador HID), no el resto de USB.
+$ids = @(); foreach ($d in @(Get-PnpDevice -PresentOnly -Class Mouse, Keyboard -ErrorAction SilentlyContinue)) { $ids += $d.InstanceId; $p = (Get-PnpDeviceProperty -InstanceId $d.InstanceId -KeyName DEVPKEY_Device_Parent -ErrorAction SilentlyContinue).Data; if ($p) { $ids += $p } }
+$hid = @(Get-CimInstance -Namespace root\wmi -ClassName MSPower_DeviceEnable -ErrorAction Stop | Where-Object { $ids -contains ($_.InstanceName -replace '_\d+$', '') -and $_.Enable })
+if (-not $hid) { throw 'Ningún ratón, teclado ni receptor tiene el ahorro de energía activado: ya estaba.' }
+$done = @()
+foreach ($d in $hid) { try { Set-CimInstance -InputObject $d -Property @{ Enable = $false } -ErrorAction Stop; $done += $d.InstanceName } catch {} }
+if (-not $done) { throw 'Windows no dejó cambiar el ahorro de energía de ningún dispositivo.' }
+$done -join '|'
+'''
+revert = '''
+$all = @(Get-CimInstance -Namespace root\wmi -ClassName MSPower_DeviceEnable -ErrorAction Stop)
+if ($Previous) {
+  $names = $Previous -split '\|'
+  $all = @($all | Where-Object { $names -contains $_.InstanceName })
+} else {
+  # Sin saber cuáles se cambiaron (ya venía hecho a mano): los ratones, teclados y sus receptores vuelven a lo de fábrica.
+  $ids = @(); foreach ($d in @(Get-PnpDevice -PresentOnly -Class Mouse, Keyboard -ErrorAction SilentlyContinue)) { $ids += $d.InstanceId; $p = (Get-PnpDeviceProperty -InstanceId $d.InstanceId -KeyName DEVPKEY_Device_Parent -ErrorAction SilentlyContinue).Data; if ($p) { $ids += $p } }
+  $all = @($all | Where-Object { $ids -contains ($_.InstanceName -replace '_\d+$', '') })
+}
+foreach ($d in $all) { Set-CimInstance -InputObject $d -Property @{ Enable = $true } -ErrorAction SilentlyContinue }
+'''
+
+[[tweak]]
+id = "performance.numlock"
+name = "Bloq Num encendido al iniciar"
+description = "El teclado numérico empieza encendido, también en la pantalla de inicio de sesión: la contraseña con números sale a la primera."
+category = "performance"
+risk = "low"
+
+[[tweak.registry]]
+path = 'HKCU\Control Panel\Keyboard'
+name = "InitialKeyboardIndicators"
+type = "string"
+value = "2"
+default = "2147483648"
+
+[[tweak.registry]]
+path = 'HKU\.DEFAULT\Control Panel\Keyboard'
+name = "InitialKeyboardIndicators"
+type = "string"
+value = "2"
+default = "2147483648"

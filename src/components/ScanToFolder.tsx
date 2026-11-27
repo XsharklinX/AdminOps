@@ -12,7 +12,7 @@ import { ViewCommand } from "./ActionCommand";
 import { NeedsAdmin } from "./AdminBanner";
 import { useConfirm, useToast } from "./feedback";
 import { BrandBadge } from "./printers/Parts";
-import { Button, Card, inputClass } from "./ui";
+import { Button, Card, inputClass, Notice } from "./ui";
 
 const MANUAL = "manual";
 
@@ -319,7 +319,7 @@ export function ScanToFolder({ isAdmin }: { isAdmin: boolean }) {
         {ipOk ? (
           <p className="text-sm font-medium text-ink">{headerText(choice?.model ?? null, ip)}</p>
         ) : (
-          pick === MANUAL && manual !== "" && <p className="text-xs text-warn">Escribe una IP completa, por ejemplo 10.0.0.41.</p>
+          pick === MANUAL && manual !== "" && <Notice tone="warn">Escribe una IP completa, por ejemplo 10.0.0.41.</Notice>
         )}
 
         {!isAdmin && (

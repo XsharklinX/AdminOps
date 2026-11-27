@@ -1,6 +1,6 @@
 ﻿# Mide arranque, memoria y CPU de AdminOps (objetivos de la Fase 7).
 # Requiere una compilación sin manifiesto de administrador:
-#   $env:ADMINOPS_ASINVOKER=1; $env:CARGO_TARGET_DIR="src-tauri/target-bench"; npx tauri build --no-bundle
+#   $env:CARGO_TARGET_DIR="src-tauri/target-bench"; npx tauri build --no-bundle
 # Uso: powershell -ExecutionPolicy Bypass -File scripts\bench.ps1 [-Exe ruta] [-Seconds 20] [-BrowserArgs '...']
 #
 # La instancia medida usa su propia carpeta de WebView2, así que sus procesos

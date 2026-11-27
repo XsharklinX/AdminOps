@@ -84,6 +84,20 @@ fn forget_hibernate() {
     }
 }
 
+/// «Volver a como estaba» desde el historial.
+pub fn restore_sides(ac: Side, dc: Side) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let (lid_present, _) = win::caps();
+        win::set(ac, dc, lid_present)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (ac, dc);
+        Err("Solo en Windows.".into())
+    }
+}
+
 /// La hibernación (segundos, enchufado y con batería) que había antes de «nunca se suspende».
 fn saved_hibernate() -> Option<(u32, u32)> {
     let read = |f: std::path::PathBuf| std::fs::read(f).ok().and_then(|b| serde_json::from_slice(&b).ok());
@@ -229,8 +243,13 @@ pub fn power_profiles() -> Vec<Profile> {
 #[tauri::command]
 pub async fn power_set(app: tauri::AppHandle, ac: Side, dc: Side) -> Result<PowerState, String> {
     let title = format!("Energía: pantalla {}/{} min, suspender {}/{} min (enchufado/batería)", ac.screen_min, dc.screen_min, ac.sleep_min, dc.sleep_min);
+    #[cfg(windows)]
+    let before = tauri::async_runtime::spawn_blocking(win::get).await.ok().and_then(Result::ok);
+    #[cfg(not(windows))]
+    let before: Option<(Side, Side)> = None;
     let r = power_set_inner(ac, dc).await;
-    crate::tweaks::record_app(&app, &title, &r);
+    let backups = before.map(|(ac, dc)| vec![crate::tweaks::journal::Backup::PowerSides { ac, dc }]).unwrap_or_default();
+    crate::tweaks::record_undoable(&app, &title, backups, &r);
     r
 }
 

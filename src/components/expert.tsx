@@ -8,7 +8,7 @@ import { DataTable, type Column } from "./DataTable";
 import { FindingList } from "./FindingList";
 import { TimeChart } from "./TimeChart";
 import { TypedConfirm } from "./DiskPartitions";
-import { Button, Card, EmptyState, ErrorState, Explain, Loading, smallBtn } from "./ui";
+import { Button, Card, EmptyState, ErrorState, Explain, Loading, smallBtn, Notice } from "./ui";
 import type { PageId } from "./Sidebar";
 import { appApi, expertApi, troubleshootApi, tweaksApi, type Autorun, type CrashReport, type EventGroup, type PerfInsights, type StressResult, type TroubleFinding, type TroubleFix } from "../lib/api";
 import { fullDate, shortDate } from "../lib/format";
@@ -151,7 +151,7 @@ export function CrashCulprits({ isAdmin }: { isAdmin: boolean }) {
       body: (
         <div className="space-y-2">
           <p>Windows someterá a {drivers.join(", ")} a pruebas duras. Si el driver es el culpable, el próximo pantallazo lo dirá con nombre.</p>
-          <p className="text-warn">Puede provocar pantallazos a propósito. Si el equipo no arranca: arranque avanzado → modo seguro → «verifier /reset», o desactívalo aquí.</p>
+          <Notice tone="warn">Puede provocar pantallazos a propósito. Si el equipo no arranca: arranque avanzado → modo seguro → «verifier /reset», o desactívalo aquí.</Notice>
         </div>
       ),
     });
@@ -195,7 +195,7 @@ export function CrashCulprits({ isAdmin }: { isAdmin: boolean }) {
               </p>
             )}
             {g.hint && <p className="mt-1 text-xs text-dim">{g.hint}</p>}
-            {g.sinceInstall && <p className="mt-1 text-xs text-warn">Todos los pantallazos son posteriores a la instalación de esta versión: lo más probable es que sea ella.</p>}
+            {g.sinceInstall && <Notice tone="warn" className="mt-1">Todos los pantallazos son posteriores a la instalación de esta versión: lo más probable es que sea ella.</Notice>}
             <div className="mt-2 flex flex-wrap gap-2">
               {g.older.length > 0 && g.inf && (
                 <button className={smallBtn} disabled={!isAdmin} onClick={() => setRollback({ inf: g.inf, device: g.device || g.driver, to: g.older[0].version })}>
@@ -332,7 +332,7 @@ export function PerfInsightsCard() {
     <Card title="Lo que crece y lo que satura el disco" icon={<Activity size={14} />}>
       <div className="space-y-3 text-xs">
         {d.leaks.length === 0 ? (
-          <p className="text-ok">Ningún programa crece sin parar en memoria ({d.hours.toFixed(0)} h de historial).</p>
+          <Notice tone="ok">Ningún programa crece sin parar en memoria ({d.hours.toFixed(0)} h de historial).</Notice>
         ) : (
           d.leaks.map((l) => (
             <div key={l.name} className="rounded-lg border border-warn/40 bg-warn/5 px-3 py-2">
@@ -340,7 +340,7 @@ export function PerfInsightsCard() {
               <span className="text-dim">
                 {(l.fromMb / 1024).toFixed(1)} GB → {(l.toMb / 1024).toFixed(1)} GB en {l.hours.toFixed(1)} h
               </span>
-              <p className="text-warn">Sube sin parar: es una fuga de memoria. Reiniciarlo la libera; si se repite, actualízalo.</p>
+              <Notice tone="warn">Sube sin parar: es una fuga de memoria. Reiniciarlo la libera; si se repite, actualízalo.</Notice>
             </div>
           ))
         )}
@@ -362,7 +362,7 @@ export function PerfInsightsCard() {
             </ul>
           </div>
         ) : (
-          <p className="text-ok">El disco no se ha quedado saturado en el historial.</p>
+          <Notice tone="ok">El disco no se ha quedado saturado en el historial.</Notice>
         )}
         {d.peak && (
           <p className="text-dim">

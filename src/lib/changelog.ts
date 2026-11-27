@@ -18,6 +18,26 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.5.2",
+    title: "Para cualquier usuario: modo usuario y modo técnico, y la barra siempre a mano",
+    added: [
+      "AdminOps se abre sin administrador para cualquier usuario del equipo, instalada o portable. La cabecera dice «Modo usuario» o «Modo técnico»: el administrador solo se pide al pasar a modo técnico, y se puede volver.",
+      "La barra del cohete siempre a mano: se queda al cerrar AdminOps (también portable) y arranca al iniciar sesión para cada usuario, sin pedir administrador. Vuelve a su sitio al conectar o quitar la base, Ctrl+Alt+Mayús+1…9 abre cada herramienta y en Ajustes se elige la barra de los usuarios del equipo.",
+      "Arreglos de un clic, también desde «Resolver un problema»: menú Inicio o barra de tareas que no responden, iconos en blanco y miniaturas, copiar y pegar, «Microsoft Print to PDF», ratón o teclado inalámbrico que se corta y Bloq Num al iniciar.",
+      "«Quitar esta» en el historial de Windows Update: quita la actualización de los últimos días que rompió algo y pausa 7 días.",
+      "Los iconos del Escritorio vuelven a su sitio al cambiar de pantallas; una memoria USB que no aparece recibe una letra libre.",
+      "Notas con capturas pegadas y casillas que se marcan desde la tarjeta; Ctrl+K busca dentro de las notas.",
+      "Datos del equipo con la impresora, el antivirus, el espacio en C: y la última actualización.",
+      "«Volver a como estaba» para memorias USB, energía, programas predeterminados y audio.",
+      "Los errores de Windows se explican en español con su código y un botón al arreglo; cada arreglo dice cuánto tarda y qué cierra.",
+    ],
+    fixed: [
+      "En el PC de otro usuario, abrir AdminOps con la cuenta del técnico daba «We couldn't create the data directory».",
+      "Un solo estilo de avisos en toda la app, accesible con teclado y lector de pantalla, y bien a 1366×768 con escala al 125 y 150 %.",
+      "Tras cada actualización, AdminOps se comprueba a sí misma y arregla lo que pueda.",
+    ],
+  },
+  {
     version: "1.5.1",
     title: "La barra para los usuarios, Notas y grabaciones mejores",
     added: [

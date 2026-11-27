@@ -1,8 +1,9 @@
 //! Detección y solicitud de privilegios de administrador (UAC).
 //!
-//! En release el ejecutable lleva un manifiesto `requireAdministrator` (ver
-//! build.rs), así que Windows pide UAC al abrirlo. En desarrollo corre como
-//! usuario normal y la UI ofrece relanzar elevado.
+//! AdminOps se abre sin administrador («Modo usuario»: cualquier usuario del
+//! equipo puede usarla). «Modo técnico» la relanza elevada con UAC
+//! (`relaunch_as_admin`) y «Volver a modo usuario» la relanza sin elevar como el
+//! usuario de la sesión (`relaunch_as_user`).
 
 #[cfg(windows)]
 pub fn is_elevated() -> bool {
@@ -17,6 +18,17 @@ pub fn is_elevated() -> bool {
 #[tauri::command]
 pub fn is_admin() -> bool {
     is_elevated()
+}
+
+/// «Volver a modo usuario»: abre AdminOps otra vez como el usuario de la sesión y sin elevar (se le pide al
+/// escritorio de Windows, que corre como él) y cierra esta instancia elevada.
+#[tauri::command]
+pub fn relaunch_as_user(app: tauri::AppHandle) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    crate::shellopen::run_as_user_visible(&exe.to_string_lossy(), "").map_err(|e| format!("No se pudo volver a modo usuario: {e}"))?;
+    crate::rocketplus::skip_rocket_behind();
+    app.exit(0);
+    Ok(())
 }
 
 /// Relanza el ejecutable actual con el verbo `runas` y, si el usuario acepta
@@ -48,6 +60,7 @@ pub fn relaunch_as_admin(app: tauri::AppHandle) -> Result<(), String> {
         if (result as isize) <= 32 {
             return Err("El usuario canceló el UAC o no se pudo elevar.".into());
         }
+        crate::rocketplus::skip_rocket_behind();
         app.exit(0);
         Ok(())
     }

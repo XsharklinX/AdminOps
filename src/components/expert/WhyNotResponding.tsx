@@ -5,7 +5,7 @@ import { HelpCircle, Loader2, Network, RefreshCw, TriangleAlert, XCircle } from 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../feedback";
 import { diagnoseApi, officeApi, type WaitReport } from "../../lib/api";
-import { smallBtn } from "../ui";
+import { smallBtn, Notice } from "../ui";
 
 const KIND_LABEL: Record<string, string> = {
   network: "La red",
@@ -69,7 +69,7 @@ export function WhyNotResponding({ pid, name, onClose, canClose, onDismiss }: { 
           <Loader2 size={14} className="animate-spin" /> Mirando a qué espera…
         </p>
       ) : error ? (
-        <p className="text-sm text-bad">{error}</p>
+        <Notice tone="error" where="Por qué no responde">{error}</Notice>
       ) : report ? (
         <>
           <p className={`text-sm ${report.verdict.kind === "busy" || report.verdict.kind === "hidden" ? "text-dim" : "text-ink"}`}>{report.verdict.text}</p>

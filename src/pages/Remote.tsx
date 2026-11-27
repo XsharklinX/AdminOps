@@ -555,7 +555,7 @@ function RdpUsers({ server, onChange, isAdmin }: { server: RdpServer; onChange: 
               </option>
             ))}
           </select>
-          <button onClick={() => pick && set(pick, true)} disabled={!pick || !isAdmin} className="rounded-md border border-line-2 px-2 text-xs text-dim hover:text-ink disabled:opacity-40">
+          <button onClick={() => pick && set(pick, true)} disabled={!pick || !isAdmin} aria-label="Dar permiso" className="rounded-md border border-line-2 px-2 text-xs text-dim hover:text-ink disabled:opacity-40">
             <UserPlus size={12} />
           </button>
         </div>

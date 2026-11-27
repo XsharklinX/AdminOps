@@ -683,7 +683,7 @@ export function Sidebar({
       <div className="flex-1" />
       {allowedInMode("tools", prefs.mode) && fixedButton("Herramientas", Wrench, active === "tools", () => onNavigate("tools"), "Herramientas de Windows y atajos de teclado")}
       {onLock && fixedButton("Bloquear", LockIcon, false, onLock, "Bloquear AdminOps (Ctrl+L)")}
-      {fixedButton("Ajustes", SettingsIcon, active === "settings", () => onNavigate("settings"), `Ajustes (Ctrl+,) · ${isAdmin ? "Administrador" : "Usuario estándar"}`)}
+      {fixedButton("Ajustes", SettingsIcon, active === "settings", () => onNavigate("settings"), `Ajustes (Ctrl+,) · ${isAdmin ? "Modo técnico" : "Modo usuario"}`)}
       <button
         onClick={() => setSidebar({ mode: mini ? "full" : "mini" })}
         className="mt-1 grid size-8 place-items-center rounded-md text-mute hover:bg-panel-2 hover:text-ink"

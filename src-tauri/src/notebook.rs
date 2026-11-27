@@ -13,6 +13,22 @@ pub struct Note {
     pub created: u64,
     pub updated: u64,
     pub pinned: bool,
+    /// Imágenes pegadas en la nota (capturas), como `data:image/…;base64,…`.
+    pub images: Vec<String>,
+}
+
+/// Como mucho 6 imágenes por nota y 3 MB cada una: el cuaderno es un solo archivo y se lee entero.
+const MAX_IMAGES: usize = 6;
+const MAX_IMAGE: usize = 3 * 1024 * 1024;
+
+fn valid_images(images: &[String]) -> Result<(), String> {
+    if images.len() > MAX_IMAGES {
+        return Err(format!("Como mucho {MAX_IMAGES} imágenes por nota."));
+    }
+    if images.iter().any(|i| !i.starts_with("data:image/") || i.len() > MAX_IMAGE) {
+        return Err("Una de las imágenes no vale o es demasiado grande (3 MB como mucho).".into());
+    }
+    Ok(())
 }
 
 fn path(app: &tauri::AppHandle) -> std::path::PathBuf {
@@ -45,6 +61,12 @@ pub fn sorted(mut v: Vec<Note>) -> Vec<Note> {
     v
 }
 
+/// Para buscar (Ctrl+K): las notas sin sus imágenes, que pueden pesar mucho.
+#[tauri::command]
+pub fn notes_index(app: tauri::AppHandle) -> Vec<Note> {
+    notes_list(app).into_iter().map(|n| Note { images: Vec::new(), ..n }).collect()
+}
+
 #[tauri::command]
 pub fn notes_list(app: tauri::AppHandle) -> Vec<Note> {
     sorted(crate::paths::read_json(&path(&app)))
@@ -53,12 +75,13 @@ pub fn notes_list(app: tauri::AppHandle) -> Vec<Note> {
 /// Crea (sin id) o guarda una nota. Una nota sin título ni texto no se guarda.
 #[tauri::command]
 pub fn notes_save(app: tauri::AppHandle, note: Note) -> Result<Note, String> {
-    if note.title.trim().is_empty() && note.text.trim().is_empty() {
+    if note.title.trim().is_empty() && note.text.trim().is_empty() && note.images.is_empty() {
         return Err("La nota está vacía.".into());
     }
     if note.text.len() > 200_000 {
         return Err("La nota es demasiado larga.".into());
     }
+    valid_images(&note.images)?;
     let p = path(&app);
     let mut all = load_for_write(&p)?;
     let t = now_ms();
@@ -66,12 +89,13 @@ pub fn notes_save(app: tauri::AppHandle, note: Note) -> Result<Note, String> {
         Some(n) => {
             n.title = note.title.trim().to_string();
             n.text = note.text;
+            n.images = note.images;
             n.pinned = note.pinned;
             n.updated = t;
             n.clone()
         }
         None => {
-            let n = Note { id: format!("n{t}"), title: note.title.trim().to_string(), text: note.text, created: t, updated: t, pinned: note.pinned };
+            let n = Note { id: format!("n{t}"), title: note.title.trim().to_string(), text: note.text, created: t, updated: t, pinned: note.pinned, images: note.images };
             all.push(n.clone());
             n
         }

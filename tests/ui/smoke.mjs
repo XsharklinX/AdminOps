@@ -64,8 +64,57 @@ const server = await createServer({ root, configFile: join(root, "vite.config.ts
 await server.listen();
 const url = `http://localhost:${server.config.server.port}/tests/ui/index.html`;
 const launch = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
-const browser = await playwright.chromium.launch(launch);
-const page = await browser.newPage({ viewport: { width: 1366, height: 820 } });
+let browser;
+try {
+  browser = await playwright.chromium.launch(launch);
+} catch {
+  // Sin el Chromium de Playwright: el Edge del equipo (el mismo motor que WebView2).
+  browser = await playwright.chromium.launch({ channel: "msedge" });
+}
+// Portátiles de oficina: 1366×768 (por defecto) y, con la escala al 125 % o 150 %, 1093 o 911 px de ancho útil.
+// `SMOKE_WIDTH=1093 npm run test:ui` lo prueba a ese ancho.
+const width = Number(process.env.SMOKE_WIDTH) || 1366;
+const page = await browser.newPage({ viewport: { width, height: Math.round(width * 0.6) } });
+const overflow = [];
+// Lo que se sale por la derecha de la pantalla (scroll de lado o algo cortado): el elemento más externo que se sale.
+const measure = (where) =>
+  page.evaluate((w) => {
+    const root = [...document.querySelectorAll("[data-page]")].find((el) => !el.hidden);
+    if (!root) return null;
+    const vw = document.documentElement.clientWidth;
+    const out = [];
+    // Scroll de lado en la propia página (o en lo que la contiene): algo es más ancho que la pantalla.
+    for (let p = root; p; p = p.parentElement) {
+      if (p.scrollWidth > p.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(p).overflowX)) {
+        let widest = null;
+        for (const el of p.querySelectorAll("*")) {
+          const r = el.getBoundingClientRect();
+          if (r.right > p.getBoundingClientRect().right + 2 && (!widest || r.width > widest.getBoundingClientRect().width)) widest = el;
+        }
+        out.push({ el: p, txt: `scroll de lado (${p.scrollWidth - p.clientWidth}px) por ${widest ? `${widest.tagName.toLowerCase()}.${String(widest.className).split(" ").slice(0, 3).join(".")} «${(widest.textContent ?? "").trim().slice(0, 40)}»` : "?"}` });
+        break;
+      }
+    }
+    for (const el of root.querySelectorAll("*")) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.right <= vw + 2) continue;
+      // Dentro de algo con scroll horizontal propio (tablas) está bien.
+      let p = el.parentElement;
+      let scrolls = false;
+      while (p && p !== root) {
+        const cs = getComputedStyle(p);
+        if (/(auto|scroll|hidden|clip)/.test(cs.overflowX) && p.getBoundingClientRect().right <= vw + 2) {
+          scrolls = true;
+          break;
+        }
+        p = p.parentElement;
+      }
+      if (scrolls) continue;
+      if (out.some((o) => o.el.contains(el))) continue;
+      out.push({ el, txt: `${el.tagName.toLowerCase()}.${String(el.className).split(" ").slice(0, 3).join(".")} «${(el.textContent ?? "").trim().slice(0, 40)}» +${Math.round(r.right - vw)}px` });
+    }
+    return out.slice(0, 3).map((o) => `${w}: ${o.txt}`);
+  }, where);
 const errors = [];
 page.on("pageerror", (e) => errors.push(`[excepción] ${e.message}`));
 page.on("console", (m) => m.type() === "error" && errors.push(`[consola] ${m.text().split("\n")[0].slice(0, 300)}`));
@@ -96,6 +145,7 @@ for (const p of pages()) {
     return { id: visible?.getAttribute("data-page") ?? "", empty: text.trim().length < 20, crashed: /Algo falló|Something went wrong/.test(text) };
   });
   await page.screenshot({ path: join(out, `${p}.png`) });
+  for (const o of (await measure(p)) ?? []) overflow.push(o);
   // Avisos rojos con un fallo de JavaScript (no los errores normales de Windows).
   const toasts = await page.evaluate(() => [...document.querySelectorAll('[data-toast="error"]')].map((t) => t.textContent ?? ""));
   for (const t of toasts) if (/TypeError|ReferenceError|undefined|null \(reading/.test(t)) errors.push(`[aviso] ${t.slice(0, 200)}`);
@@ -120,6 +170,7 @@ for (const [p, sec] of secs) {
     return { id: visible?.getAttribute("data-page") ?? "", empty: text.trim().length < 20, crashed: /Algo falló|Something went wrong/.test(text) };
   });
   await page.screenshot({ path: join(out, `${p}-${sec}.png`) });
+  for (const o of (await measure(`${p} › ${sec}`)) ?? []) overflow.push(o);
   const toasts = await page.evaluate(() => [...document.querySelectorAll('[data-toast="error"]')].map((t) => t.textContent ?? ""));
   for (const t of toasts) if (/TypeError|ReferenceError|undefined|null \(reading/.test(t)) errors.push(`[aviso] ${t.slice(0, 200)}`);
   await page.evaluate(() => document.querySelectorAll('[data-toast] button[aria-label="Cerrar aviso"]').forEach((b) => b.click()));
@@ -176,7 +227,9 @@ const unknown = await page.evaluate(() => [...window.__E2E_UNKNOWN__]);
 await browser.close();
 await server.close();
 
-console.log(`Pantallas revisadas: ${pages().length - 3} y ${secs.length} secciones. Con problemas: ${failures.length}.`);
+console.log(`Pantallas revisadas: ${pages().length - 3} y ${secs.length} secciones a ${width} px. Con problemas: ${failures.length}.`);
+console.log(`Se sale por la derecha (${overflow.length}):`);
+for (const o of overflow) console.log(`  ↔ ${o}`);
 for (const f of failures) console.log(`✗ ${f.page} (se ve «${f.shown}»)${f.empty ? " · vacía" : ""}${f.crashed ? " · «Algo falló»" : ""}\n   ${f.errors.join("\n   ")}`);
 if (unknown.length) console.log(`Órdenes sin tipo conocido (respondidas con null): ${unknown.join(", ")}`);
 process.exit(failures.length ? 1 : 0);

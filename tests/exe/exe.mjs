@@ -102,8 +102,10 @@ const baseArgs = conf.app?.windows?.[0]?.additionalBrowserArgs ?? "";
 const cdpPort = 9300 + Math.floor(Math.random() * 500);
 const webviewData = join(work, "webview2");
 const env = { ...process.env, WEBVIEW2_USER_DATA_FOLDER: webviewData, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `${baseArgs} --remote-debugging-port=${cdpPort}`.trim() };
-// Sin --admin: se abre sin pedir administrador aunque el manifiesto lo pida (solo este proceso; el .exe no cambia).
+// Sin --admin: se abre sin pedir administrador (desde la 1.5.2 ya es lo normal; esto queda por las versiones de antes).
 if (!asAdmin) env.__COMPAT_LAYER = "RunAsInvoker";
+// La prueba no deja el cohete al cerrar ni pone su arranque con Windows en el equipo de quien compila.
+env.ADMINOPS_NO_ROCKET_BEHIND = "1";
 
 const started = Date.now();
 let elevatedLaunch = false;

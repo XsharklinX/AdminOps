@@ -93,6 +93,8 @@ export function onUpdateProgress(cb: (p: UpdateProgress) => void): () => void {
 }
 
 export const updateApi = {
+  /** Quita una actualización (por su número KB) y pausa las actualizaciones 7 días. Devuelve qué pasó. */
+  uninstall: (kb: string, cumulative: boolean) => invoke<string>("update_uninstall", { kb, cumulative }),
   /** La causa del código en este equipo, o null si no se puede afirmar ninguna. */
   cause: (code: string) => invoke<UpdateCause | null>("update_cause", { code }),
   /** Descarga e instala; el avance de cada una llega por `onUpdateProgress`. */

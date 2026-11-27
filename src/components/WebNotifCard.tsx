@@ -2,7 +2,7 @@ import { BellRing, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { webNotifApi, type WebNotif } from "../lib/api";
 import { useToast } from "./feedback";
-import { Button, Card } from "./ui";
+import { Button, Card, Notice } from "./ui";
 
 /** Lo que identifica un aviso de un navegador y perfil concretos. */
 export const notifKey = (n: WebNotif) => `${n.browser}\u0000${n.profile}\u0000${n.origin}`;
@@ -83,7 +83,7 @@ export function WebNotifCard() {
           })}
         </ul>
       )}
-      {error && <p className="mt-2 text-sm text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Notificaciones web" className="mt-2">{error}</Notice>}
       {list !== null && list.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Button disabled={picked.size === 0} onClick={remove}>

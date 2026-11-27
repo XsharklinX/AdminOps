@@ -2,7 +2,7 @@ import { WEB_TICKETS } from "../lib/features";
 import { ArrowLeft, ArrowRight, Building2, Check, Mail, ShieldCheck, Stethoscope, Ticket, TriangleAlert, UserRound, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.svg";
-import { Button, inputClass } from "./ui";
+import { Button, inputClass, Notice } from "./ui";
 import { portalsApi, workApi, type Settings } from "../lib/api";
 import { setPrefs, type AppMode } from "../lib/prefs";
 
@@ -190,7 +190,7 @@ export function Onboarding({ onDone }: { onDone: (goTo: "diagnostics" | "dashboa
 
         {step === "done" && <DoneStep mode={mode} />}
 
-        {error && <p className="mt-4 text-xs text-bad">{error}</p>}
+        {error && <Notice tone="error" where="Primer arranque" className="mt-4">{error}</Notice>}
 
         <div className="mt-6 flex items-center gap-2">
           {i > 0 && (

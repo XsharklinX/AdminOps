@@ -8,7 +8,7 @@ import { advance, markTried, nextStep, startLadder, tryLabel, type Ladder } from
 import { openPalette } from "../lib/palette";
 import { ViewCommand } from "./ActionCommand";
 import { useToast } from "./feedback";
-import { Button } from "./ui";
+import { Button, Notice } from "./ui";
 
 // Leer el equipo para cada código tarda: se hace de uno en uno y una sola vez por código.
 const causes = new Map<string, Promise<UpdateCause | null>>();
@@ -85,7 +85,7 @@ export function UpdateFailure({ code, explanation, isAdmin }: { code: string; ex
         </p>
       )}
       {cause && <p className="text-xs text-ink">{cause.sentence}</p>}
-      {cause === null && ladder.tried.length > 0 && <p className="text-xs text-ok">Ya no se detecta esa causa en este equipo.</p>}
+      {cause === null && ladder.tried.length > 0 && <Notice tone="ok">Ya no se detecta esa causa en este equipo.</Notice>}
       {cause === null && ladder.tried.length === 0 && (
         <button type="button" onClick={() => openPalette("Windows Update da error")} className="text-xs text-neon hover:underline">
           Ver en Soluciones
@@ -110,7 +110,7 @@ export function UpdateFailure({ code, explanation, isAdmin }: { code: string; ex
           <span className="text-ink">{step.label}.</span> {step.detail}
         </p>
       )}
-      {note && <p className="text-xs text-ok">{note}</p>}
+      {note && <Notice tone="ok">{note}</Notice>}
     </div>
   );
 }

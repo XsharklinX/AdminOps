@@ -99,6 +99,9 @@ export function TweakCard({
             <span className={`rounded border px-1.5 py-px text-[11px] font-medium ${RISK[t.risk].cls}`}>
               {RISK[t.risk].label}
             </span>
+            {/* Antes de pulsar: cuánto tarda, si cierra algo y si reinicia (importa con el usuario delante). */}
+            {t.eta && <span className="rounded border border-line-2 px-1.5 py-px text-[11px] text-dim" title="Cuánto tarda">{t.eta}</span>}
+            {t.closes && <span className="rounded border border-warn/30 px-1.5 py-px text-[11px] text-warn">{t.closes}</span>}
             {t.reboot && (
               <span className="rounded border border-line-2 px-1.5 py-px text-[11px] text-dim">Requiere reinicio</span>
             )}

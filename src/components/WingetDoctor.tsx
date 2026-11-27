@@ -3,7 +3,7 @@ import { CheckCircle2, CircleSlash, Loader2, Wrench, XCircle } from "lucide-reac
 import { useEffect, useState } from "react";
 import { installQueueApi, type InstallItem } from "../lib/api";
 import { wingetApi, WINGET_STEP_EVENT, type WingetHealth, type WingetStep } from "../lib/api/wingetfix";
-import { Button } from "./ui";
+import { Button, Notice } from "./ui";
 
 /** Fallos que apuntan a winget y no al programa: no está, origen roto, no responde. */
 const WINGET_CODES = new Set(["0x8A15000F", "0x8A150044", "0x8A15003B", "0x8A150046", "0x8A150014", "0x8A150017"]);
@@ -106,7 +106,7 @@ export function WingetDoctor({ items, isAdmin, quiet = false }: { items: Install
           )}
         </ul>
       )}
-      {error && <p className="mt-2 text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Winget" className="mt-2">{error}</Notice>}
       {!fixed && health?.state !== "network" && (
         <div className="mt-2 flex items-center gap-2">
           <Button size="sm" disabled={!isAdmin || state === "repairing" || state === "retrying"} onClick={repair}>

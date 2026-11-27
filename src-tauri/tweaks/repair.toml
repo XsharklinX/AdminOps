@@ -2,6 +2,7 @@
 
 [[tweak]]
 id = "repair.sfc"
+eta = "unos 15 min"
 timeout = 0
 name = "Comprobar archivos del sistema (SFC)"
 description = "Busca y repara archivos de Windows dañados o modificados. Primer paso ante pantallazos azules o fallos raros."
@@ -25,6 +26,7 @@ else { "SFC terminó (código $code). Detalle en C:\Windows\Logs\CBS\CBS.log" }
 
 [[tweak]]
 id = "repair.dism"
+eta = "15–30 min"
 timeout = 0
 name = "Reparar imagen de Windows (DISM)"
 description = "Repara el almacén de componentes desde Windows Update. Necesario cuando SFC no puede reparar."
@@ -46,6 +48,8 @@ switch ($LASTEXITCODE) {
 
 [[tweak]]
 id = "repair.ip-renew"
+eta = "unos 10 s"
+closes = "corta la red unos segundos"
 name = "Renovar la IP"
 description = "Pide una dirección nueva al router o al servidor (DHCP) y vacía la caché de nombres. No toca Winsock ni la pila TCP/IP y no quita una IP fija."
 category = "repair"
@@ -69,6 +73,8 @@ if (-not $ok) { throw 'No se pudo renovar la IP: ningún adaptador tiene direcci
 
 [[tweak]]
 id = "repair.network-reset"
+eta = "unos 30 s"
+closes = "corta la red"
 name = "Restablecer red"
 description = "Reinicia Winsock y la pila TCP/IP y renueva la IP. Soluciona 'conectado sin Internet', DNS que no resuelven y restos de VPN o malware."
 category = "repair"
@@ -90,6 +96,7 @@ ipconfig.exe /flushdns | Out-Null
 
 [[tweak]]
 id = "repair.windows-update"
+eta = "unos 2 min"
 name = "Reparar Windows Update"
 description = "Detiene los servicios de actualización y renombra SoftwareDistribution y catroot2 para que se regeneren."
 category = "repair"
@@ -114,6 +121,7 @@ Start-Service 'cryptsvc', 'bits', 'wuauserv' -ErrorAction SilentlyContinue
 
 [[tweak]]
 id = "repair.wu-services"
+eta = "unos 30 s"
 name = "Reiniciar los servicios de Windows Update"
 description = "Vuelve a activar (si estaban deshabilitados) y reinicia los servicios que usa Windows Update: Windows Update, BITS y Servicios criptográficos."
 category = "repair"
@@ -141,6 +149,7 @@ if ($fixed.Count) { 'Servicios reactivados y reiniciados: ' + ($fixed -join ', '
 
 [[tweak]]
 id = "repair.esp-fonts"
+eta = "unos 30 s"
 name = "Liberar la partición reservada del sistema"
 description = "Borra de la partición de arranque (EFI) las fuentes de arranque de idiomas asiáticos (chino, japonés, coreano), que Microsoft recomienda quitar cuando Windows Update falla por falta de espacio (0x800f0922). Las latinas no se tocan. Si el equipo usa alguno de esos idiomas, las fuentes de ese idioma se dejan y se dice."
 category = "repair"
@@ -196,6 +205,8 @@ $msg
 
 [[tweak]]
 id = "repair.print-queue"
+eta = "unos 10 s"
+closes = "borra lo que esté en cola"
 name = "Desatascar cola de impresión"
 description = "Vacía los trabajos de impresión bloqueados y reinicia la cola."
 category = "repair"
@@ -215,6 +226,8 @@ Start-Service Spooler
 
 [[tweak]]
 id = "repair.explorer"
+eta = "unos 5 s"
+closes = "cierra las carpetas abiertas"
 name = "Reiniciar Explorador de Windows"
 description = "Reinicia la barra de tareas, el escritorio y el menú Inicio cuando se congelan o no responden."
 category = "repair"
@@ -234,6 +247,7 @@ if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process e
 
 [[tweak]]
 id = "repair.time-sync"
+eta = "unos 5 s"
 name = "Sincronizar hora"
 description = "Fuerza la sincronización del reloj con el servidor de hora. Una hora incorrecta rompe HTTPS, Office y las activaciones."
 category = "repair"
@@ -253,8 +267,10 @@ if ($LASTEXITCODE) { throw 'No se pudo sincronizar (¿sin conexión o puerto 123
 
 [[tweak]]
 id = "repair.icon-cache"
-name = "Reconstruir caché de iconos"
-description = "Arregla iconos en blanco, incorrectos o que no se actualizan."
+eta = "unos 10 s"
+closes = "reinicia el Explorador"
+name = "Reconstruir caché de iconos y miniaturas"
+description = "Arregla iconos en blanco, incorrectos o que no se actualizan, y carpetas de fotos o vídeos sin miniaturas."
 category = "repair"
 risk = "low"
 kind = "action"
@@ -266,10 +282,11 @@ Stop-Process -Name explorer -Force
 Start-Sleep -Milliseconds 300
 Get-ChildItem (Join-Path $UserLocalAppData 'Microsoft\Windows\Explorer') -Filter 'iconcache*' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $UserLocalAppData 'IconCache.db') -Force -ErrorAction SilentlyContinue
+Get-ChildItem (Join-Path $UserLocalAppData 'Microsoft\Windows\Explorer') -Filter 'thumbcache_*' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 # Ver 'Reiniciar Explorador': dejamos que winlogon lo relance sin privilegios.
 foreach ($i in 1..10) { Start-Sleep -Milliseconds 500; if (Get-Process explorer -ErrorAction SilentlyContinue) { break } }
 if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }
-'Caché de iconos reconstruida.'
+'Caché de iconos y miniaturas reconstruida.'
 '''
 
 [[tweak]]
@@ -290,6 +307,7 @@ Start-Process mdsched.exe
 
 [[tweak]]
 id = "repair.defender-scan"
+eta = "5–15 min"
 name = "Análisis rápido de Microsoft Defender"
 description = "Busca malware en las zonas donde suele esconderse (memoria, inicio, carpetas del sistema)."
 category = "repair"
@@ -310,6 +328,8 @@ else { 'Análisis rápido completado: no se encontraron amenazas.' }
 
 [[tweak]]
 id = "repair.store-reset"
+eta = "unos 2 min"
+closes = "cierra la Tienda"
 name = "Restablecer Microsoft Store"
 description = "Vacía la caché de la Store (wsreset). Soluciona descargas atascadas, errores al abrirla y apps que no se actualizan."
 category = "repair"
@@ -327,6 +347,8 @@ if (-not $p.WaitForExit(240000)) { throw 'wsreset no terminó en 4 minutos.' }
 
 [[tweak]]
 id = "repair.search-index"
+eta = "unos minutos"
+closes = "la búsqueda tarda en volver"
 name = "Reconstruir la búsqueda de Windows"
 description = "Reinicia el servicio de búsqueda y reconstruye el índice. Para cuando el menú Inicio o el Explorador no encuentran archivos o programas."
 category = "repair"
@@ -347,6 +369,8 @@ Start-Service WSearch
 
 [[tweak]]
 id = "repair.audio"
+eta = "unos 10 s"
+closes = "corta el sonido un momento"
 name = "Reiniciar el audio"
 description = "Reinicia los servicios de audio de Windows. Soluciona el sonido que desaparece, el icono de altavoz con una X o dispositivos que no aparecen."
 category = "repair"
@@ -365,6 +389,7 @@ if ((Get-Service Audiosrv).Status -ne 'Running') { throw 'El servicio de audio n
 
 [[tweak]]
 id = "repair.temp-profile"
+eta = "unos 30 s"
 name = "Reparar perfil temporal"
 description = "Arregla el aviso «Se inició sesión con un perfil temporal»: recupera el perfil real del usuario en el registro (claves .bak de ProfileList). No borra archivos."
 category = "repair"
@@ -402,6 +427,7 @@ else { 'No se encontró ningún perfil dañado.' }
 
 [[tweak]]
 id = "repair.defender-signatures"
+eta = "1–5 min"
 name = "Actualizar las firmas de Microsoft Defender"
 description = "Descarga las últimas definiciones del antivirus de Windows, sin esperar a Windows Update."
 category = "repair"
@@ -434,4 +460,82 @@ Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop
 Start-Sleep -Seconds 2
 if ((Get-MpComputerStatus).RealTimeProtectionEnabled) { 'Protección en tiempo real activada.' }
 else { throw 'Windows no la ha encendido: puede que una directiva de la empresa o la protección contra alteraciones lo impida. Actívala en Seguridad de Windows.' }
+'''
+
+[[tweak]]
+id = "repair.start-menu"
+eta = "unos 15 s"
+closes = "cierra las carpetas abiertas"
+name = "El menú Inicio o la barra de tareas no responden"
+description = "Reinicia el Explorador y los procesos del menú Inicio, la búsqueda y la barra de tareas, sin reiniciar el equipo."
+category = "repair"
+risk = "low"
+kind = "action"
+note = "Las ventanas de carpetas abiertas se cerrarán; los programas siguen abiertos."
+
+[tweak.script]
+run = '''
+foreach ($n in 'StartMenuExperienceHost', 'ShellExperienceHost', 'SearchHost', 'SearchApp', 'explorer') {
+  Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+}
+# Winlogon vuelve a abrir el Explorador como el usuario (sin privilegios); si tarda, se abre a mano.
+foreach ($i in 1..10) { Start-Sleep -Milliseconds 500; if (Get-Process explorer -ErrorAction SilentlyContinue) { break } }
+if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }
+'Menú Inicio y barra de tareas reiniciados. Si siguen sin responder, reinicia el equipo.'
+'''
+
+[[tweak]]
+id = "repair.clipboard"
+eta = "unos 5 s"
+name = "Copiar y pegar dejó de funcionar"
+description = "Reinicia el portapapeles de la sesión (también el que comparte el Escritorio remoto) cuando Ctrl+C y Ctrl+V dejan de pasar el texto."
+category = "repair"
+risk = "low"
+kind = "action"
+note = "Se pierde lo que hubiera copiado en ese momento."
+
+[tweak.script]
+run = '''
+$done = @()
+$rd = Get-Process rdpclip -ErrorAction SilentlyContinue
+if ($rd) {
+  $rd | Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Milliseconds 400
+  Start-Process rdpclip.exe
+  $done += 'portapapeles del Escritorio remoto'
+}
+$failed = $false
+foreach ($s in @(Get-Service -Name 'cbdhsvc_*' -ErrorAction SilentlyContinue)) {
+  try {
+    Restart-Service -InputObject $s -Force -ErrorAction Stop
+    if ((Get-Service -Name $s.Name).Status -eq 'Running') { $done += 'servicio del portapapeles' } else { $failed = $true }
+  } catch { $failed = $true }
+}
+if (-not $done) {
+  if ($failed) { throw 'Windows no dejó reiniciar el portapapeles: prueba en modo técnico o cierra sesión y vuelve a entrar.' }
+  throw 'No hay nada del portapapeles que reiniciar en esta sesión: cierra sesión y vuelve a entrar.'
+}
+"Reiniciado: $(($done | Select-Object -Unique) -join ', '). Copia otra vez y prueba a pegar."
+'''
+
+[[tweak]]
+id = "repair.print-to-pdf"
+eta = "unos 30 s"
+name = "Volver a poner «Microsoft Print to PDF»"
+description = "Reinstala la impresora de PDF de Windows cuando falta y no se puede guardar en PDF desde Imprimir."
+category = "repair"
+risk = "low"
+kind = "action"
+admin = true
+
+[tweak.script]
+run = '''
+$f = 'Printing-PrintToPDFServices-Features'
+if ((Get-Service Spooler -ErrorAction SilentlyContinue).Status -ne 'Running') { throw 'La cola de impresión de Windows está parada: arráncala (Impresoras → Desatascar cola) y vuelve a probar.' }
+if (Get-Printer -Name 'Microsoft Print to PDF' -ErrorAction SilentlyContinue) { 'La impresora «Microsoft Print to PDF» ya está.'; return }
+# Si la característica figura como puesta pero falta la impresora, se quita y se vuelve a poner.
+$st = (Get-WindowsOptionalFeature -Online -FeatureName $f -ErrorAction Stop).State
+if ($st -eq 'Enabled') { Disable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart -ErrorAction Stop | Out-Null }
+Enable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart -All -ErrorAction Stop | Out-Null
+if (Get-Printer -Name 'Microsoft Print to PDF' -ErrorAction SilentlyContinue) { '«Microsoft Print to PDF» vuelve a estar.' } else { 'Reinstalada: aparecerá al reiniciar el equipo.' }
 '''

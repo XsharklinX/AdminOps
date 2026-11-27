@@ -20,7 +20,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { SavedViews } from "../components/SavedViews";
-import { Button, Modal, ErrorState, Loading, iconBtn } from "../components/ui";
+import { Button, Modal, ErrorState, Loading, iconBtn, Notice } from "../components/ui";
 import { DataTable, type Column } from "../components/DataTable";
 import { bytes, friendlyPath } from "../lib/format";
 import { programKey as key, norm } from "../lib/programs";
@@ -613,7 +613,7 @@ function LeftoversDialog({ groups, onClose, onDone }: { groups: { program: Insta
       width="w-[680px]"
       footer={
         <>
-          {error && <p className="mr-auto max-w-80 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Desinstalar" className="mr-auto max-w-80">{error}</Notice>}
           <Button kind="ghost" onClick={onClose} disabled={busy}>
             Dejarlos
           </Button>

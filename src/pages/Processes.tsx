@@ -211,6 +211,13 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
   const header = (key: SortKey, label: string, right = false) => (
     <th
       onClick={() => setSort((s) => ({ key, desc: s.key === key ? !s.desc : key !== "name" }))}
+      tabIndex={0}
+      aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : undefined}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        setSort((s) => ({ key, desc: s.key === key ? !s.desc : key !== "name" }));
+      }}
       className={`cursor-pointer px-3 py-2 font-medium select-none hover:text-ink ${right ? "text-right" : ""}`}
     >
       <span className={`inline-flex items-center gap-1 ${sort.key === key ? "text-neon" : ""}`}>
@@ -225,6 +232,14 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
       key={p.pid}
       data-flip={nested ? undefined : String(p.pid)}
       onClick={() => setSelected({ kind: "proc", pid: p.pid })}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setSelected({ kind: "proc", pid: p.pid });
+        }
+      }}
       className={`cursor-pointer border-t border-line/60 ${selected?.kind === "proc" && selected.pid === p.pid ? "bg-neon/10" : nested ? "bg-void/30 hover:bg-panel-2" : "hover:bg-panel-2"}`}
     >
       <td className={`max-w-0 truncate py-1.5 pr-3 font-sans text-[13px] ${nested ? "pl-9 text-dim" : "pl-3 text-ink"}`} title={p.exe ?? undefined}>
@@ -344,6 +359,14 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
                       key={g.key}
                       data-flip={g.key}
                       onClick={() => setSelected(single ? { kind: "proc", pid: g.procs[0].pid } : { kind: "group", key: g.key })}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelected(single ? { kind: "proc", pid: g.procs[0].pid } : { kind: "group", key: g.key });
+                        }
+                      }}
                       className={`cursor-pointer border-t border-line/60 ${
                         (selected?.kind === "group" && selected.key === g.key) || (single && selected?.kind === "proc" && selected.pid === g.procs[0].pid) ? "bg-neon/10" : "hover:bg-panel-2"
                       }`}

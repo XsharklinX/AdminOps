@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ClipboardCopy, Images, Loader2, RotateCw, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, ClipboardCopy, Images, Info, Loader2, RotateCw, ShieldCheck, TriangleAlert, X, XCircle } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { copyAsImage, NO_CAPTURE } from "../lib/copyImage";
 import { logQuietly } from "../lib/api/core";
@@ -601,7 +601,7 @@ export function ErrorState({ message, onRetry, page = false, where }: { message:
           </button>
           {e.fix === "admin" && (
             <button onClick={admin} className={smallBtn}>
-              <ShieldCheck size={12} /> Reiniciar como administrador
+              <ShieldCheck size={12} /> Pasar a modo técnico
             </button>
           )}
           {onRetry && (
@@ -611,6 +611,53 @@ export function ErrorState({ message, onRetry, page = false, where }: { message:
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * El aviso de una acción, siempre junto a lo que se pulsó y con el mismo aspecto en toda la app: hecho (`ok`),
+ * a tener en cuenta (`warn`), error (`error`) o información (`info`). Los errores llevan «Copiar el detalle» (texto
+ * técnico sin rutas ni nombres, como en ErrorState). Para errores de lectura de una pantalla entera, ErrorState.
+ */
+export function Notice({
+  tone = "error",
+  children,
+  detail,
+  where,
+  className = "",
+}: {
+  tone?: "ok" | "warn" | "error" | "info";
+  children: ReactNode;
+  /** Lo que se copia en los errores (por defecto, el propio texto si es una cadena). */
+  detail?: string;
+  /** Pantalla o tarjeta, para los detalles de soporte. */
+  where?: string;
+  className?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const raw = detail ?? (typeof children === "string" ? children : "");
+  const copy = () =>
+    void navigator.clipboard?.writeText(supportDetails(raw, where)).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    });
+  const look = {
+    ok: ["border-ok/30 bg-ok/5", "text-ok", CheckCircle2],
+    warn: ["border-warn/30 bg-warn/5", "text-warn", TriangleAlert],
+    error: ["border-bad/30 bg-bad/5", "text-bad", XCircle],
+    info: ["border-line-2 bg-panel-2/60", "text-dim", Info],
+  } as const;
+  const [box, ink, Icon] = look[tone];
+  return (
+    <div role={tone === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed text-ink ${box} ${className}`}>
+      <Icon size={14} className={`mt-px shrink-0 ${ink}`} aria-hidden />
+      <div className="min-w-0 flex-1 break-words">{children}</div>
+      {tone === "error" && raw && (
+        <button type="button" onClick={copy} className="shrink-0 rounded px-1 text-[11px] text-mute hover:text-ink" title="Texto técnico sin rutas ni nombres de usuario">
+          {copied ? "Copiado" : "Copiar el detalle"}
+        </button>
+      )}
     </div>
   );
 }

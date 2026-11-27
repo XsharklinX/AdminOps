@@ -5,7 +5,8 @@ import { logQuietly } from "../lib/api";
 import { goToPage } from "../lib/navigate";
 import { nightApi, type NightState } from "../lib/nightJobs";
 import { useToast } from "./feedback";
-import { Card } from "./ui";
+import { api } from "../lib/api";
+import { Card, Notice } from "./ui";
 
 const DOT = { ok: "bg-ok", warn: "bg-warn", bad: "bg-bad" } as const;
 
@@ -25,11 +26,22 @@ export function NightCard() {
     return () => void un.then((f) => f());
   }, [load]);
 
+  const [elevated, setElevated] = useState<boolean | null>(null);
+  useEffect(() => {
+    api.isAdmin().then(setElevated, () => setElevated(null));
+  }, []);
   if (!s || (s.queue.length === 0 && s.unseen === 0 && !s.running)) return null;
+  // Necesitan administrador: en modo usuario esperan a una noche con AdminOps en modo técnico.
+  const waiting = s.queue.length > 0 && elevated === false;
   const fresh = s.results.slice(0, s.unseen);
 
   return (
     <Card title={fresh.length ? "Esto pasó esta noche" : "Para esta noche"} icon={<Moon size={14} />}>
+      {waiting && (
+        <Notice tone="warn" className="mb-3">
+          Se hacen de noche con AdminOps abierta en modo técnico (necesitan administrador). En modo usuario esperan.
+        </Notice>
+      )}
       {fresh.length > 0 && (
         <ul className="mb-3 space-y-2">
           {fresh.map((r) => (

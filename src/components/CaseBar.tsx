@@ -8,7 +8,7 @@ import { WEB_TICKETS } from "../lib/features";
 import { knowledgeApi } from "../lib/api";
 import { SYMPTOMS } from "../lib/symptoms";
 import { lastSymptom } from "../lib/lastSymptom";
-import { CheckCircle2, ClipboardCheck, Copy, Crop, Loader2, Pencil, PictureInPicture, Save, Send, TicketPlus, Trash2, X, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Copy, Crop, Loader2, Pencil, PictureInPicture, Save, Send, TicketPlus, Trash2, XCircle } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import { logQuietly, casesApi, noteApi, portalsApi, workApi, type Case, type CaseAction, type CaseTones, type ClipRedacted } from "../lib/api";
@@ -20,7 +20,7 @@ import { usePrefs } from "../lib/prefs";
 import { usePolling } from "../hooks/usePolling";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { useToast } from "./feedback";
-import { Button, inputClass, Modal } from "./ui";
+import { Button, inputClass, Modal, Notice } from "./ui";
 
 /** Botón de la cabecera para abrir un caso cuando no hay ninguno. */
 export function NewCaseButton({ hidden }: { hidden: boolean }) {
@@ -229,7 +229,7 @@ function CaseEditor({ mode, prefill, onClose, onSaved }: { mode: "new" | "edit";
       width="w-[520px]"
       footer={
         <>
-          {error && <p className="mr-auto max-w-64 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Caso" className="mr-auto max-w-64">{error}</Notice>}
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>
@@ -392,7 +392,7 @@ function CloseDialog({ current, onClose, onClosed }: { current: Case; onClose: (
         </>
       }
     >
-      {error && <p className="mb-3 flex items-center gap-2 text-xs text-bad"><X size={12} />{error}</p>}
+      {error && <Notice tone="error" where="Caso" className="mb-3">{error}</Notice>}
       {actions.length > 0 && (
         <ul className="mb-3 max-h-40 divide-y divide-line/60 overflow-y-auto rounded-lg border border-line text-[13px]" aria-label="Acciones apuntadas">
           {actions.map((a, i) => (

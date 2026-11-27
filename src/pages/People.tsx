@@ -20,13 +20,12 @@ import {
   Search,
   ShieldAlert,
   TicketPlus,
-  TriangleAlert,
   UserRound,
   UserX,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "../components/feedback";
-import { Button, Card, EmptyState, inputClass, Modal } from "../components/ui";
+import { Button, Card, EmptyState, inputClass, Modal, Notice } from "../components/ui";
 import { logQuietly, casesApi, contactsApi, officeApi, peopleApi, portalsApi, type Case, type LapsPassword, type Person, type PersonHit, type RecoveryKey } from "../lib/api";
 import { openCase } from "../lib/currentCase";
 import { TeamsIcon } from "../components/BrandIcons";
@@ -146,7 +145,7 @@ export function People({ focus }: { focus: string | null }) {
             {searching ? <Loader2 size={13} className="animate-spin" /> : null} Buscar
           </button>
         </form>
-        {error && <p className="mt-3 flex items-start gap-2 text-xs text-bad"><TriangleAlert size={13} className="mt-0.5 shrink-0" />{error}</p>}
+        {error && <Notice tone="error" where="Personas" className="mt-3">{error}</Notice>}
         {hits && hits.length === 0 && <p className="mt-4 text-sm text-mute">Nadie en el dominio coincide con «{query}».</p>}
         {hits && hits.length > 0 && (
           <>
@@ -290,7 +289,7 @@ function PersonCard({ sam, onLoaded }: { sam: string; onLoaded?: (p: Person) => 
     [sam],
   );
 
-  if (error) return <Card><p className="flex items-start gap-2 text-sm text-bad"><TriangleAlert size={14} className="mt-0.5 shrink-0" />{error}</p></Card>;
+  if (error) return <Card><Notice tone="error" where="Personas">{error}</Notice></Card>;
   if (!p) return <Card><p className="flex items-center gap-2 text-sm text-mute"><Loader2 size={14} className="animate-spin" /> Leyendo su cuenta del dominio…</p></Card>;
 
   const now = Date.now() / 1000;
@@ -527,7 +526,7 @@ function ResetDialog({ person, onClose, onDone }: { person: Person; onClose: () 
           <Button onClick={onClose}>Hecho</Button>
         ) : (
           <>
-            {error && <p className="mr-auto max-w-64 text-xs text-bad">{error}</p>}
+            {error && <Notice tone="error" where="Personas" className="mr-auto max-w-64">{error}</Notice>}
             <Button kind="ghost" onClick={onClose}>
               Cancelar
             </Button>
@@ -691,7 +690,7 @@ function ComputerSecrets({ initial }: { initial: string | null }) {
         }}
       >
         <input value={computer} onChange={(e) => setComputer(e.target.value)} placeholder="Nombre del equipo" className={`${inputClass} font-mono text-xs`} aria-label="Nombre del equipo" />
-        <Button kind="ghost" onClick={() => computer.trim() && setOpen(computer.trim().toUpperCase())} disabled={!computer.trim()}>
+        <Button kind="ghost" onClick={() => computer.trim() && setOpen(computer.trim().toUpperCase())} disabled={!computer.trim()} title="Abrir el equipo">
           <Check size={14} />
         </Button>
       </form>

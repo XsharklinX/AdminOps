@@ -140,6 +140,10 @@ pub fn restore(t: Option<&Tweak>, backups: &[Backup], task: Option<&Task>) -> Re
             Backup::Appx { name, store_id: Some(id) } => super::appx::reinstall(name, id, task),
             Backup::Appx { name, store_id: None } => Err(format!("{name} no se puede reinstalar automáticamente")),
             Backup::Languages { list } => crate::kbdlang::restore_languages(list),
+            Backup::UsbMode { previous } => crate::usbpolicy::restore_mode(previous),
+            Backup::PowerSides { ac, dc } => crate::power::restore_sides(*ac, *dc),
+            Backup::DefaultAppsPolicy { previous } => crate::defapps::restore_policy(previous.as_deref()),
+            Backup::AudioDefault { id } => crate::audiofix::restore_default(id),
             Backup::OneDrivePause { exe, sid, .. } => crate::onedrive::resume(exe, sid.as_deref()),
             Backup::ScanFolder { created_user, firewall, share_existed, share_access, folder_created, user_prev, client_sid } => {
                 crate::scanfolder::undo_entry(*created_user, firewall, *share_existed, share_access, *folder_created, user_prev.as_ref(), client_sid.as_deref())

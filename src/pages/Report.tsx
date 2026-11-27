@@ -3,7 +3,7 @@ import { ExternalLink, FileText, FolderOpen, Loader2, Mail, Receipt, Zap } from 
 import { useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { BillingEditor, SendReportModal, TemplatePicker } from "../components/service";
-import { Button, Card, inputClass, Loading } from "../components/ui";
+import { Button, Card, inputClass, Loading, Notice } from "../components/ui";
 import { ReportPreview } from "../components/ReportPreview";
 import { logQuietly, diagApi, EMPTY_BILLING, tweaksApi, workApi, type Billing, type Client, type Settings, type ReportOptions, type SnapshotInfo, type Template } from "../lib/api";
 import { dateTime as when } from "../lib/format";
@@ -187,7 +187,7 @@ export function Report() {
         {snapshots === null ? (
           <Loading />
         ) : snapshots.length === 0 ? (
-          <p className="text-xs text-warn">Aún no hay análisis guardados. Ejecuta un diagnóstico antes de empezar a trabajar para tener el "antes".</p>
+          <Notice tone="warn">Aún no hay análisis guardados. Ejecuta un diagnóstico antes de empezar a trabajar para tener el "antes".</Notice>
         ) : (
           <div className="max-pane-lg space-y-1 overflow-y-auto">
             <label className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm ${baseline === null ? "bg-neon/10 text-neon" : "text-dim hover:bg-panel-2"}`}>

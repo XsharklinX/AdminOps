@@ -33,7 +33,7 @@ export function NeedsAdmin({ children, className = "" }: { children: ReactNode; 
         {error && <span className="ml-2 text-bad">{error}</span>}
       </p>
       <button onClick={() => void relaunch()} disabled={busy} className={relaunchBtn}>
-        {busy ? "Esperando UAC…" : "Reiniciar como administrador"}
+        {busy ? "Esperando a Windows…" : "Pasar a modo técnico"}
       </button>
     </div>
   );

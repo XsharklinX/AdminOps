@@ -1,12 +1,12 @@
 // «Ver el comando»: el PowerShell que hace una acción, comentado en español, para
 // copiarlo o guardarlo como .ps1 y llevarlo a un equipo donde AdminOps no abre.
 // El texto sale de Rust (el mismo script que se ejecuta), no está copiado aquí.
-import { Copy, Download, Terminal, TriangleAlert } from "lucide-react";
+import { Copy, Download, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { actionsApi, type ActionCommand } from "../lib/api";
 import { Drawer } from "./Drawer";
 import { useToast } from "./feedback";
-import { Button, iconBtn, Loading } from "./ui";
+import { Button, iconBtn, Loading, Notice } from "./ui";
 
 /** Las líneas de comentario (#) van en el color suave; el resto, como código. */
 function Code({ script }: { script: string }) {
@@ -85,7 +85,7 @@ export function InlineCommand({ id, context, className = "" }: { id: string; con
       </button>
       {open && (
         <div className="mt-2 space-y-2">
-          {failed && <p className="text-xs text-bad">No se pudo leer el comando.</p>}
+          {failed && <Notice tone="error" where="Acciones">No se pudo leer el comando.</Notice>}
           {!cmd && !failed && <Loading />}
           {cmd && (
             <>
@@ -139,15 +139,12 @@ function CommandDrawer({ id, context, onClose }: { id: string; context?: string;
   return (
     <Drawer title={cmd?.name ?? "Ver el comando"} subtitle="Lo que hace AdminOps, paso a paso" onClose={onClose} width={560}>
       <div className="space-y-3">
-        {error && <p className="text-sm text-bad">{error}</p>}
+        {error && <Notice tone="error" where="Acciones">{error}</Notice>}
         {!cmd && !error && <Loading />}
         {cmd && (
           <>
             {cmd.approximate && (
-              <p className="flex gap-1.5 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
-                <TriangleAlert size={13} className="mt-px shrink-0" />
-                AdminOps lo hace con funciones de Windows; esto es lo equivalente en PowerShell.
-              </p>
+              <Notice tone="warn">AdminOps lo hace con funciones de Windows; esto es lo equivalente en PowerShell.</Notice>
             )}
             <Code script={cmd.script} />
             <div className="flex flex-wrap gap-2">

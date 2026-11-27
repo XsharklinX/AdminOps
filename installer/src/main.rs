@@ -435,7 +435,11 @@ fn run_payload(tmp: &Path, dir: &Path, emit: &dyn Fn(u32, &str)) -> i32 {
 #[tauri::command]
 fn launch(dir: String) -> Result<(), String> {
     let exe = Path::new(&dir).join("adminops.exe");
-    std::process::Command::new(&exe).current_dir(&dir).spawn().map(|_| ()).map_err(|e| format!("No se pudo abrir AdminOps: {e}"))
+    // El instalador corre como administrador (a veces con la cuenta del técnico en el PC de otro usuario). Abierto
+    // desde aquí, AdminOps heredaría ese administrador y esa cuenta: no encontraría la carpeta de datos del usuario
+    // de la sesión (WebView2: «can't read and write to its data directory»). Se le pide al Explorador, que corre
+    // como el usuario de la sesión y sin elevar: es lo mismo que abrirla con doble clic.
+    std::process::Command::new("explorer.exe").arg(&exe).spawn().map(|_| ()).map_err(|e| format!("No se pudo abrir AdminOps: {e}"))
 }
 
 /// Abre el instalador de siempre (con sus ventanas) y cierra este.

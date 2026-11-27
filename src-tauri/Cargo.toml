@@ -1,6 +1,6 @@
 [package]
 name = "adminops"
-version = "1.5.1"
+version = "1.5.2"
 description = "AdminOps - optimizacion y diagnostico de Windows"
 authors = ["David Bonilla"]
 edition = "2021"
@@ -59,7 +59,7 @@ winreg = "0.56.0"
 webview2-com = "0.38.2"
 # Grabar el fallo (faultrec): Graphics_Capture, Direct3D 11 y Media Foundation (codificador H.264 y AAC de Windows),
 # lista de ventanas (Dwm, Storage_FileSystem para el nombre del programa), clics y teclas (KeyboardAndMouse) y micrófono (Media_Audio).
-windows = { version = "0.61", features = ["ApplicationModel_DataTransfer", "Foundation", "Foundation_Collections", "Globalization", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Graphics_Imaging", "Media_Ocr", "Storage_Streams", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dwm", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_Media_MediaFoundation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_Shell_PropertiesSystem", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["ApplicationModel_DataTransfer", "Foundation", "Foundation_Collections", "Globalization", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Graphics_Imaging", "Media_Ocr", "Storage_Streams", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dwm", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_Media_MediaFoundation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_Shell_PropertiesSystem", "Win32_UI_WindowsAndMessaging"] }
 windows-core = "0.61.2"
 # Avisos con botones (la misma que usa el plugin de notificaciones por debajo).
 tauri-winrt-notification = "0.7.3"

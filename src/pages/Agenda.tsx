@@ -33,7 +33,7 @@ import { useConfirm, useToast } from "../components/feedback";
 import { AgendaHistory } from "../components/AgendaHistory";
 import { MonthView, daysBetween } from "../components/AgendaMonth";
 import type { PageId } from "../components/Sidebar";
-import { Button, Card, inputClass, Loading, Modal, iconBtn } from "../components/ui";
+import { Button, Card, inputClass, Loading, Modal, iconBtn, Notice } from "../components/ui";
 import { logQuietly, agendaApi, followupsApi, portalsApi, REPEATS, workApi, type AgendaKind, type Client, type DueClient, type Followup, type Settings, type Visit } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { timeOfDay as time, shortDate } from "../lib/format";
@@ -857,7 +857,7 @@ function EntryEditor({ entry, clients, onClose, onSaved, onDelete }: { entry: Vi
       width="w-[540px]"
       footer={
         <>
-          {error && <p className="mr-auto max-w-60 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Agenda" className="mr-auto max-w-60">{error}</Notice>}
           {onDelete && !error && (
             <button onClick={onDelete} className="mr-auto text-xs text-mute hover:text-bad">
               Borrar

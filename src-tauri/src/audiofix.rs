@@ -169,9 +169,39 @@ pub async fn audio_beep(id: String) -> Result<(), String> {
 /// micrófono, además, los permisos que falten. Devuelve lo que hizo, frase a frase.
 #[tauri::command]
 pub async fn audio_use(app: tauri::AppHandle, id: String, capture: bool, volume: u32) -> Result<Vec<String>, String> {
+    let before = tauri::async_runtime::spawn_blocking(move || previous_default(capture)).await.ok().flatten();
     let r = audio_use_inner(id, capture, volume).await;
-    crate::tweaks::record_app(&app, if capture { "Audio: micrófono para todo" } else { "Audio: altavoz para todo" }, &r);
+    let backups = before.map(|id| vec![crate::tweaks::journal::Backup::AudioDefault { id }]).unwrap_or_default();
+    crate::tweaks::record_undoable(&app, if capture { "Audio: micrófono para todo" } else { "Audio: altavoz para todo" }, backups, &r);
     r
+}
+
+/// El dispositivo predeterminado de ahora (para poder volver a él).
+fn previous_default(capture: bool) -> Option<String> {
+    #[cfg(windows)]
+    {
+        let _com = imp::Com::init();
+        imp::list(capture).ok()?.into_iter().find(|d| d.default).map(|d| d.id)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = capture;
+        None
+    }
+}
+
+/// «Volver a como estaba» desde el historial: el dispositivo predeterminado de antes.
+pub fn restore_default(id: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let _com = imp::Com::init();
+        imp::make_default(id).map(|_| ())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = id;
+        Err("Solo en Windows.".into())
+    }
 }
 
 async fn audio_use_inner(id: String, capture: bool, volume: u32) -> Result<Vec<String>, String> {

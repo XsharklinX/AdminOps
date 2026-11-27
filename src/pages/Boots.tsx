@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FreshNote } from "../components/FreshNote";
 import { readCached } from "../lib/cachedRead";
 import { NeedsAdmin } from "../components/AdminBanner";
-import { Card, ErrorState, iconBtn, Intro, Loading, Tile } from "../components/ui";
+import { Card, ErrorState, iconBtn, Intro, Loading, Tile, Notice } from "../components/ui";
 import { insightApi, type BootLog } from "../lib/api";
 import { bytes, dateTime, shortDate } from "../lib/format";
 
@@ -70,7 +70,7 @@ export function Boots({ isAdmin }: { isAdmin: boolean }) {
         <button onClick={load} disabled={busy} className={iconBtn} title="Volver a leer" aria-label="Volver a leer">
           <RotateCw size={14} className={busy ? "animate-spin" : ""} />
         </button>
-        {failed && <p className="basis-full text-xs text-bad">{failed}</p>}
+        {failed && <Notice tone="error" where="Arranques" className="basis-full">{failed}</Notice>}
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

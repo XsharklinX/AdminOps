@@ -2,7 +2,7 @@ import { Camera, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { camApi, type CamView } from "../lib/api/camera";
 import { useToast } from "./feedback";
-import { Button, Card } from "./ui";
+import { Button, Card, Notice } from "./ui";
 
 /** Una vista previa en vivo de una cámara (la pide la propia interfaz). */
 function Preview({ deviceId, label }: { deviceId: string; label: string }) {
@@ -75,7 +75,7 @@ export function CameraCard({ isAdmin }: { isAdmin: boolean }) {
   }, []);
   useEffect(load, [load, round]);
 
-  if (error) return <Card title="No me ven (cámara)" icon={<Camera size={14} />} className="col-span-12"><p className="text-sm text-bad">{error}</p></Card>;
+  if (error) return <Card title="No me ven (cámara)" icon={<Camera size={14} />} className="col-span-12"><Notice tone="error" where="Cámara">{error}</Notice></Card>;
   if (!view) return null;
 
   const p = view.privacy;
@@ -148,7 +148,7 @@ export function CameraCard({ isAdmin }: { isAdmin: boolean }) {
               </div>
             ))}
           </div>
-          {!isAdmin && <p className="mt-1 text-xs text-warn">Para activar o desactivar cámaras hay que abrir AdminOps como administrador.</p>}
+          {!isAdmin && <Notice tone="warn" className="mt-1">Para activar o desactivar cámaras hay que abrir AdminOps como administrador.</Notice>}
         </div>
       )}
     </Card>

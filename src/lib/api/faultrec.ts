@@ -247,6 +247,8 @@ export const faultRecApi = {
   mark: () => invoke<number>("faultrec_mark"),
   /** Abre (true) o cierra (false) la capa para dibujar en rojo encima del monitor grabado. */
   draw: (on: boolean) => invoke<boolean>("faultrec_draw", { on }),
+  /** La píldora y la barra, otra vez encima de la capa de dibujo (al empezar cada trazo). */
+  raiseControls: () => invoke<void>("faultrec_raise_controls"),
   /** La cámara en un círculo en la esquina de lo que se graba (sale en el vídeo). */
   camera: (on: boolean) => invoke<boolean>("faultrec_camera", { on }),
   list: () => invoke<FaultRecording[]>("faultrec_list"),

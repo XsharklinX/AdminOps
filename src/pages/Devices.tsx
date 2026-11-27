@@ -31,7 +31,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Explain, Intro } from "../components/ui";
+import { Button, Card, Explain, Intro, Notice } from "../components/ui";
 import { SavedViews } from "../components/SavedViews";
 import { logQuietly, lanApi, officeApi, officeMapApi, wifiApi, workApi, type Client, type IpConflict, type LanDevice, type LanScan } from "../lib/api";
 import { DeviceOfficeForm, macKey, OfficeMapCard, useOfficeMap } from "../components/OfficeMap";
@@ -358,7 +358,7 @@ export function Devices() {
 
       {scan && (
         <Card title={`${all.length} dispositivos${fresh ? ` · ${fresh} nuevos` : ""}`}>
-          {scan.truncated && <p className="mb-3 text-xs text-warn">La red es grande: se revisó solo el bloque de 254 direcciones de este equipo.</p>}
+          {scan.truncated && <Notice tone="warn" className="mb-3">La red es grande: se revisó solo el bloque de 254 direcciones de este equipo.</Notice>}
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
             <SavedViews scope="devices" table="devices" current={{ kindFilter }} isDefault={kindFilter === "all"} onApply={(v) => setKindFilter(v.kindFilter)} />
           </div>

@@ -5,6 +5,8 @@
 use tauri::Emitter;
 
 pub const BAR_EVENT: &str = "rocket://bar";
+/// Ctrl+Alt+Mayús+1…9: abre la herramienta de ese puesto de la barra (el número, de 0 a 8).
+pub const TOOL_EVENT: &str = "rocket://tool";
 /// Las herramientas de la barra, en su orden de fábrica.
 /// Las de después de «app» son opcionales: apagadas de fábrica, se encienden en «Personalizar».
 pub const TOOLS: [&str; 20] = ["rec", "clip", "speed", "note", "mon", "fix", "card", "help", "teams", "mail", "app", "contacts", "printer", "screens", "wifi", "keyboard", "folders", "lock", "restart", "cmd"];
@@ -227,11 +229,12 @@ pub fn bar_save_desktop(app: tauri::AppHandle, id: String) -> Result<String, Str
     Ok(name)
 }
 
-/// Ctrl+Alt+T: saca o esconde la barra (también con una presentación a pantalla completa).
+/// Ctrl+Alt+T: saca o esconde la barra (también con una presentación a pantalla completa). Ctrl+Alt+Mayús+1…9:
+/// la herramienta de ese puesto. (Ctrl+Alt+número a secas no: en el teclado español es AltGr y quitaría «@», «#» y «|».)
 pub fn start_hotkey(app: tauri::AppHandle) {
     #[cfg(windows)]
     std::thread::spawn(move || unsafe {
-        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT};
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT};
         use windows_sys::Win32::UI::WindowsAndMessaging::{GetMessageW, MSG, WM_HOTKEY};
         // Si lo tiene el proceso «solo el cohete», lo suelta al ver abierta esta AdminOps: se reintenta un rato.
         let mut ok = false;
@@ -244,17 +247,148 @@ pub fn start_hotkey(app: tauri::AppHandle) {
         }
         if !ok {
             log::warn!("No se pudo registrar Ctrl+Alt+T para la barra: lo usa otro programa.");
-            return;
+        }
+        // Los números: id 21…29. El que esté cogido por otro programa se salta (y se apunta).
+        for n in 1..=9u32 {
+            if RegisterHotKey(std::ptr::null_mut(), 20 + n as i32, MOD_CONTROL | MOD_ALT | MOD_SHIFT | MOD_NOREPEAT, u32::from(b'0') + n) == 0 {
+                log::info!("Ctrl+Alt+Mayús+{n} lo usa otro programa: esa herramienta de la barra queda sin atajo.");
+            }
         }
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
-            if msg.message == WM_HOTKEY && crate::rocket::force_show(&app) {
-                let _ = app.emit(BAR_EVENT, ());
+            if msg.message != WM_HOTKEY || !crate::rocket::force_show(&app) {
+                continue;
+            }
+            match msg.wParam {
+                5 => {
+                    let _ = app.emit(BAR_EVENT, ());
+                }
+                id @ 21..=29 => {
+                    let _ = app.emit(TOOL_EVENT, (id - 21) as u32);
+                }
+                _ => {}
             }
         }
     });
     #[cfg(not(windows))]
     let _ = app;
+}
+
+/// ¿El usuario de este proceso es administrador del equipo, aunque AdminOps no esté elevada? Se mira su token: con el
+/// control de cuentas, un administrador sin elevar lleva el grupo Administradores marcado «solo para denegar», pero lo
+/// lleva, también cuando lo es por un grupo del dominio. (La lista local de miembros falla con cuentas antiguas de Entra
+/// y no ve los grupos del dominio.) Decide qué barra le toca: la completa o la de usuario.
+#[cfg(windows)]
+pub fn user_is_admin_member() -> bool {
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows_sys::Win32::Security::{CreateWellKnownSid, EqualSid, GetTokenInformation, TokenGroups, WinBuiltinAdministratorsSid, SECURITY_MAX_SID_SIZE, TOKEN_GROUPS, TOKEN_QUERY};
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    // SAFETY: token propio, abierto y cerrado aquí; los búferes viven durante las llamadas y el de los grupos va
+    // alineado a 8 (u64) para leerlo como TOKEN_GROUPS.
+    unsafe {
+        let mut tok: HANDLE = std::ptr::null_mut();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut tok) == 0 {
+            return crate::elevation::is_elevated();
+        }
+        let mut admin = [0u8; SECURITY_MAX_SID_SIZE as usize];
+        let mut size = admin.len() as u32;
+        let sid_ok = CreateWellKnownSid(WinBuiltinAdministratorsSid, std::ptr::null_mut(), admin.as_mut_ptr().cast(), &mut size) != 0;
+        let mut need = 0u32;
+        GetTokenInformation(tok, TokenGroups, std::ptr::null_mut(), 0, &mut need);
+        let mut buf = vec![0u64; (need as usize).div_ceil(8).max(1)];
+        let got = sid_ok && need > 0 && GetTokenInformation(tok, TokenGroups, buf.as_mut_ptr().cast(), need, &mut need) != 0;
+        CloseHandle(tok);
+        if !got {
+            return crate::elevation::is_elevated();
+        }
+        let groups = &*(buf.as_ptr() as *const TOKEN_GROUPS);
+        let list = std::slice::from_raw_parts(groups.Groups.as_ptr(), groups.GroupCount as usize);
+        list.iter().any(|g| EqualSid(g.Sid, admin.as_mut_ptr().cast()) != 0)
+    }
+}
+
+#[cfg(not(windows))]
+pub fn user_is_admin_member() -> bool {
+    false
+}
+
+/// Lo que siempre se pregunta en un ticket y no estaba en «Datos del equipo».
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TicketExtras {
+    pub printer: String,
+    /// «Microsoft Defender · al día» / «… · sin actualizar» / «… · apagado».
+    pub antivirus: String,
+    /// Fecha (dd/mm/aaaa) de la última actualización de Windows instalada.
+    pub last_update: String,
+}
+
+const TICKET_SCRIPT: &str = r#"
+$p = (Get-CimInstance Win32_Printer -Filter 'Default=TRUE' -ErrorAction SilentlyContinue | Select-Object -First 1).Name
+$av = ''
+$all = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue | ForEach-Object {
+  $s = '{0:X6}' -f [int]$_.productState
+  [pscustomobject]@{ name = $_.displayName; on = ($s.Substring(2, 2) -in '10', '11'); fresh = ($s.Substring(4, 2) -eq '00'); defender = ($_.displayName -match 'Defender') }
+})
+# El que está encendido; con dos encendidos (raro), el que no es Defender (con otro antivirus, Defender queda pasivo).
+$a = $all | Sort-Object @{ Expression = { $_.on }; Descending = $true }, @{ Expression = { $_.defender } } | Select-Object -First 1
+if ($a) { $av = "$($a.name) · $(if (-not $a.on) { 'apagado' } elseif ($a.fresh) { 'al día' } else { 'sin actualizar' })" }
+$h = Get-HotFix -ErrorAction SilentlyContinue | Where-Object { $_.InstalledOn } | Sort-Object InstalledOn -Descending | Select-Object -First 1
+$u = if ($h) { $h.InstalledOn.ToString('dd/MM/yyyy') } else { '' }
+ConvertTo-Json -Compress @{ printer = "$p"; antivirus = $av; lastUpdate = $u }
+"#;
+
+/// Impresora predeterminada, antivirus y última actualización, para «Datos del equipo» y «Para el ticket».
+#[tauri::command(async)]
+pub fn bar_ticket_extras() -> TicketExtras {
+    crate::ps::powershell(TICKET_SCRIPT).ok().and_then(|o| serde_json::from_str(o.trim()).ok()).unwrap_or_default()
+}
+
+/// La barra de los usuarios de este equipo (los que no son administradores), elegida por el técnico en Ajustes. Vive
+/// en ProgramData, la misma para todos los usuarios del equipo (cada uno tiene su %APPDATA%).
+fn user_tools_file() -> Option<std::path::PathBuf> {
+    std::env::var_os("ProgramData").map(|p| std::path::PathBuf::from(p).join("AdminOps").join("barra-usuarios.json"))
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BarProfile {
+    /// El usuario es administrador del equipo (aunque AdminOps no esté elevada): barra completa.
+    pub admin: bool,
+    /// La barra de los usuarios elegida por el técnico, si la hay.
+    pub user_tools: Option<Vec<String>>,
+}
+
+/// Qué barra le toca a quien la abre.
+#[tauri::command(async)]
+pub fn bar_profile() -> BarProfile {
+    let user_tools = user_tools_file()
+        .and_then(|f| std::fs::read(f).ok())
+        .and_then(|b| serde_json::from_slice::<Vec<String>>(&b).ok())
+        .filter(|t| !t.is_empty() && valid_tools(t));
+    BarProfile { admin: user_is_admin_member(), user_tools }
+}
+
+/// Ajustes → «La barra de los usuarios de este equipo». `None` vuelve a la de fábrica.
+#[tauri::command(async)]
+pub fn bar_set_user_tools(tools: Option<Vec<String>>) -> Result<(), String> {
+    // Es la de todos los usuarios del equipo: la decide el técnico.
+    if !crate::elevation::is_elevated() {
+        return Err("Hace falta modo técnico (administrador) para esto.".into());
+    }
+    let f = user_tools_file().ok_or("No se encuentra la carpeta de datos de programas (ProgramData).")?;
+    match tools {
+        Some(t) if !t.is_empty() => {
+            if !valid_tools(&t) {
+                return Err("Lista de herramientas no válida.".into());
+            }
+            crate::paths::write_json(&f, &t).map_err(|e| format!("No se pudo guardar la barra de los usuarios: {e}"))
+        }
+        _ => match std::fs::remove_file(&f) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+            _ => Ok(()),
+        },
+    }
 }
 
 #[cfg(test)]

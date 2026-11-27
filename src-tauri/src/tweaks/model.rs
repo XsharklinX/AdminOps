@@ -100,6 +100,13 @@ pub struct Tweak {
     pub note: Option<String>,
     #[serde(default)]
     pub reboot: bool,
+    /// Cuánto tarda, para decirlo antes de pulsar («unos 15 min»). Sin esto: al momento si solo toca el registro o
+    /// servicios, «unos segundos» si lleva script.
+    #[serde(default)]
+    pub eta: Option<String>,
+    /// Lo que cierra o corta mientras se hace («cierra las carpetas abiertas», «corta la red unos segundos»).
+    #[serde(default)]
+    pub closes: Option<String>,
     #[serde(default)]
     pub min_build: u32,
     #[serde(default)]

@@ -61,7 +61,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, EmptyLine, ErrorState, Loading, Modal, inputClass } from "../components/ui";
+import { Button, Card, EmptyLine, ErrorState, Loading, Modal, inputClass, Notice } from "../components/ui";
 import { RescueUsbCard } from "../components/bigbets";
 import { FileHolders } from "../components/expert/FileHolders";
 import { hwApi, toolboxApi, type CustomKind, type CustomTool, type Inventory, type ToolGroup, type ToolboxView } from "../lib/api";
@@ -480,7 +480,7 @@ function CustomEditor({
       width="w-[560px]"
       footer={
         <>
-          {error && <p className="mr-auto text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Herramientas" className="mr-auto">{error}</Notice>}
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>
@@ -539,6 +539,7 @@ function CustomEditor({
                 <button
                   key={n}
                   onClick={() => setT({ ...t, icon: n })}
+                  aria-label={`Icono ${n}`}
                   className={`grid size-8 place-items-center rounded-md border ${on ? "border-neon/60 bg-neon/10 text-neon" : "border-line text-mute hover:text-ink"}`}
                 >
                   <I size={15} />
@@ -614,7 +615,7 @@ function MachineCard() {
       }
     >
       {error ? (
-        <p className="text-sm text-bad">{error}</p>
+        <Notice tone="error" where="Herramientas">{error}</Notice>
       ) : !inv ? (
         <p className="flex items-center gap-2 text-sm text-mute">
           <Loader2 size={13} className="animate-spin" /> Leyendo el equipo…

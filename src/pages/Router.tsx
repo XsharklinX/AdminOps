@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useToast } from "../components/feedback";
-import { Button, Card, inputClass, Loading, Modal, iconBtn } from "../components/ui";
+import { Button, Card, inputClass, Loading, Modal, iconBtn, Notice } from "../components/ui";
 import { lanApi, portalsApi, type LanInfo, type PublicIp, type RouterCheck, type RouterProfile } from "../lib/api";
 import { windowRect } from "../lib/prefs";
 import { stowPortal } from "../lib/portalState";
@@ -300,7 +300,7 @@ export function Router({ covered = false }: { covered?: boolean }) {
           )}
         </Row>
         {info.category === "Public" && (
-          <p className="mt-2 text-xs text-warn">Windows trata esta red como pública: compartir archivos e impresoras está bloqueado. Si es tu casa u oficina, márcala como privada.</p>
+          <Notice tone="warn" className="mt-2">Windows trata esta red como pública: compartir archivos e impresoras está bloqueado. Si es tu casa u oficina, márcala como privada.</Notice>
         )}
       </Card>
 
@@ -407,7 +407,7 @@ export function Router({ covered = false }: { covered?: boolean }) {
           {safeSvg(qr) ? (
             <div className="mx-auto w-60 overflow-hidden rounded-lg bg-white p-2 [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: safeSvg(qr)! }} />
           ) : (
-            <p className="text-center text-sm text-bad">No se pudo dibujar el código QR.</p>
+            <Notice tone="error" where="Router">No se pudo dibujar el código QR.</Notice>
           )}
           <p className="mt-3 text-center text-xs text-dim">Apunta la cámara del móvil al código para conectarte sin escribir la contraseña.</p>
         </Modal>

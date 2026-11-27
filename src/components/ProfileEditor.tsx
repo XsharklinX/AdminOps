@@ -1,7 +1,7 @@
 import { Save, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { logQuietly, tweaksApi, workApi, type ProfileDef, type TweakView } from "../lib/api";
-import { Overlay, softBtn } from "./ui";
+import { Notice, Overlay, softBtn } from "./ui";
 
 const CATEGORY: Record<string, string> = {
   privacy: "Privacidad",
@@ -64,7 +64,7 @@ export function ProfileEditor({
       <div className="flex max-h-[88vh] w-[760px] max-w-full flex-col rounded-xl border border-line-2 bg-panel shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <h3 className="font-semibold">{initial ? "Editar perfil" : "Nuevo perfil"}</h3>
-          <button onClick={onClose} className="text-mute hover:text-ink">
+          <button onClick={onClose} aria-label="Cerrar" className="text-mute hover:text-ink">
             <X size={16} />
           </button>
         </div>
@@ -77,6 +77,7 @@ export function ProfileEditor({
                 <button
                   key={n}
                   onClick={() => setP({ ...p, icon: n })}
+                  aria-label={`Icono ${n}`}
                   className={`grid size-8 place-items-center rounded-md border ${p.icon === n ? "border-neon/60 bg-neon/10 text-neon" : "border-line text-mute hover:text-ink"}`}
                 >
                   <I size={15} />
@@ -110,7 +111,7 @@ export function ProfileEditor({
         </div>
         <div className="flex items-center gap-3 border-t border-line px-5 py-3">
           <span className="text-xs text-dim">{p.items.length} elementos</span>
-          {error && <span className="min-w-0 flex-1 truncate text-xs text-bad">{error}</span>}
+          {error && <Notice tone="error" where="Perfiles" className="min-w-0 flex-1">{error}</Notice>}
           <button
             onClick={save}
             disabled={saving}

@@ -67,6 +67,15 @@ export function CardsView({ items, selected, selecting, onSelect, onOpen, action
             key={c.id}
             id={`contact-${c.id}`}
             onClick={() => onOpen(c)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen(c);
+              }
+            }}
             className={`group flex cursor-pointer flex-col rounded-xl border bg-panel transition-colors hover:border-line-2 ${
               selected.has(c.id) ? "border-neon/60 bg-neon/5" : "border-line"
             }`}
@@ -221,6 +230,14 @@ export function TableView({
               key={c.id}
               id={`contact-${c.id}`}
               onClick={() => onOpen(c)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpen(c);
+                }
+              }}
               className={`group cursor-pointer border-t border-line/60 text-xs text-dim hover:bg-panel-2 ${selected.has(c.id) ? "bg-neon/5" : ""}`}
             >
               <td className="py-1.5">
@@ -254,7 +271,20 @@ export function DirectoryView({ items, selected, selecting, onSelect, onOpen, ac
   return (
     <div className="grid grid-cols-1 gap-x-6 rounded-2xl border border-line/70 bg-panel shadow-elev-1 px-3 py-2 lg:grid-cols-2">
       {items.map((c) => (
-        <div key={c.id} id={`contact-${c.id}`} onClick={() => onOpen(c)} className="group flex cursor-pointer items-center gap-2 border-b border-line/40 py-1.5 hover:bg-panel-2">
+        <div
+          key={c.id}
+          id={`contact-${c.id}`}
+          onClick={() => onOpen(c)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen(c);
+            }
+          }}
+          className="group flex cursor-pointer items-center gap-2 border-b border-line/40 py-1.5 hover:bg-panel-2">
           <Check c={c} selected={selected} selecting={selecting} onSelect={onSelect} />
           <Avatar c={c} size={24} />
           <span className="min-w-0 flex-1 truncate text-sm text-ink">

@@ -7,7 +7,7 @@ import { casesApi, libraryApi, type Case, type TemplateDraft } from "../lib/api"
 import { caseSource, checkedByDefault, stepsFromDraft } from "../lib/caseTemplate";
 import { RISK } from "../lib/risk";
 import { useToast } from "./feedback";
-import { Button, inputClass, Modal } from "./ui";
+import { Button, inputClass, Modal, Notice } from "./ui";
 
 export function CaseTemplate({ current, onClose }: { current: Case; onClose: () => void }) {
   const [draft, setDraft] = useState<TemplateDraft | null>(null);
@@ -80,7 +80,7 @@ export function CaseTemplate({ current, onClose }: { current: Case; onClose: () 
         </>
       }
     >
-      {error && <p className="text-sm text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Plantillas de caso">{error}</Notice>}
       {!draft && !error && (
         <p className="flex items-center gap-2 text-sm text-mute">
           <Loader2 size={14} className="animate-spin" /> Leyendo lo que se hizo…

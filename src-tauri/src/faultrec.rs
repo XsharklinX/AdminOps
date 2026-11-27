@@ -1278,6 +1278,19 @@ pub fn faultrec_camera(app: tauri::AppHandle, on: bool) -> Result<bool, String> 
     Ok(true)
 }
 
+/// Vuelve a poner la píldora y la barra del cohete por encima de todo. La capa de dibujo, al pulsarla, sube encima
+/// de ellas (es otra ventana «siempre encima», la última activada): se llama al empezar cada trazo para que «Parar»,
+/// «Quitar dibujo» y la barra sigan siempre a la vista y pulsables.
+#[tauri::command]
+pub fn faultrec_raise_controls(app: tauri::AppHandle) {
+    for label in [PILL, "rocket"] {
+        if let Some(p) = app.get_webview_window(label) {
+            let _ = p.set_always_on_top(false);
+            let _ = p.set_always_on_top(true);
+        }
+    }
+}
+
 /// «Dibujar»: abre (o cierra) una capa transparente, siempre encima, que cubre el monitor que se graba. Con el ratón
 /// se pinta en rojo encima de lo que se ve y cada trazo se borra solo a los 3 segundos; Esc o el mismo botón la cierran.
 /// Como la capa es una ventana más del monitor, sale en el vídeo. Avisa por `faultrec://draw` (`true` = abierta).

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "../Drawer";
 import { useKeepAlive } from "../../lib/alive";
 import { useToast } from "../feedback";
-import { Button, ErrorState, softBtn } from "../ui";
+import { Button, ErrorState, softBtn, Notice } from "../ui";
 import {
   appApi,
   vendorApi,
@@ -312,7 +312,7 @@ export function DriverDrawer({
                 {target.kind === "printer" ? target.printer.name : name} con el driver {describeDriver(result.newDriver, result.newVersion)}. Queda anotado en el diario del equipo.
               </p>
             )}
-            {verdict === "undone" && <p className="text-xs text-warn">Deshecho: vuelve a {describeDriver(result.previousDriver, result.previousVersion)}.</p>}
+            {verdict === "undone" && <Notice tone="warn">Deshecho: vuelve a {describeDriver(result.previousDriver, result.previousVersion)}.</Notice>}
           </section>
         )}
         {phase === "done" && installed && (

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, EmptyState, inputClass, Intro, Loading, Modal } from "../components/ui";
+import { Button, EmptyState, inputClass, Intro, Loading, Modal, Notice } from "../components/ui";
 import { api, logQuietly, appsApi, diagApi, domainApi, libraryApi, planApi, profilesApi, sheetApi, systemApi, tweaksApi, usersApi, type AppCatalog, type PlanState, type PlanStatus, type PlanWait, type ProfileView, type Recipe, type RecipeStep } from "../lib/api";
 import { checkedMessage, fit, passwordsNeeded, pauseNeeded, resumeBanner, shouldResume, takeResumeRequest } from "../lib/planResume";
 import { riskyTweaks, withTweakIds } from "../lib/recipeEdit";
@@ -715,14 +715,14 @@ function RecipeRunner({ recipe, resume, isAdmin, onUsed, onClose }: { recipe: Re
           </div>
         )}
         {phase === "reboot" && (
-          <p className="mb-4 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn" role="status">
+          <Notice tone="warn" className="mb-4">
             {autoResume ? "Hay que reiniciar para seguir. AdminOps se abrirá solo y continuará." : "Hay que reiniciar para seguir. Al volver, abre AdminOps y el plan seguirá."}
-          </p>
+          </Notice>
         )}
         {phase === "stuck" && (
-          <p className="mb-4 rounded-lg border border-bad/40 bg-bad/5 px-3 py-2 text-xs text-bad" role="alert">
+          <Notice tone="error" where="Recetas" className="mb-4">
             {stuckText}
-          </p>
+          </Notice>
         )}
         <ol className="space-y-2">
           {recipe.steps.map((s, i) => (
@@ -739,7 +739,7 @@ function RecipeRunner({ recipe, resume, isAdmin, onUsed, onClose }: { recipe: Re
           ))}
         </ol>
         {phase === "done" && recipe.steps.some((s) => s.kind === "rename" || s.kind === "domain") && (
-          <p className="mt-4 text-sm text-warn">Reinicia el equipo para completar el cambio de nombre o la unión al dominio.</p>
+          <Notice tone="warn" className="mt-4">Reinicia el equipo para completar el cambio de nombre o la unión al dominio.</Notice>
         )}
       </Modal>
       {dialog}

@@ -4,7 +4,7 @@
 import { FileSearch, FolderOpen, HardDrive, Loader2, Usb, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../feedback";
-import { Card, EmptyLine, inputClass, smallBtn, softBtn } from "../ui";
+import { Card, EmptyLine, inputClass, smallBtn, softBtn, Notice } from "../ui";
 import { diagnoseApi, type DriveInfo, type Holder, type HolderReport } from "../../lib/api";
 import { useDropped } from "../../lib/dropped";
 
@@ -166,7 +166,7 @@ export function FileHolders() {
         </div>
       )}
 
-      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Archivos en uso" className="mt-3">{error}</Notice>}
 
       {report && (
         <div className="mt-4 space-y-3">

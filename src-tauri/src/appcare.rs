@@ -17,6 +17,60 @@ fn now() -> u64 {
 /// necesita administrador y una entrada «Run» del registro no puede elevarse.
 const TASK: &str = "AdminOps al iniciar sesión";
 
+/// Una línea de la comprobación tras actualizar.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfCheck {
+    pub text: String,
+    /// ok | fixed | warn
+    pub state: &'static str,
+}
+
+/// La primera vez que se abre una versión nueva, AdminOps mira sus propias piezas y arregla lo que pueda: que su
+/// carpeta de datos se pueda escribir, que el arranque del cohete apunte a este .exe, que no quede la tarea antigua y
+/// que la barra de los usuarios se pueda leer. Devuelve solo lo que había que contar (nada si todo estaba bien).
+#[tauri::command(async)]
+pub fn selfcheck_after_update(app: tauri::AppHandle) -> Vec<SelfCheck> {
+    let version = app.package_info().version.to_string();
+    let mark = crate::paths::shared_data_dir(&app).join("version-comprobada.txt");
+    if std::fs::read_to_string(&mark).ok().as_deref() == Some(version.as_str()) {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    // Con el modo auditoría no se cambia nada: solo se mira.
+    let audit = crate::audit::active();
+    let data = crate::paths::shared_data_dir(&app);
+    let probe = data.join(".adminops-comprobacion");
+    if std::fs::create_dir_all(&data).is_err() || std::fs::write(&probe, b"ok").is_err() {
+        out.push(SelfCheck { text: "No se puede escribir en la carpeta de datos de AdminOps: no se guardarán notas ni casos. Revisa los permisos o el espacio del disco.".into(), state: "warn" });
+    }
+    let _ = std::fs::remove_file(&probe);
+    if !crate::paths::is_portable() && !audit {
+        if crate::rocketplus::fix_startup_path() == Some(true) {
+            out.push(SelfCheck { text: "El cohete al iniciar sesión apuntaba a la versión anterior: corregido.".into(), state: "fixed" });
+        }
+        match crate::rocketplus::fix_legacy_task() {
+            Some(true) => out.push(SelfCheck { text: "Quitada la tarea antigua del cohete (ahora arranca sin administrador).".into(), state: "fixed" }),
+            Some(false) => out.push(SelfCheck { text: "Queda la tarea antigua del cohete: pasa a modo técnico una vez para quitarla.".into(), state: "warn" }),
+            None => {}
+        }
+    }
+    if let Some(pd) = std::env::var_os("ProgramData") {
+        let f = std::path::PathBuf::from(pd).join("AdminOps").join("barra-usuarios.json");
+        if let Ok(b) = std::fs::read(&f) {
+            if serde_json::from_slice::<Vec<String>>(&b).is_err() && !audit {
+                let fixed = std::fs::remove_file(&f).is_ok();
+                out.push(SelfCheck { text: if fixed { "La barra de los usuarios estaba dañada: vuelve a la de fábrica.".into() } else { "La barra de los usuarios está dañada: elígela otra vez en Ajustes (modo técnico).".into() }, state: if fixed { "fixed" } else { "warn" } });
+            }
+        }
+    }
+    // Si queda algo por hacer (la tarea antigua sin modo técnico…), se vuelve a mirar en el próximo arranque.
+    if !audit && !out.iter().any(|c| c.state == "warn") {
+        let _ = std::fs::write(&mark, &version);
+    }
+    out
+}
+
 #[tauri::command(async)]
 pub fn autostart_enabled() -> bool {
     let script = format!("{}[bool](Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue)", crate::ps::text_var("name", TASK));
@@ -35,7 +89,7 @@ pub fn set_autostart(enabled: bool) -> Result<(), String> {
              $action = New-ScheduledTaskAction -Execute $exe -Argument '--minimized'\n\
              $trigger = New-ScheduledTaskTrigger -AtLogOn -User \"$env:USERDOMAIN\\$env:USERNAME\"\n\
              $trigger.Delay = 'PT20S'\n\
-             $principal = New-ScheduledTaskPrincipal -UserId \"$env:USERDOMAIN\\$env:USERNAME\" -LogonType Interactive -RunLevel Highest\n\
+             $principal = New-ScheduledTaskPrincipal -UserId \"$env:USERDOMAIN\\$env:USERNAME\" -LogonType Interactive -RunLevel Limited\n\
              $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Seconds 0)\n\
              Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null\n'ok'",
             crate::ps::text_var("name", TASK),

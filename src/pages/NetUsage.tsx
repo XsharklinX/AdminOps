@@ -5,7 +5,7 @@ import { NeedsAdmin } from "../components/AdminBanner";
 import { DataTable, type Column } from "../components/DataTable";
 import { useToast } from "../components/feedback";
 import { ProgramIcon } from "../components/ProgramIcon";
-import { Button, ErrorState, Loading } from "../components/ui";
+import { Button, ErrorState, Loading, Notice } from "../components/ui";
 import { logQuietly, netUsageApi, toolsApi, tweaksApi, type UsageSnapshot } from "../lib/api";
 import { goToPage } from "../lib/navigate";
 import { buildView, destinationsText, freeUpText, lastSpeed, ONEDRIVE_KEY, pausedText, rateText, todayText, totalText, uploadedText, type Speed, type UsageRow } from "../lib/netusage";
@@ -190,19 +190,17 @@ export function NetUsage() {
 
       {snap.error?.kind === "needsAdmin" && <NeedsAdmin>{snap.error.message} Windows solo deja ver el tráfico de cada programa al administrador.</NeedsAdmin>}
       {snap.error?.kind === "failed" && (
-        <p className="flex items-center gap-2 rounded-lg border border-bad/40 bg-bad/5 px-3 py-2 text-xs text-bad" role="alert">
-          <Info size={14} className="shrink-0" /> {snap.error.message}
-        </p>
+        <Notice tone="error" where="Uso de red">{snap.error.message}</Notice>
       )}
       {snap.tcpOnly && (
-        <p className="flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-xs text-warn" role="note">
-          <Info size={14} className="shrink-0" /> Solo se ve el tráfico TCP (el método de reserva de Windows): lo que va por UDP, como QUIC o las llamadas de Teams, no sale aquí.
-        </p>
+        <Notice tone="warn">
+          Solo se ve el tráfico TCP (el método de reserva de Windows): lo que va por UDP, como QUIC o las llamadas de Teams, no sale aquí.
+        </Notice>
       )}
       {snap.lostEvents > 0 && (
-        <p className="flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-xs text-warn" role="note">
-          <Info size={14} className="shrink-0" /> Windows no pudo entregar {snap.lostEvents.toLocaleString("es")} eventos de red: las cifras de esta pantalla se quedan algo cortas.
-        </p>
+        <Notice tone="warn">
+          Windows no pudo entregar {snap.lostEvents.toLocaleString("es")} eventos de red: las cifras de esta pantalla se quedan algo cortas.
+        </Notice>
       )}
       {speed === null && (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-dim" role="note">
@@ -214,9 +212,9 @@ export function NetUsage() {
         </p>
       )}
       {anyPaused && view.freeUpMbps !== null && speed && (
-        <p className="rounded-lg border border-ok/40 bg-ok/5 px-3 py-2 text-sm text-ok" role="status">
+        <Notice tone="ok">
           {freeUpText(view.freeUpMbps, speed)}
-        </p>
+        </Notice>
       )}
 
       {snap.error ? null : snap.running && view.rows.length === 0 ? (

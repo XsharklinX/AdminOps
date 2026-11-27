@@ -6,7 +6,7 @@ import { useState } from "react";
 import { appApi, appcareApi, type UpdateInfo } from "../lib/api";
 import { bytes } from "../lib/format";
 import { useTaskMessage } from "../hooks/useTask";
-import { Button, Modal } from "./ui";
+import { Button, Modal, Notice } from "./ui";
 
 type Phase = "ask" | "working" | "restarting" | "manual" | "error";
 
@@ -178,7 +178,7 @@ export function UpdateDialog({ info, open, onClose }: { info: UpdateInfo; open: 
         </p>
       )}
 
-      {phase === "error" && <p className="py-2 text-sm text-bad">{error}</p>}
+      {phase === "error" && <Notice tone="error" where="Actualizaciones">{error}</Notice>}
     </Modal>
   );
 }

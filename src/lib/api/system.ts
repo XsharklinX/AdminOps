@@ -50,6 +50,8 @@ export interface LiveMetrics {
 export const api = {
   isAdmin: () => invoke<boolean>("is_admin"),
   relaunchAsAdmin: () => invoke<void>("relaunch_as_admin"),
+  /** «Volver a modo usuario»: AdminOps otra vez sin administrador, como el usuario de la sesión. */
+  relaunchAsUser: () => invoke<void>("relaunch_as_user"),
   systemInfo: () => invoke<SystemInfo>("get_system_info"),
   liveMetrics: () => invoke<LiveMetrics>("get_live_metrics"),
 };
@@ -68,6 +70,10 @@ export interface TweakView {
   kind: "toggle" | "action";
   note: string | null;
   reboot: boolean;
+  /** Cuánto tarda («al momento», «unos 15 min»). */
+  eta: string;
+  /** Lo que cierra o corta mientras se hace. */
+  closes: string | null;
   needsAdmin: boolean;
   supported: boolean;
   status: TweakStatus;

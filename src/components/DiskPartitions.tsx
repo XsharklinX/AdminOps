@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
 import { NeedsAdmin } from "./AdminBanner";
-import { Button, Card, inputClass, Intro, Loading } from "./ui";
+import { Button, Card, inputClass, Intro, Loading, Notice } from "./ui";
 import { disksApi, partitionsApi, type DiskReport, type FoundPartition, type PartitionLayout, type TableBackup } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -166,7 +166,7 @@ export function PartitionsTab({ isAdmin }: { isAdmin: boolean }) {
   useEffect(load, [load]);
 
   if (!isAdmin) return <div className="mx-auto max-w-(--page-max) p-6"><NeedsAdmin>Leer la tabla de particiones de un disco necesita administrador.</NeedsAdmin></div>;
-  if (disks === null) return error ? <p className="p-6 text-sm text-bad">{error}</p> : <Loading text="Leyendo los discos…" />;
+  if (disks === null) return error ? <Notice tone="error" where="Particiones" className="m-6">{error}</Notice> : <Loading text="Leyendo los discos…" />;
 
   const run = async <T,>(kind: NonNullable<typeof busy>, f: () => Promise<T>, done?: (r: T) => void) => {
     setBusy(kind);
@@ -215,7 +215,7 @@ export function PartitionsTab({ isAdmin }: { isAdmin: boolean }) {
         </Button>
       </div>
 
-      {error && <p className="text-sm text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Particiones">{error}</Notice>}
       {layout && disk && (
         <Card title={`Disco ${disk.number} · ${SCHEME[layout.scheme as keyof typeof SCHEME] ?? layout.scheme}`} right={<span className="text-[11px] text-mute">sectores de {layout.sector} bytes{layout.diskGuid ? ` · ${layout.diskGuid}` : ""}</span>}>
           <div className="space-y-3 p-4">
@@ -229,7 +229,7 @@ export function PartitionsTab({ isAdmin }: { isAdmin: boolean }) {
                 ))}
               </ul>
             ) : (
-              <p className="rounded-md border border-ok/40 bg-ok/10 px-3 py-1.5 text-xs text-ok">La tabla está bien: sin solapes, con su copia de seguridad y firmada correctamente.</p>
+              <Notice tone="ok">La tabla está bien: sin solapes, con su copia de seguridad y firmada correctamente.</Notice>
             )}
             {layout.partitions.length > 0 && (
               <div className="overflow-x-auto rounded-lg border border-line">

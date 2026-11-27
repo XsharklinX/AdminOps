@@ -529,6 +529,66 @@ fn pos_path(app: &tauri::AppHandle) -> PathBuf {
     crate::paths::shared_data_dir(app).join("rocket.json")
 }
 
+/// Las posiciones por combinación de pantallas (portátil solo, en su base con dos monitores…).
+fn layouts_path(app: &tauri::AppHandle) -> PathBuf {
+    crate::paths::shared_data_dir(app).join("rocket-pantallas.json")
+}
+
+/// La «firma» de las pantallas conectadas: posición, tamaño y escala de cada una. Cambia al conectar o quitar la
+/// base, un monitor o al cambiar la escala.
+fn screens_key(w: &tauri::WebviewWindow) -> String {
+    let Ok(mons) = w.available_monitors() else { return String::new() };
+    let mut parts: Vec<String> = mons
+        .iter()
+        .map(|m| format!("{},{},{}x{}@{}", m.position().x, m.position().y, m.size().width, m.size().height, (m.scale_factor() * 100.0).round() as i64))
+        .collect();
+    parts.sort();
+    parts.join("|")
+}
+
+/// Dónde se dejó con estas pantallas; si nunca se movió con ellas, la posición de antes (versiones anteriores).
+fn load_pos(app: &tauri::AppHandle, key: &str) -> Option<Pos> {
+    let map: std::collections::HashMap<String, Pos> = crate::paths::read_json(&layouts_path(app));
+    map.get(key).copied().or_else(|| std::fs::read(pos_path(app)).ok().and_then(|b| serde_json::from_slice(&b).ok()))
+}
+
+/// Guarda dónde se dejó, para estas pantallas.
+fn save_pos(app: &tauri::AppHandle, w: &tauri::WebviewWindow, pos: Pos) {
+    let key = screens_key(w);
+    let _ = crate::paths::write_json(&pos_path(app), &pos);
+    if key.is_empty() {
+        return;
+    }
+    let path = layouts_path(app);
+    let mut map: std::collections::HashMap<String, Pos> = crate::paths::read_json(&path);
+    // Pocas combinaciones de verdad; si crece mucho (monitores de salas, proyectores), se empieza de nuevo.
+    if map.len() > 24 {
+        map.clear();
+    }
+    map.insert(key, pos);
+    let _ = crate::paths::write_json(&path, &map);
+}
+
+/// Cambiaron las pantallas (se conectó o quitó la base, un monitor, la escala): la barra se recoge y el cohete vuelve
+/// a donde se dejó con estas pantallas, o a su sitio de siempre; y se vuelve a pegar a su borde.
+fn screens_changed(app: &tauri::AppHandle, w: &tauri::WebviewWindow, key: &str) {
+    WIDE.store(false, Ordering::SeqCst);
+    BAR_Y.store(i32::MIN, Ordering::SeqCst);
+    let (x, y) = match load_pos(app, key).filter(|p| on_screen(w, p.x, p.y)) {
+        Some(p) => (p.x, p.y),
+        None => default_pos(w),
+    };
+    quiet();
+    let _ = w.set_size(tauri::LogicalSize::new(size(), size()));
+    let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+    no_frame(w);
+    dock_check(app, w, false);
+    // La interfaz cierra lo que tuviera abierto y se coloca recogida en su sitio nuevo.
+    let _ = app.emit(SCREENS_EVENT, ());
+}
+
+pub const SCREENS_EVENT: &str = "rocket://screens";
+
 /// Pone el modo: abre o cierra la ventanita del escritorio y avisa a la interfaz (que pinta la
 /// burbuja dentro de AdminOps en modo `app`). Crear ventanas desde un comando síncrono puede
 /// bloquear WebView2: se hace en otro hilo.
@@ -611,7 +671,7 @@ pub fn open(app: &tauri::AppHandle) -> Result<(), String> {
     }
     let w = b.build().map_err(|e| format!("No se pudo abrir el cohete: {e}"))?;
     WIDE.store(false, Ordering::SeqCst);
-    let saved: Option<Pos> = std::fs::read(pos_path(app)).ok().and_then(|b| serde_json::from_slice(&b).ok());
+    let saved = load_pos(app, &screens_key(&w));
     let (x, y) = match saved.filter(|p| on_screen(&w, p.x, p.y)) {
         Some(p) => (p.x, p.y),
         None => default_pos(&w),
@@ -816,7 +876,7 @@ fn dock_check(app: &tauri::AppHandle, w: &tauri::WebviewWindow, save: bool) {
             let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
         }
         if save {
-            let _ = crate::paths::write_json(&pos_path(app), &Pos { x, y });
+            save_pos(app, w, Pos { x, y });
         }
         let _ = app.emit(DOCK_EVENT, Some(if right { "right" } else { "left" }));
         return;
@@ -838,10 +898,10 @@ fn dock_check(app: &tauri::AppHandle, w: &tauri::WebviewWindow, save: bool) {
             let _ = w.set_position(tauri::PhysicalPosition::new(d.docked_x, pos.y));
         }
         if save {
-            let _ = crate::paths::write_json(&pos_path(app), &Pos { x: d.docked_x, y: pos.y });
+            save_pos(app, w, Pos { x: d.docked_x, y: pos.y });
         }
     } else if save {
-        let _ = crate::paths::write_json(&pos_path(app), &Pos { x: pos.x, y: pos.y });
+        save_pos(app, w, Pos { x: pos.x, y: pos.y });
     }
     let _ = app.emit(DOCK_EVENT, dock.map(|d| if d.right { "right" } else { "left" }));
 }
@@ -969,9 +1029,37 @@ fn watch_fullscreen(app: tauri::AppHandle) {
         return;
     }
     std::thread::spawn(move || {
+        let mut screens = String::new();
+        let mut tick = 0u64;
         loop {
             std::thread::sleep(Duration::from_secs(2));
+            tick += 1;
             let Some(w) = app.get_webview_window(LABEL) else { break };
+            // ¿Se conectó o quitó la base o un monitor? (La primera vuelta solo apunta las de ahora.)
+            let key = screens_key(&w);
+            if !key.is_empty() && key != screens {
+                if !screens.is_empty() {
+                    // Windows tarda un momento en recolocar las ventanas y las áreas de trabajo.
+                    std::thread::sleep(Duration::from_millis(800));
+                    screens_changed(&app, &w, &screens_key(&w));
+                    // Los iconos del Escritorio: el Explorador los recoloca a su manera; cuando termina, se reponen como
+                    // estaban con estas pantallas.
+                    let (app2, key2) = (app.clone(), screens_key(&w));
+                    std::thread::spawn(move || {
+                        std::thread::sleep(Duration::from_millis(2500));
+                        let n = crate::desktopicons::restore(&app2, &key2);
+                        if n > 0 {
+                            log::info!("Iconos del Escritorio: {n} repuestos para estas pantallas");
+                        }
+                    });
+                }
+                screens = screens_key(&w);
+                tick = 0;
+            }
+            // Cada minuto con las mismas pantallas: dónde están los iconos ahora (para reponerlos al volver a ellas).
+            if tick % 30 == 15 && !screens.is_empty() {
+                crate::desktopicons::save(&app, &screens);
+            }
             // Tras Ctrl+Alt+O se deja a la vista un rato aunque haya una presentación.
             let forced = FORCED_UNTIL.lock().ok().and_then(|f| *f).is_some_and(|t| Instant::now() < t);
             let busy = fullscreen_now() && !forced;

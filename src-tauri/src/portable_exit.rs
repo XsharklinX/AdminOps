@@ -191,5 +191,7 @@ pub fn portable_leftovers(app: tauri::AppHandle) -> Vec<Leftover> {
 
 #[tauri::command]
 pub fn portable_cleanup(app: tauri::AppHandle, keep_night_jobs: bool) -> Result<CleanupResult, String> {
+    // Salir sin dejar rastro: tampoco el cohete.
+    crate::rocketplus::skip_rocket_behind();
     cleanup(&app, keep_night_jobs)
 }

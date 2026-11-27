@@ -165,7 +165,7 @@ concreto (y, desde la Fase 2, un `id` de tweak del catálogo embebido en el bina
 - **Registro de actividad**: `%LOCALAPPDATA%\com.adminops.app\logs\adminops.log` (o `AdminOps-data\equipos\<PC>\logs`
   en portable). Visible en Historial → Registro técnico.
 - **Rendimiento**: `cargo test --release bench -- --ignored --nocapture` (consultas) y `scripts/bench.ps1`
-  (arranque, RAM y CPU; requiere compilar con `ADMINOPS_ASINVOKER=1`, solo para medir).
+  (arranque, RAM y CPU; desde la 1.5.2 AdminOps ya se abre sin administrador, no hace falta nada especial).
 - Las consultas a PowerShell usan procesos persistentes (`src-tauri/src/pspool.rs`); lo que modifica el
   sistema o se puede cancelar va en procesos aislados (`ps.rs`). `ADMINOPS_NO_PS_POOL=1` lo desactiva.
 

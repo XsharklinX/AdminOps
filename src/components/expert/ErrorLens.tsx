@@ -3,7 +3,7 @@
 // AdminOps lo resuelve. El texto se lee con el OCR de Windows, sin nube.
 import { ClipboardPaste, Loader2, ScanText } from "lucide-react";
 import { useCallback, useState } from "react";
-import { Card, EmptyLine, smallBtn, softBtn } from "../ui";
+import { Card, EmptyLine, smallBtn, softBtn, Notice } from "../ui";
 import { isPageId, pageLabel, type PageId } from "../Sidebar";
 import { diagnoseApi, type ErrorFound, type ErrorLens as Lens } from "../../lib/api";
 import { useDropped } from "../../lib/dropped";
@@ -89,7 +89,7 @@ export function ErrorLens({ onNavigate }: { onNavigate: (page: PageId, focus?: s
             <Loader2 size={14} className="animate-spin" /> Leyendo…
           </p>
         )}
-        {error && <p className="mt-3 text-sm text-bad">{error}</p>}
+        {error && <Notice tone="error" where="Lupa de errores" className="mt-3">{error}</Notice>}
 
         {lens && !reading && (
           <div className="mt-4 space-y-3">

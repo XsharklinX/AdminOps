@@ -2,7 +2,7 @@ import { Eye, EyeOff, KeyRound, Loader2, Pencil, RefreshCw, Search, ShieldAlert,
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "../components/contacts/Avatar";
 import { useToast } from "../components/feedback";
-import { Button, EmptyLine, EmptyState, ErrorState, Loading, Modal, Tile, inputClass } from "../components/ui";
+import { Button, EmptyLine, EmptyState, ErrorState, Loading, Modal, Tile, inputClass, Notice } from "../components/ui";
 import { bytes, ago, dateTime } from "../lib/format";
 import { usersApi, type LocalUser, type NewUser } from "../lib/api";
 import { WindowsTools } from "../components/WindowsTools";
@@ -504,7 +504,7 @@ function CreateUser({ onClose, onCreated }: { onClose: () => void; onCreated: (n
       width="w-[520px]"
       footer={
         <>
-          {error && <p className="mr-auto max-w-72 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Usuarios" className="mr-auto max-w-72">{error}</Notice>}
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>
@@ -525,13 +525,13 @@ function CreateUser({ onClose, onCreated }: { onClose: () => void; onCreated: (n
             <input value={u.fullName} onChange={(e) => setU({ ...u, fullName: e.target.value })} maxLength={64} placeholder="María García" className={inputClass} />
           </label>
         </div>
-        {nameErr && <p className="text-xs text-bad">{nameErr}</p>}
+        {nameErr && <Notice tone="error" where="Usuarios">{nameErr}</Notice>}
 
         <div>
           <span className="mb-1 block text-xs text-dim">Contraseña</span>
           <PasswordFields value={u.password} confirm={confirm} onChange={(password) => setU({ ...u, password })} onConfirm={setConfirm} />
           {mismatch && confirm && <p className="mt-1 text-xs text-bad">Las contraseñas no coinciden.</p>}
-          {!u.password && <p className="mt-1 text-xs text-warn">Sin contraseña, cualquiera con acceso al equipo podrá entrar en esta cuenta.</p>}
+          {!u.password && <Notice tone="warn" className="mt-1">Sin contraseña, cualquiera con acceso al equipo podrá entrar en esta cuenta.</Notice>}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -590,7 +590,7 @@ function PasswordDialog({ user, onClose, onDone }: { user: LocalUser; onClose: (
       onClose={onClose}
       footer={
         <>
-          {error && <p className="mr-auto max-w-60 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Usuarios" className="mr-auto max-w-60">{error}</Notice>}
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>
@@ -603,7 +603,7 @@ function PasswordDialog({ user, onClose, onDone }: { user: LocalUser; onClose: (
       <div className="space-y-3">
         <PasswordFields value={pw} confirm={confirm} onChange={setPw} onConfirm={setConfirm} />
         {pw !== confirm && confirm && <p className="text-xs text-bad">Las contraseñas no coinciden.</p>}
-        {!pw && <p className="text-xs text-warn">Déjala vacía para quitar la contraseña: la cuenta entrará sin pedirla.</p>}
+        {!pw && <Notice tone="warn">Déjala vacía para quitar la contraseña: la cuenta entrará sin pedirla.</Notice>}
         <Check checked={mustChange && !!pw} disabled={!pw} onChange={setMustChange}>
           Pedir que la cambie al iniciar sesión
         </Check>
@@ -655,7 +655,7 @@ function DeleteUser({ user, onClose, onDeleted }: { user: LocalUser; onClose: ()
       onClose={deleting ? () => {} : onClose}
       footer={
         <>
-          {error && <p className="mr-auto max-w-60 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Usuarios" className="mr-auto max-w-60">{error}</Notice>}
           <Button kind="ghost" onClick={onClose} disabled={deleting}>
             Cancelar
           </Button>
@@ -729,7 +729,7 @@ function RenameDialog({ user, onClose, onDone }: { user: LocalUser; onClose: () 
       width="w-[460px]"
       footer={
         <>
-          {error && <p className="mr-auto max-w-56 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Usuarios" className="mr-auto max-w-56">{error}</Notice>}
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>

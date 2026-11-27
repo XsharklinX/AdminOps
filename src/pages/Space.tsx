@@ -505,6 +505,14 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
                   <li
                     key={e.path}
                     onClick={() => setFocused(e.path)}
+                    tabIndex={0}
+                    onKeyDown={(ev) => {
+                      if (ev.target !== ev.currentTarget) return;
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        setFocused(e.path);
+                      }
+                    }}
                     onDoubleClick={() => e.hasChildren && void openFolder(e.path)}
                     className={`group cursor-default rounded-md px-2 py-1.5 ${focused === e.path ? "bg-neon/10" : "hover:bg-panel-2"}`}
                   >

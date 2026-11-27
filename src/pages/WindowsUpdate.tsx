@@ -2,10 +2,10 @@ import { CircleCheck, CircleX, Download, Eye, EyeOff, Loader2, Pause, Play, Refr
 import { useCallback, useEffect, useState } from "react";
 import { FreshNote } from "../components/FreshNote";
 import { readCached } from "../lib/cachedRead";
-import { useToast } from "../components/feedback";
+import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { UpdateFailure } from "../components/UpdateFailure";
-import { Bar, Button, Card, Loading } from "../components/ui";
+import { Bar, Button, Card, Loading, Notice } from "../components/ui";
 import { bytes, fullDate } from "../lib/format";
 import { onUpdateProgress, toolboxApi, tweaksApi, updateApi, type PendingUpdate, type UpdateHistoryEntry, type UpdateProgress } from "../lib/api";
 import { progressText, showsBar } from "../lib/wuRow";
@@ -20,6 +20,14 @@ const RESULT = {
 
 const when = (iso: string | null) => (iso ? fullDate(iso) : "—");
 
+/** Las que se pueden quitar: instaladas en los últimos 14 días, con número KB y que no sean firmas de Defender. */
+function removableKb(h: UpdateHistoryEntry): string | null {
+  if (h.result !== "ok" || !h.date || /defender|inteligencia de seguridad|security intelligence|antimalware/i.test(h.title)) return null;
+  if (Date.now() - new Date(h.date).getTime() > 14 * 86_400_000) return null;
+  const m = /KB(\d{6,})/i.exec(h.title);
+  return m ? m[1] : null;
+}
+
 export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
   const [history, setHistory] = useState<UpdateHistoryEntry[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -32,6 +40,28 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
   const [progress, setProgress] = useState<Record<string, UpdateProgress>>({});
   const [installing, setInstalling] = useState(false);
   const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  const [removing, setRemoving] = useState<string | null>(null);
+  // «La actualización de ayer rompió algo»: quitar una de las de los últimos 14 días y pausar 7 días.
+  const removeUpdate = async (kb: string, title: string) => {
+    const ok = await confirm({
+      title: `Quitar KB${kb}`,
+      body: `«${title}» se desinstala y las actualizaciones se pausan 7 días para que no vuelva enseguida. Suele hacer falta reiniciar.`,
+      confirmLabel: "Quitarla",
+      danger: true,
+    });
+    if (!ok) return;
+    setRemoving(kb);
+    try {
+      // Acumulativa de Windows (no las de .NET, que son otra cosa): si wusa no puede, se quita su paquete.
+      toast("ok", await updateApi.uninstall(kb, /acumulativa|cumulative/i.test(title) && /windows/i.test(title) && !/\.net/i.test(title)));
+      load();
+    } catch (e) {
+      toast("error", String(e));
+    } finally {
+      setRemoving(null);
+    }
+  };
 
   const [historyAt, setHistoryAt] = useState<number | null>(null);
   const [historyBusy, setHistoryBusy] = useState(false);
@@ -273,7 +303,7 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
         }
       >
         {historyError ? (
-          <p className="text-sm text-bad">{historyError}</p>
+          <Notice tone="error" where="Windows Update">{historyError}</Notice>
         ) : !history ? (
           <Loading text="Leyendo historial…" />
         ) : shown.length === 0 ? (
@@ -290,6 +320,14 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
                       {h.title}
                     </span>
                     <span className="shrink-0 text-xs text-mute">{when(h.date)}</span>
+                    {(() => {
+                      const kb = removableKb(h);
+                      return kb ? (
+                        <button type="button" disabled={!isAdmin || removing !== null} onClick={() => void removeUpdate(kb, h.title)} className="shrink-0 rounded border border-line-2 px-1.5 py-px text-[11px] text-dim hover:border-bad/50 hover:text-bad disabled:opacity-40" title={isAdmin ? "Si desde que se instaló falla algo: quitarla y pausar 7 días" : "Hace falta modo técnico"}>
+                          {removing === kb ? "Quitando…" : "Quitar esta"}
+                        </button>
+                      ) : null;
+                    })()}
                     <span className={`w-20 shrink-0 text-right text-xs ${r.color}`}>{r.label}</span>
                   </div>
                   {h.result !== "ok" && h.code && (h.result === "failed" || h.result === "partial") ? (
@@ -308,6 +346,7 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
       </Card>
-    </div>
+    {dialog}
+      </div>
   );
 }

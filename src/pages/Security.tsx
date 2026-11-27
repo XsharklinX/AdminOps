@@ -22,7 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import type { PageId } from "../components/Sidebar";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Explain, Loading, Modal } from "../components/ui";
+import { Button, Card, Explain, Loading, Modal, Notice } from "../components/ui";
 import { TweaksPage } from "./TweaksPage";
 import { UsbCard } from "../components/UsbCard";
 import { WebNotifCard } from "../components/WebNotifCard";
@@ -108,7 +108,7 @@ export function Security({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
         }
       >
         {error ? (
-          <p className="text-sm text-bad">{error}</p>
+          <Notice tone="error" where="Seguridad">{error}</Notice>
         ) : !audit ? (
           <p className="flex items-center gap-2 text-sm text-mute">
             <Loader2 size={14} className="animate-spin" /> Revisando antivirus, firewall, cifrado, cuentas y programas…

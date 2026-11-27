@@ -176,6 +176,12 @@ fn run_one_inner(app: &tauri::AppHandle, q: &Queued) -> Outcome {
 
 /// Hace la cola entera, uno detrás de otro.
 fn run_queue(app: &tauri::AppHandle) {
+    // Reparar Windows, la superficie de un disco…: necesitan administrador. En modo usuario no se ejecutan ni se
+    // gastan: esperan a una noche con AdminOps en modo técnico.
+    if !crate::elevation::is_elevated() {
+        log::info!("Trabajos de noche: AdminOps está en modo usuario; quedan para una noche en modo técnico.");
+        return;
+    }
     if WORKING.swap(true, Ordering::SeqCst) {
         return;
     }
@@ -269,8 +275,12 @@ pub fn night_set_time(app: tauri::AppHandle, at: String) -> Result<NightState, S
 
 /// Empezar ya, sin esperar a la noche.
 #[tauri::command(async)]
-pub fn night_run_now(app: tauri::AppHandle) {
+pub fn night_run_now(app: tauri::AppHandle) -> Result<(), String> {
+    if !crate::elevation::is_elevated() {
+        return Err("Hace falta modo técnico (administrador) para esto.".into());
+    }
     std::thread::spawn(move || run_queue(&app));
+    Ok(())
 }
 
 /// El Panel ya enseñó los resultados.

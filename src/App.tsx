@@ -7,6 +7,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, us
 import type { PaletteAction } from "./components/CommandPalette";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/feedback";
+import { SelfCheck } from "./components/SelfCheck";
 import { AlertCenter } from "./components/AlertCenter";
 import { QuitButton } from "./components/QuitButton";
 import { PortableExit } from "./components/PortableExit";
@@ -709,7 +710,7 @@ export default function App() {
 
   const actions = useMemo<PaletteAction[]>(
     () => [
-      ...(isAdmin === false ? [{ id: "admin", title: "Reiniciar AdminOps como administrador", run: () => void api.relaunchAsAdmin() }] : []),
+      ...(isAdmin === false ? [{ id: "admin", title: "Pasar a modo técnico (administrador)", keywords: "administrador reiniciar elevar uac tecnico", run: () => void api.relaunchAsAdmin() }] : []),
       { id: "support", title: "Crear paquete de soporte", subtitle: "Registro y último diagnóstico en un .zip", run: () => void appApi.supportPackage() },
       {
         id: "escalate",
@@ -878,6 +879,8 @@ export default function App() {
 
   return (
     <ToastProvider>
+      {/* La primera vez de una versión nueva: se comprueba a sí misma. */}
+      <SelfCheck />
       {locked !== false && (locked === null ? <div className="fixed inset-0 z-[100] bg-void" /> : <LockScreen kind={lock?.kind ?? "password"} onUnlock={() => {
         lastActivity.current = Date.now();
         setLocked(false);

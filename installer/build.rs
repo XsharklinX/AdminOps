@@ -32,9 +32,9 @@ fn main() {
 
     // El instalador escribe en Archivos de programa: exige administrador (UAC al abrirlo).
     let manifest = if std::env::var("PROFILE").as_deref() == Ok("release") {
-        include_str!("../src-tauri/manifests/admin.manifest")
+        include_str!("installer.manifest")
     } else {
-        include_str!("../src-tauri/manifests/dev.manifest")
+        include_str!("../src-tauri/manifests/app.manifest")
     };
     // Propiedades del ejecutable (Detalles en Windows): la misma versión, editor y
     // copyright que AdminOps. TAURI_CONFIG se mezcla con installer/tauri.conf.json.

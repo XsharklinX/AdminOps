@@ -38,7 +38,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { SheetPanel } from "../components/MachineSheetCard";
-import { Button, Explain, iconBtn, inputClass, Loading, Modal } from "../components/ui";
+import { Button, Explain, iconBtn, inputClass, Loading, Modal, Notice } from "../components/ui";
 import { lockApi, portalsApi, type Portal, type PortalAction } from "../lib/api";
 import { clearPortalBlocked, clearPortalError, failPortal, lastPortalKey, stowPortal, unreadFromTitle, useOnline, usePortalView, type PortalDownload } from "../lib/portalState";
 import { getPrefs, windowRect } from "../lib/prefs";
@@ -867,7 +867,7 @@ function PortalEditor({ kind, initial, onClose, onSaved }: { kind: PortalKind; i
       width="w-[560px]"
       footer={
         <>
-          {error && <p className="mr-auto max-w-72 text-xs text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Tickets" className="mr-auto max-w-72">{error}</Notice>}
           <Button kind="ghost" onClick={onClose}>
             Cancelar
           </Button>

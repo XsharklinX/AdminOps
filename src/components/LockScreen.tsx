@@ -2,7 +2,7 @@ import { Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.svg";
 import { dataCryptApi, lockApi, workApi, type Settings } from "../lib/api";
-import { Button, inputClass } from "./ui";
+import { Button, inputClass, Notice } from "./ui";
 
 /** Pantalla de bloqueo: PIN o contraseña de AdminOps, o la de Windows si se olvidó. */
 export function LockScreen({ kind, onUnlock }: { kind: string; onUnlock: () => void }) {
@@ -69,7 +69,7 @@ export function LockScreen({ kind, onUnlock }: { kind: string; onUnlock: () => v
             <p className="mt-1 text-sm text-dim">Entraste con la contraseña de Windows: para abrir los datos escribe la clave de rescate.</p>
           </div>
           <input autoFocus value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" className={`${inputClass} text-center font-mono`} aria-label="Clave de rescate" />
-          {error && <p className="text-center text-sm text-bad">{error}</p>}
+          {error && <Notice tone="error" where="Bloqueo">{error}</Notice>}
           <Button onClick={() => {}} disabled={busy || secret.trim().length < 10}>
             Abrir los datos
           </Button>
@@ -109,7 +109,7 @@ export function LockScreen({ kind, onUnlock }: { kind: string; onUnlock: () => v
           className={`${inputClass} text-center ${pin ? "font-mono text-xl tracking-[0.5em]" : ""}`}
           aria-label={pin ? "PIN" : "Contraseña"}
         />
-        {error && <p className="text-center text-sm text-bad">{error}</p>}
+        {error && <Notice tone="error" where="Bloqueo">{error}</Notice>}
         <Button onClick={() => {}} disabled={busy || !secret}>
           Desbloquear
         </Button>

@@ -6,7 +6,7 @@ import { logQuietly, toolsApi, type SoftwareUpdate } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { FreshNote } from "../components/FreshNote";
 import { readCached, remember } from "../lib/cachedRead";
-import { softBtn } from "../components/ui";
+import { softBtn, Notice } from "../components/ui";
 import { VulnerableCard } from "../components/bigbets";
 
 type Result = { id: string; name: string; ok: boolean; message: string };
@@ -144,11 +144,11 @@ export function Software({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {!isAdmin && (
-        <p className="mb-3 rounded-lg border border-warn/30 bg-warn/5 px-3.5 py-2 text-xs text-warn">
+        <Notice tone="warn" className="mb-3">
           Sin administrador, los programas instalados para todo el equipo pueden pedir permiso (UAC) al actualizarse.
-        </p>
+        </Notice>
       )}
-      {error && <p className="mb-3 rounded-lg border border-bad/30 bg-bad/5 px-3.5 py-2 text-sm text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Software" className="mb-3">{error}</Notice>}
 
       {results && (
         <div className="mb-4 rounded-2xl border border-line/70 bg-panel shadow-elev-1 p-4">

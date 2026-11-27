@@ -4,7 +4,7 @@
 import { Download, FilePlus2, FolderOpen, FolderPlus, Loader2, Package, RefreshCw, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
-import { Button, EmptyLine, ErrorState, Loading, smallBtn } from "../components/ui";
+import { Button, EmptyLine, ErrorState, Loading, smallBtn, Notice } from "../components/ui";
 import { ActionError, BrandBadge } from "../components/printers/Parts";
 import { bestCandidate, bytesText, coveredBy, dayText, describeDriver, downloadTitle, VENDOR_NAME } from "../components/printers/logic";
 import {
@@ -168,7 +168,7 @@ export function Drivers({ isAdmin }: { isAdmin: boolean }) {
             <RefreshCw size={13} className={scanning ? "animate-spin" : ""} /> Volver a leer
           </button>
         </div>
-        {!lib.exists && <p className="mt-3 text-xs text-warn">La carpeta no está disponible. Si es un pendrive, conéctalo y pulsa «Volver a leer».</p>}
+        {!lib.exists && <Notice tone="warn" className="mt-3">La carpeta no está disponible. Si es un pendrive, conéctalo y pulsa «Volver a leer».</Notice>}
         {actionError && <ActionError className="mt-3" message={actionError} />}
       </section>
 

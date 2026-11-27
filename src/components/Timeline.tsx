@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowRight, CalendarClock, Loader2, MonitorCog, RefreshCw, Stethoscope, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useGrowOnScroll } from "../lib/growOnScroll";
-import { Card, EmptyLine } from "./ui";
+import { Card, EmptyLine, Notice } from "./ui";
 import { isPageId, pageLabel, type PageId } from "./Sidebar";
 import { timelineApi, type TimelineEvent } from "../lib/api";
 
@@ -117,7 +117,7 @@ export function Timeline({ onNavigate }: { onNavigate?: (p: PageId) => void }) {
       </div>
 
       {error ? (
-        <p className="text-sm text-bad">{error}</p>
+        <Notice tone="error" where="Cronología">{error}</Notice>
       ) : !events ? (
         <p className="flex items-center gap-2 text-sm text-mute">
           <Loader2 size={13} className="animate-spin" /> Reuniendo lo que pasó en el equipo…

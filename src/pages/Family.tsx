@@ -1,7 +1,7 @@
 import { Ban, Clock, Plus, Save, ShieldCheck, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, inputClass, Loading } from "../components/ui";
+import { Button, Card, inputClass, Loading, Notice } from "../components/ui";
 import { familyApi, type UserHours } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
@@ -81,7 +81,7 @@ function DnsFilter() {
           </label>
         ))}
       </div>
-      {active === "custom" && <p className="mt-2 text-xs text-warn">Ahora hay DNS personalizados (no son de ningún filtro): se sustituirán.</p>}
+      {active === "custom" && <Notice tone="warn" className="mt-2">Ahora hay DNS personalizados (no son de ningún filtro): se sustituirán.</Notice>}
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-[11px] text-mute">Si un navegador usa su propio «DNS seguro» (Firefox), actívalo también allí o desactívalo.</p>
         <Button onClick={apply} disabled={busy || choice === active}>

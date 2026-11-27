@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "./feedback";
 import { TypedConfirm } from "./DiskPartitions";
 import { TaskStatus } from "./TaskStatus";
-import { Button, Card, ErrorState, Explain, Loading, smallBtn } from "./ui";
+import { Button, Card, ErrorState, Explain, Loading, smallBtn, Notice } from "./ui";
 import { appsApi, bigApi, toolsApi, type RescueStatus, type VulnReport } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -192,7 +192,7 @@ export function RescueUsbCard({ isAdmin }: { isAdmin: boolean }) {
               <LifeBuoy size={13} /> Crear el pendrive de rescate
             </Button>
           )}
-          {!isAdmin && <p className="text-xs text-warn">Requiere ejecutar AdminOps como administrador.</p>}
+          {!isAdmin && <Notice tone="warn">Requiere ejecutar AdminOps como administrador.</Notice>}
           <p className="text-[11px] text-mute">
             Para usarlo: enciende el equipo con el pendrive puesto y pulsa la tecla del menú de arranque (F12, F8, F11 o Esc según la marca). La ventana completa de AdminOps no funciona dentro de WinPE porque le falta WebView2: el menú de rescate es de texto, pero hace lo importante.
           </p>

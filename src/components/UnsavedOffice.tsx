@@ -10,7 +10,7 @@ import { ViewCommand } from "./ActionCommand";
 import { NeedsAdmin } from "./AdminBanner";
 import { DataTable, type Column } from "./DataTable";
 import { useToast } from "./feedback";
-import { Button, Card, ErrorState, Loading } from "./ui";
+import { Button, Card, ErrorState, Loading, Notice } from "./ui";
 
 const ICON: Record<string, ReactNode> = {
   Word: <FileText size={16} className="shrink-0 text-dim" />,
@@ -52,7 +52,7 @@ function Preview({ file }: { file: UnsavedFile }) {
         </dd>
       </dl>
       {error ? (
-        <p className="text-xs text-bad">{error}</p>
+        <Notice tone="error" where="Documentos sin guardar">{error}</Notice>
       ) : lines === null ? (
         <p className="text-xs text-mute">Leyendo…</p>
       ) : lines.length ? (
@@ -209,7 +209,7 @@ export function UnsavedOffice({ isAdmin }: { isAdmin: boolean }) {
           <div className="mt-3 border-t border-line pt-3 text-sm">
             <div className="mb-2 text-ink">{chosen.name}</div>
             {versionsError ? (
-              <p className="text-xs text-bad">{versionsError}</p>
+              <Notice tone="error" where="Documentos sin guardar">{versionsError}</Notice>
             ) : !versions ? (
               <p className="text-xs text-mute">Buscando en las copias de Windows…</p>
             ) : sentence ? (

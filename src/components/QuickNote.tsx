@@ -8,6 +8,7 @@ import { emit } from "@tauri-apps/api/event";
 import { CalendarClock, Loader2, TicketPlus, StickyNote } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { casesApi, followupsApi, noteApi, tomorrowMorning, notesApi } from "../lib/api";
+import { Notice } from "./ui";
 
 const input =
   "w-full rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50";
@@ -63,7 +64,7 @@ export function QuickNote() {
     setBusy("save");
     setError(null);
     try {
-      await notesApi.save({ id: "", title: title.trim(), text, created: 0, updated: 0, pinned: false });
+      await notesApi.save({ id: "", title: title.trim(), text, created: 0, updated: 0, pinned: false, images: [] });
       await emit("notes-changed");
       await noteApi.close();
     } catch (e) {
@@ -85,7 +86,7 @@ export function QuickNote() {
         <span className="mb-1 block text-xs text-dim">Nota</span>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe lo que quieras apuntar…" className={`${input} h-36 resize-none`} />
       </label>
-      {error && <p className="text-xs text-bad">{error}</p>}
+      {error && <Notice tone="error" where="Nota rápida">{error}</Notice>}
       <button
         onClick={() => void save()}
         disabled={empty || busy !== null}

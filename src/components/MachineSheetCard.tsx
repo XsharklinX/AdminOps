@@ -1,7 +1,7 @@
 import { ClipboardCopy, Download, ExternalLink, FileSpreadsheet, IdCard, Loader2, RefreshCw, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "./feedback";
-import { Button, Card } from "./ui";
+import { Button, Card, Notice } from "./ui";
 import { logQuietly, officeApi, sheetApi, workApi, type Client, type MachineSheet } from "../lib/api";
 import { useLiveEffect } from "../lib/useLiveEffect";
 
@@ -141,7 +141,7 @@ export function MachineSheetCard({ autoLoad = false }: { autoLoad?: boolean }) {
                     </option>
                   ))}
                 </select>
-                <Button kind="ghost" onClick={addToClient} disabled={!clientId}>
+                <Button kind="ghost" onClick={addToClient} disabled={!clientId} title="Añadir al cliente">
                   <UserPlus size={13} />
                 </Button>
               </span>
@@ -188,7 +188,7 @@ export function SheetPanel({ onClose }: { onClose: () => void }) {
       <p className="px-3 pt-2 text-[11px] text-mute">Clic en un dato para copiarlo y pégalo en el formulario.</p>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {error ? (
-          <p className="p-2 text-xs text-bad">{error}</p>
+          <Notice tone="error" where="Ficha del equipo" className="m-2">{error}</Notice>
         ) : !sheet ? (
           <p className="flex items-center gap-2 p-2 text-xs text-mute">
             <Loader2 size={12} className="animate-spin" /> Leyendo el equipo…

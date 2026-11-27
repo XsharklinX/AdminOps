@@ -1,7 +1,7 @@
 import { Building2, CheckCircle2, Circle, ExternalLink, KeyRound, Loader2, LogOut, Mail, RefreshCw, Search, ShieldAlert, Trash2, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, Explain, inputClass, Loading } from "../components/ui";
+import { Button, Card, Explain, inputClass, Loading, Notice } from "../components/ui";
 import { WindowsTools } from "../components/WindowsTools";
 import { accountsApi, troubleshootApi, usersApi, type AccountsStatus } from "../lib/api";
 import { NeedsAdmin } from "../components/AdminBanner";
@@ -58,7 +58,7 @@ export function Accounts({ isAdmin }: { isAdmin: boolean }) {
     return (s?.credentials ?? []).filter((c) => !q || `${c.target} ${c.user}`.toLowerCase().includes(q));
   }, [s, query]);
 
-  if (error) return <p className="p-8 text-sm text-bad">{error}</p>;
+  if (error) return <Notice tone="error" where="Cuentas" className="m-8">{error}</Notice>;
   if (!s) return <Loading page text="Leyendo las cuentas del equipo…" />;
 
   const k = KIND[s.sessionKind];

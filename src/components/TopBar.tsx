@@ -12,6 +12,7 @@ import { usePrefs } from "../lib/prefs";
 import { OutlookIcon, TeamsIcon } from "./BrandIcons";
 import { RecButton } from "./RecButton";
 import { allowedInMode, type PageId } from "./Sidebar";
+import { useConfirm, useToast } from "./feedback";
 
 const DOT: Record<Tone, string> = { ok: "bg-ok", warn: "bg-warn", bad: "bg-bad", neutral: "bg-mute" };
 
@@ -55,6 +56,22 @@ export function TopBar({
   right: ReactNode;
 }) {
   const prefs = usePrefs();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  // Cambiar de modo reinicia AdminOps: corta lo que esté en marcha (una reparación, una grabación). Se pregunta.
+  const switchMode = async (toTech: boolean) => {
+    const ok = await confirm(
+      toTech
+        ? { title: "Pasar a modo técnico", body: "AdminOps se reinicia con permisos de administrador (Windows pide la contraseña de un administrador). Lo que esté en marcha se corta.", confirmLabel: "Pasar a modo técnico" }
+        : { title: "Volver a modo usuario", body: "AdminOps se reinicia sin permisos de administrador. Lo que esté en marcha se corta.", confirmLabel: "Volver a modo usuario" },
+    );
+    if (!ok) return;
+    try {
+      await (toTech ? api.relaunchAsAdmin() : api.relaunchAsUser());
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
   const { ctx, net, findings } = state;
   const b = (t: string) => <b className="font-medium text-ink">{t}</b>;
   const where = { ask: "", adminops: " (en AdminOps)", browser: " (en el navegador)", app: " (en su aplicación)" };
@@ -118,13 +135,15 @@ export function TopBar({
           </Chip>
         )}
         {isAdmin !== null &&
+          // AdminOps se abre en «Modo usuario» (sin administrador, para cualquiera); «Modo técnico» la relanza
+          // elevada con el aviso de Windows, y desde ahí se puede volver.
           (isAdmin ? (
-            <Chip tone="ok" title={targetUser ? `AdminOps tiene permisos de administrador · los ajustes de usuario se aplican a ${targetUser.name}` : "AdminOps tiene permisos de administrador"}>
-              Administrador
+            <Chip tone="ok" title={`Modo técnico: AdminOps tiene permisos de administrador${targetUser ? ` · los ajustes de usuario se aplican a ${targetUser.name}` : ""} · pulsa para volver a modo usuario`} onClick={() => void switchMode(false)}>
+              Modo técnico
             </Chip>
           ) : (
-            <Chip tone="warn" title="Sin permisos de administrador solo se puede mirar · pulsa para reiniciar AdminOps como administrador (Windows lo confirma)" onClick={() => void api.relaunchAsAdmin().catch(() => {})}>
-              Solo lectura
+            <Chip tone="neutral" title="Modo usuario: sin administrador · pulsa para pasar a modo técnico (Windows pide la contraseña de un administrador)" onClick={() => void switchMode(true)}>
+              Modo usuario
             </Chip>
           ))}
         {net &&
@@ -168,6 +187,7 @@ export function TopBar({
         <span className="mx-1 h-5 w-px bg-line" />
         {right}
       </div>
+      {dialog}
     </div>
   );
 }

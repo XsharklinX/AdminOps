@@ -15,7 +15,7 @@ import type { DiskErrors } from "../lib/diskAssist";
 import { logQuietly } from "../lib/api";
 import { usePrefs } from "../lib/prefs";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Explain, Loading, smallBtn } from "../components/ui";
+import { Button, Card, Explain, Loading, smallBtn, Notice } from "../components/ui";
 import { disksApi, type DiskCheck, type DiskReport, type DiskVolume, type RescueResult } from "../lib/api";
 import { withoutUserPaths } from "../lib/errors";
 import { bytes } from "../lib/format";
@@ -82,7 +82,7 @@ export function Disks({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {error ? (
-        <p className="text-sm text-bad">{error}</p>
+        <Notice tone="error" where="Discos">{error}</Notice>
       ) : disks === null ? (
         <Loading text="Leyendo los discos… (con discos grandes o externos tarda unos segundos)" />
       ) : (
@@ -427,7 +427,7 @@ function Rescue({ isAdmin }: { isAdmin: boolean }) {
             En el destino: {result.copied.toLocaleString("es")} archivos ({bytes(result.bytes)}).
           </p>
           {result.failed.length === 0 ? (
-            <p className="mt-1 text-ok">No se quedó nada: todo se pudo leer.</p>
+            <Notice tone="ok" className="mt-1">No se quedó nada: todo se pudo leer.</Notice>
           ) : (
             <>
               <p className="mt-1 text-warn">

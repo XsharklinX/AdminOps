@@ -5,6 +5,7 @@ import { NeedsAdmin } from "../AdminBanner";
 import { HoverCard } from "../HoverCard";
 import { onVendorEvent, type DriverStatus, type VendorKey, type VendorStepEvent } from "../../lib/api";
 import { applyStep, chipText, isAdminError, isAuditError, STATUS_TONE, UPDATE_STEPS, VENDOR_NAME, type StepView, type Tone } from "./logic";
+import { Notice } from "../ui";
 
 const TONE_CLASS: Record<Tone, string> = {
   ok: "border-ok/40 bg-ok/10 text-ok",
@@ -51,7 +52,7 @@ export function DriverChip({
           {source ? ` en ${source}` : ""}.
         </p>
       )}
-      {disabledReason && <p className="text-warn">{disabledReason}</p>}
+      {disabledReason && <Notice tone="warn">{disabledReason}</Notice>}
       {onClick && !disabled && <p className="text-mute">Clic para ver el driver y cambiarlo.</p>}
     </div>
   );

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePolling } from "../hooks/usePolling";
 import { useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
-import { Button, Card, Loading, Toggle } from "./ui";
+import { Button, Card, Loading, Toggle, Notice } from "./ui";
 import { appApi, disksApi, type DiskReport, type HealthScore, type ScanLive, type ScanResult, type SelfTest, type SmartFull, type SmartRow, type WatchConfig } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -95,7 +95,7 @@ function SmartTab({ d }: { d: DiskReport }) {
   }, [d.number, d.bus, d.model]);
   useEffect(load, [load]);
 
-  if (error) return <p className="px-4 py-3 text-xs text-bad">{error}</p>;
+  if (error) return <Notice tone="error" where="Disco a fondo">{error}</Notice>;
   if (!data)
     return (
       <div className="px-4">
@@ -157,7 +157,15 @@ function SmartLine({ r, levels, open, onToggle }: { r: SmartRow; levels: boolean
   const Chev = open ? ChevronDown : ChevronRight;
   return (
     <>
-      <tr className={`cursor-pointer border-t border-line/60 hover:bg-panel-2 ${r.status !== "ok" ? "bg-panel-2/60" : ""}`} onClick={onToggle}>
+      <tr className={`cursor-pointer border-t border-line/60 hover:bg-panel-2 ${r.status !== "ok" ? "bg-panel-2/60" : ""}`} onClick={onToggle}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}>
         <td className="px-2 py-1.5 text-mute">
           <Chev size={12} />
         </td>
