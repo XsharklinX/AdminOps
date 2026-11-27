@@ -11,7 +11,86 @@ local sí); un solo técnico; sin datos personales en la interfaz; textos en esp
 con lint, typecheck, pruebas de Rust y de interfaz, y `npm run test:exe` + `npm run test:perf` con un
 .exe de depuración. Antes de cambiar algo visual que no esté ya en la maqueta, enseñar el antes y el después.
 
-## 1.5.0 — BUILD RELANZADA (26 nov, noche). Falló la 1ª por test:exe (David tocaba la AdminOps de prueba) y
+## Tanda «el compendio» (elegida el 27 nov) · SIN EMPEZAR · va DESPUÉS de publicar la 1.5.1
+Catálogo https://claude.ai/artifact/Usa36hPriT2JAyAjaa6HYY (fuente adminops-compendio.html en el scratchpad de la sesión
+4862ee06). Las maquetas ANTES/AHORA de cada idea son lo aprobado. Número de versión: lo decide David.
+**SÍ (25):** A3 dibujar nunca tapa los botones · A4 barra y cohete vuelven a su sitio con la base (posición por combinación
+de monitores y escala) · A5 errores de Windows en español con qué hacer (diccionario único + botón al arreglo) · A6 bloquear
+USB sin cortarse a sí mismo (portable) · A7 admins por grupos efectivos del token · A8 «Volver a como estaba» para USB,
+energía, predeterminados y audio · M4 notas con imágenes y casillas · M6 Ctrl+K busca dentro de las notas · M10 la barra de
+los usuarios elegida en Ajustes y puesta al activar el cohete · M11 Ctrl+Alt+1…9 por herramienta · M12 datos para el ticket
+completos (impresora, antivirus, espacio C:, última actualización) · M13 Bloq Num al iniciar · M16 cada arreglo dice cuánto
+tarda y si reinicia · N4 desinstalar la actualización de ayer + pausar 7 días · N6 menú Inicio/barra de tareas no responden
+· N7 iconos en blanco y miniaturas · N8 copiar y pegar (rdpclip, cbdhsvc) · N10 Microsoft Print to PDF · N13 iconos del
+Escritorio por combinación de pantallas · N14 receptor inalámbrico (ahorro de energía USB) · N16 memoria USB sin letra o
+con letra de unidad de red · Q1 1366×768 y escala 125–150 % (con capturas en cada build) · Q2 teclado y lector de
+pantalla · Q4 comprobación de sí misma tras actualizar · Q5 un solo estilo de avisos.
+**NO (20, no volver a proponer):** A1, A2, M1, M2, M3, M5, M7, M8, M9, M14, M15, N1, N2, N3, N5, N9, N11, N12, N15, Q3.
+Orden propuesto (fases; marcar HECHO al terminar cada una):
+ F1 barra y cohete: A3, A4, A7, M10, M11.
+ F2 avisos y errores: Q5 (pieza única) → A5 (diccionario) → M16 (etiquetas de tiempo/reinicio).
+ F3 deshacer y USB: A8, A6, N16.
+ F4 arreglos de Windows: N4, N6, N7, N8, N10, N13, N14, M13.
+ F5 notas y datos: M4, M6, M12.
+ F6 calidad: Q1, Q2, Q4.
+ Cierre: revisión Opus, previo, build cuando la pida.
+
+## 1.5.0 — PUBLICADA (27 nov) · commit 0405cac, https://github.com/XsharklinX/AdminOps/releases/tag/v1.5.0
+test:exe pasa con el cohete apagado en su settings (la barra, siempre encima, se llevaba el clic y el cierre de la
+prueba). Sin revisión de Opus: hacerla ahora sobre todo lo de la 1.5.0.
+SIGUIENTE TANDA (en orden): feedback pendiente (5 clic derecho, 7 sección Notas, 9 audio del equipo) + grabaciones
+elegidas (audio del equipo, dibujar, cámara en esquina, pausar, para enviar/GIF, Ctrl+Alt+M) + barra elegida el 27
+nov: SÍ 1 velocímetro en vivo con fases, 2 lo contratado (porcentaje), 4 memoria bajando en vivo con lista de pasos,
+5 empezar el día ligero (optimiza tras el arranque, «Buenos días»), 7 controles de grabar en la barra (tiempo,
+pausar, dibujar, marcar, parar), 8 datos para el ticket (IP pública, red, Windows, días encendido, «Para el
+ticket»); NO 3 cable o Wi-Fi, 6 el cohete dice qué pasa. NUEVO PEDIDO: el cohete limpia las cookies de la ÚLTIMA
+HORA del navegador abierto (Chrome/Edge/Brave/Firefox), sin tocar contraseñas, historial ni sesiones antiguas
+(una web interna se cae y se arregla borrando cookies). Ojo: con el navegador abierto la base de cookies está
+bloqueada; hacerlo con el navegador cerrado o por CDP/extension; decidir al empezar.
+BUILD 1.5.1 (27 nov, noche): David la pidió; compilada (release/v1.5.1, test:exe y perf pasan) pero NO publicada: el
+guardia pidió revisión de los arreglos posteriores; el revisor Opus encontró 2 medios (alto de la barra con la lista de
+fábrica en Ctrl+Alt+T/Esc; «empezar el día» a medianoche), 3 leves y 1 posible (UAC con RunAsInvoker heredado): ARREGLADOS
+en el código, en verde. La build compilada NO los lleva: hay que recompilar (pedir permiso a David) y luego commit +
+npm run publish:release. Versión, changelog y docs/notas-1.5.1.md ya puestos.
+PARA RETOMAR (27 nov, cierre): toda la tanda 1.5.1 está HECHA sin commit y sin probar en exe (checks en verde:
+clippy, cargo test 914+, tsc, eslint, vitest 501). Lo de las cookies quedó descartado por David: era la CACHÉ (hecha en
+rocket.rs). Faltan, en orden: (1) HECHO 27 nov: parte A arreglada entera (13 + posibles de código, ver ✔ en
+docs/revision-1.5.1.md); HECHO también: revisión B (commit 1.5.0, 1 grave de seguridad + 3 medios + 4 leves) y 2.ª ronda de A (5 medios + 7 leves),
+todo arreglado y en verde (ver docs/revision-1.5.1.md); quedan los «posibles» que solo se ven en real;
+(2) probar en un exe de depuración (barra: herramientas opcionales, iconos con color, cámara, dibujar, pausar, CMD);
+(3) cuando David pida build: versión 1.5.1, changelog, notas ES/EN ≤500, test:exe desde PowerShell, commit +
+npm run publish:release.
+PLAN DE LA TANDA 1.5.1 (DECIDIDO por David el 27 nov: la próxima versión es la 1.5.1, no la 1.6) (empezada el 27 nov, en este orden; marcar HECHO al terminar cada uno):
+ 1. HECHO (sin probar en el exe): USER_TOOLS si no es administrador y no hay rocketTools; menú «menu» con OPTIONS por herramienta (clic derecho); correo con OutlookIcon y «Abrir Outlook» (bar_open_comm outlook). Barra: perfil «usuario» (no administrador: optimizar, grabar, captura, velocidad, Notas, Asistencia, Correo,
+    Teams) + clic derecho con opciones en cada herramienta.
+ 2. HECHO (sin probar en el exe): SpeedPanel + SpeedGauge en RocketBar.tsx con el evento speedtest-progress (latency/download/upload), lo contratado en localStorage adminops.speedPlan. Velocímetro en vivo (aguja, cifra grande, fases ping/bajada/subida; ver si run_speedtest emite progreso) +
+    «lo contratado» (ajuste en Mb, porcentaje con color).
+ 3. HECHO (sin probar en el exe): evento rocket://progress desde rocket::run (memory, temp, browser, dns con su _done y mem_pct); panel «progress» en Rocket.tsx con la barra de memoria y la lista ✓. Cohete: memoria bajando en vivo con lista de pasos ✓ (eventos de progreso desde rocket::run).
+ 4. HECHO (sin probar): ajuste rocketMorning (Ajustes → General), en start_brain una vez al día a los 90 s (marca cohete-dia.txt), aviso AUTO_EVENT con reason «mañana» → «Buenos días: equipo listo». Empezar el día ligero (ajuste; una vez al día tras el arranque; panel «Buenos días»).
+ 5. EN CURSO por un oficial (Sonnet, 27 nov): loopback, pausar, Ctrl+Alt+M, para enviar/GIF, controles en la barra, dibujar, cámara si es sencillo. Revisar su diff. Grabar: audio del equipo (loopback, pista propia), pausar y seguir, marcar Ctrl+Alt+M, dibujar en pantalla,
+    cámara en una esquina, «para enviar» (720p 15 fps) y GIF; controles de grabar en la barra.
+ 6. HECHO (sin probar): bar_network (netsh: Wi-Fi «SSID» · señal o Cable), IP pública de la última prueba de velocidad, Windows y días encendido; botón «Para el ticket». Datos para el ticket (IP pública, red, Windows, días encendido, «Para el ticket»).
+ 7. HECHO (sin probar): browser_caches() en rocket.rs (Chrome, Edge, Brave, Opera, Firefox; Cache_Data, Code Cache, GPUCache, cache2) en cada «Optimizar ya», 4 s como mucho, lo abierto se salta; sale como «Caché de los navegadores» en el desglose. CACHÉ (no cookies, corregido por David) del navegador, también abierto: en «Optimizar ya»; lo que esté en uso se salta;
+    sin tocar contraseñas, cookies ni historial.
+ 8. HECHO (sin probar): notebook.rs (notas.json; notes_list/save/delete, SAFE), Conocimiento → pestaña «Notas» (Notebook.tsx: galería, buscar, fijar, editar, borrar; evento notes-changed), la nota rápida ahora es «Nota» (título + texto, «Guardar nota»; caso y «para mañana» siguen), Ctrl+K «Notas». Sección Notas en AdminOps (cuaderno/galería) y «Notas» en vez de nota de llamada en toda la app.
+ 8b. HECHO (sin probar): botón verde rkb-update (ArrowDownToLine, late) arriba de la barra si check_update da newer+installable (a los 20 s y cada 6 h); panel «update» → install_update; con usuario sin administrador puede fallar el instalador (se enseña el error). Con versión nueva, en la barra una FLECHA DE DESCARGA; al tocarla, actualizar ahí mismo sin GitHub (usar appcare check_update/install_update, lo más rápido posible; en «solo el cohete» también).
+ 8c. HECHO (sin probar): al parar desde la barra, «Guardar en el Escritorio» (bar_save_desktop: Escritorio del usuario de la sesión, también redirigido por OneDrive; nombre «Grabación dd-mm-aaaa hh.mm.mp4», con (2) si se repite).
+ 8f. HECHO (sin probar en exe): 9 herramientas opcionales (apagadas de fábrica, DEFAULT_TOOLS = las 11 de antes): contacts, printer, screens, wifi, keyboard, folders, lock, restart, cmd (pedido suelto: CMD; clic derecho: como administrador / PowerShell). Backend en bartools.rs (DisplaySwitch, radios WinRT, netsh reconectar, carpetas del usuario, LockWorkStation, reinicio sin /f: «esta noche» lo lleva AdminOps con un hilo — 22:00 o 2:00 —, consola runas); paneles en BarExtra.tsx; iconos con color (chip) en todas. Personalizar con alto según la lista. NO: unidades de red, escanear a carpeta.
+ 8g. Grabaciones (oficial, 27 nov): HECHOS 1–6 (loopback, pausar, Ctrl+Alt+M, para enviar/GIF, recctl en la barra, dibujar DrawLayer). 7 cámara en una esquina HECHA por mí (sin probar en exe): faultrec_camera → ventana `reccam` (CamCorner.tsx, getUserMedia, círculo espejo, arrastrable, ✕ al pasar el ratón, se quita sola si falla), abajo a la derecha de lo grabado (camera_rect, con prueba); no al grabar una ventana; se cierra al parar (close_draw). Interruptor en la barra (panel rec y recctl), la píldora (icono) y Grabar el fallo (RecOptions.camera). Revisar el diff del oficial en la revisión Opus.
+ 8d. (cerrado por 8f) PEDIDO: más herramientas OPCIONALES para «Personalizar» (apagadas de fábrica), p. ej. Contactos. Catálogo publicado (artifact 1aRYZujEa9FtK4w8KQSRCj, 10 ideas: Contactos (pedida, va sí o sí), impresora, pantallas, Wi-Fi/Bluetooth, teclado español, unidades de red, escanear a carpeta, mis carpetas, bloquear, reiniciar sin miedo); ESPERA SU ELECCIÓN.
+ 8e. PEDIDO: rework de iconos de la barra: todos con color propio y forma distintiva (chip de color translúcido + trazo del color; colores en el artifact: clip #a78bfa, speed #22d3ee, note #f5b84b, mon #3ecf8e, fix #fb923c, card #60a5fa, help #f472b6…) + mini rework de la barra. Se hace junto con 8d.
+ 9. REVISADO por código (sin probar): cada opción del menú del cohete tiene su acción (boost, deep, call, custom, open, move, hide); lo que fallaba era el cierre al instante, ya arreglado. Revisar una a una las opciones del clic derecho del cohete. 10. Revisión de Opus de 1.5.0 + tanda.
+PEDIDO 27 nov (también para la siguiente tanda):
+- La barra en los PC de los usuarios: no son administradores (AdminOps se abre como «solo el cohete» con
+  RunAsInvoker, ver rocket_set_startup). Para ellos la barra lleva solo: optimizar, grabar pantalla, captura,
+  velocidad de internet, Notas, Asistencia rápida, Correo y Teams (sin mini monitor, arreglos, datos, AdminOps).
+  Propuesta: perfil «usuario» automático cuando el proceso no es administrador (y elegible en Ajustes).
+- HECHO: el icono de Correo de la barra es el OutlookIcon de la cabecera de AdminOps.
+- Clic derecho en CADA herramienta de la barra → sus opciones (grabar: pantalla/ventana/zona, voz, audio del
+  equipo; captura: zona/pantalla/ventana; velocidad: medir, historial, lo contratado; Notas: nueva, ver todas;
+  optimizar: ya, a fondo, preparar llamada; correo: nuevo correo, abrir; Teams: abrir, chat; Asistencia: dar o
+  recibir ayuda). Enseñar el menú en un artifact antes de hacerlo (regla de maquetas con la interfaz real).
+ANTES (26 nov, noche): Falló la 1ª por test:exe (David tocaba la AdminOps de prueba) y
 por la prueba de rapidez (referencia actualizada a propósito). HECHOS del feedback: 1 pestaña con flecha
 (22×64, rkb-tab), 2 GRACE_MS 1200 tras abrir + dock_check nunca con WIDE, 3 se abre a la altura de la pestaña
 (BAR_Y = su centro) y sitio de partida a 1/4 de la pantalla, 4 no_frame() tras show/set_size/pantalla completa,

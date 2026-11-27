@@ -1,6 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AppWindow, ArrowLeft, Check, ChevronRight, Circle, Eye, FileText, Film, FolderOutput, Mic, MousePointerClick, RefreshCw, Scissors, SquareDashed, StickyNote, Video } from "lucide-react";
+import { AppWindow, ArrowLeft, Check, ChevronRight, Circle, Eye, FileText, Film, FolderOutput, Mic, MousePointerClick, RefreshCw, Scissors, Send, SquareDashed, StickyNote, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { casesApi, faultRecApi, FAULTREC_AUTO_EVENT, FAULTREC_DONE_EVENT, FAULTREC_REGION_EVENT, type FaultAutoSaved, FAULTREC_TICK_EVENT, type FaultInput, type FaultMark, type FaultRecDone, type FaultRecMonitor, type FaultRecStatus, type FaultRecWindow, type FaultRecording, type FaultRecordingDetail, type FaultRegion, type FaultRegionPicked } from "../lib/api";
 import { logQuietly } from "../lib/api/core";
@@ -114,7 +114,7 @@ function TrackPanel({ rec, pos, sel, onSeek, onMark, onSelect }: { rec: FaultRec
           </TrackRow>
         )}
         {voice.length > 0 && (
-          <TrackRow label="Voz">
+          <TrackRow label={rec.systemAudio && !rec.mic ? "Sonido" : rec.systemAudio ? "Voz y sonido" : "Voz"}>
             <div className="absolute inset-0 flex items-center gap-px overflow-hidden px-px">
               {voice.map((v, i) => (
                 <span key={i} className="min-w-px flex-1 rounded-full bg-ok/60" style={{ height: `${Math.max(8, Math.min(100, v))}%` }} />
@@ -173,9 +173,9 @@ function ClipBar({ detail, sel, onClear }: { detail: FaultRecordingDetail; sel: 
   const rec = detail.meta;
   const toast = useToast();
   const [inReport, setInReport] = useState<[number, number] | null>(detail.clip ?? null);
-  const [busy, setBusy] = useState<"report" | "case" | "export" | null>(null);
+  const [busy, setBusy] = useState<"report" | "case" | "export" | "small" | "gif" | null>(null);
   const [a, b] = sel ?? [0, rec.secs];
-  const run = async (kind: "report" | "case" | "export", fn: () => Promise<void>) => {
+  const run = async (kind: "report" | "case" | "export" | "small" | "gif", fn: () => Promise<void>) => {
     setBusy(kind);
     try {
       await fn();
@@ -214,6 +214,17 @@ function ClipBar({ detail, sel, onClear }: { detail: FaultRecordingDetail; sel: 
       // Solo el nombre del archivo: la ruta lleva el usuario de Windows.
       if (r) toast("ok", `Guardado como «${r.path.split(/[\\/]/).pop() ?? "grabación.mp4"}».`);
     });
+  // Copias pequeñas que se ponen en el portapapeles como archivo, para pegarlas en Teams o en el correo.
+  const forSending = () =>
+    run("small", async () => {
+      await faultRecApi.exportSmall(rec.id);
+      toast("ok", "Copia pequeña lista y copiada: pégala en Teams o en el correo.");
+    });
+  const asGif = () =>
+    run("gif", async () => {
+      await faultRecApi.exportGif(rec.id, a * 1000, b * 1000);
+      toast("ok", "GIF listo y copiado: pégalo en Teams o en el correo.");
+    });
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line/70 bg-panel-2/40 px-3 py-2 text-[13px]">
       <span className="flex items-center gap-1.5 text-ink tabular">
@@ -248,6 +259,12 @@ function ClipBar({ detail, sel, onClear }: { detail: FaultRecordingDetail; sel: 
         </Button>
         <Button kind="secondary" size="sm" onClick={() => void exportMp4()} disabled={busy !== null}>
           <FolderOutput size={13} /> {busy === "export" ? "Exportando…" : "Exportar MP4"}
+        </Button>
+        <Button kind="secondary" size="sm" onClick={() => void forSending()} disabled={busy !== null} title="Toda la grabación, en 720p y 15 fotogramas por segundo, copiada para pegarla">
+          <Send size={13} /> {busy === "small" ? "Preparando…" : "Para enviar"}
+        </Button>
+        <Button kind="secondary" size="sm" onClick={() => void asGif()} disabled={busy !== null} title="Del trozo elegido (o del principio), 8 segundos como mucho, copiado para pegarlo">
+          <Film size={13} /> {busy === "gif" ? "Preparando…" : "GIF de 8 s"}
         </Button>
       </span>
     </div>
@@ -374,6 +391,7 @@ function Result({ detail, onAgain, onDelete, onBack }: { detail: FaultRecordingD
         {rec.target ? ` · ${rec.target}` : ""}
         {rec.monitor && !rec.target?.startsWith("Ventana") ? ` · ${rec.monitor}` : ""}
         {rec.mic ? " · con voz" : ""}
+        {rec.systemAudio ? " · con el sonido del equipo" : ""}
       </p>
       {hasVideo ? (
         videoError ? (
@@ -615,6 +633,24 @@ function Setup({ monitors, choice, onChange }: { monitors: FaultRecMonitor[]; ch
           </span>
         </span>
       </Row>
+      <Row label="Sonido del equipo">
+        <span className="flex items-center gap-3">
+          <Toggle checked={opts.system} onChange={(v) => setOpts({ system: v })} label="Con el sonido del equipo" />
+          <span className="text-dim">
+            <Volume2 size={12} className="mr-1 inline" />
+            {opts.system ? "Lo que suena por el altavoz (una videollamada, un aviso) va en el vídeo, mezclado con la voz." : "Apagado: solo se oye la voz, si está encendida."}
+          </span>
+        </span>
+      </Row>
+      <Row label="Cámara">
+        <span className="flex items-center gap-3">
+          <Toggle checked={opts.camera} onChange={(v) => setOpts({ camera: v })} label="Mi cámara en una esquina" />
+          <span className="text-dim">
+            <Video size={12} className="mr-1 inline" />
+            {opts.target === "window" ? "Solo sale al grabar la pantalla entera o una zona." : opts.camera ? "Un círculo con la cámara abajo a la derecha; se arrastra a otra esquina." : "Apagada."}
+          </span>
+        </span>
+      </Row>
     </>
   );
 }
@@ -775,7 +811,9 @@ export function FaultRecorder() {
         region: opts.target === "region" ? (choice.region?.region ?? null) : null,
         input: opts.input,
         mic: opts.mic,
+        systemAudio: opts.system,
       });
+      if (opts.camera && opts.target !== "window") void faultRecApi.camera(true).catch((e) => toast("error", String(e)));
       setStatus(s);
       setPreparing(false);
     } catch (e) {

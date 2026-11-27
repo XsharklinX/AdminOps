@@ -90,6 +90,8 @@ pub struct Settings {
     pub rocket_size: String,
     /// Despega solo con la memoria alta un rato o el equipo sin usar (nunca en llamada ni presentación).
     pub rocket_auto: bool,
+    /// Empezar el día ligero: una vez al día, al poco de encender, el cohete optimiza solo.
+    pub rocket_morning: bool,
     /// Herramientas de la barra del cohete y su orden. Sin configurar (None): todas, en su orden de fábrica.
     pub rocket_tools: Option<Vec<String>>,
 }
@@ -251,6 +253,7 @@ impl Default for Settings {
             rocket: "desktop".into(),
             rocket_size: "m".into(),
             rocket_auto: false,
+            rocket_morning: false,
             rocket_tools: None,
         }
     }

@@ -38,6 +38,7 @@ export const KIND_LABEL: Record<FaultMarkKind, string> = {
   cpu: "Procesador",
   hang: "No responde",
   error: "Error de Windows",
+  manual: "Marca",
 };
 
 /** Las clases van escritas enteras para que Tailwind las encuentre. */
@@ -46,6 +47,7 @@ export const KIND_STYLE: Record<FaultMarkKind, { dot: string; text: string }> = 
   cpu: { dot: "bg-warn", text: "text-warn" },
   hang: { dot: "bg-bad", text: "text-bad" },
   error: { dot: "bg-bad", text: "text-bad" },
+  manual: { dot: "bg-neon", text: "text-neon" },
 };
 
 /** «0:24 · Disco al 100 %». */
@@ -134,10 +136,14 @@ export interface RecOptions {
   input: boolean;
   /** Grabar el micrófono. De serie, no. */
   mic: boolean;
+  /** Grabar también lo que suena en el equipo. De serie, no. */
+  system: boolean;
+  /** La cámara en una esquina (no al grabar una ventana). De serie, no. */
+  camera: boolean;
 }
 
 const OPTIONS_KEY = "adminops.faultrec.options";
-export const DEFAULT_REC_OPTIONS: RecOptions = { target: "screen", input: true, mic: false };
+export const DEFAULT_REC_OPTIONS: RecOptions = { target: "screen", input: true, mic: false, system: false, camera: false };
 
 export function getRecOptions(): RecOptions {
   try {
@@ -147,6 +153,8 @@ export function getRecOptions(): RecOptions {
       target: v.target === "window" || v.target === "region" ? v.target : "screen",
       input: typeof v.input === "boolean" ? v.input : DEFAULT_REC_OPTIONS.input,
       mic: typeof v.mic === "boolean" ? v.mic : DEFAULT_REC_OPTIONS.mic,
+      system: typeof v.system === "boolean" ? v.system : DEFAULT_REC_OPTIONS.system,
+      camera: typeof v.camera === "boolean" ? v.camera : DEFAULT_REC_OPTIONS.camera,
     };
   } catch {
     return { ...DEFAULT_REC_OPTIONS };
@@ -159,6 +167,18 @@ export function setRecOptions(o: RecOptions) {
   } catch {
     /* sin almacenamiento: vale para esta vez */
   }
+}
+
+/** Lo que dura un trazo de «Dibujar» desde que se suelta, y lo que tarda en desvanecerse al final. */
+export const STROKE_LIFE_MS = 3000;
+export const STROKE_FADE_MS = 400;
+
+/** La opacidad de un trazo `age` milisegundos después de soltarlo: entero hasta casi el final, luego se desvanece. */
+export function strokeAlpha(age: number): number {
+  if (!(age > 0)) return 1;
+  if (age >= STROKE_LIFE_MS) return 0;
+  const left = STROKE_LIFE_MS - age;
+  return left >= STROKE_FADE_MS ? 1 : left / STROKE_FADE_MS;
 }
 
 /** Lo más pequeña que puede ser una zona (píxeles físicos). */
@@ -305,7 +325,9 @@ export function rangeLabel(fromSecs: number, toSecs: number): string {
 /** Qué pasó en una grabación, para la lista: el programa que falló, lo que la disparó o la primera marca. */
 export function recSummary(r: Pick<FaultRecording, "marks" | "trigger" | "origin">): { what: string; probable: string | null } {
   const marks = sortedMarks(r.marks);
-  const what = marks.find((m) => m.app)?.title ?? (r.origin === "auto" ? r.trigger : null) ?? marks[0]?.title ?? "Sin marcas";
+  // Las marcas puestas a mano (Ctrl+Alt+M) solo dicen «Marca»: el titular sale de las que encontró AdminOps.
+  const found = marks.filter((m) => m.kind !== "manual");
+  const what = found.find((m) => m.app)?.title ?? (r.origin === "auto" ? r.trigger : null) ?? found[0]?.title ?? marks[0]?.title ?? "Sin marcas";
   const p = marks.find((m) => m.probable);
   return { what, probable: p ? `Causa probable: ${p.title.charAt(0).toLowerCase()}${p.title.slice(1)}` : null };
 }
@@ -313,7 +335,8 @@ export function recSummary(r: Pick<FaultRecording, "marks" | "trigger" | "origin
 /** La línea que «Al caso» añade a las notas del caso. */
 export function caseNote(r: Pick<FaultRecording, "started" | "marks" | "trigger" | "origin">, fromSecs: number, toSecs: number): string {
   const inside = sortedMarks(r.marks).filter((m) => m.t >= Math.floor(fromSecs) && m.t <= Math.ceil(toSecs));
-  const what = inside.find((m) => m.app)?.title ?? inside[0]?.title ?? (r.origin === "auto" ? r.trigger : null);
+  const found = inside.filter((m) => m.kind !== "manual");
+  const what = found.find((m) => m.app)?.title ?? found[0]?.title ?? (r.origin === "auto" ? r.trigger : null) ?? inside[0]?.title;
   const cause = inside.find((m) => m.probable);
   const parts = [`Grabación del fallo (${whenLabel(r.started + Math.floor(fromSecs))}, ${rangeLabel(fromSecs, toSecs)})`];
   if (what) parts.push(what);

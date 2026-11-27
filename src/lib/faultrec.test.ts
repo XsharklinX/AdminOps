@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { FaultMark, FaultRecMonitor, FaultRecording } from "./api";
-import { areaPath, axisStep, bucketMax, axisTicks, bufferPercent, caseNote, rangeLabel, rateLabel, recSummary, tracksOf, clock, dragRegion, originLabel, watchSince, eraseWhen, getRecOptions, inputLine, inputOverlay, KIND_STYLE, lengthLabel, markLine, markPercent, marksCount, monitorLabel, pickRecording, pillText, regionLabel, remaining, seekTime, setRecOptions, sortedMarks, videoBox, whenLabel } from "./faultrec";
+import { areaPath, axisStep, bucketMax, axisTicks, bufferPercent, caseNote, rangeLabel, rateLabel, recSummary, tracksOf, clock, dragRegion, originLabel, watchSince, eraseWhen, getRecOptions, inputLine, inputOverlay, KIND_STYLE, lengthLabel, markLine, markPercent, marksCount, monitorLabel, pickRecording, pillText, regionLabel, remaining, seekTime, setRecOptions, sortedMarks, strokeAlpha, videoBox, whenLabel } from "./faultrec";
 
 const mark = (p: Partial<FaultMark> = {}): FaultMark => ({ t: 24, kind: "hang", title: "Excel no responde", detail: "", ...p });
 const rec = (p: Partial<FaultRecording> = {}): FaultRecording => ({ id: "fr-1", started: 1_700_000_000, secs: 72, monitor: "Monitor principal", width: 1920, height: 1080, caseId: null, marks: [], bytes: 1, note: null, ...p });
@@ -161,15 +161,28 @@ describe("G2: zona, clics y teclas", () => {
     expect(videoBox(0, 0, 0, 0)).toEqual({ left: 0, top: 0, width: 0, height: 0 });
   });
 
+  it("un trazo dibujado se ve entero, se desvanece al final y se borra a los 3 s", () => {
+    expect(strokeAlpha(0)).toBe(1);
+    expect(strokeAlpha(-5)).toBe(1);
+    expect(strokeAlpha(2000)).toBe(1);
+    expect(strokeAlpha(2600)).toBe(1);
+    expect(strokeAlpha(2800)).toBeCloseTo(0.5, 5);
+    expect(strokeAlpha(2999)).toBeGreaterThan(0);
+    expect(strokeAlpha(2999)).toBeLessThan(0.01);
+    expect(strokeAlpha(3000)).toBe(0);
+    expect(strokeAlpha(9000)).toBe(0);
+    expect(strokeAlpha(Number.NaN)).toBe(1);
+  });
+
   it("las opciones guardadas se leen con sus valores de serie si faltan o están mal", () => {
     const mem = new Map<string, string>();
     vi.stubGlobal("localStorage", { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) });
     localStorage.removeItem("adminops.faultrec.options");
-    expect(getRecOptions()).toEqual({ target: "screen", input: true, mic: false });
-    setRecOptions({ target: "region", input: false, mic: true });
-    expect(getRecOptions()).toEqual({ target: "region", input: false, mic: true });
+    expect(getRecOptions()).toEqual({ target: "screen", input: true, mic: false, system: false, camera: false });
+    setRecOptions({ target: "region", input: false, mic: true, system: true, camera: true });
+    expect(getRecOptions()).toEqual({ target: "region", input: false, mic: true, system: true, camera: true });
     localStorage.setItem("adminops.faultrec.options", JSON.stringify({ target: "x", mic: "sí" }));
-    expect(getRecOptions()).toEqual({ target: "screen", input: true, mic: false });
+    expect(getRecOptions()).toEqual({ target: "screen", input: true, mic: false, system: false, camera: false });
     vi.unstubAllGlobals();
   });
 });

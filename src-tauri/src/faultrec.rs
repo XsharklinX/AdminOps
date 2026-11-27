@@ -46,12 +46,16 @@ use tauri::{Emitter, Manager};
 pub const MAX_SECS: u64 = 120;
 /// Etiqueta de la ventana flotante con el tiempo y el botón «Parar».
 const PILL: &str = "recpill";
-const PILL_W: f64 = 220.0;
+const PILL_W: f64 = 430.0;
 const PILL_H: f64 = 44.0;
 /// Separación de la píldora al borde del monitor (píxeles lógicos).
 const PILL_MARGIN: f64 = 16.0;
 /// Etiqueta de la ventana transparente que cubre un monitor para dibujar la zona que se quiere grabar.
 const AREA: &str = "recarea";
+/// Etiqueta de la capa transparente donde se dibuja encima del monitor grabado.
+const DRAW: &str = "recdraw";
+/// La cámara en una esquina de lo que se graba.
+const CAM: &str = "reccam";
 const ID_PREFIX: &str = "fr-";
 
 /// El momento del primer fotograma: de ahí cuentan los segundos del vídeo.
@@ -91,6 +95,8 @@ pub struct Meta {
     pub voice: Vec<u8>,
     /// El vídeo lleva de verdad la voz.
     pub mic: bool,
+    /// El vídeo lleva de verdad el sonido del equipo.
+    pub system_audio: bool,
     /// De dónde sale: «record» (grabada a mano), «replay» («¡Acaba de pasar!») o «auto» (grabación automática).
     #[serde(default = "origin_record")]
     pub origin: String,
@@ -118,6 +124,8 @@ pub struct StartOptions {
     pub input: bool,
     /// Grabar el micrófono. Apagado de serie.
     pub mic: bool,
+    /// Grabar también lo que suena en el equipo (el altavoz predeterminado), mezclado con la voz. Apagado de serie.
+    pub system_audio: bool,
 }
 
 /// Una zona de un monitor, en píxeles físicos desde su esquina superior izquierda.
@@ -164,6 +172,14 @@ pub struct Status {
     pub error: Option<String>,
     /// Se está grabando la voz ahora.
     pub mic: bool,
+    /// Se está grabando el sonido del equipo ahora.
+    pub system_audio: bool,
+    /// En pausa: no se escribe nada y el tiempo no avanza.
+    pub paused: bool,
+    /// La capa de dibujo está abierta.
+    pub drawing: bool,
+    /// La cámara está en la esquina.
+    pub camera: bool,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -351,6 +367,55 @@ pub fn sweep_dir(dir: &Path, open: Option<&str>, mode: Sweep) -> usize {
     removed
 }
 
+
+// ---------- Pausas (puro, con pruebas) ----------
+
+/// Una pausa: de cuándo a cuándo, en milisegundos de reloj desde el primer fotograma.
+type Pause = (u32, u32);
+
+/// Las pausas con la abierta (si la hay) puesta como una más que no termina.
+fn with_open(pauses: &[Pause], open: Option<u32>) -> Vec<Pause> {
+    let mut all = pauses.to_vec();
+    if let Some(s) = open {
+        all.push((s, u32::MAX));
+    }
+    all
+}
+
+/// Del reloj de pared al tiempo del vídeo: se quita lo que duraron las pausas hasta ese momento. Un instante que
+/// cae dentro de una pausa se queda donde empezó.
+fn video_ms(pauses: &[Pause], open: Option<u32>, wall_ms: u32) -> u32 {
+    let paused: u32 = with_open(pauses, open).iter().filter(|(s, _)| wall_ms > *s).map(|(s, e)| wall_ms.min(*e) - s).fold(0, u32::saturating_add);
+    wall_ms.saturating_sub(paused)
+}
+
+/// ¿Ese instante (reloj de pared) cae dentro de una pausa?
+fn in_pause(pauses: &[Pause], wall_ms: u32) -> bool {
+    pauses.iter().any(|(s, e)| (*s..*e).contains(&wall_ms))
+}
+
+/// Cuánto duraron en total las pausas (cerradas).
+fn paused_total_ms(pauses: &[Pause]) -> u32 {
+    pauses.iter().map(|(s, e)| e.saturating_sub(*s)).fold(0, u32::saturating_add)
+}
+
+/// Las medidas de procesador, disco y demás pasadas al tiempo del vídeo: lo medido en pausa se tira. Si dos caen en
+/// el mismo segundo del vídeo (la pausa empezó a mitad de segundo), se queda la primera.
+fn remap_ticks(ticks: &[Tick], pauses: &[Pause]) -> Vec<Tick> {
+    let mut out: Vec<Tick> = ticks
+        .iter()
+        .filter(|t| !in_pause(pauses, t.t.saturating_mul(1000)))
+        .map(|t| Tick { t: video_ms(pauses, None, t.t.saturating_mul(1000)) / 1000, ..t.clone() })
+        .collect();
+    out.dedup_by_key(|t| t.t);
+    out
+}
+
+/// Los clics y las teclas pasados al tiempo del vídeo: lo hecho en pausa no está en el vídeo.
+fn remap_input(input: Vec<InputEvent>, pauses: &[Pause]) -> Vec<InputEvent> {
+    input.into_iter().filter(|e| !in_pause(pauses, e.t)).map(|e| InputEvent { t: video_ms(pauses, None, e.t), ..e }).collect()
+}
+
 // ---------- Estado de la grabación en marcha ----------
 
 struct Active {
@@ -372,8 +437,36 @@ struct Active {
     mic: bool,
     /// Por qué no arrancó el micrófono, si se pidió.
     mic_note: Option<String>,
+    /// El sonido del equipo arrancó.
+    sys: bool,
+    /// Por qué no arrancó el sonido del equipo, si se pidió.
+    sys_note: Option<String>,
+    /// «Pausar»: lo mira el hilo de captura.
+    pause: Arc<AtomicBool>,
+    /// Las pausas ya terminadas (reloj de pared, en milisegundos desde el primer fotograma).
+    pauses: Vec<Pause>,
+    /// Desde cuándo está en pausa, si lo está.
+    paused_at: Option<u32>,
+    /// Las marcas puestas a mano (Ctrl+Alt+M o el botón), en segundos del vídeo.
+    manual: Vec<u32>,
+    /// El monitor donde se graba (o donde está la ventana): la capa de dibujo lo cubre.
+    mon: Option<crate::displays::Monitor>,
+    /// La zona que se graba dentro de `mon`, si es una zona: la cámara va en su esquina.
+    area: Option<Region>,
     case_id: Option<String>,
     dir: PathBuf,
+}
+
+impl Active {
+    /// Milisegundos de reloj desde el primer fotograma.
+    fn wall_ms(&self) -> u32 {
+        lock(&self.first).map_or(0, |s| s.at.elapsed().as_millis().min(u128::from(u32::MAX)) as u32)
+    }
+
+    /// Milisegundos del vídeo hasta ahora (sin lo que lleva en pausa).
+    fn video_now_ms(&self) -> u32 {
+        video_ms(&self.pauses, self.paused_at, self.wall_ms())
+    }
 }
 
 static ACTIVE: Mutex<Option<Active>> = Mutex::new(None);
@@ -412,6 +505,15 @@ fn restore_main(app: &tauri::AppHandle) {
 
 fn close_pill(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window(PILL) {
+        let _ = w.close();
+    }
+}
+
+fn close_draw(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window(DRAW) {
+        let _ = w.close();
+    }
+    if let Some(w) = app.get_webview_window(CAM) {
         let _ = w.close();
     }
 }
@@ -501,12 +603,14 @@ fn read_events(from: u64, secs: u32) -> Result<Vec<crate::eventdigest::RawEvent>
 // ---------- Empezar y terminar ----------
 
 /// Lo guarda todo al terminar de grabar. `quiet`: al cerrar AdminOps no se espera al registro de eventos.
-fn save(app: &tauri::AppHandle, a: &Active, done: capture::Done, started: Started, ticks: &[Tick], mut input: Vec<InputEvent>, quiet: bool) -> Result<Meta, String> {
+fn save(app: &tauri::AppHandle, a: &Active, done: capture::Done, started: Started, ticks: &[Tick], input: Vec<InputEvent>, quiet: bool) -> Result<Meta, String> {
     let secs = ((done.duration_ms + 500) / 1000) as u32;
-    let (events, events_note) = if quiet {
+    // Con pausas, los errores de Windows se buscan en todo el rato de reloj y luego se pasan al tiempo del vídeo.
+    let wall_secs = secs + paused_total_ms(&a.pauses).div_ceil(1000);
+    let (mut events, events_note) = if quiet {
         (Vec::new(), Some("Se guardó al cerrar AdminOps: faltan las marcas de errores de Windows.".to_string()))
     } else {
-        match read_events(started.unix, secs) {
+        match read_events(started.unix, wall_secs) {
             Ok(v) => (v, None),
             Err(e) => {
                 log::warn!("Grabar el fallo: no se pudo leer el registro de eventos: {e}");
@@ -524,11 +628,33 @@ fn save(app: &tauri::AppHandle, a: &Active, done: capture::Done, started: Starte
     } else if a.mic && !done.with_voice {
         notes.push("No se grabó la voz: Windows no pudo guardarla en el vídeo.".to_string());
     }
+    if let Some(n) = &a.sys_note {
+        notes.push(n.clone());
+    } else if a.sys && !done.with_voice {
+        notes.push("No se grabó el sonido del equipo: Windows no pudo guardarlo en el vídeo.".to_string());
+    }
     notes.extend(events_note);
     let note = join_notes(notes);
+    // Lo medido, lo pulsado y los errores, al tiempo del vídeo (sin las pausas).
+    let remapped;
+    let (ticks, mut input) = if a.pauses.is_empty() {
+        (ticks, input)
+    } else {
+        for ev in &mut events {
+            let wall_ms = (ev.t.saturating_sub(started.unix) * 1000).min(u64::from(u32::MAX)) as u32;
+            ev.t = started.unix + u64::from(video_ms(&a.pauses, None, wall_ms) / 1000);
+        }
+        remapped = remap_ticks(ticks, &a.pauses);
+        (remapped.as_slice(), remap_input(input, &a.pauses))
+    };
     // Nada de lo apuntado después del último fotograma.
     input.retain(|e| u64::from(e.t) <= done.duration_ms);
-    let marks = analysis::build_marks(ticks, &events, started.unix, secs);
+    let mut marks = analysis::build_marks(ticks, &events, started.unix, secs);
+    // Las marcas puestas a mano, tal cual, sin buscarles causa.
+    if !a.manual.is_empty() {
+        marks.extend(a.manual.iter().map(|&t| Mark { t: t.min(secs), kind: analysis::Kind::Manual, title: "Marca".into(), ..Default::default() }));
+        marks.sort_by_key(|m| m.t);
+    }
     let part = part_file(&a.dir, &a.id);
     // Si el caso se cerró mientras se grababa, la grabación ya no tiene dónde colgar: no se guarda.
     if a.case_id.is_some() && a.case_id != crate::cases::open_case_id(app) {
@@ -553,7 +679,8 @@ fn save(app: &tauri::AppHandle, a: &Active, done: capture::Done, started: Starte
         target: a.target.clone(),
         input_on: a.input_on,
         input,
-        mic: done.with_voice,
+        mic: done.with_voice && a.mic,
+        system_audio: done.with_voice && a.sys,
         voice: done.voice,
         origin: origin_record(),
         trigger: None,
@@ -598,10 +725,16 @@ fn finish(app: &tauri::AppHandle, quiet: bool) -> Result<Meta, String> {
     // Lo primero que ve el usuario al parar: la píldora se va (también al cerrar AdminOps, o el proceso no
     // terminaría con ella abierta) y AdminOps vuelve al frente.
     close_pill(app);
+    close_draw(app);
+    stop_mark_hotkey(app);
     if !quiet {
         restore_main(app);
     }
     let started = *lock(&a.first);
+    // Si se paró estando en pausa, esa pausa termina ahora.
+    if let (Some(s), Some(st)) = (a.paused_at.take(), started) {
+        a.pauses.push((s, st.at.elapsed().as_millis().min(u128::from(u32::MAX)) as u32));
+    }
     let result = match (done, started) {
         (Ok(d), Some(s)) => save(app, &a, d, s, &ticks, input, quiet),
         (Err(e), _) => Err(e),
@@ -625,16 +758,17 @@ fn finish(app: &tauri::AppHandle, quiet: bool) -> Result<Meta, String> {
     result
 }
 
-fn spawn_coordinator(app: tauri::AppHandle, first: Started, stop: Arc<AtomicBool>) {
+fn spawn_coordinator(app: tauri::AppHandle, stop: Arc<AtomicBool>) {
     let _ = std::thread::Builder::new().name("faultrec-coordinator".into()).spawn(move || {
         let mut shown: Option<u32> = None;
         loop {
             std::thread::sleep(Duration::from_millis(200));
-            let ended = match lock(&ACTIVE).as_ref() {
+            // El tiempo que cuenta es el del vídeo: lo que lleva en pausa no entra.
+            let (ended, video) = match lock(&ACTIVE).as_ref() {
                 None => return,
-                Some(a) => a.stop.load(Ordering::SeqCst) || a.capture.as_ref().is_none_or(JoinHandle::is_finished),
+                Some(a) => (a.stop.load(Ordering::SeqCst) || a.capture.as_ref().is_none_or(JoinHandle::is_finished), a.video_now_ms()),
             };
-            let elapsed = first.at.elapsed();
+            let elapsed = Duration::from_millis(u64::from(video));
             let secs = elapsed.as_secs().min(MAX_SECS) as u32;
             if shown != Some(secs) {
                 shown = Some(secs);
@@ -696,6 +830,7 @@ pub fn shutdown(app: &tauri::AppHandle) {
     // Pase lo que pase, la píldora y el selector de zona no pueden quedarse abiertos: Tauri no sale mientras
     // quede una ventana. Sin zona pendiente, para que cerrar no avise a nadie.
     close_pill(app);
+    close_draw(app);
     *lock(&AREA_PENDING) = None;
     close_area(app);
     let n = sweep_dir(&dir(app), None, Sweep::Exit);
@@ -835,6 +970,20 @@ fn start_recording(app: tauri::AppHandle, monitor: Option<String>, opts: Option<
         (None, None)
     };
     let mic_on = mic.is_some();
+    // El sonido del equipo: igual que la voz, si no arranca se graba igual y la nota lo cuenta.
+    let (sys, sys_note) = if opts.system_audio {
+        match mic::start_system() {
+            Ok(m) => (Some(m), None),
+            Err(e) => {
+                log::warn!("Grabar el fallo: el sonido del equipo no arrancó: {e:?}");
+                (None, Some(e.note_system()))
+            }
+        }
+    } else {
+        (None, None)
+    };
+    let sys_on = sys.is_some();
+    let pause = Arc::new(AtomicBool::new(false));
 
     // AdminOps se quita de en medio antes de grabar, para que no salga en el vídeo.
     if let Some(main) = app.get_webview_window("main") {
@@ -851,7 +1000,7 @@ fn start_recording(app: tauri::AppHandle, monitor: Option<String>, opts: Option<
     let id = vigil::unique_id(&rec_dir);
     let stop = Arc::new(AtomicBool::new(false));
     let first: Arc<Mutex<Option<Started>>> = Arc::new(Mutex::new(None));
-    let job = capture::Job { gdi: gdi.clone(), window, region, mic, out: part_file(&rec_dir, &id), stop: stop.clone(), first: first.clone(), max: Duration::from_secs(MAX_SECS) };
+    let job = capture::Job { gdi: gdi.clone(), window, region, mic, sys, pause: pause.clone(), out: part_file(&rec_dir, &id), stop: stop.clone(), first: first.clone(), max: Duration::from_secs(MAX_SECS) };
     let capture_handle = std::thread::Builder::new().name("faultrec-capture".into()).spawn(move || capture::record(job)).map_err(|e| {
         let _ = std::fs::remove_file(part_file(&rec_dir, &id));
         fail_start(&app, e.to_string())
@@ -880,9 +1029,9 @@ fn start_recording(app: tauri::AppHandle, monitor: Option<String>, opts: Option<
 
     // Hasta que llega el primer fotograma no se sabe si funciona: el fallo se cuenta aquí, no a medias.
     let waited = Instant::now();
-    let started = loop {
-        if let Some(s) = *lock(&first) {
-            break s;
+    loop {
+        if lock(&first).is_some() {
+            break;
         }
         let problem = if STOP_EARLY.load(Ordering::SeqCst) {
             stop.store(true, Ordering::SeqCst);
@@ -948,13 +1097,22 @@ fn start_recording(app: tauri::AppHandle, monitor: Option<String>, opts: Option<
             window: window.is_some(),
             mic: mic_on,
             mic_note,
+            sys: sys_on,
+            sys_note,
+            pause,
+            pauses: Vec::new(),
+            paused_at: None,
+            manual: Vec::new(),
+            mon: chosen.shown.clone(),
+            area: region,
             case_id,
             dir: rec_dir,
         });
     }
-    spawn_coordinator(app.clone(), started, stop);
+    spawn_coordinator(app.clone(), stop);
+    start_mark_hotkey(&app);
     let _ = app.emit("faultrec://tick", 0u32);
-    Ok(Status { recording: true, finishing: false, secs: 0, max_secs: MAX_SECS as u32, id: Some(id), error: None, mic: mic_on })
+    Ok(Status { recording: true, finishing: false, secs: 0, max_secs: MAX_SECS as u32, id: Some(id), error: None, mic: mic_on, system_audio: sys_on, paused: false, drawing: false, camera: false })
 }
 
 /// Las ventanas que se pueden grabar (las de arriba primero). El título es solo para el selector: no se guarda.
@@ -1028,11 +1186,316 @@ pub fn faultrec_region_done(app: tauri::AppHandle, region: Option<Region>) -> Re
 /// Cómo va: grabando (y cuántos segundos), terminando de preparar las marcas, o el fallo de la última vez.
 #[tauri::command]
 pub fn faultrec_status() -> Status {
-    let (recording, secs, id, mic) = match lock(&ACTIVE).as_ref() {
-        Some(a) => (true, lock(&a.first).map_or(0, |s| s.at.elapsed().as_secs().min(MAX_SECS) as u32), Some(a.id.clone()), a.mic),
-        None => (false, 0, None, false),
+    let (recording, secs, id, mic, system_audio, paused) = match lock(&ACTIVE).as_ref() {
+        Some(a) => (true, (a.video_now_ms() / 1000).min(MAX_SECS as u32), Some(a.id.clone()), a.mic, a.sys, a.paused_at.is_some()),
+        None => (false, 0, None, false, false, false),
     };
-    Status { recording, finishing: FINISHING.load(Ordering::SeqCst), secs, max_secs: MAX_SECS as u32, id, error: lock(&LAST_ERROR).take(), mic }
+    Status { recording, finishing: FINISHING.load(Ordering::SeqCst), secs, max_secs: MAX_SECS as u32, id, error: lock(&LAST_ERROR).take(), mic, system_audio, paused, drawing: DRAWING.load(Ordering::SeqCst), camera: CAMERA.load(Ordering::SeqCst) }
+}
+
+
+/// ¿Está abierta la capa de dibujo?
+static DRAWING: AtomicBool = AtomicBool::new(false);
+/// ¿Está la cámara en la esquina?
+static CAMERA: AtomicBool = AtomicBool::new(false);
+
+/// Dónde va la cámara: un cuadrado de un cuarto del lado corto de lo que se graba (entre 140 y 360 px físicos),
+/// abajo a la derecha con un margen. `(x, y, lado)` en píxeles físicos de la pantalla.
+pub fn camera_rect(mon: (i32, i32, u32, u32), area: Option<Region>) -> (i32, i32, u32) {
+    let (mx, my, mw, mh) = mon;
+    let (x, y, w, h) = match area {
+        Some(r) => (mx + r.x, my + r.y, r.w, r.h),
+        None => (mx, my, mw, mh),
+    };
+    let side = (w.min(h) / 4).clamp(140, 360).min(w.min(h));
+    // El margen nunca la saca de la zona (en una zona pequeña la cámara la ocupa casi entera).
+    let margin = (side / 8).min((w.min(h) - side) / 2) as i32;
+    (x + w as i32 - side as i32 - margin, y + h as i32 - side as i32 - margin, side)
+}
+
+/// «Cámara»: la webcam en un círculo en la esquina de lo que se graba. Es una ventana más encima del monitor, así
+/// que sale en el vídeo; se puede arrastrar a otra esquina y se cierra al parar. Avisa por `faultrec://camera`.
+#[tauri::command(async)]
+pub fn faultrec_camera(app: tauri::AppHandle, on: bool) -> Result<bool, String> {
+    if !on {
+        if let Some(w) = app.get_webview_window(CAM) {
+            let _ = w.close();
+        }
+        return Ok(false);
+    }
+    if app.get_webview_window(CAM).is_some() {
+        return Ok(true);
+    }
+    let (mon, area) = {
+        let active = lock(&ACTIVE);
+        let a = active.as_ref().ok_or("No se está grabando.")?;
+        if a.window {
+            return Err("La cámara sale al grabar un monitor o una zona: una ventana grabada no enseña lo que hay encima.".into());
+        }
+        (a.mon.clone().ok_or("No se sabe qué monitor se está grabando.")?, a.area)
+    };
+    let (x, y, side) = camera_rect((mon.x, mon.y, mon.width, mon.height), area);
+    let mut b = tauri::WebviewWindowBuilder::new(&app, CAM, tauri::WebviewUrl::App("index.html".into()))
+        .title("AdminOps · cámara")
+        .inner_size(200.0, 200.0)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .disable_drag_drop_handler()
+        .initialization_script("window.__ADMINOPS_CAM__ = true;");
+    if let Some(args) = app.config().app.windows.first().and_then(|w| w.additional_browser_args.clone()) {
+        b = b.additional_browser_args(&args);
+    }
+    let w = b.build().map_err(|e| format!("No se pudo abrir la cámara: {e}"))?;
+    // La grabación pudo pararse sola mientras se creaba: `finish` suelta ACTIVE antes de cerrar estas ventanas, así
+    // que si ya no está, nadie cerraría esta.
+    if lock(&ACTIVE).is_none() {
+        let _ = w.close();
+        return Err("La grabación ya terminó.".into());
+    }
+    let app2 = app.clone();
+    w.on_window_event(move |ev| {
+        if let tauri::WindowEvent::Destroyed = ev {
+            CAMERA.store(false, Ordering::SeqCst);
+            let _ = app2.emit("faultrec://camera", false);
+        }
+    });
+    // Primero dentro del monitor (así toma su escala) y luego, ya con su tamaño real, en la esquina.
+    for _ in 0..2 {
+        let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+        let _ = w.set_size(tauri::PhysicalSize::new(side, side));
+    }
+    w.show().map_err(|e| e.to_string())?;
+    CAMERA.store(true, Ordering::SeqCst);
+    let _ = app.emit("faultrec://camera", true);
+    Ok(true)
+}
+
+/// «Dibujar»: abre (o cierra) una capa transparente, siempre encima, que cubre el monitor que se graba. Con el ratón
+/// se pinta en rojo encima de lo que se ve y cada trazo se borra solo a los 3 segundos; Esc o el mismo botón la cierran.
+/// Como la capa es una ventana más del monitor, sale en el vídeo. Avisa por `faultrec://draw` (`true` = abierta).
+#[tauri::command(async)]
+pub fn faultrec_draw(app: tauri::AppHandle, on: bool) -> Result<bool, String> {
+    if !on {
+        close_draw(&app);
+        return Ok(false);
+    }
+    if app.get_webview_window(DRAW).is_some() {
+        return Ok(true);
+    }
+    let mon = {
+        let active = lock(&ACTIVE);
+        let a = active.as_ref().ok_or("No se está grabando.")?;
+        // Al grabar una ventana solo sale esa ventana: lo que se pinte encima del escritorio no entraría en el vídeo.
+        if a.window {
+            return Err("Dibujar vale al grabar un monitor o una zona: una ventana grabada no enseña lo que se pinta encima.".into());
+        }
+        a.mon.clone().ok_or("No se sabe qué monitor se está grabando.")?
+    };
+    let mut b = tauri::WebviewWindowBuilder::new(&app, DRAW, tauri::WebviewUrl::App("index.html".into()))
+        .title("AdminOps · dibujar")
+        .inner_size(400.0, 300.0)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(true)
+        .visible(false)
+        .disable_drag_drop_handler()
+        .initialization_script("window.__ADMINOPS_DRAW__ = true;");
+    if let Some(args) = app.config().app.windows.first().and_then(|w| w.additional_browser_args.clone()) {
+        b = b.additional_browser_args(&args);
+    }
+    let w = b.build().map_err(|e| format!("No se pudo abrir la capa de dibujo: {e}"))?;
+    // Igual que la cámara: si la grabación terminó mientras se creaba, nadie la cerraría.
+    if lock(&ACTIVE).is_none() {
+        let _ = w.close();
+        return Err("La grabación ya terminó.".into());
+    }
+    // Si se cierra por cualquier camino (Esc, Alt+F4, parar la grabación), se avisa a quien tenga el botón.
+    let app2 = app.clone();
+    w.on_window_event(move |ev| {
+        if let tauri::WindowEvent::Destroyed = ev {
+            DRAWING.store(false, Ordering::SeqCst);
+            let _ = app2.emit("faultrec://draw", false);
+        }
+    });
+    // Primero dentro del monitor (así toma su escala) y luego, ya con su tamaño real, encima de él.
+    for _ in 0..2 {
+        let _ = w.set_position(tauri::PhysicalPosition::new(mon.x, mon.y));
+        let _ = w.set_size(tauri::PhysicalSize::new(mon.width, mon.height));
+    }
+    w.show().map_err(|e| e.to_string())?;
+    let _ = w.set_focus();
+    DRAWING.store(true, Ordering::SeqCst);
+    // La capa tapa todo el monitor: la píldora y la barra del cohete se vuelven a poner encima para poder quitarla.
+    for label in [PILL, "rocket"] {
+        if let Some(p) = app.get_webview_window(label) {
+            let _ = p.set_always_on_top(false);
+            let _ = p.set_always_on_top(true);
+        }
+    }
+    let _ = app.emit("faultrec://draw", true);
+    Ok(true)
+}
+
+/// Pone o quita la pausa de la grabación en marcha y lo avisa por `faultrec://paused` (`true` = en pausa).
+fn set_paused(app: &tauri::AppHandle, on: bool) -> Result<Status, String> {
+    {
+        let mut active = lock(&ACTIVE);
+        let a = active.as_mut().ok_or("No se está grabando.")?;
+        // Antes del primer fotograma no hay reloj: no hay nada que pausar.
+        if lock(&a.first).is_none() {
+            return Err("La grabación todavía no ha empezado.".into());
+        }
+        let wall = a.wall_ms();
+        if on && a.paused_at.is_none() {
+            a.paused_at = Some(wall);
+            a.pause.store(true, Ordering::SeqCst);
+        } else if !on {
+            if let Some(s) = a.paused_at.take() {
+                a.pauses.push((s, wall));
+            }
+            a.pause.store(false, Ordering::SeqCst);
+        }
+    }
+    let _ = app.emit("faultrec://paused", on);
+    Ok(faultrec_status())
+}
+
+/// «Pausar»: el vídeo y el audio dejan de escribirse y el tiempo no avanza; al seguir, queda en una sola pieza.
+#[tauri::command]
+pub fn faultrec_pause(app: tauri::AppHandle) -> Result<Status, String> {
+    set_paused(&app, true)
+}
+
+/// «Seguir»: sigue grabando donde se quedó.
+#[tauri::command]
+pub fn faultrec_resume(app: tauri::AppHandle) -> Result<Status, String> {
+    set_paused(&app, false)
+}
+
+/// Pone una marca («Marca») en el segundo actual del vídeo. Devuelve ese segundo y lo avisa por `faultrec://marked`.
+fn add_mark(app: &tauri::AppHandle) -> Result<u32, String> {
+    /// Las que caben como mucho: más que eso ya no es una línea de tiempo que se pueda leer.
+    const MAX_MANUAL: usize = 60;
+    let t = {
+        let mut active = lock(&ACTIVE);
+        let a = active.as_mut().ok_or("No se está grabando.")?;
+        if lock(&a.first).is_none() {
+            return Err("La grabación todavía no ha empezado.".into());
+        }
+        let t = a.video_now_ms() / 1000;
+        if a.manual.len() >= MAX_MANUAL {
+            return Err("Ya hay demasiadas marcas en esta grabación.".into());
+        }
+        if !a.manual.contains(&t) {
+            a.manual.push(t);
+        }
+        t
+    };
+    let _ = app.emit("faultrec://marked", t);
+    Ok(t)
+}
+
+/// «Marcar»: apunta este momento en la línea de tiempo de la grabación (también con Ctrl+Alt+M).
+#[tauri::command]
+pub fn faultrec_mark(app: tauri::AppHandle) -> Result<u32, String> {
+    add_mark(&app)
+}
+
+/// Hilo del atajo Ctrl+Alt+M (0 = aún no existe). Los atajos de Windows son de un hilo: se registran y se
+/// sueltan desde el mismo, así que se le mandan mensajes.
+static MARK_TID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+#[cfg(windows)]
+const MARK_ON: u32 = windows_sys::Win32::UI::WindowsAndMessaging::WM_APP + 1;
+#[cfg(windows)]
+const MARK_OFF: u32 = windows_sys::Win32::UI::WindowsAndMessaging::WM_APP + 2;
+
+/// Ctrl+Alt+M: marca el momento mientras se graba. Se coge al empezar a grabar y se suelta al parar: fuera de
+/// una grabación es de quien lo use (en Word, por ejemplo, es un atajo propio).
+fn start_mark_hotkey(app: &tauri::AppHandle) {
+    mark_hotkey(app, true);
+}
+
+fn stop_mark_hotkey(app: &tauri::AppHandle) {
+    mark_hotkey(app, false);
+}
+
+fn mark_hotkey(app: &tauri::AppHandle, on: bool) {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::PostThreadMessageW;
+        if !on && MARK_TID.load(Ordering::SeqCst) == 0 {
+            return;
+        }
+        let app = app.clone();
+        ONCE.call_once(move || {
+            let (tx, rx) = std::sync::mpsc::channel::<()>();
+            let _ = std::thread::Builder::new().name("faultrec-markkey".into()).spawn(move || {
+                use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+                use windows_sys::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT};
+                use windows_sys::Win32::UI::WindowsAndMessaging::{GetMessageW, PeekMessageW, MSG, PM_NOREMOVE, WM_HOTKEY, WM_USER};
+                // SAFETY: punteros a datos de este hilo; el atajo es de este hilo y se suelta aquí mismo.
+                unsafe {
+                    let mut msg: MSG = std::mem::zeroed();
+                    // Crea la cola de mensajes del hilo antes de decir que está listo.
+                    PeekMessageW(&mut msg, std::ptr::null_mut(), WM_USER, WM_USER, PM_NOREMOVE);
+                    MARK_TID.store(GetCurrentThreadId(), Ordering::SeqCst);
+                    let _ = tx.send(());
+                    let mut held = false;
+                    while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+                        match msg.message {
+                            MARK_ON if !held => {
+                                // Otro proceso de AdminOps puede tardar un poco en soltarlo.
+                                for i in 0..3 {
+                                    if RegisterHotKey(std::ptr::null_mut(), 6, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, u32::from(b'M')) != 0 {
+                                        held = true;
+                                        break;
+                                    }
+                                    if i < 2 {
+                                        std::thread::sleep(Duration::from_millis(700));
+                                    }
+                                }
+                                if !held {
+                                    log::warn!("Grabar el fallo: no se pudo registrar Ctrl+Alt+M para marcar: lo usa otro programa.");
+                                }
+                            }
+                            MARK_OFF if held => {
+                                UnregisterHotKey(std::ptr::null_mut(), 6);
+                                held = false;
+                            }
+                            // Fuera de una grabación no hace nada.
+                            WM_HOTKEY => drop(add_mark(&app)),
+                            _ => {}
+                        }
+                    }
+                }
+            });
+            let _ = rx.recv_timeout(Duration::from_secs(2));
+        });
+        let tid = MARK_TID.load(Ordering::SeqCst);
+        if tid != 0 {
+            // SAFETY: solo se pone un mensaje en la cola de ese hilo.
+            unsafe {
+                PostThreadMessageW(tid, if on { MARK_ON } else { MARK_OFF }, 0, 0);
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (app, on, &ONCE);
 }
 
 /// Para y guarda. Vuelve a poner AdminOps al frente; devuelve la grabación con sus marcas.
@@ -1239,6 +1702,61 @@ pub fn faultrec_export(app: tauri::AppHandle, id: String, from_ms: u64, to_ms: u
     Ok(Some(Exported { path: out.to_string_lossy().into_owned(), ms }))
 }
 
+/// La carpeta temporal de AdminOps (lo que se copia al portapapeles va ahí con un nombre legible).
+fn temp_out_dir() -> Result<PathBuf, String> {
+    let out_dir = std::env::temp_dir().join("AdminOps");
+    std::fs::create_dir_all(&out_dir).map_err(|e| format!("No se pudo preparar la carpeta temporal: {e}"))?;
+    Ok(out_dir)
+}
+
+/// «Para enviar»: una copia pequeña (720p como mucho, 15 fotogramas por segundo) para mandarla por Teams o el correo.
+/// Se deja en la carpeta temporal y se pone en el portapapeles como archivo. Tarda un poco: se vuelve a codificar.
+#[tauri::command(async)]
+pub fn faultrec_export_small(app: tauri::AppHandle, id: String) -> Result<Exported, String> {
+    if !valid_id(&id) {
+        return Err("Grabación desconocida.".into());
+    }
+    let d = dir(&app);
+    let meta = read_meta(&meta_file(&d, &id)).ok_or("Esa grabación ya no está.")?;
+    let video = video_file(&d, &id);
+    if !video.exists() {
+        return Err("El vídeo de esa grabación ya no está.".into());
+    }
+    let out = temp_out_dir()?.join(small_name(&export_name(meta.started, 0)));
+    let ms = clip::shrink(&video, &out)?;
+    crate::rocketbar::copy_file_to_clipboard(&out)?;
+    Ok(Exported { path: out.to_string_lossy().into_owned(), ms })
+}
+
+/// «GIF de 8 s»: un GIF del trozo (8 segundos como mucho, 480 de ancho, 10 fotogramas por segundo) y al portapapeles.
+#[tauri::command(async)]
+pub fn faultrec_export_gif(app: tauri::AppHandle, id: String, from_ms: u64, to_ms: u64) -> Result<Exported, String> {
+    if !valid_id(&id) {
+        return Err("Grabación desconocida.".into());
+    }
+    let d = dir(&app);
+    let meta = read_meta(&meta_file(&d, &id)).ok_or("Esa grabación ya no está.")?;
+    let video = video_file(&d, &id);
+    if !video.exists() {
+        return Err("El vídeo de esa grabación ya no está.".into());
+    }
+    let (from, to) = clamp_range(&meta, from_ms, to_ms);
+    let out = temp_out_dir()?.join(gif_name(&export_name(meta.started, from)));
+    let ms = clip::gif(&video, &out, from, to)?;
+    crate::rocketbar::copy_file_to_clipboard(&out)?;
+    Ok(Exported { path: out.to_string_lossy().into_owned(), ms })
+}
+
+/// «grabacion-2026-11-23-1042.mp4» → «grabacion-2026-11-23-1042-para-enviar.mp4».
+fn small_name(name: &str) -> String {
+    format!("{}-para-enviar.mp4", name.trim_end_matches(".mp4"))
+}
+
+/// «grabacion-2026-11-23-1042.mp4» → «grabacion-2026-11-23-1042.gif».
+fn gif_name(name: &str) -> String {
+    format!("{}.gif", name.trim_end_matches(".mp4"))
+}
+
 // ---------- Al parar, desde la barra del cohete ----------
 
 /// «Al caso»: la grabación pasa al caso abierto (así no se borra al cerrar AdminOps y sale en el caso).
@@ -1435,6 +1953,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn camara_en_la_esquina() {
+        // Monitor 1920×1080 en (0,0): lado 270, abajo a la derecha con margen 33.
+        assert_eq!(super::camera_rect((0, 0, 1920, 1080), None), (1920 - 270 - 33, 1080 - 270 - 33, 270));
+        // Zona pequeña: nunca más grande que la zona, y dentro de ella.
+        let (x, y, s) = super::camera_rect((100, 0, 1920, 1080), Some(super::Region { x: 10, y: 20, w: 120, h: 100 }));
+        assert!(s <= 100 && x >= 110 && y >= 20, "{x} {y} {s}");
+    }
+
+    #[test]
     fn g4_trozo_titulo_lineas_y_nombre() {
         let m = Meta {
             id: "fr-1".into(),
@@ -1599,6 +2126,52 @@ mod tests {
         assert_eq!(region_target(1920, 64), "Zona de 1920 × 64");
     }
 
+
+    #[test]
+    fn el_tiempo_del_video_no_cuenta_las_pausas() {
+        let pauses: Vec<Pause> = vec![(10_000, 14_000), (20_000, 21_000)];
+        assert_eq!(video_ms(&pauses, None, 5_000), 5_000);
+        // Dentro de una pausa se queda donde empezó.
+        assert_eq!(video_ms(&pauses, None, 12_000), 10_000);
+        assert_eq!(video_ms(&pauses, None, 14_000), 10_000);
+        assert_eq!(video_ms(&pauses, None, 18_000), 14_000);
+        assert_eq!(video_ms(&pauses, None, 30_000), 25_000);
+        // Una pausa abierta cuenta hasta ahora.
+        assert_eq!(video_ms(&pauses, Some(40_000), 45_000), 45_000 - 4_000 - 1_000 - 5_000);
+        assert_eq!(video_ms(&[], None, 7), 7);
+        assert!(in_pause(&pauses, 10_000) && in_pause(&pauses, 13_999) && !in_pause(&pauses, 14_000) && !in_pause(&pauses, 9_999));
+        assert_eq!(paused_total_ms(&pauses), 5_000);
+    }
+
+    #[test]
+    fn lo_medido_y_lo_pulsado_se_pasa_al_tiempo_del_video() {
+        let pauses: Vec<Pause> = vec![(2_000, 5_000)];
+        let tick = |t: u32| Tick { t, cpu: t as f32, ..Default::default() };
+        let out = remap_ticks(&[tick(0), tick(1), tick(2), tick(3), tick(4), tick(5), tick(6)], &pauses);
+        assert_eq!(out.iter().map(|t| t.t).collect::<Vec<_>>(), vec![0, 1, 2, 3]);
+        assert_eq!(out.iter().map(|t| t.cpu as u32).collect::<Vec<_>>(), vec![0, 1, 5, 6]);
+        let ev = |t: u32| InputEvent { t, kind: "keys".into(), ..Default::default() };
+        let input = remap_input(vec![ev(1_000), ev(3_000), ev(5_500)], &pauses);
+        assert_eq!(input.iter().map(|e| e.t).collect::<Vec<_>>(), vec![1_000, 2_500]);
+        // Sin pausas no se toca nada.
+        assert_eq!(remap_input(vec![ev(9)], &[]).len(), 1);
+    }
+
+    #[test]
+    fn los_nombres_de_las_copias_para_enviar() {
+        assert_eq!(small_name("grabacion-2026-11-23-1042.mp4"), "grabacion-2026-11-23-1042-para-enviar.mp4");
+        assert_eq!(gif_name("grabacion-2026-11-23-1042.mp4"), "grabacion-2026-11-23-1042.gif");
+        assert_eq!(gif_name("grabacion.mp4"), "grabacion.gif");
+    }
+
+    #[test]
+    fn las_opciones_nuevas_del_audio_del_equipo_se_leen() {
+        let none: StartOptions = serde_json::from_str("{}").unwrap();
+        assert!(!none.system_audio);
+        let o: StartOptions = serde_json::from_str(r#"{"systemAudio":true,"mic":true}"#).unwrap();
+        assert!(o.system_audio && o.mic);
+    }
+
     #[test]
     fn las_opciones_de_empezar_se_leen_en_camel_case_y_todo_es_opcional() {
         let none: StartOptions = serde_json::from_str("{}").unwrap();
@@ -1669,7 +2242,7 @@ mod tests {
         let video = video_file(&d, "fr-1");
         let first: Arc<Mutex<Option<Started>>> = Arc::new(Mutex::new(None));
         let stop = Arc::new(AtomicBool::new(false));
-        let job = capture::Job { gdi: String::new(), window, region, mic, out: video.clone(), stop: stop.clone(), first: first.clone(), max: Duration::from_secs(3) };
+        let job = capture::Job { gdi: String::new(), window, region, mic, sys: None, pause: Arc::new(AtomicBool::new(false)), out: video.clone(), stop: stop.clone(), first: first.clone(), max: Duration::from_secs(3) };
         // Clics y teclas a la vez, como al grabar de verdad (aquí nadie pulsa nada).
         let (f2, s2) = (first.clone(), stop.clone());
         let watch = input::Watch { gdi: String::new(), window, region };
@@ -1748,7 +2321,7 @@ mod tests {
         let part = part_file(&d, "fr-1");
         let first: Arc<Mutex<Option<Started>>> = Arc::new(Mutex::new(None));
         let stop = Arc::new(AtomicBool::new(false));
-        let job = capture::Job { gdi: String::new(), window: None, region: None, mic: None, out: part.clone(), stop: stop.clone(), first: first.clone(), max: Duration::from_secs(3) };
+        let job = capture::Job { gdi: String::new(), window: None, region: None, mic: None, sys: None, pause: Arc::new(AtomicBool::new(false)), out: part.clone(), stop: stop.clone(), first: first.clone(), max: Duration::from_secs(3) };
         // El hilo que apunta procesador, disco y programas colgados, como al grabar de verdad.
         let (f2, s2) = (first.clone(), stop.clone());
         let watcher = std::thread::spawn(move || watch::run(f2, s2));

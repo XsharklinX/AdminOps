@@ -36,7 +36,7 @@ export function shouldNudge(highSince: number | null, now: number): boolean {
 /** Tamaño de cada panel al lado de la burbuja (px de la página, antes del tamaño elegido). */
 export const BUBBLE = 68;
 export const PANEL_W = 344;
-export const PANEL_H = { result: 68, nudge: 68, auto: 68, error: 68, hung: 100, menu: 232, deep: 222, details: 236, call: 170 } as const;
+export const PANEL_H = { progress: 152, result: 68, nudge: 68, auto: 68, error: 68, hung: 100, menu: 232, deep: 222, details: 236, call: 170 } as const;
 export type PanelKind = keyof typeof PANEL_H;
 
 /** Sumas por línea del desglose: la barra más larga es la del que más soltó. */

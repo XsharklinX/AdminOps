@@ -85,7 +85,7 @@ export function StartWindow({ s, set }: SettingsProps) {
         </Row>
         <Row
           title="Icono junto al reloj"
-          sub="Un icono de AdminOps al lado del reloj de Windows. Clic para abrirla; clic derecho para un análisis rápido, la nota de llamada, el mini monitor, los avisos o salir. Windows 11 lo deja al principio en los iconos ocultos (la flecha «^» junto al reloj): arrástralo de ahí a la barra para tenerlo siempre a la vista."
+          sub="Un icono de AdminOps al lado del reloj de Windows. Clic para abrirla; clic derecho para un análisis rápido, una nota nueva, el mini monitor, los avisos o salir. Windows 11 lo deja al principio en los iconos ocultos (la flecha «^» junto al reloj): arrástralo de ahí a la barra para tenerlo siempre a la vista."
         >
           <Toggle checked={s.trayIcon} onChange={(v) => set({ trayIcon: v })} />
         </Row>
@@ -114,6 +114,9 @@ export function StartWindow({ s, set }: SettingsProps) {
               sub="Si la memoria pasa del 90 % durante dos minutos, o el equipo lleva un rato sin usarse con la memoria alta, el cohete optimiza solo y lo dice en la burbuja. Nunca con una presentación, un vídeo a pantalla completa o el micrófono en uso; como mucho una vez cada media hora."
             >
               <Toggle checked={!!s.rocketAuto} onChange={(v) => set({ rocketAuto: v })} />
+            </Row>
+            <Row title="Empezar el día ligero" sub="Una vez al día, al poco de encender el equipo (cuando Windows ya ha cargado lo suyo), el cohete optimiza solo y saluda con lo que liberó.">
+              <Toggle checked={!!s.rocketMorning} onChange={(v) => set({ rocketMorning: v })} />
             </Row>
             {(s.rocket ?? "desktop") === "desktop" && <RocketStartup />}
           </>

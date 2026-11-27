@@ -61,13 +61,33 @@ pub fn valid_side(s: &Side) -> bool {
     s.screen_min <= 24 * 60 && s.sleep_min <= 24 * 60 && s.lid <= 3
 }
 
+/// Una por equipo: en la versión portable la carpeta de datos es la del USB, compartida entre equipos, y la
+/// hibernación de uno no puede acabar puesta en otro.
 fn hibernate_file() -> Option<std::path::PathBuf> {
+    let host: String = std::env::var("COMPUTERNAME").unwrap_or_default().chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
+    crate::paths::shared_data_dir_early().map(|d| d.join(if host.is_empty() { "energia-hibernar.json".to_string() } else { format!("energia-hibernar-{host}.json") }))
+}
+
+/// El archivo de la 1.5.0 (uno solo, sin el nombre del equipo). Solo cuenta instalada: en portable podría ser de
+/// otro equipo.
+fn legacy_hibernate_file() -> Option<std::path::PathBuf> {
+    if crate::paths::is_portable() {
+        return None;
+    }
     crate::paths::shared_data_dir_early().map(|d| d.join("energia-hibernar.json"))
+}
+
+/// Ya recuperada: se olvida, para no volver a ponerla más tarde si el usuario la quita.
+fn forget_hibernate() {
+    for f in [hibernate_file(), legacy_hibernate_file()].into_iter().flatten() {
+        let _ = std::fs::remove_file(f);
+    }
 }
 
 /// La hibernación (segundos, enchufado y con batería) que había antes de «nunca se suspende».
 fn saved_hibernate() -> Option<(u32, u32)> {
-    hibernate_file().and_then(|f| std::fs::read(f).ok()).and_then(|b| serde_json::from_slice(&b).ok())
+    let read = |f: std::path::PathBuf| std::fs::read(f).ok().and_then(|b| serde_json::from_slice(&b).ok());
+    hibernate_file().and_then(read).or_else(|| legacy_hibernate_file().and_then(read))
 }
 
 fn save_hibernate(v: (u32, u32)) {
@@ -167,6 +187,10 @@ mod win {
         if (nac, ndc) != (hac, hdc) {
             write(&s, &SUB_SLEEP, &HIBERNATEIDLE, nac, ndc)?;
         }
+        // Un perfil que se suspende en los dos lados ya recuperó lo guardado.
+        if saved.is_some() && ac.sleep_min != 0 && dc.sleep_min != 0 {
+            super::forget_hibernate();
+        }
         if lid_present {
             write(&s, &SUB_BUTTONS, &LIDACTION, ac.lid, dc.lid)?;
         }
@@ -203,7 +227,14 @@ pub fn power_profiles() -> Vec<Profile> {
 
 /// Pone los valores (de un perfil o a medida) en el plan activo.
 #[tauri::command]
-pub async fn power_set(ac: Side, dc: Side) -> Result<PowerState, String> {
+pub async fn power_set(app: tauri::AppHandle, ac: Side, dc: Side) -> Result<PowerState, String> {
+    let title = format!("Energía: pantalla {}/{} min, suspender {}/{} min (enchufado/batería)", ac.screen_min, dc.screen_min, ac.sleep_min, dc.sleep_min);
+    let r = power_set_inner(ac, dc).await;
+    crate::tweaks::record_app(&app, &title, &r);
+    r
+}
+
+async fn power_set_inner(ac: Side, dc: Side) -> Result<PowerState, String> {
     if !valid_side(&ac) || !valid_side(&dc) {
         return Err("Valores de energía no válidos.".into());
     }

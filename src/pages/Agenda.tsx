@@ -381,7 +381,7 @@ export function Agenda({ onNavigate, focus }: { onNavigate: (page: PageId, focus
             </Card>
           )}
 
-          <p className="px-1 text-[11px] text-mute">AdminOps avisa 30 minutos antes de cada cosa y, al abrirlo, de lo que hay hoy. Los seguimientos de la nota de llamada (Ctrl+Alt+N) también salen aquí.</p>
+          <p className="px-1 text-[11px] text-mute">AdminOps avisa 30 minutos antes de cada cosa y, al abrirlo, de lo que hay hoy. Lo que apuntes «Para mañana» en una nota (Ctrl+Alt+N) también sale aquí.</p>
         </div>
 
         <div className="col-span-12 space-y-5 lg:col-span-8">

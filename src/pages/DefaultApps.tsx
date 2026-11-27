@@ -39,7 +39,7 @@ export function DefaultApps({ isAdmin }: { isAdmin: boolean }) {
     setBusy(true);
     try {
       const n = await defappsApi.apply();
-      toast("ok", `Puesto (${n} tipos de archivo). Windows lo aplica al volver a iniciar sesión, a todos los usuarios de este equipo.`);
+      toast("ok", `Puesto (${n} ${n === 1 ? "tipo" : "tipos"} de la lista). Windows lo aplica al volver a iniciar sesión, a todos los usuarios de este equipo.`);
       load();
     } catch (e) {
       toast("error", String(e));
@@ -51,7 +51,7 @@ export function DefaultApps({ isAdmin }: { isAdmin: boolean }) {
     setBusy(true);
     try {
       const n = await defappsApi.applyNewUsers();
-      setNewUsers(`Guardado (${n} tipos de archivo): los usuarios que se creen en este equipo ya salen así.`);
+      setNewUsers(`Guardado (${n} ${n === 1 ? "tipo" : "tipos"} de la lista): los usuarios que se creen en este equipo ya salen así.`);
     } catch (e) {
       toast("error", String(e));
     } finally {

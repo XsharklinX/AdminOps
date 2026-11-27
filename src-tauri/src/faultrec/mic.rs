@@ -1,5 +1,7 @@
 //! La voz del técnico: el micrófono por defecto de Windows (WASAPI compartido) pasado a PCM de 16 bits,
 //! 48 000 Hz y un canal, que el hilo de captura mete en la segunda pista (AAC) del MP4.
+//! También el sonido del equipo (lo que suena por el altavoz predeterminado, WASAPI en modo «loopback»), con
+//! el mismo formato: se mezcla con la voz en esa misma pista.
 //!
 //! El micrófono vive en su propio hilo (con su COM) y manda trozos de muestras por un canal. Si no arranca
 //! (no hay micrófono, Windows no deja usarlo, un error), se graba igual sin voz y la nota lo cuenta.
@@ -15,6 +17,9 @@ pub const RATE: u32 = 48_000;
 pub const TENTH: usize = (RATE / 10) as usize;
 /// Si el audio va más de esto por detrás del vídeo, se rellena con silencio (200 ms).
 pub const MAX_LAG: u64 = (RATE / 5) as u64;
+
+/// Con el sonido del equipo, no se escribe un trozo de menos de 10 ms (no merece la pena una muestra por llamada).
+pub const MIN_BLOCK: usize = (RATE / 100) as usize;
 
 const E_ACCESSDENIED: u32 = 0x8007_0005;
 const E_NOTFOUND: u32 = 0x8007_0490;
@@ -48,7 +53,18 @@ impl MicError {
     }
 }
 
-/// Un micrófono en marcha.
+impl MicError {
+    /// La nota cuando falla el sonido del equipo (no hay permiso de privacidad que pedir: solo puede faltar la salida).
+    pub fn note_system(&self) -> String {
+        match self {
+            MicError::Denied => "No se grabó el sonido del equipo: Windows no dejó abrir la salida de audio.".to_string(),
+            MicError::NoDevice => "No se grabó el sonido del equipo: no hay ninguna salida de audio.".to_string(),
+            MicError::Other(e) => format!("No se grabó el sonido del equipo: {}.", e.trim().trim_end_matches('.')),
+        }
+    }
+}
+
+/// Un micrófono (o el sonido del equipo) en marcha.
 pub struct Mic {
     /// Trozos de muestras (16 bits, 48 000 Hz, un canal) a medida que llegan.
     pub rx: Receiver<Vec<i16>>,
@@ -129,6 +145,35 @@ pub fn hns_of(samples: u64) -> i64 {
     (u128::from(samples) * 10_000_000 / u128::from(RATE)) as i64
 }
 
+/// Suma dos pistas muestra a muestra con saturación (nunca da la vuelta al pasarse). La más corta se completa con
+/// silencio.
+pub fn mix(a: &[i16], b: &[i16]) -> Vec<i16> {
+    (0..a.len().max(b.len()))
+        .map(|i| {
+            let s = i32::from(a.get(i).copied().unwrap_or(0)) + i32::from(b.get(i).copied().unwrap_or(0));
+            s.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16
+        })
+        .collect()
+}
+
+/// Saca de `pending` las primeras `n` muestras; si hay menos, se completa con silencio (el sonido del equipo no
+/// entrega nada mientras no suena nada, y la pista tiene que seguir el reloj del vídeo).
+pub fn take_padded(pending: &mut Vec<i16>, n: usize) -> Vec<i16> {
+    let k = n.min(pending.len());
+    let mut out: Vec<i16> = pending.drain(..k).collect();
+    out.resize(n, 0);
+    out
+}
+
+/// Si una pista va más de un segundo por delante de lo que toca, se tira lo más viejo: así un retraso no crece sin fin.
+pub fn trim_backlog(pending: &mut Vec<i16>, n: usize) {
+    let keep = n + RATE as usize;
+    if pending.len() > keep {
+        let extra = pending.len() - keep;
+        pending.drain(..extra);
+    }
+}
+
 // ---------- El micrófono de Windows ----------
 
 #[cfg(not(windows))]
@@ -136,8 +181,13 @@ pub fn start() -> Result<Mic, MicError> {
     Err(MicError::Other("Windows es el único sistema donde se graba la voz".into()))
 }
 
+#[cfg(not(windows))]
+pub fn start_system() -> Result<Mic, MicError> {
+    Err(MicError::Other("Windows es el único sistema donde se graba el sonido del equipo".into()))
+}
+
 #[cfg(windows)]
-pub use imp::start;
+pub use imp::{start, start_system};
 
 #[cfg(windows)]
 mod imp {
@@ -145,7 +195,7 @@ mod imp {
     use std::sync::mpsc::{channel, Sender};
     use std::time::Duration;
     use windows::Win32::Media::Audio::{
-        eCapture, eConsole, IAudioCaptureClient, IAudioClient, IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, WAVEFORMATEX,
+        eCapture, eConsole, eRender, IAudioCaptureClient, IAudioClient, IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, AUDCLNT_STREAMFLAGS_LOOPBACK, AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, WAVEFORMATEX,
         WAVE_FORMAT_PCM,
     };
     use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED};
@@ -154,11 +204,12 @@ mod imp {
         MicError::classify(x.code().0 as u32, &x.message())
     }
 
-    /// Abre el micrófono por defecto y empieza a capturar. Devuelve el cliente y el lector.
-    unsafe fn open() -> Result<(IAudioClient, IAudioCaptureClient), MicError> {
+    /// Abre el micrófono por defecto (o, con `system`, el altavoz predeterminado en modo «loopback»: lo que suena en
+    /// el equipo) y empieza a capturar. Devuelve el cliente y el lector.
+    unsafe fn open(system: bool) -> Result<(IAudioClient, IAudioCaptureClient), MicError> {
         unsafe {
             let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|x| classify(&x))?;
-            let device = enumerator.GetDefaultAudioEndpoint(eCapture, eConsole).map_err(|x| classify(&x))?;
+            let device = enumerator.GetDefaultAudioEndpoint(if system { eRender } else { eCapture }, eConsole).map_err(|x| classify(&x))?;
             let client: IAudioClient = device.Activate(CLSCTX_ALL, None).map_err(|x| classify(&x))?;
             let format = WAVEFORMATEX {
                 wFormatTag: WAVE_FORMAT_PCM as u16,
@@ -170,8 +221,10 @@ mod imp {
                 cbSize: 0,
             };
             // Que Windows convierta lo que dé el micrófono a lo pedido, y con búfer de un segundo.
+            // En «loopback» Windows solo entrega datos mientras algo suena: la mezcla con el vídeo rellena los huecos.
+            let flags = AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY | if system { AUDCLNT_STREAMFLAGS_LOOPBACK } else { 0 };
             client
-                .Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, 10_000_000, 0, &format, None)
+                .Initialize(AUDCLNT_SHAREMODE_SHARED, flags, 10_000_000, 0, &format, None)
                 .map_err(|x| classify(&x))?;
             let capture: IAudioCaptureClient = client.GetService().map_err(|x| classify(&x))?;
             client.Start().map_err(|x| classify(&x))?;
@@ -208,17 +261,26 @@ mod imp {
 
     /// Arranca el micrófono por defecto. Tarda como mucho unos segundos en saber si funciona.
     pub fn start() -> Result<Mic, MicError> {
+        start_source(false)
+    }
+
+    /// Arranca la captura de lo que suena por el altavoz predeterminado.
+    pub fn start_system() -> Result<Mic, MicError> {
+        start_source(true)
+    }
+
+    fn start_source(system: bool) -> Result<Mic, MicError> {
         let (tx, rx) = channel::<Vec<i16>>();
         let (ready_tx, ready_rx) = channel::<Result<(), MicError>>();
         let stop = Arc::new(AtomicBool::new(false));
         let stop2 = stop.clone();
         let handle = std::thread::Builder::new()
-            .name("faultrec-mic".into())
+            .name(if system { "faultrec-sysaudio" } else { "faultrec-mic" }.into())
             .spawn(move || {
                 // SAFETY: COM se inicia y se cierra en este mismo hilo, y todo lo que se crea se suelta antes.
                 unsafe {
                     let com = CoInitializeEx(None, COINIT_MULTITHREADED);
-                    match open() {
+                    match open(system) {
                         Ok((client, capture)) => {
                             let _ = ready_tx.send(Ok(()));
                             read_loop(&capture, &tx, &stop2);
@@ -244,7 +306,7 @@ mod imp {
             }
             Err(_) => {
                 stop.store(true, Ordering::SeqCst);
-                Err(MicError::Other("Windows tardó demasiado en abrir el micrófono".into()))
+                Err(MicError::Other("Windows tardó demasiado en abrir el audio".into()))
             }
         }
     }
@@ -329,5 +391,39 @@ mod tests {
         assert_eq!(MicError::Denied.note(), "No se grabó la voz: Windows no deja usar el micrófono a las aplicaciones (Configuración → Privacidad y seguridad → Micrófono).");
         assert_eq!(MicError::Other("dispositivo en uso.".into()).note(), "No se grabó la voz: dispositivo en uso.");
         assert_eq!(MicError::Other("fallo ".into()).note(), "No se grabó la voz: fallo.");
+    }
+
+    #[test]
+    fn la_mezcla_suma_con_saturacion_y_completa_la_mas_corta() {
+        assert_eq!(mix(&[100, -100, 5], &[1, 2]), vec![101, -98, 5]);
+        assert_eq!(mix(&[i16::MAX, i16::MIN], &[1000, -1000]), vec![i16::MAX, i16::MIN]);
+        assert_eq!(mix(&[], &[3, 4]), vec![3, 4]);
+        assert!(mix(&[], &[]).is_empty());
+    }
+
+    #[test]
+    fn se_saca_lo_pedido_y_se_rellena_con_silencio() {
+        let mut p = vec![1, 2, 3, 4, 5];
+        assert_eq!(take_padded(&mut p, 3), vec![1, 2, 3]);
+        assert_eq!(p, vec![4, 5]);
+        assert_eq!(take_padded(&mut p, 4), vec![4, 5, 0, 0]);
+        assert!(p.is_empty());
+        assert_eq!(take_padded(&mut p, 2), vec![0, 0]);
+    }
+
+    #[test]
+    fn el_atraso_no_crece_sin_fin() {
+        let mut p = vec![7i16; 200_000];
+        trim_backlog(&mut p, 4_800);
+        assert_eq!(p.len(), 4_800 + RATE as usize);
+        let mut q = vec![1i16; 100];
+        trim_backlog(&mut q, 4_800);
+        assert_eq!(q.len(), 100);
+    }
+
+    #[test]
+    fn el_fallo_del_sonido_del_equipo_se_cuenta() {
+        assert_eq!(MicError::NoDevice.note_system(), "No se grabó el sonido del equipo: no hay ninguna salida de audio.");
+        assert_eq!(MicError::Other("x.".into()).note_system(), "No se grabó el sonido del equipo: x.");
     }
 }

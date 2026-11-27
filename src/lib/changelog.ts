@@ -18,6 +18,24 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.5.1",
+    title: "La barra para los usuarios, Notas y grabaciones mejores",
+    added: [
+      "La barra en los PC de los usuarios sin administrador: solo optimizar, grabar, captura, velocidad, Notas, Asistencia rápida, Correo y Teams. Clic derecho en cada herramienta para sus opciones, iconos con color y nueve herramientas opcionales en Personalizar (contactos, impresora, pantallas, Wi-Fi y Bluetooth, teclado, mis carpetas, bloquear, reiniciar sin miedo y CMD).",
+      "Velocidad de internet con aguja en vivo, ping, bajada y subida, y el porcentaje de lo contratado. Datos del equipo con la red, la IP pública, Windows y los días encendido.",
+      "El cohete enseña la memoria bajando y cada paso con su ✓, limpia también la caché de los navegadores abiertos (nunca contraseñas, cookies ni historial) y puede empezar el día ligero por la mañana.",
+      "Grabar: el sonido del equipo, pausar y seguir, marcar con Ctrl+Alt+M, dibujar en la pantalla, la cámara en una esquina, controles en la barra, «Para enviar» (copia pequeña) y GIF de los últimos 8 s, y guardar en el Escritorio.",
+      "Notas: un cuaderno en Conocimiento → Notas con todo lo apuntado (buscar, fijar, editar). La nota rápida ahora es una nota libre con título.",
+      "Con una versión nueva, una flecha verde en la barra la instala ahí mismo.",
+    ],
+    fixed: [
+      "Seguridad: al cerrar AdminOps abierta con la cuenta del técnico en el PC de un usuario, el cohete que se queda ya no conserva ese administrador.",
+      "Con el modo auditoría, Asistencia rápida ya no se instala; reparar winget ya no quita los orígenes propios sin necesidad; en portable la hibernación de un equipo no pasa a otro.",
+      "USB, energía, programas predeterminados, audio y winget quedan en el diario y en el informe.",
+      "Al seguir tras una pausa el vídeo ya no se queda congelado; la píldora enseña el tiempo; Ctrl+Alt+M solo se usa mientras se graba.",
+    ],
+  },
+  {
     version: "1.5.0",
     title: "La barra del cohete, arreglos de oficina y la cámara",
     added: [

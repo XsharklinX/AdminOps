@@ -168,7 +168,13 @@ pub async fn audio_beep(id: String) -> Result<(), String> {
 /// «Usar este para todo»: predeterminado (también para llamadas), volumen y sin silencio; en un
 /// micrófono, además, los permisos que falten. Devuelve lo que hizo, frase a frase.
 #[tauri::command]
-pub async fn audio_use(id: String, capture: bool, volume: u32) -> Result<Vec<String>, String> {
+pub async fn audio_use(app: tauri::AppHandle, id: String, capture: bool, volume: u32) -> Result<Vec<String>, String> {
+    let r = audio_use_inner(id, capture, volume).await;
+    crate::tweaks::record_app(&app, if capture { "Audio: micrófono para todo" } else { "Audio: altavoz para todo" }, &r);
+    r
+}
+
+async fn audio_use_inner(id: String, capture: bool, volume: u32) -> Result<Vec<String>, String> {
     let volume = volume.clamp(10, 100);
     tauri::async_runtime::spawn_blocking(move || {
         #[cfg(windows)]
@@ -267,8 +273,10 @@ pub async fn audio_echo(mic: String, speaker: String, secs: u32) -> Result<f32, 
 }
 
 #[tauri::command]
-pub fn audio_allow_mic() -> Result<Vec<String>, String> {
-    allow_mic()
+pub fn audio_allow_mic(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let r = allow_mic();
+    crate::tweaks::record_app(&app, "Audio: permiso de micrófono para las aplicaciones", &r);
+    r
 }
 
 #[cfg(windows)]

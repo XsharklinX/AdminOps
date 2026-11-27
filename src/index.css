@@ -830,9 +830,9 @@ tr[tabindex]:focus-visible {
 }
 
 /* ---------- La barra de herramientas del cohete (components/RocketBar.tsx) ---------- */
-.rkb-col { display: flex; flex: none; flex-direction: column; align-items: center; width: 68px; padding-bottom: 6px; background: #151c24; border: 1px solid #2e3b49; box-shadow: -8px 10px 26px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.06); }
-.rkb-col.rkb-right { border-right: 0; border-radius: 34px 0 0 16px; }
-.rkb-col.rkb-left { border-left: 0; border-radius: 0 34px 16px 0; }
+.rkb-col { display: flex; flex: none; flex-direction: column; align-items: center; width: 68px; padding-bottom: 18px; background: #151c24; border: 1px solid #2e3b49; box-shadow: -8px 10px 26px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.06); }
+.rkb-col.rkb-right { border-right: 0; border-radius: 34px 0 0 34px; }
+.rkb-col.rkb-left { border-left: 0; border-radius: 0 34px 34px 0; }
 .rkb-col.rkb-tucked { background: transparent; border: 0; box-shadow: none; padding: 0; }
 .rkb-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 15px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: #5b8def; color: #0c1422; pointer-events: none; }
 .rkb-arrow-r { left: 4px; }
@@ -841,6 +841,9 @@ tr[tabindex]:focus-visible {
 .rkb-grip:active { cursor: grabbing; }
 .rkb-btn { position: relative; width: 38px; height: 36px; margin-top: 4px; border-radius: 10px; display: grid; place-items: center; color: #e8eef4; transition: background 0.15s; }
 .rkb-btn:hover, .rkb-btn.rkb-on { background: #1b242e; }
+.rkb-chip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; transition: transform 0.15s, filter 0.15s; }
+.rkb-btn:hover .rkb-chip { transform: scale(1.08); filter: brightness(1.15); }
+.rkb-btn:active .rkb-chip { transform: scale(0.94); }
 .rkb-btn.rkb-on { box-shadow: inset 0 0 0 1px #f2706b; }
 .rkb-badge { position: absolute; right: 0; top: 1px; padding: 0 3px; border-radius: 5px; background: #f5b84b; color: #0c1422; font: 600 8.5px/12px var(--font-mono); pointer-events: none; }
 .rkb-badge.rkb-rec { background: #f2706b; color: #fff; right: -4px; }
@@ -853,7 +856,13 @@ tr[tabindex]:focus-visible {
 .rkb-tools { display: flex; flex-direction: column; align-items: center; overflow-y: auto; overflow-x: visible; scrollbar-width: thin; scrollbar-color: #2e3b49 transparent; padding: 0 2px; }
 .rkb-edit { color: #76869a; border-top: 1px solid #2e3b49; border-radius: 0 0 10px 10px; margin-top: 4px; height: 32px; }
 .rkb-edit:hover { color: #e8eef4; }
+/* Esconder la barra: debajo del lápiz, centrada en el remate redondeado. */
+.rkb-hide { color: #76869a; height: 28px; width: 40px; border-radius: 14px; }
+.rkb-hide:hover { color: #e8eef4; background: #1b242e; }
 .rkb-tab { width: 22px; height: 64px; display: grid; place-items: center; background: #151c24; border: 1px solid #2e3b49; color: #e8eef4; box-shadow: -4px 6px 14px rgb(0 0 0 / 0.45); cursor: pointer; touch-action: none; }
 .rkb-tab:hover { background: #1b242e; color: #5b8def; }
 .rkb-tab-r { border-right: 0; border-radius: 10px 0 0 10px; }
 .rkb-tab-l { border-left: 0; border-radius: 0 10px 10px 0; }
+.rkb-update { color: #0c1422; background: #3ecf8e; margin-top: 2px; animation: rkb-glow 2s ease-in-out infinite; }
+.rkb-update:hover { background: #5fe0a6; }
+@keyframes rkb-glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(62 207 142 / 0.5); } 50% { box-shadow: 0 0 0 5px rgb(62 207 142 / 0); } }

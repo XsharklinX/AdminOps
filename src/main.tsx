@@ -7,6 +7,8 @@ import { ToastProvider } from "./components/feedback";
 import { MiniMonitor } from "./components/MiniMonitor";
 import { AdminOpsMini } from "./components/AdminOpsMini";
 import { AreaPicker } from "./components/AreaPicker";
+import { CamCorner } from "./components/CamCorner";
+import { DrawLayer } from "./components/DrawLayer";
 import { RecPill } from "./components/RecPill";
 import { RocketBar } from "./components/RocketBar";
 import { appApi } from "./lib/api";
@@ -19,17 +21,21 @@ import "./index.css";
 
 // ¿Es la ventanita de la nota de llamada (Ctrl+Alt+N) y no la aplicación?
 // Lo marca el programa al crearla (quicknote.rs).
-const flags = window as unknown as { __ADMINOPS_NOTE__?: boolean; __ADMINOPS_MONITOR__?: boolean; __ADMINOPS_MINI__?: boolean; __ADMINOPS_PILL__?: boolean; __ADMINOPS_AREA__?: boolean; __ADMINOPS_ROCKET__?: boolean };
+const flags = window as unknown as { __ADMINOPS_NOTE__?: boolean; __ADMINOPS_MONITOR__?: boolean; __ADMINOPS_MINI__?: boolean; __ADMINOPS_PILL__?: boolean; __ADMINOPS_AREA__?: boolean; __ADMINOPS_DRAW__?: boolean; __ADMINOPS_CAM__?: boolean; __ADMINOPS_ROCKET__?: boolean };
 const isMonitor = flags.__ADMINOPS_MONITOR__ === true;
 const isMini = flags.__ADMINOPS_MINI__ === true;
 // El contador de «Grabar el fallo» (faultrec.rs): otra ventanita.
 const isPill = flags.__ADMINOPS_PILL__ === true;
 // La capa para dibujar la zona que se graba (faultrec.rs, ventana `recarea`).
 const isArea = flags.__ADMINOPS_AREA__ === true;
+// La capa para dibujar encima del monitor que se graba (faultrec.rs, ventana `recdraw`).
+const isDraw = flags.__ADMINOPS_DRAW__ === true;
+// La cámara en la esquina de lo que se graba (faultrec.rs, ventana `reccam`).
+const isCam = flags.__ADMINOPS_CAM__ === true;
 // El cohete de «Optimizar ya» en el escritorio (rocket.rs).
 const isRocket = flags.__ADMINOPS_ROCKET__ === true;
 // Para el arranque, la nota, el mini monitor y la mini son lo mismo: una ventanita, no la aplicación.
-const isNote = flags.__ADMINOPS_NOTE__ === true || isMonitor || isMini || isPill || isArea || isRocket;
+const isNote = flags.__ADMINOPS_NOTE__ === true || isMonitor || isMini || isPill || isArea || isDraw || isCam || isRocket;
 
 // Lo primero de todo: decirle al programa que el código ya se está ejecutando.
 // En un equipo viejo pueden pasar diez segundos largos de aquí a la primera
@@ -56,7 +62,7 @@ window.addEventListener("unhandledrejection", (e) => appApi.logError(`Promesa si
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ErrorBoundary>{isRocket ? <RocketBar /> : isArea ? <AreaPicker /> : isPill ? <RecPill /> : isMini ? <ToastProvider listenUndo={false}><AdminOpsMini /></ToastProvider> : isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
+    <ErrorBoundary>{isRocket ? <RocketBar /> : isDraw ? <DrawLayer /> : isCam ? <CamCorner /> : isArea ? <AreaPicker /> : isPill ? <RecPill /> : isMini ? <ToastProvider listenUndo={false}><AdminOpsMini /></ToastProvider> : isMonitor ? <MiniMonitor /> : isNote ? <QuickNote /> : <App />}</ErrorBoundary>
   </React.StrictMode>,
 );
 

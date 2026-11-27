@@ -8,6 +8,9 @@ describe("audio", () => {
   it("empareja micro y cascos por el aparato", () => {
     expect(gadget("Micrófono (Jabra Evolve 20)")).toBe("Jabra Evolve 20");
     expect(gadget("Altavoces")).toBe("Altavoces");
+    // Los nombres reales de Realtek llevan paréntesis dentro.
+    expect(gadget("Micrófono (Realtek(R) Audio)")).toBe("Realtek(R) Audio");
+    expect(gadget("Altavoces (Realtek(R) Audio)")).toBe(gadget("Micrófono (Realtek(R) Audio)"));
   });
 
   it("si el predeterminado no oye y otro sí, propone el otro con sus cascos", () => {

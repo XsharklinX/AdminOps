@@ -23,7 +23,7 @@ pub fn open(app: &tauri::AppHandle) -> Result<(), String> {
         return w.set_focus().map_err(|e| e.to_string());
     }
     let mut b = tauri::WebviewWindowBuilder::new(app, LABEL, tauri::WebviewUrl::App("index.html".into()))
-        .title("Nota de llamada · AdminOps")
+        .title("Nota · AdminOps")
         .inner_size(400.0, 470.0)
         .resizable(false)
         .always_on_top(true)

@@ -37,6 +37,7 @@ export * from "./faultrec";
 export * from "./scanfolder";
 export * from "./rocket";
 export * from "./rocketbar";
+export * from "./notebook";
 export * from "./power";
 export * from "./audio";
 export * from "./camera";

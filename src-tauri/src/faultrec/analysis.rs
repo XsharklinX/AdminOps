@@ -28,6 +28,8 @@ pub enum Kind {
     Cpu,
     Hang,
     Error,
+    /// Puesta a mano con el botón «Marcar» o Ctrl+Alt+M.
+    Manual,
 }
 
 /// Una marca de la línea de tiempo.

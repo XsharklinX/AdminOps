@@ -349,6 +349,12 @@ const DEMO_UNSAVED = (): { files: UnsavedFile[]; recent: RecentDoc[] } => ({
 /** Respuesta de ejemplo para una orden, o undefined si se deja pasar la real. */
 export function demoAnswer(command: string, args?: Record<string, unknown>): unknown {
   switch (command) {
+    // El cuaderno de Notas: unas de ejemplo, nunca las reales del técnico.
+    case "notes_list":
+      return [
+        { id: "n-demo-1", title: "Impresora de recepción", text: "Si sale «sin conexión»: apagarla 10 s y volver a encenderla.\nIP fija 192.168.1.40.", created: (now() - 3 * DAY) * 1000, updated: (now() - DAY) * 1000, pinned: true },
+        { id: "n-demo-2", title: "Llamar a contabilidad", text: "Pedir el número de serie del portátil nuevo.", created: (now() - 2 * 3600) * 1000, updated: (now() - 2 * 3600) * 1000, pinned: false },
+      ];
     case "list_clients":
       return structuredClone(DEMO_CLIENTS);
     case "list_contacts":
@@ -384,6 +390,9 @@ export function demoAnswer(command: string, args?: Record<string, unknown>): unk
       return {};
     case "faultrec_export":
       return null;
+    case "faultrec_export_small":
+    case "faultrec_export_gif":
+      return { path: "demo", ms: 0 };
     case "faultrec_watch_start":
       demoWatchSince = now();
       return demoFaultWatch();
@@ -415,7 +424,13 @@ export function demoAnswer(command: string, args?: Record<string, unknown>): unk
       demoFaultStart = Date.now();
       return demoFaultTick();
     case "faultrec_status":
+    case "faultrec_pause":
+    case "faultrec_resume":
       return demoFaultTick();
+    case "faultrec_mark":
+      return demoFaultTick().secs;
+    case "faultrec_draw":
+      return false;
     case "faultrec_stop":
       // Parar antes de tiempo en la demo deja igualmente la grabación de ejemplo.
       demoFaultStart = 0;
@@ -467,7 +482,7 @@ export function demoAnswer(command: string, args?: Record<string, unknown>): unk
 
 /** ¿Guardaría algo en los datos del técnico? En demostración no se guarda. */
 export function demoBlocks(command: string): boolean {
-  return /^(save_|delete_|purge_|import_|update_client|contacts_bulk|revert_entry|display_(apply|confirm|undo|restart_driver)|kbd_only_spanish|unsaved_copy|scanfolder_(new_password|private_network|disable_signing)|plan_(state_save|reboot)|measure_record|case_(open|update|close|discard)|inventory_(add|remove)|finish_session|start_session)/.test(command);
+  return /^(save_|delete_|purge_|import_|update_client|contacts_bulk|revert_entry|display_(apply|confirm|undo|restart_driver)|kbd_only_spanish|unsaved_copy|scanfolder_(new_password|private_network|disable_signing)|plan_(state_save|reboot)|measure_record|case_(open|update|close|discard)|inventory_(add|remove)|finish_session|start_session|notes_(save|delete))/.test(command);
 }
 
 export const DEMO_BLOCKED = "Modo demostración: no se guarda nada. Desactívalo en Ajustes → General para trabajar con tus datos.";

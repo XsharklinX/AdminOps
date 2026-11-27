@@ -52,6 +52,14 @@ pub struct TweakState {
     app: Option<tauri::AppHandle>,
 }
 
+/// Apunta en el diario (y así en el caso y el informe) lo que hizo un comando que cambia el equipo.
+pub fn record_app<T>(app: &tauri::AppHandle, title: &str, result: &Result<T, String>) {
+    use tauri::Manager;
+    if let Some(state) = app.try_state::<TweakState>() {
+        state.record(journal::Op::Run, title, result);
+    }
+}
+
 impl TweakState {
     pub fn new(app: &tauri::AppHandle) -> Self {
         Self { app: Some(app.clone()), ..Self::with_data_dir(crate::paths::machine_data_dir(app)) }

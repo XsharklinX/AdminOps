@@ -237,6 +237,7 @@ fn save_window(shared: &Shared, dir: &Path, case_id: Option<String>, from_ms: u6
         input,
         voice: Vec::new(),
         mic: false,
+        system_audio: false,
         origin: origin.kind.to_string(),
         trigger: origin.trigger.clone(),
         trigger_key: origin.trigger_key.clone(),

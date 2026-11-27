@@ -8,10 +8,11 @@
 //! - Temporales: lo que tiene más de un día en la carpeta temporal del usuario y en la de Windows.
 //!   Lo que está abierto se salta.
 //! - Informes de errores de Windows con más de una semana.
+//! - La caché de los navegadores (Chrome, Edge, Brave, Opera, Firefox), también abiertos: lo que está en uso
+//!   se salta; nunca contraseñas, cookies ni historial (pedido por David en la 1.5.1).
 //! - Caché DNS.
 //!
-//! Lo que podría notarse (vaciar la papelera, la caché de los navegadores, reiniciar el Explorador)
-//! no está aquí a propósito.
+//! Lo que podría notarse (vaciar la papelera, reiniciar el Explorador) no está aquí a propósito.
 //!
 //! Tres modos (Ajustes → General): `desktop`, una ventanita sin marco y siempre encima que sigue ahí
 //! con AdminOps minimizada o escondida junto al reloj; `app`, la misma burbuja dentro de la ventana
@@ -124,7 +125,15 @@ pub async fn boost(app: &tauri::AppHandle, title: &str) -> Result<Boost, String>
     if BUSY.swap(true, Ordering::SeqCst) {
         return Err("Ya está optimizando.".into());
     }
-    let r = tauri::async_runtime::spawn_blocking(run).await.map_err(|e| e.to_string());
+    // Cada paso se avisa a la interfaz (la memoria bajando en vivo y la lista con su ✓).
+    let em = app.clone();
+    let r = tauri::async_runtime::spawn_blocking(move || {
+        run(&move |step: &str, text: String| {
+            let _ = em.emit(PROGRESS_EVENT, Progress { step: step.to_string(), mem_pct: rocket_memory(), text });
+        })
+    })
+    .await
+    .map_err(|e| e.to_string());
     BUSY.store(false, Ordering::SeqCst);
     let b = r?;
     record(app, title, &b);
@@ -153,18 +162,62 @@ fn record(app: &tauri::AppHandle, title: &str, b: &Boost) {
     state.record_measured(crate::tweaks::journal::Op::Run, &text, &Ok::<(), String>(()), Some(measure));
 }
 
-fn run() -> Boost {
+pub const PROGRESS_EVENT: &str = "rocket://progress";
+
+/// Un paso de la pasada: memory | temp | browser | dns, con la memoria en uso en ese momento.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct Progress {
+    step: String,
+    mem_pct: u32,
+    text: String,
+}
+
+/// Las cachés de los navegadores del usuario (Chrome, Edge, Brave, Opera y Firefox), en todos sus perfiles. Con el
+/// navegador abierto lo que esté en uso no se puede borrar y se salta; contraseñas, cookies e historial no están aquí.
+fn browser_caches() -> Vec<PathBuf> {
+    let Some(u) = crate::target_user::user_dirs() else { return vec![] };
+    let mut out = Vec::new();
+    for base in [r"Google\Chrome\User Data", r"Microsoft\Edge\User Data", r"BraveSoftware\Brave-Browser\User Data"] {
+        let root = u.local_app_data.join(base);
+        let Ok(rd) = std::fs::read_dir(&root) else { continue };
+        for e in rd.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name == "Default" || name.starts_with("Profile ") {
+                for c in [r"Cache\Cache_Data", "Code Cache", "GPUCache"] {
+                    out.push(e.path().join(c));
+                }
+            }
+        }
+    }
+    let opera = u.local_app_data.join(r"Opera Software\Opera Stable");
+    for c in [r"Cache\Cache_Data", "Code Cache", "GPUCache"] {
+        out.push(opera.join(c));
+    }
+    if let Ok(rd) = std::fs::read_dir(u.local_app_data.join(r"Mozilla\Firefox\Profiles")) {
+        for e in rd.flatten() {
+            out.push(e.path().join("cache2"));
+        }
+    }
+    out.retain(|p| p.is_dir());
+    out
+}
+
+fn run(on: &dyn Fn(&str, String)) -> Boost {
     let t0 = Instant::now();
     let mut b = Boost::default();
     let (total, before) = memory();
     b.ram_total = total;
     b.ram_used_before = before;
 
+    on("memory", "Liberando memoria".into());
     let per_proc = trim_working_sets();
     b.trimmed = per_proc.len() as u32;
     b.apps = top_apps(&per_proc, 5);
     b.standby = purge_low_priority_standby();
     let t_mem = t0.elapsed().as_millis();
+    let freed: u64 = per_proc.iter().map(|(_, b)| b).sum();
+    on("memory_done", format!("Memoria · {} MB", freed / 1_048_576));
 
     // Los temporales del usuario con la sesión abierta (no los de la cuenta que elevó AdminOps).
     let day = Duration::from_secs(24 * 3600);
@@ -180,6 +233,7 @@ fn run() -> Boost {
         dirs.push((wer.join("ReportArchive"), day * 7, "Informes de errores"));
         dirs.push((wer.join("ReportQueue"), day * 7, "Informes de errores"));
     }
+    on("temp", "Borrando temporales".into());
     // Que el cohete no se quede minutos girando en una carpeta temporal enorme: lo que no dé
     // tiempo se hace la próxima vez.
     let deadline = Instant::now() + Duration::from_secs(6);
@@ -202,9 +256,25 @@ fn run() -> Boost {
         }
     }
 
+    on("temp_done", format!("Temporales · {} MB", b.temp_freed / 1_048_576));
+    // La caché de los navegadores, también abiertos (sin edad mínima: es caché).
+    on("browser", "Limpiando la caché de los navegadores".into());
+    let mut cache = Clean::default();
+    let cache_deadline = Instant::now() + Duration::from_secs(4);
+    for dir in browser_caches() {
+        clean_dir(&dir, Duration::ZERO, 0, cache_deadline, &mut cache);
+    }
+    if cache.bytes > 0 {
+        b.temp_freed += cache.bytes;
+        b.temp_files += cache.files;
+        b.folders.push(Freed { name: "Caché de los navegadores".into(), bytes: cache.bytes });
+    }
+    on("browser_done", format!("Caché de navegadores · {} MB", cache.bytes / 1_048_576));
     let t_tmp = t0.elapsed().as_millis();
     log::info!("Cohete: memoria en {t_mem} ms, temporales en {} ms", t_tmp - t_mem);
+    on("dns", "Vaciando la caché DNS".into());
     b.dns = crate::ps::hidden("ipconfig").arg("/flushdns").output().map(|o| o.status.success()).unwrap_or(false);
+    on("dns_done", if b.dns { "Caché DNS vaciada".into() } else { "Caché DNS: no se pudo".into() });
 
     // Un respiro para que Windows apunte lo liberado antes de medir otra vez.
     std::thread::sleep(Duration::from_millis(400));

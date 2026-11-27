@@ -64,6 +64,30 @@ pub fn protocol_registered(scheme: &str) -> bool {
     }
 }
 
+/// Abre un programa pidiendo siempre administrador (verbo «runas»): Windows enseña su aviso (UAC), también si este
+/// proceso se abrió con RunAsInvoker.
+pub fn run_elevated(program: &str, args: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::Shell::ShellExecuteW;
+        use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+        let (verb, file, params) = (wide("runas"), wide(program), wide(args));
+        // SAFETY: cadenas terminadas en cero, vivas durante la llamada.
+        let r = unsafe { ShellExecuteW(std::ptr::null_mut(), verb.as_ptr(), file.as_ptr(), params.as_ptr(), std::ptr::null(), SW_SHOWNORMAL) };
+        match r as isize {
+            x if x > 32 => Ok(()),
+            5 => Err("Cancelado: Windows no dio permiso de administrador.".into()),
+            x => Err(format!("No se pudo abrir (código {x}).")),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (program, args);
+        Err("Solo en Windows.".into())
+    }
+}
+
 /// Abre un programa con argumentos. Si el programa pide administrador, Windows enseña su aviso (UAC).
 pub fn run_with_args(program: &str, args: &str) -> Result<(), String> {
     #[cfg(windows)]

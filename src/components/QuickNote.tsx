@@ -1,22 +1,21 @@
-// La nota de llamada: la ventanita que sale con Ctrl+Alt+N.
+// «Notas»: la ventanita que sale con Ctrl+Alt+N o el botón de la barra del cohete; se guarda en el cuaderno.
 //
 // Suena el teléfono mientras estás con otra cosa: quién llama, desde qué equipo
 // y qué le pasa, y con un clic se convierte en un caso (que empieza a apuntar lo
 // que hagas) o en un seguimiento para más tarde. Vive en su propia ventana, siempre
 // encima, así que no hace falta cambiar de lo que estabas haciendo.
 import { emit } from "@tauri-apps/api/event";
-import { CalendarClock, Loader2, PhoneCall, TicketPlus } from "lucide-react";
+import { CalendarClock, Loader2, TicketPlus, StickyNote } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { casesApi, followupsApi, noteApi, tomorrowMorning } from "../lib/api";
+import { casesApi, followupsApi, noteApi, tomorrowMorning, notesApi } from "../lib/api";
 
 const input =
   "w-full rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-neon/50";
 
 export function QuickNote() {
-  const [person, setPerson] = useState("");
-  const [machine, setMachine] = useState("");
+  const [title, setTitle] = useState("");
   const [text, setText] = useState("");
-  const [busy, setBusy] = useState<"case" | "later" | null>(null);
+  const [busy, setBusy] = useState<"case" | "later" | "save" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const first = useRef<HTMLInputElement>(null);
 
@@ -28,13 +27,15 @@ export function QuickNote() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const empty = !person.trim() && !machine.trim() && !text.trim();
+  const empty = !title.trim() && !text.trim();
+  // El título es libre (no siempre es quién llama): al caso o a «para mañana» va delante del texto, no como persona.
+  const joined = [title.trim(), text.trim()].filter(Boolean).join(": ");
 
   const asCase = async () => {
     setBusy("case");
     setError(null);
     try {
-      await casesApi.open({ person, machine, notes: text });
+      await casesApi.open({ notes: [title.trim(), text.trim()].filter(Boolean).join("\n") });
       // La ventana principal enseña la barra del caso en cuanto se entera.
       await emit("case-changed");
       await noteApi.close();
@@ -48,9 +49,22 @@ export function QuickNote() {
     setBusy("later");
     setError(null);
     try {
-      const quien = person.trim() ? `${person.trim()}: ` : "";
-      await followupsApi.add({ text: `${quien}${text.trim() || "Llamada pendiente"}`, due: tomorrowMorning(), person, machine });
+      await followupsApi.add({ text: joined || "Nota pendiente", due: tomorrowMorning() });
       await emit("followups-changed");
+      await noteApi.close();
+    } catch (e) {
+      setError(String(e));
+      setBusy(null);
+    }
+  };
+
+  // Lo normal: guardarla en el cuaderno (Conocimiento → Notas). Caso y «para mañana» siguen a mano.
+  const save = async () => {
+    setBusy("save");
+    setError(null);
+    try {
+      await notesApi.save({ id: "", title: title.trim(), text, created: 0, updated: 0, pinned: false });
+      await emit("notes-changed");
       await noteApi.close();
     } catch (e) {
       setError(String(e));
@@ -61,39 +75,33 @@ export function QuickNote() {
   return (
     <div className="flex h-full flex-col gap-3 bg-void p-4 text-ink">
       <div className="flex items-center gap-2 text-sm font-semibold">
-        <PhoneCall size={15} className="text-neon" /> Nota de llamada
+        <StickyNote size={15} className="text-neon" /> Nota
       </div>
       <label className="block">
-        <span className="mb-1 block text-xs text-dim">Quién llama</span>
-        <input ref={first} value={person} onChange={(e) => setPerson(e.target.value)} placeholder="María Pérez · ext. 4512" className={input} />
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-xs text-dim">Equipo</span>
-        <input value={machine} onChange={(e) => setMachine(e.target.value)} placeholder="PC-CONTA-03" className={`${input} font-mono`} />
+        <span className="mb-1 block text-xs text-dim">Título (opcional)</span>
+        <input ref={first} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Laura · contabilidad, impresora, contraseña wifi…" className={input} />
       </label>
       <label className="block flex-1">
-        <span className="mb-1 block text-xs text-dim">Qué le pasa</span>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="No imprime desde esta mañana…" className={`${input} h-28 resize-none`} />
+        <span className="mb-1 block text-xs text-dim">Nota</span>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe lo que quieras apuntar…" className={`${input} h-36 resize-none`} />
       </label>
       {error && <p className="text-xs text-bad">{error}</p>}
+      <button
+        onClick={() => void save()}
+        disabled={empty || busy !== null}
+        className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-neon px-3 text-[13px] font-medium text-on-neon hover:brightness-110 disabled:opacity-40"
+      >
+        {busy === "save" ? <Loader2 size={14} className="animate-spin" /> : <StickyNote size={14} />} Guardar nota
+      </button>
       <div className="flex gap-2">
-        <button
-          onClick={() => void asCase()}
-          disabled={empty || busy !== null}
-          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-neon px-3 text-[13px] font-medium text-on-neon hover:brightness-110 disabled:opacity-40"
-        >
-          {busy === "case" ? <Loader2 size={14} className="animate-spin" /> : <TicketPlus size={14} />} Abrir caso
+        <button onClick={() => void asCase()} disabled={empty || busy !== null} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 text-[12px] text-ink hover:bg-panel-2 disabled:opacity-40">
+          {busy === "case" ? <Loader2 size={13} className="animate-spin" /> : <TicketPlus size={13} />} Abrir caso
         </button>
-        <button
-          onClick={() => void later()}
-          disabled={empty || busy !== null}
-          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 text-[13px] text-ink hover:bg-panel-2 disabled:opacity-40"
-          title="Aparecerá mañana a las 9 en «Hoy», con un aviso"
-        >
-          {busy === "later" ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />} Para mañana
+        <button onClick={() => void later()} disabled={empty || busy !== null} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 text-[12px] text-ink hover:bg-panel-2 disabled:opacity-40" title="Aparecerá mañana a las 9 en «Hoy», con un aviso">
+          {busy === "later" ? <Loader2 size={13} className="animate-spin" /> : <CalendarClock size={13} />} Para mañana
         </button>
       </div>
-      <p className="text-center text-[11px] text-mute">Ctrl+Alt+N la abre desde cualquier sitio · Esc la cierra</p>
+      <p className="text-center text-[11px] text-mute">Todas las notas: Conocimiento → Notas · Ctrl+Alt+N · Esc cierra</p>
     </div>
   );
 }

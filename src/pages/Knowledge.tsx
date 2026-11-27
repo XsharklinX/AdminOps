@@ -44,13 +44,20 @@ import { ChipRow } from "../components/ChipRow";
 import { norm } from "../lib/contacts";
 import { AUTO_VARS, autoValues, fill, questions } from "../lib/templates";
 import { PlaceNotes } from "../components/PlaceNotes";
+import { Notebook } from "../components/Notebook";
 import { useLiveEffect } from "../lib/useLiveEffect";
 import { onSectionRequest, reportSection, usePageId } from "../lib/sectionState";
 
-type Tab = "solutions" | "templates" | "notes";
+type Tab = "notebook" | "solutions" | "templates" | "notes";
 
 const TABS: { id: Tab; label: string; icon: typeof Lightbulb; hint: string }[] =
   [
+    {
+      id: "notebook",
+      label: "Notas",
+      icon: StickyNote,
+      hint: "Todo lo que apuntas con «Notas» (la barra del cohete o Ctrl+Alt+N), en un cuaderno para buscar y editar.",
+    },
     {
       id: "solutions",
       label: "Soluciones",
@@ -158,6 +165,7 @@ export function Knowledge({
       )}
       {tab === "templates" && <Templates openId={openId} />}
       {tab === "notes" && <Notes />}
+      {tab === "notebook" && <Notebook />}
     </div>
   );
 }

@@ -78,7 +78,9 @@ export function RecButton({ onNavigate }: { onNavigate: (page: PageId, section?:
       } else {
         // Siempre la pantalla entera; clics, teclas y voz como se dejaron en Grabar el fallo.
         const o = getRecOptions();
-        const s = await faultRecApi.start(null, { input: o.input, mic: o.mic });
+        const s = await faultRecApi.start(null, { input: o.input, mic: o.mic, systemAudio: o.system });
+        // Pantalla entera: la cámara en la esquina sale en el vídeo, si se dejó elegida.
+        if (o.camera && s.recording) void faultRecApi.camera(true).catch((e) => toast("error", String(e)));
         setRecording(s.recording);
         setSecs(s.secs);
       }

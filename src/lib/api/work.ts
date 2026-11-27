@@ -49,6 +49,8 @@ export interface Settings {
   rocketSize?: "s" | "m" | "l";
   /** Despega solo con la memoria alta o el equipo sin usar. */
   rocketAuto?: boolean;
+  /** Empezar el día ligero: optimiza una vez al día al poco de encender. */
+  rocketMorning?: boolean;
   /** Herramientas de la barra del cohete, en su orden (null: todas). */
   rocketTools?: string[] | null;
 }

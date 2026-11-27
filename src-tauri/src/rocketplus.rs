@@ -392,6 +392,23 @@ pub fn auto_due(high_for: Duration, idle: Duration, pct: u32, since_last: Option
     }
 }
 
+/// «Empezar el día ligero». `since` es lo que lleva el cohete en marcha hoy: desde que arrancó (la tarea lo abre al
+/// iniciar sesión) o desde que cambió el día con él abierto (el portátil despierta por la mañana). No se usa el
+/// tiempo encendido de Windows: con el inicio rápido o la suspensión no vuelve a cero. `None`: aún es pronto
+/// (Windows sigue cargando lo suyo, minuto y medio); `Some(true)`: toca; `Some(false)`: hoy ya no (más de 3 h, o
+/// pasada la mañana: abrir AdminOps a las 15:00 no es empezar el día). De madrugada (antes de las 6:00) aún no: un
+/// equipo que no se apaga, o que Windows despierta a las 3:00 para su mantenimiento, no gasta ahí el día; se espera
+/// a las 6:00 contando desde entonces.
+pub fn morning_window(since: Duration, hour: u32) -> Option<bool> {
+    if hour >= 13 {
+        Some(false)
+    } else if hour < 6 || since < Duration::from_secs(90) {
+        None
+    } else {
+        Some(since <= Duration::from_secs(3 * 3600))
+    }
+}
+
 /// Arranca el vigilante una sola vez: cada 2 s mira si el programa de delante está colgado (solo con
 /// el cohete en el escritorio) y, si está activado, si toca despegar solo.
 pub fn start_brain(app: tauri::AppHandle) {
@@ -403,6 +420,9 @@ pub fn start_brain(app: tauri::AppHandle) {
         let mut told: Option<u32> = None;
         let mut high_since: Option<Instant> = None;
         let mut last_auto: Option<Instant> = None;
+        let mut morning_checked = false;
+        let mut morning_day = chrono::Local::now().date_naive();
+        let mut morning_from = Instant::now();
         let mut tick = 0u64;
         loop {
             std::thread::sleep(Duration::from_secs(2));
@@ -438,6 +458,39 @@ pub fn start_brain(app: tauri::AppHandle) {
                             let _ = app.emit(HUNG_EVENT, Option::<Hung>::None);
                         }
                     }
+                }
+            }
+            // Empezar el día ligero: una vez al día, por la mañana, pasado minuto y medio de empezar (ver
+            // `morning_window`). Con AdminOps abierta varios días, cada día nuevo vuelve a contar. Con una llamada o
+            // pantalla completa se espera, sin marcar el día.
+            let local = chrono::Local::now();
+            if local.date_naive() != morning_day {
+                morning_day = local.date_naive();
+                morning_from = Instant::now();
+                morning_checked = false;
+            }
+            // Encendido desde la madrugada: el día empieza a contar a las 6:00.
+            if chrono::Timelike::hour(&local) < 6 {
+                morning_from = Instant::now();
+            }
+            let window = morning_window(morning_from.elapsed(), chrono::Timelike::hour(&local));
+            if !morning_checked && settings.rocket_morning && !crate::audit::active() && window == Some(false) {
+                morning_checked = true;
+            }
+            if !morning_checked && settings.rocket_morning && !crate::audit::active() && window == Some(true) && !crate::rocket::fullscreen_now() && !crate::uxio::media_in_use() {
+                morning_checked = true;
+                let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+                let mark = crate::paths::shared_data_dir(&app).join("cohete-dia.txt");
+                if std::fs::read_to_string(&mark).ok().as_deref() != Some(today.as_str()) {
+                    let _ = std::fs::write(&mark, &today);
+                    let app2 = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Ok(b) = crate::rocket::boost(&app2, "Empezar el día ligero (cohete)").await {
+                            let pct = |u: u64| if b.ram_total == 0 { 0 } else { (u as f64 / b.ram_total as f64 * 100.0).round() as u32 };
+                            let at = chrono::Local::now().format("%H:%M").to_string();
+                            let _ = app2.emit(AUTO_EVENT, AutoNote { at, before_pct: pct(b.ram_used_before), after_pct: pct(b.ram_used_after), reason: "mañana" });
+                        }
+                    });
                 }
             }
             // Despegar solo (nunca en modo auditoría).
@@ -602,6 +655,19 @@ pub fn watch_full(app: tauri::AppHandle) {
 /// «Abrir AdminOps» desde «solo el cohete»: abre la entera y este proceso se cierra (ella trae su cohete).
 pub fn open_full(app: &tauri::AppHandle) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    if !crate::elevation::is_elevated() {
+        // Sin elevar (el PC de un usuario, con RunAsInvoker): se pide el administrador de forma explícita y sale el
+        // aviso de Windows (UAC) para que el técnico ponga su contraseña; mientras, la barra sigue respondiendo. Si se
+        // cancela, el cohete se queda.
+        let app = app.clone();
+        // Con el verbo «runas»: este proceso lleva __COMPAT_LAYER=RunAsInvoker en su entorno (así lo abre la
+        // tarea) y lo heredaría AdminOps entera, que se abriría sin elevar en vez de pedir el administrador.
+        std::thread::spawn(move || match crate::shellopen::run_elevated(&exe.to_string_lossy(), "") {
+            Ok(()) => app.exit(0),
+            Err(e) => log::info!("Abrir AdminOps entera sin elevar: {e} (cancelado o sin administrador)"),
+        });
+        return Ok(());
+    }
     std::process::Command::new(exe).spawn().map_err(|e| format!("No se pudo abrir AdminOps: {e}"))?;
     app.exit(0);
     Ok(())
@@ -616,9 +682,19 @@ pub fn leave_rocket_behind(app: &tauri::AppHandle) {
     // Mirar la tarea es PowerShell: fuera del hilo de las ventanas.
     std::thread::spawn(|| {
         if startup_enabled() {
-            if let Ok(exe) = std::env::current_exe() {
-                let _ = std::process::Command::new(exe).arg("--rocket").spawn();
+            let Ok(exe) = std::env::current_exe() else { return };
+            // Elevada con OTRA cuenta (el técnico puso su contraseña en el PC de un usuario estándar): el cohete que
+            // se queda no puede heredar ese administrador. Se abre como el usuario de la sesión y sin elevar, igual
+            // que la tarea de inicio de sesión.
+            let other = crate::elevation::is_elevated() && matches!((crate::target_user::own_sid(), crate::target_user::get()), (Some(own), Some(t)) if own != t.sid);
+            if other {
+                let args = format!("/c set __COMPAT_LAYER=RunAsInvoker&& start \"\" \"{}\" --rocket", exe.to_string_lossy());
+                if let Err(e) = crate::shellopen::run_as_user("cmd.exe", &args) {
+                    log::warn!("No se pudo dejar el cohete como el usuario: {e}");
+                }
+                return;
             }
+            let _ = std::process::Command::new(exe).arg("--rocket").spawn();
         }
     });
 }
@@ -674,6 +750,19 @@ pub fn rocket_set_startup(enabled: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empezar_el_dia_cuenta_desde_que_empieza_y_solo_por_la_manana() {
+        assert_eq!(morning_window(Duration::from_secs(30), 8), None);
+        assert_eq!(morning_window(Duration::from_secs(95), 8), Some(true));
+        assert_eq!(morning_window(Duration::from_secs(2 * 3600), 10), Some(true));
+        assert_eq!(morning_window(Duration::from_secs(7 * 3600), 11), Some(false));
+        // Abrir AdminOps (o despertar el portátil) por la tarde no es empezar el día.
+        assert_eq!(morning_window(Duration::from_secs(95), 15), Some(false));
+        // De madrugada (medianoche, mantenimiento de las 3:00) se espera, sin gastar el día.
+        assert_eq!(morning_window(Duration::from_secs(95), 0), None);
+        assert_eq!(morning_window(Duration::from_secs(4 * 3600), 3), None);
+    }
 
     #[test]
     fn papelera() {

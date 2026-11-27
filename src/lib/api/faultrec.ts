@@ -2,7 +2,8 @@ import { invoke } from "./core";
 
 // ---------- Grabar el fallo (Estado del equipo → Grabar el fallo) ----------
 
-export type FaultMarkKind = "disk" | "cpu" | "hang" | "error";
+/** «manual»: la puso el técnico con «Marcar» o Ctrl+Alt+M. */
+export type FaultMarkKind = "disk" | "cpu" | "hang" | "error" | "manual";
 
 /** Un punto de la línea de tiempo de una grabación. */
 export interface FaultMark {
@@ -41,6 +42,8 @@ export interface FaultRecording {
   input?: FaultInput[];
   /** Lleva la voz del micrófono. */
   mic?: boolean;
+  /** Lleva el sonido del equipo (lo que suena por el altavoz). */
+  systemAudio?: boolean;
   /** Volumen de la voz por décima de segundo, de 0 a 100. */
   voice?: number[];
   /** «record» a mano, «replay» con «¡Acaba de pasar!», «auto» guardada sola al vigilar. */
@@ -99,6 +102,14 @@ export interface FaultRecStatus {
   error: string | null;
   /** Se está grabando la voz. */
   mic?: boolean;
+  /** Se está grabando el sonido del equipo. */
+  systemAudio?: boolean;
+  /** La capa de «Dibujar» está abierta. */
+  drawing?: boolean;
+  /** La cámara está en la esquina. */
+  camera?: boolean;
+  /** En pausa: no se escribe nada y el tiempo del vídeo no avanza. */
+  paused?: boolean;
 }
 
 /** Una zona de un monitor, en píxeles físicos desde su esquina superior izquierda. */
@@ -119,6 +130,8 @@ export interface FaultStartOptions {
   input: boolean;
   /** Grabar el micrófono. */
   mic: boolean;
+  /** Grabar también lo que suena en el equipo, mezclado con la voz. */
+  systemAudio?: boolean;
 }
 
 /** Una ventana abierta que se puede grabar. El título solo se enseña en el selector; no se guarda. */
@@ -195,6 +208,14 @@ export const FAULTREC_TICK_EVENT = "faultrec://tick";
 export const FAULTREC_DONE_EVENT = "faultrec://done";
 export const FAULTREC_REGION_EVENT = "faultrec://region";
 export const FAULTREC_AUTO_EVENT = "faultrec://auto";
+/** Se pausó o se siguió la grabación: `true` = en pausa. */
+export const FAULTREC_PAUSED_EVENT = "faultrec://paused";
+/** Se puso una marca a mano: el segundo del vídeo. */
+export const FAULTREC_MARKED_EVENT = "faultrec://marked";
+/** Se abrió o se cerró la capa de «Dibujar»: `true` = abierta. */
+export const FAULTREC_DRAW_EVENT = "faultrec://draw";
+/** Se puso o se quitó la cámara de la esquina: `true` = puesta. */
+export const FAULTREC_CAMERA_EVENT = "faultrec://camera";
 /** Se pulsó el aviso de Windows de una grabación: `{ id }`. */
 export const FAULTREC_OPEN_EVENT = "faultrec://open";
 
@@ -218,6 +239,16 @@ export const faultRecApi = {
   status: () => invoke<FaultRecStatus>("faultrec_status"),
   /** Para, guarda y trae AdminOps al frente. */
   stop: () => invoke<FaultRecording>("faultrec_stop"),
+  /** Pausa: no se escribe nada y el tiempo del vídeo no avanza. */
+  pause: () => invoke<FaultRecStatus>("faultrec_pause"),
+  /** Sigue grabando donde se quedó. */
+  resume: () => invoke<FaultRecStatus>("faultrec_resume"),
+  /** Pone una marca en este momento (Ctrl+Alt+M); devuelve el segundo del vídeo. */
+  mark: () => invoke<number>("faultrec_mark"),
+  /** Abre (true) o cierra (false) la capa para dibujar en rojo encima del monitor grabado. */
+  draw: (on: boolean) => invoke<boolean>("faultrec_draw", { on }),
+  /** La cámara en un círculo en la esquina de lo que se graba (sale en el vídeo). */
+  camera: (on: boolean) => invoke<boolean>("faultrec_camera", { on }),
   list: () => invoke<FaultRecording[]>("faultrec_list"),
   get: (id: string) => invoke<FaultRecordingDetail>("faultrec_get", { id }),
   remove: (id: string) => invoke<void>("faultrec_delete", { id }),
@@ -239,6 +270,10 @@ export const faultRecApi = {
   reportRemove: (id: string) => invoke<void>("faultrec_report_remove", { id }),
   /** «Exportar MP4»: pregunta dónde y copia el trozo sin recodificar; null si se canceló. */
   exportClip: (id: string, fromMs: number, toMs: number) => invoke<FaultExported | null>("faultrec_export", { id, fromMs: Math.round(fromMs), toMs: Math.round(toMs) }),
+  /** «Para enviar»: copia a 720p como mucho y 15 fotogramas por segundo, al portapapeles como archivo. */
+  exportSmall: (id: string) => invoke<FaultExported>("faultrec_export_small", { id }),
+  /** «GIF de 8 s»: un GIF del trozo (8 s como mucho, 480 de ancho), al portapapeles como archivo. */
+  exportGif: (id: string, fromMs: number, toMs: number) => invoke<FaultExported>("faultrec_export_gif", { id, fromMs: Math.round(fromMs), toMs: Math.round(toMs) }),
   autoGet: () => invoke<FaultAutoSettings>("faultrec_auto_get"),
   autoSet: (settings: FaultAutoSettings) => invoke<FaultAutoSettings>("faultrec_auto_set", { settings }),
   autoIgnore: (key: string, label: string) => invoke<void>("faultrec_auto_ignore", { key, label }),

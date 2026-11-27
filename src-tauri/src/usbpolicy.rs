@@ -115,7 +115,18 @@ pub async fn usb_state() -> Result<UsbState, String> {
 }
 
 #[tauri::command]
-pub async fn usb_set(mode: String) -> Result<UsbState, String> {
+pub async fn usb_set(app: tauri::AppHandle, mode: String) -> Result<UsbState, String> {
+    let label = match mode.as_str() {
+        "allowed" => "permitidas",
+        "readonly" => "solo lectura",
+        _ => "bloqueadas",
+    };
+    let r = usb_set_inner(mode).await;
+    crate::tweaks::record_app(&app, &format!("Memorias USB: {label}"), &r);
+    r
+}
+
+async fn usb_set_inner(mode: String) -> Result<UsbState, String> {
     if !valid_mode(&mode) {
         return Err("Modo de USB no válido.".into());
     }
@@ -135,7 +146,13 @@ pub async fn usb_set(mode: String) -> Result<UsbState, String> {
 
 /// Permite las memorias `minutes` minutos y deja programada la vuelta a lo que había.
 #[tauri::command]
-pub async fn usb_allow_for(minutes: u32) -> Result<UsbState, String> {
+pub async fn usb_allow_for(app: tauri::AppHandle, minutes: u32) -> Result<UsbState, String> {
+    let r = usb_allow_for_inner(minutes).await;
+    crate::tweaks::record_app(&app, &format!("Memorias USB permitidas {} min", minutes.clamp(1, 240)), &r);
+    r
+}
+
+async fn usb_allow_for_inner(minutes: u32) -> Result<UsbState, String> {
     if !crate::elevation::is_elevated() {
         return Err("Hace falta abrir AdminOps como administrador.".into());
     }

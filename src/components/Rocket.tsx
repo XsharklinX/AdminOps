@@ -39,7 +39,8 @@ export type Panel =
   | { kind: "auto"; note: AutoNote }
   | { kind: "hung"; hung: RocketHung; busy?: boolean; msg?: string; ok?: boolean }
   | { kind: "deep"; state: "scan" | "pick" | "clean" | "done"; items: DeepItem[]; picked: string[]; freed?: number; error?: string }
-  | { kind: "call"; steps: CallStep[] | null };
+  | { kind: "call"; steps: CallStep[] | null }
+  | { kind: "progress"; memStart: number | null; mem: number | null; steps: { id: string; text: string; done: boolean }[] };
 export type Action = "boost" | "deep" | "call" | "open" | "move" | "hide" | "custom";
 
 /** Píxeles que hay que mover el ratón para que sea arrastrar y no tocar; y lo que hay que mantener para «a fondo». */
@@ -159,9 +160,9 @@ export function SidePanel({ panel, side, inApp, setPanel, act, ops }: { panel: P
     case "auto":
       return (
         <div className={base} role="status">
-          <div className="text-[12px] font-medium text-[#e8eef4]">Optimizado solo a las {panel.note.at}</div>
+          <div className="text-[12px] font-medium text-[#e8eef4]">{panel.note.reason === "mañana" ? `${Number(panel.note.at.slice(0, 2)) < 12 ? "Buenos días" : Number(panel.note.at.slice(0, 2)) < 20 ? "Buenas tardes" : "Buenas noches"}: equipo listo (${panel.note.at})` : `Optimizado solo a las ${panel.note.at}`}</div>
           <div className="text-[10.5px] text-[#3ecf8e]">
-            Memoria del {panel.note.beforePct} % al {panel.note.afterPct} % · {panel.note.reason === "memoria" ? "estaba alta" : "con el equipo sin usar"}
+            Memoria del {panel.note.beforePct} % al {panel.note.afterPct} % · {panel.note.reason === "memoria" ? "estaba alta" : panel.note.reason === "mañana" ? "al empezar el día" : "con el equipo sin usar"}
           </div>
         </div>
       );
@@ -242,6 +243,27 @@ export function SidePanel({ panel, side, inApp, setPanel, act, ops }: { panel: P
         </div>
       );
     }
+    case "progress":
+      return (
+        <div className={base} role="status">
+          <div className="text-[12px] font-semibold text-[#e8eef4]">Optimizando…</div>
+          {panel.mem !== null && (
+            <div className="mt-1 flex items-center gap-2 text-[11px] text-[#a8b4c0]">
+              Memoria
+              <span className="h-[7px] flex-1 overflow-hidden rounded bg-[#0e1319]">
+                <i className="block h-full rounded bg-[#3ecf8e] transition-[width] duration-500" style={{ width: `${panel.mem}%` }} />
+              </span>
+              <b className="font-mono text-[#e8eef4]">{panel.mem} %</b>
+            </div>
+          )}
+          {panel.memStart !== null && <div className="text-[10px] text-[#76869a]">antes {panel.memStart} %</div>}
+          {panel.steps.map((s) => (
+            <div key={s.id} className={`mt-[2px] text-[11px] ${s.done ? "text-[#3ecf8e]" : "text-[#a8b4c0]"}`}>
+              {s.done ? "✓" : "…"} {s.text}
+            </div>
+          ))}
+        </div>
+      );
     case "call":
       return (
         <div className={base} role="status">
@@ -313,7 +335,7 @@ export function useRocket(opts: { inApp: boolean; onPanel: (k: PanelKind | null)
 
   const launch = useCallback(async () => {
     if (phaseRef.current === "working") return;
-    setPanel(null);
+    setPanel({ kind: "progress", memStart: null, mem: null, steps: [] });
     setPh("working");
     const started = Date.now();
     let next: Panel;
@@ -404,7 +426,7 @@ export function useRocket(opts: { inApp: boolean; onPanel: (k: PanelKind | null)
       else if (a === "deep") deep();
       else if (a === "call") call();
       else if (a === "custom") window.dispatchEvent(new Event("rocket:custom"));
-      else if (a === "open") void rocketApi.openMain().catch(logQuietly("Rocket.open"));
+      else if (a === "open") void rocketApi.openMain().catch((e) => setPanel({ kind: "error", line: String(e) }));
       else if (a === "move") void rocketApi.setMode(opts.inApp ? "desktop" : "app").catch(logQuietly("Rocket.mode"));
       else void rocketApi.setMode("off").catch(logQuietly("Rocket.mode"));
     },
@@ -445,6 +467,15 @@ export function useRocket(opts: { inApp: boolean; onPanel: (k: PanelKind | null)
   // Avisos del programa: despegar (Ctrl+K, Ctrl+Alt+O, menú del reloj), colgado y despegue automático.
   useEffect(() => {
     const offs = [
+      listen<{ step: string; memPct: number; text: string }>("rocket://progress", (e) => {
+        const cur = panelRef.current;
+        if (cur?.kind !== "progress") return;
+        const { step, memPct, text } = e.payload;
+        const id = step.replace(/_done$/, "");
+        const done = step.endsWith("_done");
+        const steps = cur.steps.some((s) => s.id === id) ? cur.steps.map((s) => (s.id === id ? { id, text, done } : s)) : [...cur.steps, { id, text, done }];
+        setPanel({ kind: "progress", memStart: cur.memStart ?? memPct, mem: memPct, steps });
+      }),
       listen(ROCKET_LAUNCH_EVENT, () => void launch()),
       listen<RocketHung | null>(ROCKET_HUNG_EVENT, (e) => {
         const h = e.payload;

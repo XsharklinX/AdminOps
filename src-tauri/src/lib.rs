@@ -116,7 +116,9 @@ mod rocketplus;
 mod usbpolicy;
 mod camfix;
 mod lostwin;
+mod notebook;
 mod rocketbar;
+mod bartools;
 mod webnotif;
 mod wingetfix;
 mod accounts;
@@ -515,6 +517,19 @@ pub fn run() {
             rocketbar::bar_open_comm,
             rocketbar::bar_quick_assist,
             rocketbar::bar_screen_clip,
+            rocketbar::bar_network,
+            rocketbar::bar_save_desktop,
+            bartools::bar_display_mode,
+            bartools::bar_wireless,
+            bartools::bar_set_radio,
+            bartools::bar_wifi_reconnect,
+            bartools::bar_open_folder,
+            bartools::bar_lock,
+            bartools::bar_console,
+            bartools::bar_restart,
+            notebook::notes_list,
+            notebook::notes_save,
+            notebook::notes_delete,
             faultrec::faultrec_attach_case,
             faultrec::faultrec_copy_file,
             faultrec::faultrec_open_file,
@@ -587,6 +602,11 @@ pub fn run() {
             faultrec::faultrec_start,
             faultrec::faultrec_status,
             faultrec::faultrec_stop,
+            faultrec::faultrec_pause,
+            faultrec::faultrec_resume,
+            faultrec::faultrec_mark,
+            faultrec::faultrec_draw,
+            faultrec::faultrec_camera,
             faultrec::faultrec_list,
             faultrec::faultrec_get,
             faultrec::faultrec_delete,
@@ -605,6 +625,8 @@ pub fn run() {
             faultrec::faultrec_to_report,
             faultrec::faultrec_report_remove,
             faultrec::faultrec_export,
+            faultrec::faultrec_export_small,
+            faultrec::faultrec_export_gif,
             onedrive::onedrive_pause,
             scanfolder::scanfolder_status,
             scanfolder::scanfolder_setup,

@@ -245,6 +245,12 @@ pub fn build_xml(choices: &[(&[&str], String, &BTreeMap<String, String>)]) -> (S
 /// asociaciones quedaron puestas. Se aplica al volver a iniciar sesión.
 #[tauri::command]
 pub async fn defapps_apply(app: tauri::AppHandle) -> Result<usize, String> {
+    let r = defapps_apply_inner(app.clone()).await;
+    crate::tweaks::record_app(&app, "Programas predeterminados como en la oficina", &r);
+    r
+}
+
+async fn defapps_apply_inner(app: tauri::AppHandle) -> Result<usize, String> {
     if !crate::elevation::is_elevated() {
         return Err("Hace falta abrir AdminOps como administrador.".into());
     }
@@ -263,7 +269,7 @@ pub async fn defapps_apply(app: tauri::AppHandle) -> Result<usize, String> {
         write_protected(&file, &xml)?;
         use crate::tweaks::model::{RegData, RegKind};
         crate::tweaks::registry::write(POLICY_KEY, POLICY_VALUE, RegKind::String, &RegData::Str(file.to_string_lossy().into_owned()))?;
-        log::info!("Programas predeterminados: directiva con {n} asociaciones");
+        log::info!("Programas predeterminados: directiva con {n} de la lista");
         Ok(n)
     })
     .await
@@ -286,7 +292,10 @@ fn office_xml(app: &tauri::AppHandle) -> Result<(String, usize), String> {
     if n == 0 {
         return Err("No hay nada elegido «en la oficina», o esos programas no están en este equipo.".into());
     }
-    Ok((xml, n))
+    // Lo que se cuenta al técnico son los tipos de la lista (Páginas web, PDF…) que de verdad quedan puestos, no cada
+    // asociación (Páginas web son cuatro: http, https, .htm y .html) ni los que ese programa no sabe abrir.
+    let kinds = choices.iter().filter(|(ids, _, assoc)| ids.iter().any(|id| assoc.contains_key(*id))).count();
+    Ok((xml, kinds))
 }
 
 /// Escribe en la carpeta de AdminOps en ProgramData, que Windows lee con privilegios: la carpeta, solo de
@@ -319,9 +328,9 @@ pub async fn defapps_apply_new_users(app: tauri::AppHandle) -> Result<usize, Str
         crate::ps::exec_opts("dism.exe", &["/Online", &arg], crate::ps::Opts { timeout: Some(std::time::Duration::from_secs(120)), task: None })
             .map_err(|e| format!("Windows no aceptó las asociaciones: {}", crate::ps::clean_error(&e)))?;
         if let Some(state) = app.try_state::<crate::tweaks::TweakState>() {
-            state.record(crate::tweaks::journal::Op::Run, &format!("Programas predeterminados para usuarios nuevos ({n} tipos)"), &Ok::<(), String>(()));
+            state.record(crate::tweaks::journal::Op::Run, &format!("Programas predeterminados para usuarios nuevos ({n} de la lista)"), &Ok::<(), String>(()));
         }
-        log::info!("Programas predeterminados: {n} asociaciones para los usuarios nuevos");
+        log::info!("Programas predeterminados: {n} de la lista para los usuarios nuevos");
         Ok(n)
     })
     .await
@@ -330,7 +339,13 @@ pub async fn defapps_apply_new_users(app: tauri::AppHandle) -> Result<usize, Str
 
 /// Quita la directiva de AdminOps (lo predeterminado vuelve a ser cosa de cada usuario).
 #[tauri::command]
-pub fn defapps_remove_policy() -> Result<(), String> {
+pub fn defapps_remove_policy(app: tauri::AppHandle) -> Result<(), String> {
+    let r = defapps_remove_policy_inner();
+    crate::tweaks::record_app(&app, "Programas predeterminados: quitada la directiva de AdminOps", &r);
+    r
+}
+
+fn defapps_remove_policy_inner() -> Result<(), String> {
     if crate::tweaks::registry::read_string(POLICY_KEY, POLICY_VALUE).is_some() {
         crate::tweaks::registry::delete(POLICY_KEY, POLICY_VALUE)?;
     }

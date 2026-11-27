@@ -10,7 +10,7 @@ export const TIPS: string[] = [
   "El icono de la cámara de cada tarjeta la copia como imagen, lista para pegar en un ticket o en Teams.",
   "En las listas, J y K (o las flechas) recorren las filas y Alt+↑/↓ reordena lo que se puede reordenar.",
   "El modo privacidad (Ctrl+Alt+P) difumina IP, correos y claves antes de compartir pantalla.",
-  "Ctrl+Alt+N abre una nota de llamada aunque AdminOps esté minimizado.",
+  "Ctrl+Alt+N abre una nota nueva aunque AdminOps esté minimizado; todas quedan en Conocimiento → Notas.",
   "Un clic sobre una IP, una MAC o un número de serie lo copia: verás un «Copiado» al instante.",
   "F11 abre la pantalla de taller: cifras enormes para dejarla en un monitor mientras trabajas.",
   "En Programas → Actualizar salen primero los que tienen fallos de seguridad que se están explotando.",

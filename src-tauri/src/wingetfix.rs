@@ -90,6 +90,12 @@ struct Step {
 /// Repara lo que haga falta, paso a paso (`winget://step`), y devuelve cómo queda.
 #[tauri::command]
 pub async fn winget_repair(app: tauri::AppHandle) -> Result<WingetHealth, String> {
+    let r = winget_repair_inner(app.clone()).await;
+    crate::tweaks::record_app(&app, "Reparar winget", &r);
+    r
+}
+
+async fn winget_repair_inner(app: tauri::AppHandle) -> Result<WingetHealth, String> {
     if !crate::elevation::is_elevated() {
         return Err("Para reparar winget hay que abrir AdminOps como administrador.".into());
     }
@@ -139,12 +145,22 @@ Repair-WinGetPackageManager -Latest -Force -AllUsers -ErrorAction Stop | Out-Nul
             step("update", "skip", "La versión de winget vale");
         }
 
-        if h.state != "ok" {
-            step("sources", "run", "Restablecer los orígenes (winget y msstore)");
+        if h.state == "network" {
+            // Sin Internet (o un proxy) restablecer no arregla nada y quitaría los orígenes propios de la oficina.
+            step("sources", "fail", &format!("{} Restablecer los orígenes no lo arreglaría: revisa la conexión.", h.detail));
+        } else if h.state != "ok" {
+            step("sources", "run", "Actualizar los orígenes");
             let opts = || crate::ps::Opts { timeout: Some(Duration::from_secs(180)), task: None };
-            let _ = crate::ps::exec_opts("winget", &["source", "reset", "--force", "--disable-interactivity"], opts());
             let _ = crate::ps::exec_opts("winget", &["source", "update", "--disable-interactivity"], opts());
             h = health();
+            // Solo si actualizar no basta: el restablecimiento deja los de fábrica y quita los añadidos (un
+            // repositorio privado de la empresa), así que se dice.
+            if h.state != "ok" && h.state != "network" {
+                step("sources", "run", "Restablecer los orígenes a los de fábrica (winget y msstore; los añadidos a mano se quitan)");
+                let _ = crate::ps::exec_opts("winget", &["source", "reset", "--force", "--disable-interactivity"], opts());
+                let _ = crate::ps::exec_opts("winget", &["source", "update", "--disable-interactivity"], opts());
+                h = health();
+            }
             step("sources", if h.state == "ok" { "ok" } else { "fail" }, &h.detail);
         } else {
             step("sources", "skip", "Los orígenes funcionan");

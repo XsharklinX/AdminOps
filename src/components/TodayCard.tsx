@@ -198,7 +198,7 @@ export function TodayCard() {
           <Loader2 size={12} className="animate-spin" /> Juntando lo pendiente…
         </p>
       ) : items.length === 0 ? (
-        <p className="px-5 pb-4 text-xs text-mute">Ni casos, ni seguimientos, ni visitas para hoy. Lo que apuntes con «Seguimiento» o con la nota de llamada (Ctrl+Alt+N) aparecerá aquí cuando toque.</p>
+        <p className="px-5 pb-4 text-xs text-mute">Ni casos, ni seguimientos, ni visitas para hoy. Lo que apuntes con «Seguimiento» o con «Para mañana» en una nota (Ctrl+Alt+N) aparecerá aquí cuando toque.</p>
       ) : (
         <ul className="space-y-1.5 px-3 pb-3">
           {rows.map(({ item: it, state }) => (

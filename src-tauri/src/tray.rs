@@ -67,7 +67,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>, fixes: &[String]) ->
     let rocket_show = item("rocket-show", "Enseñar el cohete")?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let quick = item("quick-scan", "Análisis rápido")?;
-    let note = item("note", "Nota de llamada")?;
+    let note = item("note", "Nota nueva")?;
     let monitor = item("monitor", "Mini monitor")?;
     let alerts = item("alerts", "Avisos")?;
     let sep2 = PredefinedMenuItem::separator(app)?;

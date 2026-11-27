@@ -14,6 +14,8 @@ pub const MESSAGE: &str = "Modo auditoría activo: AdminOps no hace cambios en e
 
 /// Comandos que cambian el equipo (sistema, programas, usuarios, red, archivos).
 const BLOCKED: &[&str] = &[
+    // barra: pantallas (Win+P), Wi-Fi y Bluetooth, reconectar la Wi-Fi y reiniciar
+    "bar_display_mode", "bar_set_radio", "bar_wifi_reconnect", "bar_restart",
     // connected: buscar driver, volver a detectar y habilitar cambian el equipo
     "connected_action",
     // pantallas: cambiar la resolución o la disposición, confirmar o deshacer, y reiniciar el driver gráfico
@@ -249,13 +251,13 @@ const SAFE: &[&str] = &[
     "netusage_start", "netusage_snapshot", "netusage_stop", "netusage_icon",
     // grabar el fallo: solo escribe el vídeo y las marcas en la carpeta de datos de AdminOps y no cambia nada del equipo
     // (la ventana flotante es de AdminOps y se cierra sola); en auditoría funciona igual
-    "faultrec_monitors", "faultrec_start", "faultrec_status", "faultrec_stop", "faultrec_list", "faultrec_get", "faultrec_delete",
+    "faultrec_monitors", "faultrec_start", "faultrec_status", "faultrec_stop", "faultrec_pause", "faultrec_resume", "faultrec_mark", "faultrec_draw", "faultrec_camera", "faultrec_list", "faultrec_get", "faultrec_delete",
     // elegir qué grabar: la lista de ventanas es solo lectura y el selector de zona es una ventana propia de AdminOps
     "faultrec_windows", "faultrec_pick_region", "faultrec_region_done",
     // Vigilar (el último minuto en memoria) y la grabación automática: solo escriben en la carpeta de AdminOps
     "faultrec_watch_start", "faultrec_watch_stop", "faultrec_watch_status", "faultrec_just_happened",
     "faultrec_auto_get", "faultrec_auto_set", "faultrec_auto_ignore", "faultrec_auto_unignore",
-    "faultrec_thumb", "faultrec_to_report", "faultrec_report_remove", "faultrec_export",
+    "faultrec_thumb", "faultrec_to_report", "faultrec_report_remove", "faultrec_export", "faultrec_export_small", "faultrec_export_gif",
     "displays_list", "kbd_state", "unsaved_list", "unsaved_preview", "unsaved_versions", "unsaved_pick",
     // hardware
     "hardware_inventory", "memory_test_result",
@@ -308,7 +310,7 @@ const SAFE: &[&str] = &[
     // escucharte (graba y reproduce, no cambia nada), la cámara (lectura) y la barra del cohete
     "audio_echo", "cam_view", "rocket_bar", "bar_fixes", "bar_open_comm",
     // abrir Asistencia rápida; la grabación al caso (datos de AdminOps), copiarla al portapapeles y abrirla
-    "bar_quick_assist", "bar_screen_clip", "faultrec_attach_case", "faultrec_copy_file", "faultrec_open_file",
+    "bar_quick_assist", "bar_screen_clip", "bar_network", "bar_save_desktop", "bar_wireless", "bar_open_folder", "bar_lock", "bar_console", "notes_list", "notes_save", "notes_delete", "faultrec_attach_case", "faultrec_copy_file", "faultrec_open_file",
     // ventanas fuera de la pantalla y avisos de webs (solo leer)
     "lost_windows", "web_notifications",
     // bandeja: lista de arreglos (lectura) y lo que queda en modo portable (lectura)

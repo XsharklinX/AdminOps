@@ -7,6 +7,8 @@
 //! anterior, porque Windows solo entrega fotogramas cuando algo cambia) y se escribe con la marca de
 //! tiempo real. Al monitor se le deja su borde amarillo de Windows: es el aviso al usuario de que se graba.
 //! La voz (si la hay) se escribe en cada décima con lo que haya llegado del micrófono, con su propio tiempo.
+//! Con el sonido del equipo, voz y sonido se mezclan en esa misma pista siguiendo el reloj del vídeo (el altavoz no
+//! entrega nada mientras no suena nada). En pausa no se escribe ni imagen ni audio y el tiempo del vídeo no avanza.
 
 use super::mic::{self, Mic, VoiceMeter};
 use super::{Region, Started};
@@ -34,6 +36,10 @@ pub struct Job {
     pub region: Option<Region>,
     /// El micrófono ya abierto, si se graba la voz.
     pub mic: Option<Mic>,
+    /// El sonido del equipo (altavoz predeterminado en «loopback»), si se graba.
+    pub sys: Option<Mic>,
+    /// «Pausar»: mientras esté en `true` no se escribe nada y el vídeo no avanza (queda en una sola pieza).
+    pub pause: Arc<AtomicBool>,
     pub out: PathBuf,
     pub stop: Arc<AtomicBool>,
     /// Se rellena al llegar el primer fotograma: de ahí cuentan los segundos del vídeo y de la línea de tiempo.
@@ -423,6 +429,9 @@ mod imp {
             if let Some(m) = job.mic {
                 m.finish();
             }
+            if let Some(m) = job.sys {
+                m.finish();
+            }
             if com.is_ok() {
                 CoUninitialize();
             }
@@ -471,11 +480,15 @@ mod imp {
                 None => (size.Width.max(2) as u32, size.Height.max(2) as u32),
             };
             let (out_w, out_h) = output_size(base_w, base_h);
-            let (mut encoder, mut hardware) = open_encoder(&job.out, out_w, out_h, job.mic.is_some())?;
+            let audio_wanted = job.mic.is_some() || job.sys.is_some();
+            let (mut encoder, mut hardware) = open_encoder(&job.out, out_w, out_h, audio_wanted)?;
             // La voz: lo que ya se escribió (en muestras), lo que espera, y el volumen de cada décima.
             let mut audio_samples: u64 = 0;
             let mut audio_failed = false;
             let mut pending: Vec<i16> = Vec::new();
+            // Lo que espera del sonido del equipo, y desde cuándo está en pausa (si lo está).
+            let mut pending_sys: Vec<i16> = Vec::new();
+            let mut paused_since: Option<Instant> = None;
             let mut meter = VoiceMeter::default();
             let tick = Duration::from_millis(1000 / u64::from(FPS));
             let tick_hns = (tick.as_nanos() / 100) as i64;
@@ -542,7 +555,7 @@ mod imp {
                                 n = 0;
                                 *job.first.lock().unwrap_or_else(|x| x.into_inner()) = Some(Started { at: now, unix: now_unix() });
                                 // La voz que llegó antes del primer fotograma no cuenta: el audio empieza con el vídeo.
-                                if let Some(m) = &job.mic {
+                                for m in [&job.mic, &job.sys].into_iter().flatten() {
                                     while m.rx.try_recv().is_ok() {}
                                 }
                             }
@@ -554,7 +567,27 @@ mod imp {
                     }
                 }
 
+                // Pausar y seguir: al seguir, el origen del vídeo se corre lo que duró la pausa, así el tiempo no avanza.
                 if let Some(t0) = start {
+                    match (job.pause.load(Ordering::SeqCst), paused_since) {
+                        (true, None) => {
+                            paused_since = Some(Instant::now());
+                            pending.clear();
+                            pending_sys.clear();
+                        }
+                        (false, Some(since)) => {
+                            let t1 = t0 + since.elapsed();
+                            start = Some(t1);
+                            paused_since = None;
+                            // El contador de fotogramas siguió sumando durante la pausa: con el origen corrido, la
+                            // espera hasta el siguiente duraría lo que la pausa (vídeo congelado). Se recalcula.
+                            n = (t1.elapsed().as_nanos() / tick.as_nanos().max(1)).min(u128::from(u32::MAX)) as u32;
+                        }
+                        _ => {}
+                    }
+                }
+
+                if let Some(t0) = start.filter(|_| paused_since.is_none()) {
                     // Un fotograma por décima de segundo, con la marca de tiempo real (nunca hacia atrás).
                     let mut hns = (t0.elapsed().as_nanos() / 100) as i64;
                     if hns <= last_hns {
@@ -567,7 +600,7 @@ mod imp {
                         // Primero se suelta el de la tarjeta: tiene abierto el mismo archivo.
                         let _ = encoder.finish();
                         let _ = std::fs::remove_file(&job.out);
-                        encoder = Encoder::open(&job.out, out_w, out_h, false, job.mic.is_some())?;
+                        encoder = Encoder::open(&job.out, out_w, out_h, false, audio_wanted)?;
                         hardware = false;
                         wrote = encoder.write(&image, hns, tick_hns);
                     }
@@ -580,22 +613,45 @@ mod imp {
 
                     // La voz de esta décima, con su propio tiempo (el de sus muestras). Si el micrófono se queda
                     // atrás (quitado, bloqueado), se rellena con silencio: el codificador espera a las dos pistas.
-                    if let (Some(m), true) = (&job.mic, encoder.audio.is_some() && !audio_failed) {
-                        while let Ok(chunk) = m.rx.try_recv() {
-                            pending.extend_from_slice(&chunk);
+                    if audio_wanted && encoder.audio.is_some() && !audio_failed {
+                        if let Some(m) = &job.mic {
+                            while let Ok(chunk) = m.rx.try_recv() {
+                                pending.extend_from_slice(&chunk);
+                            }
+                        }
+                        if let Some(s) = &job.sys {
+                            while let Ok(chunk) = s.rx.try_recv() {
+                                pending_sys.extend_from_slice(&chunk);
+                            }
                         }
                         let due = (t0.elapsed().as_nanos() * u128::from(mic::RATE) / 1_000_000_000) as u64;
-                        let gap = mic::silence_needed(audio_samples, pending.len() as u64, due) as usize;
-                        if gap > 0 {
-                            let mut padded = vec![0i16; gap];
-                            padded.append(&mut pending);
-                            pending = padded;
-                        }
-                        if !pending.is_empty() {
-                            match encoder.write_audio(&pending, mic::hns_of(audio_samples)) {
+                        let block: Vec<i16> = if job.sys.is_some() {
+                            // Con el sonido del equipo manda el reloj del vídeo: cada pista aporta lo que tiene y se
+                            // completa con silencio, y se suman (con saturación) en la misma pista.
+                            let n = due.saturating_sub(audio_samples) as usize;
+                            if n < mic::MIN_BLOCK {
+                                Vec::new()
+                            } else {
+                                mic::trim_backlog(&mut pending, n);
+                                mic::trim_backlog(&mut pending_sys, n);
+                                let voice = mic::take_padded(&mut pending, n);
+                                let system = mic::take_padded(&mut pending_sys, n);
+                                mic::mix(&voice, &system)
+                            }
+                        } else {
+                            let gap = mic::silence_needed(audio_samples, pending.len() as u64, due) as usize;
+                            if gap > 0 {
+                                let mut padded = vec![0i16; gap];
+                                padded.append(&mut pending);
+                                pending = padded;
+                            }
+                            std::mem::take(&mut pending)
+                        };
+                        if !block.is_empty() {
+                            match encoder.write_audio(&block, mic::hns_of(audio_samples)) {
                                 Ok(()) => {
-                                    audio_samples += pending.len() as u64;
-                                    meter.push(&pending);
+                                    audio_samples += block.len() as u64;
+                                    meter.push(&block);
                                 }
                                 Err(x) => {
                                     // Sin voz, pero el vídeo sigue.
@@ -603,15 +659,20 @@ mod imp {
                                     audio_failed = true;
                                 }
                             }
-                            pending.clear();
                         }
+                    }
+                } else if start.is_some() {
+                    // En pausa: lo que llegue de audio se tira.
+                    for m in [&job.mic, &job.sys].into_iter().flatten() {
+                        while m.rx.try_recv().is_ok() {}
                     }
                 } else if waiting.elapsed() > FIRST_FRAME_WAIT && !have_image {
                     failure = Some(if job.window.is_some() { "Windows no entregó imagen de esa ventana (¿está oculta o protegida?)." } else { "Windows no entregó imagen de ese monitor (¿está apagado o protegido?)." }.into());
                     break;
                 }
 
-                if job.stop.load(Ordering::SeqCst) || start.is_some_and(|t0| t0.elapsed() >= job.max) {
+                // El máximo cuenta el tiempo del vídeo: lo que lleva en pausa no entra.
+                if job.stop.load(Ordering::SeqCst) || start.is_some_and(|t0| t0.elapsed().saturating_sub(paused_since.map_or(Duration::ZERO, |s| s.elapsed())) >= job.max) {
                     break;
                 }
                 // Windows solo entrega fotogramas cuando algo cambia; si lleva rato sin hacerlo, se mira si el
@@ -639,6 +700,10 @@ mod imp {
                 }
             }
 
+            // Si se paró estando en pausa, esa pausa no cuenta.
+            if let (Some(t0), Some(since)) = (start, paused_since) {
+                start = Some(t0 + since.elapsed());
+            }
             let duration_ms = start.map_or(0, |t0| t0.elapsed().as_millis() as u64);
             match failure {
                 Some(msg) => {

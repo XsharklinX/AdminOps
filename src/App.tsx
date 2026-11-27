@@ -370,6 +370,8 @@ export default function App() {
       if (payload === "alerts") setAlertSignal((n) => n + 1);
       // Al pulsar el aviso de un dispositivo recién conectado que no funciona.
       if (payload === "connected") navigate("machine", "connected");
+      // «Ver todas las notas» desde la barra del cohete.
+      if (payload === "notebook") navigate("knowledge", "notebook");
       if (payload === "quick-scan") window.dispatchEvent(new Event(TRAY_QUICK_SCAN));
       if (payload === "portable-exit") window.dispatchEvent(new Event("adminops:portable-exit"));
     });
@@ -758,7 +760,7 @@ export default function App() {
       { id: "setup", title: "Volver a abrir el asistente de inicio", run: () => setOnboarding(true) },
       { id: "case", title: "Nuevo caso", subtitle: "Lo que hagas queda apuntado y la resolución se redacta sola", keywords: "ticket incidencia caso abrir atender", run: () => openCase() },
       { id: "minimon", title: "Mini monitor siempre encima", subtitle: "Una ventanita con procesador, memoria, temperatura y red", keywords: "monitor flotante widget vigilar temperatura cpu ram encima", run: () => workApi.miniMonitor() },
-      { id: "note", title: "Nota de llamada", subtitle: "También con Ctrl+Alt+N, aunque AdminOps esté minimizado", keywords: "telefono llamada apuntar nota rapida", run: () => noteApi.open() },
+      { id: "note", title: "Nota nueva", subtitle: "También con Ctrl+Alt+N, aunque AdminOps esté minimizado", keywords: "telefono llamada apuntar nota rapida notas", run: () => noteApi.open() },
       { id: "clip", title: "Recorte de pantalla", subtitle: "Tapa solo rutas, usuario y equipo; queda en el portapapeles para el ticket", keywords: "captura pantallazo imagen recortes ocr privacidad", run: () => noteApi.screenClip() },
       {
         id: "redact",
@@ -777,6 +779,7 @@ export default function App() {
         ? [{ id: "rocket", title: "Optimizar ya", subtitle: "El cohete: memoria, temporales y DNS, sin cerrar nada", keywords: "cohete optimizar acelerar limpiar memoria ram temporales rapido lento", run: () => void emit(ROCKET_LAUNCH_EVENT) }]
         : []),
       { id: "lostwin", title: "Traer ventanas perdidas a la pantalla", subtitle: "Solucionar problemas → Pantalla o monitor", keywords: "ventana fuera pantalla monitor desaparecio perdida segundo monitor mover traer", run: () => navigate("troubleshoot", "display") },
+      { id: "go:notebook", title: "Notas", subtitle: "Conocimiento → Notas: el cuaderno", keywords: "notas apuntes cuaderno nota rapida libreta", run: () => navigate("knowledge", "notebook") },
       { id: "go:usb",title: "Memorias USB: bloquear o solo lectura", subtitle: "Este equipo → Seguridad", keywords: "usb pendrive memoria bloquear solo lectura copiar datos almacenamiento extraible", run: () => navigate("security") },
       { id: "go:defaults", title: "Programas predeterminados", subtitle: "Programas → Predeterminados", keywords: "pdf adobe navegador chrome edge abrir con asociacion csv excel predeterminado", run: () => navigate("apps", "defaults") },
       { id: "netrepair", title: "Reparar la red", subtitle: "DNS, IP y adaptadores, con antes y después", keywords: "internet conexion winsock tcp ip renovar", run: () => navigate("network") },

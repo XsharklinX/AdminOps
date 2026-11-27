@@ -41,7 +41,7 @@ export interface AutoNote {
   at: string;
   beforePct: number;
   afterPct: number;
-  reason: "memoria" | "sin usar";
+  reason: "memoria" | "sin usar" | "mañana";
 }
 
 export interface CallStep {

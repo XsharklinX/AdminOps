@@ -5,8 +5,18 @@ export const HEARD = 0.05;
 
 /** «Micrófono (Jabra Evolve 20)» → «Jabra Evolve 20»: el aparato, para emparejar micro y altavoz. */
 export function gadget(name: string): string {
-  const m = /\(([^()]+)\)\s*$/.exec(name);
-  return (m ? m[1] : name).trim();
+  // Como en audiofix.rs: el último paréntesis entero, también con otros dentro («Micrófono (Realtek(R) Audio)»).
+  const n = name.trim();
+  if (!n.endsWith(")")) return n;
+  let depth = 0;
+  for (let i = n.length - 1; i >= 0; i--) {
+    if (n[i] === ")") depth++;
+    else if (n[i] === "(" && --depth === 0) {
+      const inner = n.slice(i + 1, -1).trim();
+      return inner || n;
+    }
+  }
+  return n;
 }
 
 /** Los permisos que faltan, en palabras. */
