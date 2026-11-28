@@ -1,7 +1,7 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Activity, ArrowDownToLine, BookUser, ChevronLeft, ChevronRight, FolderOpen, Gauge, GripHorizontal, IdCard, Keyboard, LifeBuoy, Lock, MonitorUp, NotebookPen, Pencil, Printer, RotateCcw, ScanLine, SquareTerminal, Wifi, Wrench } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { api, appcareApi, diagApi, faultRecApi, FAULTREC_CAMERA_EVENT, FAULTREC_DONE_EVENT, FAULTREC_DRAW_EVENT, FAULTREC_MARKED_EVENT, FAULTREC_PAUSED_EVENT, FAULTREC_REGION_EVENT, FAULTREC_TICK_EVENT, lanApi, noteApi, notesApi, sheetApi, toolsApi, workApi, type FaultRecDone, type FaultRecWindow, type FaultRegionPicked, type Note, type SpeedResult } from "../lib/api";
 import { logQuietly } from "../lib/api/core";
 import { rocketApi, ROCKET_DOCK_EVENT } from "../lib/api/rocket";
@@ -29,6 +29,34 @@ const HIDE_AFTER_MS = 5000;
 /** Personalizar: cabecera + pie (Guardar) y cada fila (la pastilla del icono mide 22 px aunque se vea al 80 %). */
 const CUSTOM_HEAD = 108;
 const CUSTOM_ROW = 28;
+/** Lo que mide el panel de una herramienta. */
+function toolPanelH(t: Exclude<ToolPanel, null>): number {
+  return t.kind === "fix" ? 60 + (t.fixes?.length ?? 2) * 30 : t.kind === "extra" ? EXTRA_H[t.tool] : t.kind === "custom" ? Math.min(CUSTOM_HEAD + t.list.length * CUSTOM_ROW, screenMaxH()) : TOOL_PANEL_H[t.kind];
+}
+
+/** De qué herramienta es un panel (para abrirlo a su altura). */
+function ownerOf(t: Exclude<ToolPanel, null>, last: BarTool | null): BarTool | null {
+  switch (t.kind) {
+    case "rec":
+    case "recctl":
+    case "recdone":
+      return "rec";
+    case "speed":
+    case "card":
+    case "fix":
+      return t.kind;
+    case "extra":
+    case "menu":
+      return t.tool;
+    case "notes":
+      return "note";
+    case "msg":
+      return last;
+    default:
+      return null;
+  }
+}
+
 /** Lo más alto que puede ser la ventana de la barra: la pantalla, en píxeles de la página (con el zoom del cohete). */
 function screenMaxH() {
   const zoom = (window as unknown as { __ADMINOPS_ROCKET_ZOOM__?: number }).__ADMINOPS_ROCKET_ZOOM__ ?? 1;
@@ -153,6 +181,16 @@ export function RocketBar() {
   const toolsRef = useRef<BarTool[]>(tools);
   toolsRef.current = tools;
   const runRef = useRef<(t: BarTool) => Promise<void>>(async () => {});
+  // Cada panel se abre a la altura del botón que lo abrió (no siempre arriba, junto al cohete).
+  const btnRefs = useRef<Partial<Record<BarTool, HTMLButtonElement | null>>>({});
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const lastToolRef = useRef<BarTool | null>(null);
+  const [panelTop, setPanelTop] = useState(0);
+  // Herramientas trabajando ahora (para no empezarlas otra vez con un segundo toque) y lo que enseñan mientras.
+  const busyRef = useRef(new Set<BarTool>());
+  const liveRef = useRef<Partial<Record<BarTool, Exclude<ToolPanel, null>>>>({});
+  // El aviso abierto es el de Asistencia rápida (los avisos son de varias herramientas).
+  const helpOwnRef = useRef(false);
   const hideRef = useRef<() => void>(() => {});
   const glanceTimer = useRef(0);
   const openRef = useRef(false);
@@ -177,7 +215,7 @@ export function RocketBar() {
     (wantOpen: boolean) => {
       const k = kindRef.current;
       const t = toolRef.current;
-      const panelH = t ? (t.kind === "fix" ? 60 + (t.fixes?.length ?? 2) * 30 : t.kind === "extra" ? EXTRA_H[t.tool] : t.kind === "custom" ? Math.min(CUSTOM_HEAD + t.list.length * CUSTOM_ROW, screenMaxH()) : TOOL_PANEL_H[t.kind]) : k ? PANEL_H[k] : 0;
+      const panelH = t ? toolPanelH(t) : k ? PANEL_H[k] : 0;
       const isOpen = wantOpen || !!k || !!t;
       if (isOpen && !openRef.current) openedAt.current = Date.now();
       openRef.current = isOpen;
@@ -362,6 +400,7 @@ export function RocketBar() {
 
   /** Lo que hace cada opción del clic derecho de una herramienta. */
   const option = async (t: BarTool, o: string) => {
+    lastToolRef.current = t;
     try {
       if (t === "rec" && o === "now") await faultRecApi.start(null, { input: false, mic: false, systemAudio: false });
       else if (t === "speed" && o === "history") setTool({ kind: "speed", running: false, result: null, history: await toolsApi.speedHistory() });
@@ -403,6 +442,26 @@ export function RocketBar() {
     }
   };
   const run = async (t: BarTool) => {
+    lastToolRef.current = t;
+    const cur = toolRef.current;
+    // ¿El panel abierto es el de esta herramienta?
+    const own =
+      !!cur &&
+      (cur.kind === "extra" ? cur.tool === t : t === "rec" ? cur.kind === "rec" || cur.kind === "recctl" : t === "help" ? cur.kind === "msg" && helpOwnRef.current : cur.kind === t);
+    // Trabajando (midiendo, leyendo, abriendo): otro toque no la vuelve a empezar ni la cierra. Si su panel se cerró
+    // mientras tanto, vuelve a verse tal como va.
+    if (busyRef.current.has(t)) {
+      const back = liveRef.current[t];
+      if (!own && back) setTool(back);
+      return;
+    }
+    // Terminada y con su panel abierto: otro toque lo cierra.
+    if (own) {
+      setTool(null);
+      return;
+    }
+    busyRef.current.add(t);
+    helpOwnRef.current = false;
     try {
       if (t === "rec") {
         // Grabando, el botón abre los controles (pausar, marcar, parar) en vez de parar de golpe.
@@ -414,6 +473,7 @@ export function RocketBar() {
       else if (t === "note") await noteApi.open();
       else if (t === "mon") await workApi.miniMonitor();
       else if (t === "fix") {
+        liveRef.current.fix = { kind: "fix", fixes: null };
         setTool({ kind: "fix", fixes: null });
         const fixes = await barApi.fixes();
         if (toolRef.current?.kind === "fix") setTool({ kind: "fix", fixes });
@@ -423,12 +483,17 @@ export function RocketBar() {
       else if (t === "cmd") await barApi.console("cmd");
       else if (isExtra(t)) setTool({ kind: "extra", tool: t });
       else if (t === "help") {
-        setTool({ kind: "msg", text: "Abriendo Asistencia rápida…", ok: true });
-        setTool({ kind: "msg", text: await barApi.quickAssist(), ok: true });
+        liveRef.current.help = { kind: "msg", text: "Abriendo Asistencia rápida…", ok: true };
+        setTool(liveRef.current.help);
+        helpOwnRef.current = true;
+        const text = await barApi.quickAssist();
+        setTool({ kind: "msg", text, ok: true });
+        helpOwnRef.current = true;
       }
       else if (t === "speed") {
         const history = await toolsApi.speedHistory().catch(() => [] as SpeedResult[]);
-        setTool({ kind: "speed", running: true, result: null, history });
+        liveRef.current.speed = { kind: "speed", running: true, result: null, history };
+        setTool(liveRef.current.speed);
         try {
           const result = await toolsApi.speedtest();
           setLastSpeed(Math.round(result.downloadMbps));
@@ -437,7 +502,8 @@ export function RocketBar() {
           if (toolRef.current?.kind === "speed") setTool({ kind: "speed", running: false, result: null, history, msg: String(e) });
         }
       } else if (t === "card") {
-        setTool({ kind: "card", rows: null });
+        liveRef.current.card = { kind: "card", rows: null };
+        setTool(liveRef.current.card);
         const s = await sheetApi.get();
         // La IP pública se pregunta ahora (la de la última prueba de velocidad puede ser de otra red).
         const [net, live, pub, extra] = await Promise.all([
@@ -468,17 +534,31 @@ export function RocketBar() {
       }
     } catch (e) {
       setTool({ kind: "msg", text: String(e), ok: false });
+    } finally {
+      busyRef.current.delete(t);
+      delete liveRef.current[t];
     }
   };
   // Los atajos (manejador creado al montar) usan el `run` de ahora, con el estado de ahora.
   runRef.current = run;
   hideRef.current = scheduleHide;
 
+  // A la altura del botón de su herramienta; si ahí no cabe, sube lo justo para entrar en la barra.
+  useLayoutEffect(() => {
+    if (!tool || !rowRef.current) return setPanelTop(0);
+    const owner = ownerOf(tool, lastToolRef.current);
+    const el = owner ? btnRefs.current[owner] : null;
+    if (!el) return setPanelTop(0);
+    const y = (el.getBoundingClientRect().top - rowRef.current.getBoundingClientRect().top) / zoom;
+    setPanelTop(Math.max(0, Math.min(Math.round(y), barH - toolPanelH(tool))));
+  }, [tool, barH, zoom]);
+
   const tucked = !open;
   const memBadge = r.mem !== null && r.mem >= 80 ? `${r.mem}%` : null;
   const side = right ? "left" : "right";
   return (
     <div
+      ref={rowRef}
       className={`flex h-screen w-screen select-none items-start ${right ? "flex-row-reverse" : ""}`}
       onPointerEnter={() => {
         inside.current = true;
@@ -538,6 +618,9 @@ export function RocketBar() {
                 className={`rkb-btn ${t === "rec" && recSecs !== null ? "rkb-on" : ""}`}
                 aria-label={LABEL[t]}
                 title={`${t === "rec" && recSecs !== null ? "Controles de la grabación" : LABEL[t]}${KEY[t] ? ` (${KEY[t]})` : ""}${i < 9 ? ` · Ctrl+Alt+Mayús+${i + 1}` : ""}`}
+                ref={(el) => {
+                  btnRefs.current[t] = el;
+                }}
                 onClick={() => void run(t)}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -573,7 +656,11 @@ export function RocketBar() {
       </div>
       )}
       {r.panel && <SidePanel panel={r.panel} side={side} inApp={false} setPanel={r.setPanel} act={r.act} ops={r.ops} />}
-      {tool && <ToolSide tool={tool} recSecs={recSecs} side={side} setTool={setTool} tools={tools} setTools={setTools} onOption={(t, o) => void option(t, o)} />}
+      {tool && (
+        <div className="min-w-0 flex-1" style={{ marginTop: panelTop, maxWidth: 274 }}>
+          <ToolSide tool={tool} recSecs={recSecs} side={side} setTool={setTool} tools={tools} setTools={setTools} onOption={(t, o) => void option(t, o)} />
+        </div>
+      )}
     </div>
   );
 }

@@ -182,15 +182,11 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
     <div className="mx-auto grid max-w-(--page-max) grid-cols-12 gap-4 p-6">
       <Card title="Estado" className="col-span-12 lg:col-span-5">
         {paused ? (
-          <p className="flex items-center gap-2 text-sm text-warn">
-            <Pause size={14} /> Pausadas hasta el {when(paused)}
-          </p>
+          <Notice tone="warn">Pausadas hasta el {when(paused)}</Notice>
         ) : (
-          <p className="flex items-center gap-2 text-sm text-ok">
-            <Play size={14} /> Actualizaciones activas
-          </p>
+          <Notice tone="ok">Actualizaciones activas</Notice>
         )}
-        {failed.length > 0 && <p className="mt-1 text-xs text-bad">{failed.length} actualizaciones fallidas en el historial reciente.</p>}
+        {failed.length > 0 && <Notice tone="warn" className="mt-1">{failed.length} actualizaciones fallidas en el historial reciente.</Notice>}
         <div className="mt-3 flex flex-wrap gap-2">
           {paused ? (
             <Button onClick={() => pause(0)} disabled={!isAdmin || busy !== null}>
@@ -212,7 +208,7 @@ export function WindowsUpdate({ isAdmin }: { isAdmin: boolean }) {
             Abrir Windows Update
           </Button>
         </div>
-        {!isAdmin && <p className="mt-2 text-[11px] text-warn">Pausar, ocultar y reparar requieren administrador.</p>}
+        {!isAdmin && <Notice tone="warn" className="mt-2">Pausar, ocultar y reparar requieren administrador.</Notice>}
       </Card>
 
       <Card

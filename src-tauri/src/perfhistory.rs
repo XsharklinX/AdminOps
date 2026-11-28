@@ -206,7 +206,7 @@ pub fn start(app: tauri::AppHandle) {
                 unsaved = 0;
                 if let Ok(json) = serde_json::to_string(&v) {
                     // Se escribe aparte y se cambia el nombre: un corte a medias no deja el archivo roto.
-                    let (path, tmp) = (file(&app), file(&app).with_extension("json.tmp"));
+                    let (path, tmp) = (file(&app), crate::paths::tmp_for(&file(&app)));
                     if std::fs::write(&tmp, json).is_ok() {
                         let _ = std::fs::rename(&tmp, &path);
                     }

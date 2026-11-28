@@ -11,6 +11,81 @@ fn now() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
 }
 
+// ---------- Marca de «arrancó bien» y actualización fallida ----------
+
+/// Carpeta de la marca de arranque: `%ProgramData%\AdminOps\arranque`. La crea el instalador; «Usuarios» puede crear
+/// y cambiar archivos dentro (AdminOps escribe ahí sin administrador) y el instalador solo lee. El aviso de
+/// actualización fallida va en la carpeta de las copias (`setups_dir`), que solo cambian los administradores.
+pub fn boot_dir() -> Option<PathBuf> {
+    std::env::var_os("ProgramData").map(|p| PathBuf::from(p).join("AdminOps").join("arranque"))
+}
+
+/// La interfaz pintó su primera pantalla: se apunta `arranque-<versión>.ok` para que el instalador, que espera a
+/// ver si la versión nueva abre, sepa que esta arrancó bien. Con el portable (.zip) no hay instalador: no se escribe.
+/// Una instalada en un pendrive sí la escribe (también se actualiza con el instalador).
+pub fn mark_boot_ok(version: &str) {
+    if portable_zip() {
+        return;
+    }
+    let Some(dir) = boot_dir() else { return };
+    // Solo si la carpeta existe (la crea el instalador al abrir la versión nueva): si no, nadie está esperando.
+    if !dir.is_dir() {
+        return;
+    }
+    let name = format!("arranque-{version}.ok");
+    if std::fs::write(dir.join(&name), now().to_string()).is_err() {
+        log::warn!("No se pudo escribir la marca de arranque {name}.");
+    }
+}
+
+/// Un campo («Clave: valor») de `actualizacion-fallida.txt`.
+fn failed_field(file: &str, k: &str) -> Option<String> {
+    file.trim_start_matches('\u{feff}').lines().find_map(|l| l.trim().strip_prefix(k).map(|v| v.trim().trim_end_matches('.').to_string())).filter(|v| !v.is_empty())
+}
+
+/// El texto del aviso a partir de `actualizacion-fallida.txt`.
+pub fn failed_update_text(file: &str) -> Option<String> {
+    let field = |k: &str| failed_field(file, k);
+    let version = field("Version:")?;
+    let when = field("Hora:").map(|h| format!(" ({h})")).unwrap_or_default();
+    let why = field("Motivo:").map(|m| format!(" Motivo: {m}.")).unwrap_or_default();
+    let previous = field("Anterior:").map(|v| format!("la {v}")).unwrap_or_else(|| "la versión anterior".into());
+    Some(match field("Resultado:").as_deref() {
+        Some("vuelta") => format!("La actualización a la {version} no llegó a abrir bien y AdminOps volvió sola a {previous}{when}.{why}"),
+        Some("manual") => format!("La actualización a la {version} no llegó a abrir bien{when}. Se abrió el instalador de {previous} para volver; confírmalo en su ventana.{why}"),
+        _ => format!("La actualización a la {version} no confirmó que abriera bien y no se pudo volver sola a la versión anterior{when}. Si algo falla, reinstala AdminOps desde la web.{why}"),
+    })
+}
+
+/// ¿Sigue siendo noticia para la versión que corre? Si ya corre una más nueva que la de la actualización fallida, no.
+/// Con la misma versión, «vuelta» es de una vez anterior (se volvió y luego se actualizó bien): tampoco.
+pub fn failed_update_still_news(file: &str, running: &str) -> bool {
+    let Some(version) = failed_field(file, "Version:") else { return false };
+    match parse_version(&version).cmp(&parse_version(running)) {
+        std::cmp::Ordering::Less => false,
+        std::cmp::Ordering::Equal => failed_field(file, "Resultado:").as_deref() != Some("vuelta"),
+        std::cmp::Ordering::Greater => true,
+    }
+}
+
+/// Si el instalador dejó `actualizacion-fallida.txt` (en su carpeta de solo administradores), devuelve el aviso una
+/// sola vez: no se puede borrar sin administrador, así que se apunta en los datos de este equipo que ya se enseñó.
+fn take_failed_update(app: &tauri::AppHandle) -> Option<String> {
+    let f = setups_dir()?.join("actualizacion-fallida.txt");
+    let text = String::from_utf8_lossy(&std::fs::read(&f).ok()?).into_owned();
+    let seen_file = crate::paths::machine_data_dir(app).join("aviso-actualizacion-visto.txt");
+    let id = format!("{}|{}", failed_field(&text, "Version:").unwrap_or_default(), failed_field(&text, "Hora:").unwrap_or_default());
+    if std::fs::read_to_string(&seen_file).ok().as_deref() == Some(id.as_str()) {
+        return None;
+    }
+    let _ = std::fs::create_dir_all(crate::paths::machine_data_dir(app));
+    let _ = std::fs::write(&seen_file, &id);
+    if !failed_update_still_news(&text, &app.package_info().version.to_string()) {
+        return None;
+    }
+    failed_update_text(&text)
+}
+
 // ---------- Inicio con Windows ----------
 
 /// Tarea programada al iniciar sesión, con los permisos más altos: AdminOps
@@ -22,7 +97,7 @@ const TASK: &str = "AdminOps al iniciar sesión";
 #[serde(rename_all = "camelCase")]
 pub struct SelfCheck {
     pub text: String,
-    /// ok | fixed | warn
+    /// ok | fixed | warn | failed (una actualización que no abrió y se deshizo)
     pub state: &'static str,
 }
 
@@ -32,11 +107,14 @@ pub struct SelfCheck {
 #[tauri::command(async)]
 pub fn selfcheck_after_update(app: tauri::AppHandle) -> Vec<SelfCheck> {
     let version = app.package_info().version.to_string();
+    let mut out = Vec::new();
+    if let Some(text) = (!crate::audit::active()).then(|| take_failed_update(&app)).flatten() {
+        out.push(SelfCheck { text, state: "failed" });
+    }
     let mark = crate::paths::shared_data_dir(&app).join("version-comprobada.txt");
     if std::fs::read_to_string(&mark).ok().as_deref() == Some(version.as_str()) {
-        return Vec::new();
+        return out;
     }
-    let mut out = Vec::new();
     // Con el modo auditoría no se cambia nada: solo se mira.
     let audit = crate::audit::active();
     let data = crate::paths::shared_data_dir(&app);
@@ -406,6 +484,56 @@ fn set_trusted_previous(_version: &str, _sha256: &str) -> Result<(), String> {
     Err("solo en Windows".into())
 }
 
+/// Copias del instalador que guarda el propio instalador (la versión instalada y la anterior), en una carpeta que
+/// solo cambian los administradores; su huella y su formato de datos, en HKLM. Desde la 1.5.3.
+const SETUPS_KEY: &str = r"SOFTWARE\AdminOps\Instaladores";
+
+fn setups_dir() -> Option<PathBuf> {
+    std::env::var_os("ProgramData").map(|p| PathBuf::from(p).join("AdminOps").join("instalador"))
+}
+
+/// La copia protegida más nueva que sea anterior a `current`: (info, ruta, huella apuntada en HKLM).
+#[cfg(windows)]
+fn protected_previous(current: &str) -> Option<(PreviousInfo, PathBuf, String)> {
+    let root = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE).open_subkey(SETUPS_KEY).ok()?;
+    let dir = setups_dir()?;
+    let mut best: Option<(PreviousInfo, PathBuf, String)> = None;
+    for v in root.enum_keys().flatten() {
+        let file = format!("AdminOps-{v}-Setup.exe");
+        if !setup_name_ok(&file, &v) || parse_version(&v) >= parse_version(current) {
+            continue;
+        }
+        if best.as_ref().is_some_and(|(b, _, _)| parse_version(&b.version) >= parse_version(&v)) {
+            continue;
+        }
+        let Ok(k) = root.open_subkey(&v) else { continue };
+        let Ok(sha) = k.get_value::<String, _>("Sha256") else { continue };
+        let format: u32 = k.get_value("DataFormat").unwrap_or(0);
+        let path = dir.join(&file);
+        let Ok(m) = std::fs::metadata(&path) else { continue };
+        let saved_at = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+        best = Some((PreviousInfo { version: v.clone(), size: m.len(), saved_at, compatible: format == DATA_FORMAT }, path, sha));
+    }
+    best
+}
+
+#[cfg(not(windows))]
+fn protected_previous(_current: &str) -> Option<(PreviousInfo, PathBuf, String)> {
+    None
+}
+
+/// ¿Ya hay copia protegida del instalador de esta versión? Entonces no hace falta descargarla antes de actualizar.
+#[cfg(windows)]
+fn protected_copy_of(version: &str) -> bool {
+    let has_key = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE).open_subkey(format!(r"{SETUPS_KEY}\{version}")).is_ok();
+    has_key && setups_dir().is_some_and(|d| d.join(format!("AdminOps-{version}-Setup.exe")).is_file())
+}
+
+#[cfg(not(windows))]
+fn protected_copy_of(_version: &str) -> bool {
+    false
+}
+
 /// El único nombre válido para la copia: el que genera la build, con una versión de números y puntos.
 pub fn setup_name_ok(file: &str, version: &str) -> bool {
     !version.is_empty() && version.chars().all(|c| c.is_ascii_digit() || c == '.') && file == format!("AdminOps-{version}-Setup.exe")
@@ -552,9 +680,14 @@ pub fn previous_version(app: tauri::AppHandle) -> Option<PreviousInfo> {
     if portable_zip() {
         return None;
     }
+    let current = app.package_info().version.to_string();
+    // Primero la copia que guarda el instalador (1.5.3 en adelante); si no, la que guardaba AdminOps antes de actualizar.
+    if let Some((info, _, _)) = protected_previous(&current) {
+        return Some(info);
+    }
     let (meta, path) = previous_meta(&app)?;
     let len = std::fs::metadata(&path).ok().map(|m| m.len());
-    usable_previous(&meta, &app.package_info().version.to_string(), len)
+    usable_previous(&meta, &current, len)
 }
 
 /// «Volver a la X»: comprueba otra vez la huella de la copia guardada y abre su
@@ -565,6 +698,17 @@ pub fn rollback_previous(app: tauri::AppHandle, accept_data: bool) -> Result<Str
     let info = previous_version(app.clone()).ok_or("No hay ninguna versión anterior guardada.")?;
     if !info.compatible && !accept_data {
         return Err(format!("La {} no sabe leer algunos datos de esta versión. Confírmalo antes de volver.", info.version));
+    }
+    if let Some((p, path, trusted_sha)) = protected_previous(&app.package_info().version.to_string()) {
+        // Abierta y bloqueada desde que se comprueba hasta que el instalador arranca.
+        let locked = open_locked(&path)?;
+        if sha256_of(&locked)? != trusted_sha {
+            return Err(format!("La copia guardada de la {} está dañada (su huella no coincide). No se usa.", p.version));
+        }
+        log::info!("Volver a la versión anterior: se abre el Setup guardado de la {}", p.version);
+        crate::shellopen::run_installer(&path.display().to_string(), "--volver")?;
+        close_when_installer_runs_holding(app, format!("AdminOps-{}-Setup.exe", p.version), Some(locked));
+        return Ok(p.version);
     }
     let (meta, path) = previous_meta(&app).ok_or("No hay ninguna versión anterior guardada.")?;
     // La huella buena es la de HKLM (solo la escribe un administrador), no la del archivo de la carpeta de datos.
@@ -578,7 +722,7 @@ pub fn rollback_previous(app: tauri::AppHandle, accept_data: bool) -> Result<Str
         return Err(format!("La copia guardada de la {} está dañada (su huella no coincide). No se usa.", meta.version));
     }
     log::info!("Volver a la versión anterior: se abre el Setup de la {}", meta.version);
-    crate::shellopen::run_with_args(&path.display().to_string(), "--volver")?;
+    crate::shellopen::run_installer(&path.display().to_string(), "--volver")?;
     close_when_installer_runs_holding(app, meta.file.clone(), Some(locked));
     Ok(meta.version)
 }
@@ -618,7 +762,9 @@ pub async fn install_update(app: tauri::AppHandle) -> Result<InstallOutcome, Str
         .map_err(|e| e.to_string())?;
     // Antes de nada, la versión de ahora queda guardada para poder volver a ella (no en el portable:
     // ahí la carpeta anterior ya es la copia).
-    if !zip {
+    // Si el instalador ya guardó la suya (1.5.3 en adelante), no hace falta. Y sin administrador no se puede apuntar en
+    // HKLM: la descarga no serviría de nada.
+    if !zip && !protected_copy_of(&current) && crate::elevation::is_elevated() {
         task.step(format!("Guardando la versión {current} por si hay que volver…"));
         if let Err(e) = save_current_setup(&app, &client, &current, &task).await {
             log::warn!("Actualización: no se guardó la versión {current} para poder volver: {e}");
@@ -695,8 +841,10 @@ pub async fn install_update(app: tauri::AppHandle) -> Result<InstallOutcome, Str
         }
     } else {
         // Con `--actualizar` el instalador actualiza sin preguntar nada y vuelve a abrir AdminOps.
-        // Se abre desde aquí (AdminOps ya es administrador): así Windows no vuelve a pedir permiso.
-        crate::shellopen::run_with_args(&out.display().to_string(), "--actualizar")?;
+        // El instalador pide administrador (instala en Archivos de programa): en modo usuario sale el aviso de Windows.
+        // `--anterior`: dónde está la copia de la versión de ahora, por si la nueva no abre y el instalador tiene que volver.
+        let args = format!("--actualizar --anterior \"{}\"", previous_dir(&app).display());
+        crate::shellopen::run_installer(&out.display().to_string(), &args)?;
         close_when_installer_runs(app.clone(), asset.name.clone());
         Ok(outcome("installer"))
     }
@@ -912,6 +1060,35 @@ mod tests {
         let newer_format = PreviousSetup { data_format: DATA_FORMAT + 1, ..meta };
         assert!(!usable_previous(&newer_format, "1.6.0", Some(13_000_000)).unwrap().compatible);
         assert!(usable_previous(&PreviousSetup::default(), "1.6.0", Some(0)).is_none());
+    }
+
+    #[test]
+    fn el_aviso_de_actualizacion_fallida_dice_lo_que_paso() {
+        let vuelta = super::failed_update_text("Version: 1.5.4\r\nHora: 27/11/2026 14:05\r\nResultado: vuelta\r\nMotivo: La versión nueva no confirmó que abría en 180 s; se volvió a la 1.5.3\r\n").unwrap();
+        assert!(vuelta.contains("volvió sola a la versión anterior (27/11/2026 14:05)."));
+        assert!(!vuelta.contains(".."));
+        let con = super::failed_update_text("Version: 1.5.4\nResultado: vuelta\nAnterior: 1.5.3\n").unwrap();
+        assert!(con.contains("volvió sola a la 1.5.3."));
+        let manual = super::failed_update_text("Version: 1.5.3\nResultado: manual\nAnterior: 1.5.2\n").unwrap();
+        assert!(manual.contains("Se abrió el instalador de la 1.5.2 para volver; confírmalo en su ventana."));
+        let sin = super::failed_update_text("Version: 1.5.4\nResultado: sin-copia\nMotivo: no hay copia.\n").unwrap();
+        assert!(sin.contains("no se pudo volver sola"));
+        assert!(!sin.contains(".."));
+        assert!(super::failed_update_text("basura").is_none());
+    }
+
+    #[test]
+    fn el_aviso_viejo_no_se_ensena() {
+        let vuelta = "Version: 1.5.4\nResultado: vuelta\n";
+        // Volvió a la 1.5.3: es noticia.
+        assert!(super::failed_update_still_news(vuelta, "1.5.3"));
+        // Ya corre la 1.5.4 (se actualizó bien después) o una más nueva: no.
+        assert!(!super::failed_update_still_news(vuelta, "1.5.4"));
+        assert!(!super::failed_update_still_news(vuelta, "1.5.5"));
+        // Sin copia o esperando a que se confirme el instalador de la anterior, sigue la 1.5.4: sí.
+        assert!(super::failed_update_still_news("Version: 1.5.4\nResultado: sin-copia\n", "1.5.4"));
+        assert!(super::failed_update_still_news("Version: 1.5.4\nResultado: manual\n", "1.5.4"));
+        assert!(!super::failed_update_still_news("basura", "1.5.4"));
     }
 
     #[test]

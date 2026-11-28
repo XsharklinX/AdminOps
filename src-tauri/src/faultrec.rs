@@ -263,7 +263,7 @@ fn read_meta(path: &Path) -> Option<Meta> {
 
 fn write_meta(dir: &Path, meta: &Meta) -> Result<(), String> {
     let json = serde_json::to_string_pretty(meta).map_err(|e| e.to_string())?;
-    let (path, tmp) = (meta_file(dir, &meta.id), dir.join(format!("{}.json.tmp", meta.id)));
+    let (path, tmp) = (meta_file(dir, &meta.id), crate::paths::tmp_for(&meta_file(dir, &meta.id)));
     std::fs::write(&tmp, json).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
 }

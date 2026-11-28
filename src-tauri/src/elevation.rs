@@ -20,12 +20,55 @@ pub fn is_admin() -> bool {
     is_elevated()
 }
 
+/// Lo pasa «Volver a modo usuario» a la instancia nueva: se queda en modo usuario.
+const USER_MODE_ARG: &str = "--modo-usuario";
+
+/// «Abrir en modo técnico en este equipo»: un archivo en la carpeta de este equipo (en portable, la del equipo
+/// dentro del USB; instalada, la de esta cuenta). Nunca en los datos compartidos, que en portable viajan en el USB
+/// y harían pedir el administrador en todos los PC de los usuarios.
+fn tech_on_open_file(app: &tauri::AppHandle) -> std::path::PathBuf {
+    crate::paths::machine_data_dir(app).join("abrir-en-modo-tecnico.txt")
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TechOnOpen {
+    /// El ajuste está puesto en este equipo.
+    pub on: bool,
+    /// Hay que pedir el administrador ahora: puesto, sin elevar y no se viene de «Volver a modo usuario».
+    pub relaunch: bool,
+}
+
+#[tauri::command]
+pub fn tech_on_open(app: tauri::AppHandle) -> TechOnOpen {
+    let on = tech_on_open_file(&app).is_file();
+    let from_user_mode = std::env::args().any(|a| a == USER_MODE_ARG);
+    TechOnOpen { on, relaunch: on && !is_elevated() && !from_user_mode && !crate::audit::active() }
+}
+
+#[tauri::command]
+pub fn set_tech_on_open(app: tauri::AppHandle, on: bool) -> Result<(), String> {
+    let f = tech_on_open_file(&app);
+    if on {
+        if let Some(d) = f.parent() {
+            std::fs::create_dir_all(d).map_err(|e| format!("No se pudo guardar: {e}"))?;
+        }
+        std::fs::write(&f, b"1").map_err(|e| format!("No se pudo guardar: {e}"))
+    } else {
+        match std::fs::remove_file(&f) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(format!("No se pudo guardar: {e}")),
+            _ => Ok(()),
+        }
+    }
+}
+
 /// «Volver a modo usuario»: abre AdminOps otra vez como el usuario de la sesión y sin elevar (se le pide al
 /// escritorio de Windows, que corre como él) y cierra esta instancia elevada.
 #[tauri::command]
 pub fn relaunch_as_user(app: tauri::AppHandle) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    crate::shellopen::run_as_user_visible(&exe.to_string_lossy(), "").map_err(|e| format!("No se pudo volver a modo usuario: {e}"))?;
+    // `--modo-usuario`: la instancia nueva no vuelve a pedir el administrador aunque esté puesto «Abrir en modo técnico».
+    crate::shellopen::run_as_user_visible(&exe.to_string_lossy(), USER_MODE_ARG).map_err(|e| format!("No se pudo volver a modo usuario: {e}"))?;
     crate::rocketplus::skip_rocket_behind();
     app.exit(0);
     Ok(())

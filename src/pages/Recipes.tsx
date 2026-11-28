@@ -733,7 +733,11 @@ function RecipeRunner({ recipe, resume, isAdmin, onUsed, onClose }: { recipe: Re
                   {STEP_INFO[s.kind].label}
                   {describe(s) && <span className="text-mute"> · {describe(s)}</span>}
                 </span>
-                {messages[i] && <span className={`block text-xs break-words ${status[i] === "error" ? "text-bad" : "text-dim"}`}>{messages[i]}</span>}
+                {messages[i] && (
+                  <Notice tone={status[i] === "error" ? "error" : "info"} where="Recetas" className="mt-1">
+                    {messages[i]}
+                  </Notice>
+                )}
               </span>
             </li>
           ))}

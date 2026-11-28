@@ -50,6 +50,8 @@ export interface LiveMetrics {
 export const api = {
   isAdmin: () => invoke<boolean>("is_admin"),
   relaunchAsAdmin: () => invoke<void>("relaunch_as_admin"),
+  techOnOpen: () => invoke<{ on: boolean; relaunch: boolean }>("tech_on_open"),
+  setTechOnOpen: (on: boolean) => invoke<void>("set_tech_on_open", { on }),
   /** «Volver a modo usuario»: AdminOps otra vez sin administrador, como el usuario de la sesión. */
   relaunchAsUser: () => invoke<void>("relaunch_as_user"),
   systemInfo: () => invoke<SystemInfo>("get_system_info"),
@@ -144,7 +146,7 @@ export const tweaksApi = {
   journal: () => invoke<JournalEntry[]>("get_journal"),
   /** El diario en PDF (`ids`: solo esas entradas; vacío: todas). Nombre del archivo, o null si se cancela. */
   exportJournalPdf: (ids: number[]) => invoke<string | null>("export_journal_pdf", { ids }),
-  index: () => invoke<{ id: string; name: string; description: string; category: string; risk: Risk; note: string | null }[]>("tweak_index"),
+  index: () => invoke<{ id: string; name: string; description: string; category: string; risk: Risk; note: string | null; eta: string; closes: string | null; reboot: boolean }[]>("tweak_index"),
   revertEntry: (entryId: number) => invoke<OpResult>("revert_entry", { entryId }),
   /** Antes → después de cada cosa que tocarán esos ajustes (solo lee). */
   preview: (ids: string[]) => invoke<TweakPreview[]>("tweak_preview", { ids }),

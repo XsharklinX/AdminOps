@@ -429,6 +429,48 @@ pub fn restore_languages(list: &[LanguageEntry]) -> Result<(), String> {
     crate::ps::powershell_opts(&script, crate::ps::Opts { timeout: Some(Duration::from_secs(60)), task: None }).map(|_| ())
 }
 
+/// Cambia el teclado con el que se escribe, sin quitar ninguno: en los programas abiertos al momento y en los que se
+/// abran después (es el teclado «predeterminado» del usuario). No necesita administrador. Deja una entrada en el Historial.
+#[tauri::command(async)]
+pub fn kbd_use(app: tauri::AppHandle, lang_id: u32, klid: String) -> Result<String, String> {
+    let r = use_keyboard(lang_id, klid);
+    if let Ok((_, name)) = &r {
+        crate::tweaks::record_app(&app, &format!("Teclado cambiado a {name}"), &Ok::<(), String>(()));
+    }
+    r.map(|(msg, _)| msg)
+}
+
+/// Devuelve el mensaje para la pantalla y el nombre del teclado.
+fn use_keyboard(lang_id: u32, klid: String) -> Result<(String, String), String> {
+    let st = state()?;
+    if st.other_user {
+        return Err("Con AdminOps abierto con otra cuenta no se cambia el teclado de este usuario.".into());
+    }
+    let klid: String = klid.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+    if klid.len() != 8 || lang_id > 0xFFFF {
+        return Err("Teclado no válido.".into());
+    }
+    let tip = format!("{lang_id:04X}:{klid}");
+    // Para los programas que se abran a partir de ahora.
+    crate::ps::powershell(&format!("Set-WinDefaultInputMethodOverride -InputTip '{tip}'")).map_err(|e| format!("No se pudo cambiar el teclado: {}", crate::ps::clean_error(&e)))?;
+    // Y los que ya están abiertos, ya (como Alt+Mayús, pero en todos).
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{LoadKeyboardLayoutW, KLF_ACTIVATE};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, HWND_BROADCAST, WM_INPUTLANGCHANGEREQUEST};
+        let wide: Vec<u16> = klid.encode_utf16().chain(Some(0)).collect();
+        // SAFETY: cadena terminada en cero; el mensaje solo pide cambiar el idioma de entrada.
+        unsafe {
+            let hkl = LoadKeyboardLayoutW(wide.as_ptr(), KLF_ACTIVATE);
+            if !hkl.is_null() {
+                PostMessageW(HWND_BROADCAST, WM_INPUTLANGCHANGEREQUEST, 0, hkl as isize);
+            }
+        }
+    }
+    let name = st.rows.iter().find(|r| r.lang_id == lang_id).map(|r| format!("{} · {}", r.language, r.layout)).unwrap_or(tip);
+    Ok((format!("Ahora se escribe en {name}."), name))
+}
+
 /// «Dejar solo Español y quitar el atajo». Guarda antes la lista y el atajo para poder deshacerlo.
 #[tauri::command(async)]
 pub fn kbd_only_spanish(state: State<'_, TweakState>) -> Result<KbdChange, String> {

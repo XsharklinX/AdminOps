@@ -11,6 +11,75 @@ local sí); un solo técnico; sin datos personales en la interfaz; textos en esp
 con lint, typecheck, pruebas de Rust y de interfaz, y `npm run test:exe` + `npm run test:perf` con un
 .exe de depuración. Antes de cambiar algo visual que no esté ya en la maqueta, enseñar el antes y el después.
 
+## PARA RETOMAR (28 nov) · 1.5.3 LISTA PARA COMPILAR, sin commit
+- Tanda 1.5.3 entera hecha (14 ideas + arreglo de la actualización + barra en Ajustes + doble toque, teclado, paneles)
+  y M3/M4 (notas con aviso y plantillas), A1 (vuelta sola a la anterior), Q2 (barra en exe.mjs).
+- Cuatro rondas de revisión Opus. Todo lo encontrado, arreglado. Lo último de la 4.ª (rdp-cache borra solo
+  bcache*.bmc y Cache*.bin de primer nivel; protected_previous vuelve a mirar dueño y enlace de «instalador») lo
+  arreglé y probé yo (script de rdp-cache contra carpeta falsa). Aceptado como riesgo bajo: los borrados de hooks.nsh
+  siguen un enlace si un usuario creó %ProgramData%\AdminOps sin que corriera installer/ (solo nombres exactos).
+- Limitación conocida: si una versión vieja sin admin creó %ProgramData%\AdminOps a nombre de un usuario, no hay vuelta
+  automática en ese equipo (falla del lado seguro).
+- Versión 1.5.3 puesta (setversion), changelog.ts y docs/notas-1.5.3.md (ES 385, EN 403).
+- En verde: tsc, eslint, clippy app+instalador, cargo test 927, instalador 6, vitest 503.
+- Siguiente: build cuando David la pida (SHARKCOST_PEDIDA=1) → commit + publish:release. ANTES DE PUBLICAR (obligatorio):
+  instalar 1.5.3 encima de 1.5.2 en PC real con usuario estándar: `icacls %ProgramData%\AdminOps\arranque` con las dos
+  entradas, aparece arranque-1.5.3.ok y el instalador termina en «ok».
+
+## PARA LA 1.5.3 (27 nov, noche) · HECHO sin commit, en verde (clippy, cargo test 919, tsc, eslint, vitest 503) · SIN revisión Opus
+1. Arreglo de la actualización automática (abajo; ya revisado y APROBADO).
+2. Barra: tocar dos veces una herramienta cierra su panel; si está trabajando (velocidad, datos, arreglos, Asistencia) no
+   se reinicia ni se cierra, y si su panel se cerró, vuelve tal como va (RocketBar.tsx: busyRef, liveRef, helpOwnRef).
+3. Barra, teclado: el panel lista los teclados instalados y con un toque se escribe con ese en todo (kbdlang.rs kbd_use:
+   Set-WinDefaultInputMethodOverride + WM_INPUTLANGCHANGEREQUEST a todas las ventanas; SAFE en audit); «Volver a como
+   estaba» deshace «Dejar solo español» (revert_entry de la entrada guardada en localStorage adminops.bar.kbdUndo).
+4. Barra: cada panel se abre a la altura del botón que lo abrió (toolPanelH, ownerOf, btnRefs, panelTop con
+   useLayoutEffect), subiendo lo justo si no cabe. Sin probar en el exe.
+Falta: revisión Opus de 2–4, versión 1.5.3 + changelog + notas, build cuando la pida David, publish.
+Catálogo «AdminOps 1.5.3, ideas» (https://claude.ai/artifact/K8LYLoKecJapKz4pHi5TJr; fuente adminops-153.html +
+ideas153.js en el scratchpad de la sesión 4862ee06). ELEGIDO (27 nov): SÍ (14) D3 la DLL en Ctrl+K y «Resolver» (qué paquete
+y botón para instalarlo) · A1 si una actualización sale mal, volver sola a la anterior (el instalador espera 60 s a que abra) ·
+A2 cohete portable: copiarse a una carpeta del equipo para poder expulsar el USB · A3 la barra en todos los escritorios
+virtuales · A5 los ~50 avisos sueltos que quedan, a Notice · M1 «En este equipo, abrir en modo técnico» (ajuste por equipo) ·
+M2 candado en los botones que piden modo técnico (clic en el candado = pasar a modo técnico) · M3 nota con aviso a una hora ·
+M4 notas desde plantilla de pasos (editables) · M5 tiempos (eta/closes) también en los botones de «Resolver un problema» ·
+N1 aviso falso de «sin Internet» (NCSI/proxy): detectar, explicar y arreglar · N2 qué programa usa la cámara o el micrófono
+(y cerrarlo) · N3 Escritorio remoto que se corta o queda en negro (UDP y caché de imágenes, con deshacer) · Q2 la barra y sus
+paneles en la prueba del .exe. NO (7, no volver a proponer): D1 aviso automático de DLL, D2 instalar el paquete por bits
+desde el aviso, D4 DLL del propio programa, A4 copia de las notas, M6 tres herramientas opcionales más, N4 luz nocturna y
+brillo, Q1 actualización probada en cada build. Orden propuesto: build 1.5.3 con lo de arriba (si la pide) → A2, A3, M1, M2
+→ D3, M5, A5 → N1, N2, N3 → M3, M4 → A1, Q2 → revisión Opus → build.
+DECISIÓN de David (27 nov): todo esto (arreglo de actualización, doble toque, teclado, paneles a su altura y las 14) va en
+la 1.5.3; no hay 1.5.3 corta. AVANCE: A2 HECHO (rocketplus.rs local_copy: en portable el cohete se copia a
+%LOCALAPPDATA%\AdminOps\cohete\AdminOps.exe y corre desde ahí); M1 HECHO (Settings open_technician + Ajustes → General
+«Abrir en modo técnico en este equipo» + App.tsx relanza elevado una vez por arranque con sessionStorage). Siguiente: A3
+(IVirtualDesktopManager documentado: si la ventana del cohete no está en el escritorio actual, MoveWindowToDesktop al
+GetWindowDesktopId de la ventana de delante, en el vigilante de rocket.rs) y M2 (candado en botones que piden admin).
+A3 HECHO (src-tauri/src/vdesk.rs follow(), llamado en el vigilante de rocket.rs; sin probar con varios escritorios).
+M2 HECHO en el catálogo (TweakCard.tsx: con needsAdmin en modo usuario, botón «Modo técnico» con candado que relanza elevado; chip «Pide modo técnico»). PASO 1 COMPLETO, sin commit, tsc/eslint/clippy en verde. SIGUE el paso 2: D3 (DLL en Ctrl+K y Resolver: tabla DLL→paquete winget de VC++ 2008–2022, DirectX, .NET), M5 (eta/closes en los botones fix de Resolver: leer eta del catálogo por id), A5 (avisos que quedan, lista en el informe del oficial).
+D3 HECHO (src/lib/dlls.ts tabla DLL→paquete winget; CommandPalette entradas kind repair que encolan en Instalar y abren la pantalla; solución «dll-falta» en solutionsCatalog). tsc/eslint en verde. M5 HECHO (tweak_index con eta/closes/reboot; GuidedSolution.tsx enseña «· unos 15 s · reinicia» junto a cada botón fix). A5 HECHA (oficial, 27 nov): 81 avisos más a Notice en 36 archivos (tsc, eslint, vitest 503 en verde; sin ver en pantalla). Cambian de aspecto Tickets sin conexión y AuditMode (ya no franja ámbar a todo el ancho). Quedan sin migrar a propósito: chips de estado (Shares), mensajes dentro de <p> (Shares ~205, Domain ~110/117) y unos pocos fuera de la lista (Profiles ~206, WindowsUpdate ~242, Scanners ~102, Tickets ~635, DriverDrawer ~243/283/324, ScanToFolder ~426/486, Diagnostics ~711, Hardware ~298, Processes ~327, AdminBanner, AudioCard ~69). N1 y N3 HECHAS (repair.toml: repair.ncsi-false = UseGlobalDNS en NetworkConnectivityStatusIndicator; repair.rdp-drops = fClientDisableUDP en la directiva del cliente RDP; soluciones sin-internet-falso y rdp-corta en solutionsCatalog; cargo test 919 en verde; la caché de imágenes de RDP NO se vacía todavía, solo el UDP). PEDIDO NUEVO de David para la 1.5.3: en Ajustes, una sección propia para TODO lo de la barra (herramientas, barra de los usuarios, arranque con Windows, tamaño, esconderse sola, atajos, modo del cohete…), reuniendo lo que hoy está repartido en Ajustes → General. N2 HECHA (src-tauri/src/inuse.rs device_in_use por ConsentStore, SAFE; InUseNotice.tsx en CameraCard y AudioCard, mira cada 5 s; no cierra el programa, remite a Procesos). Ajustes de la barra HECHO (General.tsx: tarjeta propia «La barra del cohete» con modo, tamaño, despegue automático, empezar el día, arranque con Windows, barra de los usuarios y fila de atajos; sacado de «La ventana»). SIGUE (yo): vaciar caché RDP en repair.rdp-drops, M3 M4, A1 Q2, revisión Opus, versión 1.5.3 + changelog + notas, build cuando la pida (N1 N2 N3), 4 (M3 M4), 5 (A1 Q2), revisión Opus, versión 1.5.3 + changelog + notas, build cuando la pida.
+
+A1 tras la 2.ª revisión Opus (27 nov): la marca de arranque la escriben también las instaladas en pendrive (solo el portable .zip no); la vuelta sola solo a la versión que había antes de instalar y con el mismo DataFormat (si no, «sin-copia» con el motivo); con un Setup < 1.5.3 (no entiende --automatico) el resultado es «manual» (pide confirmar en su ventana); el aviso actualizacion-fallida.txt va en %ProgramData%\AdminOps\instalador (solo admin) y la app apunta en machine_data_dir/aviso-actualizacion-visto.txt que ya lo enseñó (y no enseña los viejos); el instalador nunca borra ni escribe en «arranque» (solo marcas posteriores al lanzamiento); «arranque» con Usuarios (RX,WD,AD) en la carpeta + (OI)(CI)(IO)M dentro (no pueden borrarla ni cambiarla por un enlace); carpetas de ProgramData: si son de un usuario o tienen enlaces dentro, se borran y se crean de nuevo; icacls sin /T (también defapps.rs); reinstalar la misma versión conserva la copia anterior; WebView2 del instalador por PID (wv-<pid>). LIMITACIÓN conocida: el instalador clásico con ventanas, si se elige «desinstalar antes», desinstala sin /UPDATE y borra las copias (la siguiente actualización no podrá volver sola hasta tener copia nueva). Sin probar instalando de verdad.
+
+A1 tras la 3.ª revisión Opus (27 nov): rdp-cache comprueba que ni Cache ni ninguna carpeta de encima (hasta la LocalAppData del usuario) sea un enlace, y si lo es no toca nada (probado con una junction en el scratchpad: se niega y la carpeta de destino queda intacta; sin enlace vacía la caché con subcarpetas); el instalador borra actualizacion-fallida.txt cuando verify_launch ve la marca (no en install(): el Setup anterior al volver borraría el aviso recién escrito); icacls() devuelve si salió con código 0 y «arranque»/«instalador» solo se dan por listas si todas las llamadas salen bien (si no, «ok» sin comprobar: nunca se deshace una que quizá abrió); comprobado con icacls en una carpeta de prueba que el segundo /grant sin :r deja dos entradas separadas («(RX,WD,AD)» y «(OI)(CI)(IO)(M)»), no las fusiona; hooks.nsh borra en «instalador» solo AdminOps-*-Setup.exe, *.nuevo y actualizacion-fallida.txt y luego RMDir sin /r; CrossProcessLock crea el mutex con SDDL (SYSTEM y Administradores todo; usuarios autenticados esperar y soltar; integridad media) y si ya existe con menos permisos lo abre con OpenMutexW, así el cohete sin elevar y la app en modo técnico se bloquean de verdad (prueba nueva); owned_by acepta también como dueño la cuenta del propio proceso solo en carpetas que acaba de crear (directiva «Creador del objeto»), y la carpeta padre recién creada se pasa a Administradores con /setowner.
+
+**OBLIGATORIO ANTES DE PUBLICAR LA 1.5.3 (prueba en PC real, 3.ª revisión punto 4):** instalar la 1.5.3 encima de la 1.5.2 en un PC real con un usuario estándar en la sesión; mirar `icacls %ProgramData%\AdminOps\arranque` (deben salir Usuarios «(RX,WD,AD)» y «(OI)(CI)(IO)(M)» como entradas separadas); confirmar que aparece `arranque-1.5.3.ok` y que el instalador termina en «ok» (no vuelve a la 1.5.2). Sin esta prueba no se publica.
+
+## ACTUALIZACIÓN AUTOMÁTICA ROTA (27 nov, noche) · ARREGLADO sin commit · revisión Opus en curso · falta build 1.5.3
+David: al actualizar desde la app, se descarga, sale un cuadro negro donde iba el instalador, desaparece y se cierra todo.
+Causa: el instalador heredaba WEBVIEW2_USER_DATA_FOLDER (…\AdminOps\WebView) de AdminOps, y su stop_app mata los
+msedgewebview2 con '*\AdminOps\WebView*': se mataba a sí mismo. Arreglo: installer/src/main.rs pone su propia carpeta
+(%TEMP%\adminops-instalador\wv) y quita la otra variable; shellopen::run_installer (usado en --actualizar y --volver) no
+pasa esas variables. Los que tengan 1.5.1/1.5.2 se arreglan al bajar el Setup de la 1.5.3 (el de la 1.5.2 publicado está
+roto para actualizar desde la app; instalarlo a mano con doble clic sí funciona). Sin probar una actualización real.
+
+## 1.5.2 PUBLICADA (27 nov) · commit 74f3239, https://github.com/XsharklinX/AdminOps/releases/tag/v1.5.2
+Lleva: abrir sin administrador + «Modo usuario/Modo técnico» + barra del cohete siempre (también portable, decisión de David) +
+la tanda del compendio entera (F1–F6). test:exe pasó entero; el presupuesto de tamaño se actualizó (Knowledge.js +21 % por las
+notas). Falta que David la pruebe en PCs reales, sobre todo: modo técnico con la cuenta de otro (el caso de yerlin.bonilla),
+«Quitar esta» con una acumulativa (DISM por la KB en Description/SupportInformation) y reponer los iconos del Escritorio.
+Lo de abajo es historia.
+
 ## ESTADO 27 nov (noche): 1.5.2 + F1, F2 y F3 de la tanda del compendio HECHAS sin commit, en verde (clippy, cargo test 919,
 tsc, eslint, vitest 503). 2.ª revisión Opus: 7 hallazgos + posibles ARREGLADOS y re-revisados: APRUEBA (y sus 3 leves
 finales arreglados). Siguiente: versión 1.5.2 (o la que decida David) + changelog + notas ES/EN, build cuando la pida, publish.

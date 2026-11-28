@@ -1,3 +1,4 @@
+import { InUseNotice } from "./InUseNotice";
 import { Camera, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { camApi, type CamView } from "../lib/api/camera";
@@ -108,6 +109,7 @@ export function CameraCard({ isAdmin }: { isAdmin: boolean }) {
         </button>
       }
     >
+      <InUseNotice kind="webcam" />
       {(perms.length > 0 || view.inUse.length > 0) && (
         <div className="mb-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-sm text-ink">
           {perms.map((t) => (

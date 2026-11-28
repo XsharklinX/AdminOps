@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { contactsApi, disksApi, faultRecApi, kbdApi, printersApi, type Contact, type KbdState, type PrinterInfo } from "../lib/api";
+import { contactsApi, disksApi, faultRecApi, kbdApi, printersApi, tweaksApi, type Contact, type KbdState, type PrinterInfo } from "../lib/api";
 import { barApi, type BarWireless } from "../lib/api/rocketbar";
+import { loadUiPref, saveUiPref } from "../lib/api/uipref";
 
 /**
  * Las herramientas opcionales de la barra (apagadas de fábrica; se encienden en «Personalizar»): su panel al
@@ -11,7 +12,7 @@ export const EXTRA_TOOLS: readonly ExtraTool[] = ["contacts", "printer", "screen
 export const isExtra = (t: string): t is ExtraTool => (EXTRA_TOOLS as readonly string[]).includes(t);
 
 /** Alto de cada panel (la ventana de la barra se ajusta a él). */
-export const EXTRA_H: Record<ExtraTool, number> = { contacts: 300, printer: 236, screens: 128, wifi: 168, keyboard: 176, folders: 218, restart: 206 };
+export const EXTRA_H: Record<ExtraTool, number> = { contacts: 300, printer: 236, screens: 128, wifi: 168, keyboard: 250, folders: 218, restart: 206 };
 
 const btn = "rounded-md px-2 py-[4px] text-left text-[11.5px] font-medium text-[#e8eef4] transition-colors hover:bg-[#2e3b49] disabled:opacity-50";
 const chip = "rounded-md bg-[#2e3b49] px-2 py-[3px] text-[11px] font-medium text-[#e8eef4] transition-colors hover:bg-[#3a4959] disabled:opacity-50";
@@ -281,14 +282,40 @@ function Wireless({ base }: { base: string }) {
 }
 
 /** El teclado en español: un clic cuando «la ñ no sale». */
+const KBD_UNDO = "adminops.bar.kbdUndo";
+
 function Keyboard({ base }: { base: string }) {
   const [s, setS] = useState<KbdState | null>(null);
   const [busy, setBusy] = useState(false);
   const { msg, setMsg } = useMsg();
+  // La entrada del diario de «Dejar solo español», para poder volver a como estaba (de este usuario).
+  // Se guarda en un archivo de AdminOps (no en localStorage) para que valga en modo técnico y en modo usuario.
+  const [undo, setUndo] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void loadUiPref("kbdUndo", KBD_UNDO, (v): v is number => typeof v === "number" && v > 0).then((v) => alive && v && setUndo(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const load = () => kbdApi.state().then(setS, (e) => setMsg({ text: String(e), ok: false }));
   useEffect(() => void load(), []); // eslint-disable-line react-hooks/exhaustive-deps
-  const active = s?.rows.find((r) => r.active) ?? null;
   const onlySpanish = !!s && s.rows.length > 0 && s.rows.every((r) => /^es\b/i.test(r.tag));
+  const act = (p: Promise<string>, after?: () => void) => {
+    setBusy(true);
+    p.then(
+      (text) => {
+        setMsg({ text, ok: true });
+        after?.();
+        void load();
+      },
+      (e) => setMsg({ text: String(e), ok: false }),
+    ).finally(() => setBusy(false));
+  };
+  const remember = (id: number | null) => {
+    setUndo(id);
+    saveUiPref("kbdUndo", id || null).catch(() => {});
+  };
   return (
     <div className={base} role="dialog" aria-label="El teclado">
       <div className={title}>El teclado</div>
@@ -296,51 +323,80 @@ function Keyboard({ base }: { base: string }) {
         <div className={muted}>Mirando…</div>
       ) : (
         <>
-          <div className="flex justify-between gap-2 text-[11.5px]">
-            <span className="text-[#76869a]">Escribe en</span>
-            <span className={active && /^es\b/i.test(active.tag) ? "text-[#3ecf8e]" : "text-[#f5b84b]"}>{active ? `${active.language} · ${active.layout}` : "—"}</span>
+          {/* Cada teclado instalado: tocarlo lo pone ya, en todos los programas (sin quitar los demás). */}
+          <div className="max-h-[132px] overflow-y-auto">
+            {s.rows.map((r) => (
+              <button
+                key={`${r.tag}-${r.klid ?? ""}`}
+                type="button"
+                disabled={busy || r.active || !r.klid || s.otherUser}
+                className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-[3px] text-left text-[11.5px] ${r.active ? "bg-[#1b242e] text-[#e8eef4]" : "text-[#a8b4c0] hover:bg-[#1b242e] hover:text-[#e8eef4]"} disabled:cursor-default`}
+                title={r.active ? "Es el que escribe ahora" : "Escribir con este teclado"}
+                onClick={() => r.klid && act(kbdApi.use(r.langId, r.klid))}
+              >
+                <span className="min-w-0 truncate">
+                  {r.language} · {r.layout}
+                </span>
+                {r.active && <span className="shrink-0 text-[#3ecf8e]">✓</span>}
+              </button>
+            ))}
           </div>
-          {s.rows.length > 1 && <div className="text-[11px] text-[#76869a]">{s.rows.length} teclados instalados (cambian con {s.shortcut.label})</div>}
-          {onlySpanish ? (
-            <div className="mt-1 text-[11px] text-[#3ecf8e]">Ya está solo en español.</div>
-          ) : !s.hasSpanish ? (
-            <div className="mt-1 text-[11px] text-[#f5b84b]">No hay ningún español instalado: se añade desde AdminOps → Teclado.</div>
-          ) : s.otherUser ? (
-            <div className="mt-1 text-[11px] text-[#a8b4c0]">Con AdminOps abierto con otra cuenta no se cambia el teclado de este usuario.</div>
-          ) : (
-            <button
-              type="button"
-              disabled={busy}
-              className={`${primary} mt-1`}
-              title={s.warning ?? undefined}
-              onClick={() => {
-                setBusy(true);
-                kbdApi
-                  .onlySpanish()
-                  .then(
-                    (r) => {
-                      setMsg({ text: r.message, ok: true });
-                      void load();
-                    },
-                    (e) => setMsg({ text: String(e), ok: false }),
+          {s.rows.length > 1 && <div className="mt-0.5 text-[10.5px] text-[#76869a]">También con {s.shortcut.label}</div>}
+          <div className="mt-1 flex flex-wrap gap-1">
+            {!onlySpanish && s.hasSpanish && !s.otherUser && (
+              <button
+                type="button"
+                disabled={busy}
+                className={chip}
+                title={s.warning ?? "Quita los demás teclados: «la ñ no sale», teclas cambiadas"}
+                onClick={() => {
+                  setBusy(true);
+                  kbdApi
+                    .onlySpanish()
+                    .then(
+                      (r) => {
+                        remember(r.entryId);
+                        setMsg({ text: r.message, ok: true });
+                        void load();
+                      },
+                      (e) => setMsg({ text: String(e), ok: false }),
+                    )
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Dejar solo español
+              </button>
+            )}
+            {undo && (
+              <button
+                type="button"
+                disabled={busy}
+                className={chip}
+                title="Vuelve a poner los teclados que había antes de «Dejar solo español»"
+                onClick={() =>
+                  act(
+                    tweaksApi.revertEntry(undo).then((r) => r.message || "Teclados como estaban."),
+                    () => remember(null),
                   )
-                  .finally(() => setBusy(false));
-              }}
-            >
-              Dejar solo español
-            </button>
-          )}
+                }
+              >
+                Volver a como estaba
+              </button>
+            )}
+          </div>
+          {!s.hasSpanish && <div className="mt-1 text-[11px] text-[#f5b84b]">No hay ningún español instalado: se añade desde AdminOps → Teclado.</div>}
+          {s.otherUser && <div className="mt-1 text-[11px] text-[#a8b4c0]">Con AdminOps abierto con otra cuenta no se cambia el teclado de este usuario.</div>}
         </>
       )}
       <Msg msg={msg} />
     </div>
   );
 }
-
 const FOLDERS_KEY = "adminops.barFolders";
 const leaf = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;
 
 /** Mis carpetas: Escritorio, Descargas, Documentos y hasta 3 elegidas (la de la oficina). */
+
 function Folders({ base }: { base: string }) {
   const [mine, setMine] = useState<string[]>(() => {
     try {

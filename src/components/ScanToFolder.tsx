@@ -326,11 +326,10 @@ export function ScanToFolder({ isAdmin }: { isAdmin: boolean }) {
           <NeedsAdmin>«Escanear a carpeta» crea un usuario, un recurso compartido y reglas del cortafuegos en este equipo: necesita administrador. Sin él solo se puede mirar.</NeedsAdmin>
         )}
         {isAdmin && publicNet && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-xs text-warn" role="note">
-            <CircleAlert size={14} className="shrink-0" />
-            <p className="min-w-48 flex-1">
+          <div className="space-y-1.5">
+            <Notice tone="warn">
               La red de este equipo{status?.networkName ? ` («${status.networkName}»)` : ""} es pública y Windows no deja compartir archivos por ella. Hay que ponerla como privada: es un paso aparte y se puede deshacer.
-            </p>
+            </Notice>
             <span className="flex items-center gap-1">
               <Button kt="V" kind="secondary" size="sm" disabled={audit || busy !== null} title={lock} onClick={makePrivate}>
                 Poner la red como privada
@@ -340,9 +339,9 @@ export function ScanToFolder({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
         {tooShort && (
-          <p className="flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-xs text-warn" role="note">
-            <CircleAlert size={14} className="shrink-0" /> La directiva de contraseñas de este equipo pide al menos {status?.passwordMin} caracteres y la contraseña que genera AdminOps no pasa de {status?.passwordMax}.
-          </p>
+          <Notice tone="warn">
+            La directiva de contraseñas de este equipo pide al menos {status?.passwordMin} caracteres y la contraseña que genera AdminOps no pasa de {status?.passwordMax}.
+          </Notice>
         )}
         {configured && !setup && (
           <p className="text-xs text-dim">Ya está preparado en este equipo: recurso «Escaneos» y usuario «escaner». Si no tienes la contraseña, «Contraseña nueva» pone otra.</p>
@@ -449,9 +448,7 @@ export function ScanToFolder({ isAdmin }: { isAdmin: boolean }) {
 
             {watch?.state === "arrived" && (
               <div className="space-y-2">
-                <p className="flex items-center gap-2 text-sm text-ok" role="status">
-                  <CheckCircle2 size={14} /> Escanear a carpeta funcionando
-                </p>
+                <Notice tone="ok">Escanear a carpeta funcionando</Notice>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button kt="A" onClick={() => run("open", () => scanFolderApi.openFolder())}>
                     <FolderOpen size={13} /> Abrir la carpeta

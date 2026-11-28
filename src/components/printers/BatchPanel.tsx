@@ -6,7 +6,7 @@ import { CheckCircle2, ClipboardCopy, Loader2, RotateCcw, Undo2, X, XCircle } fr
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "../feedback";
 import { useKeepAlive } from "../../lib/alive";
-import { Button, smallBtn } from "../ui";
+import { Button, Notice, smallBtn } from "../ui";
 import { onVendorEvent, vendorApi, type VendorKey, type VendorPrinter, type VendorStepEvent } from "../../lib/api";
 import { ActionError, BrandBadge } from "./Parts";
 import { bestCandidate, describeDriver, isAdminError, isAuditError, ticketSummary, VENDOR_NAME, type BatchResult } from "./logic";
@@ -148,7 +148,7 @@ export function BatchPanel({
                   {st?.phase === "ok" && r ? `${r.from} → ${r.to}` : `${describeDriver(p.driver.name, p.driver.version)} · ${p.state.label}`}
                 </div>
                 {st?.phase === "running" && live?.printer === p.name && <div className="text-dim">{live.text}</div>}
-                {(st?.phase === "failed" || st?.phase === "undone") && r && <div className={st.phase === "failed" ? "text-bad" : "text-warn"}>{r.message}</div>}
+                {(st?.phase === "failed" || st?.phase === "undone") && r && <Notice tone={st.phase === "failed" ? "error" : "warn"} where="Impresoras" className="mt-1">{r.message}</Notice>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {st?.phase === "ok" && r?.undoId && (

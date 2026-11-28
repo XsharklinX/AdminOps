@@ -46,6 +46,7 @@ export function StartWindow({ s, set }: SettingsProps) {
           <Toggle checked={prefs.diagnoseOnOpen} onChange={(v) => setPrefs({ diagnoseOnOpen: v })} />
         </Row>
         <Autostart />
+        <TechOnOpen />
         <Row
           title="Volver a ver la bienvenida"
           sub="El asistente de la primera vez: elegir el modo (técnico o usuario), la página de inicio y lo básico de AdminOps. Las explicaciones de cada pantalla, que se pliegan tras la primera visita, también pueden volver a salir enteras. No borra nada de lo que ya tengas configurado."
@@ -91,6 +92,16 @@ export function StartWindow({ s, set }: SettingsProps) {
           <Toggle checked={s.trayIcon} onChange={(v) => set({ trayIcon: v })} />
         </Row>
         {s.trayIcon && <TrayFixes s={s} set={set} />}
+        <Row title="Actualización del Panel" sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo.">
+          <select value={prefs.refreshMs} onChange={(e) => setPrefs({ refreshMs: Number(e.target.value) })} className={selectClass}>
+            <option value={1000}>Cada segundo</option>
+            <option value={2000}>Cada 2 segundos</option>
+            <option value={5000}>Cada 5 segundos</option>
+          </select>
+        </Row>
+      </Card>
+      {/* Todo lo de la barra del cohete en un sitio: modo, tamaño, despegue, arranque, herramientas y atajos. */}
+      <Card title="La barra del cohete">
         <Row
           title="Cohete de «Optimizar ya»"
           sub="Una burbuja con un cohete que se puede mover a cualquier sitio. Al tocarla libera memoria, borra temporales de más de un día y vacía la caché DNS, sin cerrar nada de lo que estás usando. En el escritorio se queda siempre encima, también con AdminOps minimizada, y se esconde sola con una presentación o un vídeo a pantalla completa. Clic derecho en el cohete para cambiarlo de sitio u ocultarlo."
@@ -123,12 +134,11 @@ export function StartWindow({ s, set }: SettingsProps) {
             {(s.rocket ?? "desktop") === "desktop" && <UserBar />}
           </>
         )}
-        <Row title="Actualización del Panel" sub="Cada cuánto se refrescan CPU, memoria, red y procesos. Menos frecuente = menos consumo.">
-          <select value={prefs.refreshMs} onChange={(e) => setPrefs({ refreshMs: Number(e.target.value) })} className={selectClass}>
-            <option value={1000}>Cada segundo</option>
-            <option value={2000}>Cada 2 segundos</option>
-            <option value={5000}>Cada 5 segundos</option>
-          </select>
+        <Row
+          title="Atajos de la barra"
+          sub="Ctrl+Alt+T saca o esconde la barra. Ctrl+Alt+Mayús+1…9 abre la herramienta de ese puesto. Con el lápiz de la barra se eligen y ordenan tus herramientas; tocar dos veces una herramienta cierra su panel."
+        >
+          <span className="text-xs text-mute">Ctrl+Alt+T · Ctrl+Alt+Mayús+1…9</span>
         </Row>
       </Card>
       <Card title="Demostración">
@@ -423,6 +433,35 @@ function WhereStored({ portable }: { portable: boolean }) {
         </Explain>
       )}
     </Card>
+  );
+}
+
+/** «Abrir en modo técnico en este equipo»: se guarda en la carpeta de este equipo (en portable, la del equipo dentro
+ * del USB), no en los ajustes que viajan en el USB. */
+function TechOnOpen() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const toast = useToast();
+  useEffect(() => {
+    api
+      .techOnOpen()
+      .then((t) => setOn(t.on))
+      .catch(() => setOn(false));
+  }, []);
+  const toggle = async (v: boolean) => {
+    try {
+      await api.setTechOnOpen(v);
+      setOn(v);
+    } catch (e) {
+      toast("error", String(e));
+    }
+  };
+  return (
+    <Row
+      title="Abrir en modo técnico en este equipo"
+      sub="Para tu propio PC: AdminOps pide el administrador nada más abrirse, sin pasar por «Modo usuario». Solo en este equipo (y con esta cuenta): en los PC de los usuarios, también con el portable, sigue abriendo en modo usuario."
+    >
+      <Toggle checked={!!on} disabled={on === null} onChange={(v) => toggle(v)} />
+    </Row>
   );
 }
 

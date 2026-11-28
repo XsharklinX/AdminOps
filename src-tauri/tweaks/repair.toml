@@ -539,3 +539,61 @@ if ($st -eq 'Enabled') { Disable-WindowsOptionalFeature -Online -FeatureName $f 
 Enable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart -All -ErrorAction Stop | Out-Null
 if (Get-Printer -Name 'Microsoft Print to PDF' -ErrorAction SilentlyContinue) { '«Microsoft Print to PDF» vuelve a estar.' } else { 'Reinstalada: aparecerá al reiniciar el equipo.' }
 '''
+
+[[tweak]]
+id = "repair.ncsi-false"
+eta = "al momento"
+name = "Aviso falso de «sin Internet»"
+description = "Windows dice «Sin Internet» aunque las webs cargan (su prueba de conexión no resuelve bien su dirección con el DNS de la empresa). Outlook y Teams se ponen sin conexión. Hace que la prueba use el DNS normal del equipo. No cambia el proxy."
+category = "repair"
+risk = "low"
+note = "Se nota al volver a conectar la red o al reiniciar."
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\NetworkConnectivityStatusIndicator'
+name = "UseGlobalDNS"
+type = "dword"
+value = 1
+
+[[tweak]]
+id = "repair.rdp-drops"
+eta = "al momento"
+name = "Escritorio remoto que se corta o se queda en negro"
+description = "Desde este equipo, las conexiones de Escritorio remoto dejan de usar UDP (la causa más común de cortes y pantallas negras en redes de oficina)."
+category = "repair"
+risk = "low"
+note = "La conexión puede ir algo menos fluida con vídeo; se nota en la siguiente conexión."
+
+[[tweak.registry]]
+path = 'HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client'
+name = "fClientDisableUDP"
+type = "dword"
+value = 1
+
+[[tweak]]
+id = "repair.rdp-cache"
+eta = "al momento"
+name = "Vaciar la caché de imágenes del Escritorio remoto"
+description = "Borra la caché de imágenes que guarda el cliente de Escritorio remoto; ayuda cuando la pantalla sale corrupta o en negro."
+category = "repair"
+risk = "low"
+kind = "action"
+note = "Se nota en la siguiente conexión; la primera puede tardar un poco más en pintar."
+
+[tweak.script]
+run = '''
+# Corre como administrador sobre una carpeta del usuario, que el usuario puede cambiar por un enlace en cualquier
+# momento. La caché es plana: solo se borran, sin entrar en subcarpetas, los archivos con los nombres que usa el
+# cliente (bcache*.bmc y Cache*.bin). Aunque alguien colara un enlace, solo podría borrar archivos con esos nombres.
+$raiz = Join-Path $UserLocalAppData 'Microsoft\Terminal Server Client\Cache'
+$fallos = 0
+if (Test-Path -LiteralPath $raiz -PathType Container) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $raiz -File -Force -ErrorAction SilentlyContinue)) {
+        if ($f.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+        if ($f.Name -notlike 'bcache*.bmc' -and $f.Name -notlike 'Cache*.bin') { continue }
+        try { Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop } catch { $fallos++ }
+    }
+}
+if ($fallos -gt 0) { throw "No se pudieron borrar $fallos de sus archivos: cierra Escritorio remoto y vuelve a probar." }
+'Caché de imágenes del Escritorio remoto vaciada.'
+'''

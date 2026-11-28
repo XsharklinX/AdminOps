@@ -1,10 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
-import { Pin, Plus, Search, StickyNote, Trash2 } from "lucide-react";
+import { BellOff, FileText, Pin, Plus, Search, StickyNote, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logQuietly } from "../lib/api/core";
-import { checkCount, CHECK_RE, notesApi, NOTES_CHANGED_EVENT, toggleCheck, type Note } from "../lib/api/notebook";
+import { checkCount, CHECK_RE, fmtRemind, notesApi, NOTES_CHANGED_EVENT, remindOptions, toggleCheck, type Note } from "../lib/api/notebook";
+import { BUILTIN_TEMPLATES, deleteUserTemplate, loadUserTemplates, saveUserTemplate, type NoteTemplate } from "../lib/noteTemplates";
 import { useConfirm, useToast } from "./feedback";
-import { Button, EmptyState } from "./ui";
+import { Button, EmptyState, Notice } from "./ui";
 
 const fmt = (ms: number) => new Date(ms).toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -40,6 +41,16 @@ export function Notebook({ openId = null, onOpened }: { openId?: string | null; 
   const [edit, setEditState] = useState<Note | null>(null);
   // Cómo estaba la nota al abrirla: para saber si hay cambios sin guardar.
   const [orig, setOrig] = useState<Note | null>(null);
+  const [tplOpen, setTplOpen] = useState(false);
+  const [userTpl, setUserTpl] = useState<NoteTemplate[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void loadUserTemplates().then((l) => alive && setUserTpl(l));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const [tplMsg, setTplMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
   const load = useCallback(() => {
@@ -63,7 +74,7 @@ export function Notebook({ openId = null, onOpened }: { openId?: string | null; 
     const w = q.trim().toLowerCase();
     return (notes ?? []).filter((n) => !w || `${n.title} ${n.text}`.toLowerCase().includes(w));
   }, [notes, q]);
-  const dirty = !!edit && (!orig || edit.title !== orig.title || edit.text !== orig.text || (edit.images ?? []).join("|") !== (orig.images ?? []).join("|"));
+  const dirty = !!edit && (!orig || edit.title !== orig.title || edit.text !== orig.text || (edit.images ?? []).join("|") !== (orig.images ?? []).join("|") || (edit.remindAt ?? null) !== (orig.remindAt ?? null));
   // Pegar una captura en la nota (Ctrl+V con una imagen en el portapapeles).
   const pasteImage = (e: React.ClipboardEvent) => {
     if (!edit) return;
@@ -135,7 +146,24 @@ export function Notebook({ openId = null, onOpened }: { openId?: string | null; 
     }
     load();
   };
-  const blank: Note = { id: "", title: "", text: "", created: 0, updated: 0, pinned: false, images: [] };
+  const blank: Note = { id: "", title: "", text: "", created: 0, updated: 0, pinned: false, images: [], remindAt: null };
+  const fromTemplate = (t: NoteTemplate) => {
+    setTplOpen(false);
+    void open({ ...blank, title: t.title, text: t.text });
+  };
+  const saveTemplate = () => {
+    if (!edit || (!edit.title.trim() && !edit.text.trim())) {
+      setTplMsg({ tone: "warn", text: "Escribe un título o un texto para guardarlo como plantilla." });
+      return;
+    }
+    saveUserTemplate(edit.title, edit.text).then(
+      (l) => {
+        setUserTpl(l);
+        setTplMsg({ tone: "ok", text: "Plantilla guardada: sale en «Desde plantilla»." });
+      },
+      () => setTplMsg({ tone: "warn", text: "No se pudo guardar la plantilla en este equipo." }),
+    );
+  };
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -146,6 +174,27 @@ export function Notebook({ openId = null, onOpened }: { openId?: string | null; 
         <Button onClick={() => void open(blank)}>
           <Plus size={14} /> Nota nueva
         </Button>
+        <div className="relative">
+          <Button kind="secondary" onClick={() => setTplOpen((v) => !v)}>
+            <FileText size={14} /> Desde plantilla
+          </Button>
+          {tplOpen && (
+            <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-xl border border-line bg-panel p-1 shadow-elev-1">
+              {[...BUILTIN_TEMPLATES, ...userTpl].map((t) => (
+                <div key={t.id} className="flex items-center rounded-md hover:bg-void/60">
+                  <button type="button" className="min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm text-ink" onClick={() => fromTemplate(t)}>
+                    {t.title}
+                  </button>
+                  {!t.builtin && (
+                    <button type="button" title="Borrar la plantilla" aria-label={`Borrar la plantilla ${t.title}`} className="shrink-0 px-2 text-mute hover:text-bad" onClick={() => void deleteUserTemplate(t.id).then(setUserTpl, () => setTplMsg({ tone: "warn", text: "No se pudo borrar la plantilla." }))}>
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       {edit && (
         <div className="mb-4 rounded-xl border border-neon/40 bg-panel p-3">
@@ -168,12 +217,36 @@ export function Notebook({ openId = null, onOpened }: { openId?: string | null; 
               ))}
             </div>
           )}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-dim">
+            <span>Avisarme:</span>
+            {remindOptions().map((o) => (
+              <Button key={o.label} size="sm" kind={edit.remindAt === o.at ? "primary" : "secondary"} onClick={() => setEditState({ ...edit, remindAt: o.at })}>
+                {o.label}
+              </Button>
+            ))}
+            {edit.remindAt ? (
+              <>
+                <span className="text-warn">⏰ {fmtRemind(edit.remindAt)}</span>
+                <Button size="sm" kind="ghost" onClick={() => setEditState({ ...edit, remindAt: null })}>
+                  <BellOff size={12} /> Quitar aviso
+                </Button>
+              </>
+            ) : null}
+          </div>
+          {tplMsg && (
+            <Notice tone={tplMsg.tone} className="mt-2" where="Notas">
+              {tplMsg.text}
+            </Notice>
+          )}
           <div className="mt-2 flex items-center gap-2">
             <Button size="sm" onClick={() => void save(edit, true)}>
               Guardar
             </Button>
             <Button size="sm" kind="ghost" onClick={() => void open(null)}>
               Cancelar
+            </Button>
+            <Button size="sm" kind="ghost" onClick={saveTemplate}>
+              Guardar como plantilla
             </Button>
             {edit.id && (
               <button type="button" className="ml-auto flex items-center gap-1 text-xs text-bad hover:underline" onClick={() => void remove(edit)}>
@@ -216,6 +289,7 @@ export function Notebook({ openId = null, onOpened }: { openId?: string | null; 
                 const c = checkCount(n.text);
                 return c.total > 0 ? <span className={`mt-1 text-[11px] ${c.done === c.total ? "text-ok" : "text-mute"}`}>{c.done} de {c.total} hechas</span> : null;
               })()}
+              {n.remindAt ? <span className="mt-1 text-[11px] text-warn">⏰ {fmtRemind(n.remindAt)}</span> : null}
               <span className="mt-auto pt-2 text-[11px] text-mute">{fmt(n.updated)}</span>
             </article>
           ))}

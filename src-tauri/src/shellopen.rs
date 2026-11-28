@@ -74,6 +74,24 @@ pub fn protocol_registered(scheme: &str) -> bool {
     }
 }
 
+/// Abre el instalador de AdminOps (actualizar, volver) sin pasarle la carpeta de WebView2 de esta AdminOps: si la
+/// heredara, al cerrar el navegador interno de AdminOps antes de instalar se cerraría su propia ventana. La variable se
+/// quita solo mientras Windows crea el proceso (lo copia en ese momento) y se vuelve a poner.
+pub fn run_installer(program: &str, args: &str) -> Result<(), String> {
+    let saved = std::env::var_os("WEBVIEW2_USER_DATA_FOLDER");
+    let saved_args = std::env::var_os("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS");
+    std::env::remove_var("WEBVIEW2_USER_DATA_FOLDER");
+    std::env::remove_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS");
+    let r = run_with_args(program, args);
+    if let Some(v) = saved {
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", v);
+    }
+    if let Some(v) = saved_args {
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", v);
+    }
+    r
+}
+
 /// Abre un programa con argumentos. Si el programa pide administrador, Windows enseña su aviso (UAC).
 pub fn run_with_args(program: &str, args: &str) -> Result<(), String> {
     #[cfg(windows)]

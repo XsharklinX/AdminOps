@@ -132,7 +132,7 @@ impl Journal {
             let _ = std::fs::create_dir_all(dir);
         }
         // Escritura atómica: un corte de luz no debe dejar el diario corrupto.
-        let tmp = self.path.with_extension("json.tmp");
+        let tmp = crate::paths::tmp_for(&self.path);
         if let Ok(json) = serde_json::to_string_pretty(&self.entries) {
             if std::fs::write(&tmp, json).is_ok() {
                 let _ = std::fs::rename(&tmp, &self.path);

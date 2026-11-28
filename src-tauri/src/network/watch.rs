@@ -153,7 +153,7 @@ fn file(app: &tauri::AppHandle) -> std::path::PathBuf {
 
 fn save(app: &tauri::AppHandle, outages: &[Outage]) {
     if let Ok(json) = serde_json::to_string(outages) {
-        let tmp = file(app).with_extension("json.tmp");
+        let tmp = crate::paths::tmp_for(&file(app));
         if std::fs::write(&tmp, json).is_ok() {
             let _ = std::fs::rename(&tmp, file(app));
         }

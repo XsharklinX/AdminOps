@@ -22,7 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineCommand } from "../components/ActionCommand";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, Card, Explain, smallBtn } from "../components/ui";
+import { Button, Card, Explain, Notice, smallBtn } from "../components/ui";
 import { api, appApi, logQuietly, measureApi, toolsApi, tweaksApi, type Duplicates, type Measure, type Freeable, type SpaceEntry, type SpaceFolder, type SpaceView } from "../lib/api";
 import { bytes, ago, friendlyPath } from "../lib/format";
 import { crumbsOf, type FolderSort, kindColor, kindLabel, kindShares, LOOSE, looseSize, matchesText, parentOf, percent, sortEntries } from "../lib/spaceView";
@@ -202,9 +202,9 @@ export function Space({ onNavigate }: { onNavigate?: (p: PageId, focus?: string 
             {list.length > names.length && <li>y {list.length - names.length} más</li>}
           </ul>
           {folders > 0 && (
-            <p className="text-[13px] text-warn">
+            <Notice tone="warn">
               {folders === 1 ? "Incluye una carpeta entera" : `Incluye ${folders} carpetas enteras`}, con todo lo que hay dentro.
-            </p>
+            </Notice>
           )}
           <p className="text-[12px] text-mute">Lo que sea demasiado grande para la papelera, Windows lo borra del todo.</p>
         </div>

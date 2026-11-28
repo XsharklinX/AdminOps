@@ -4,7 +4,7 @@ import { Copy, Eraser, Eye, Gauge, KeyRound, Loader2, LogOut, ShieldCheck, TestT
 import { useState } from "react";
 import { useConfirm, useToast } from "./feedback";
 import { TaskStatus } from "./TaskStatus";
-import { Button, inputClass, Modal } from "./ui";
+import { Button, inputClass, Modal, Notice } from "./ui";
 import { disksApi, type DiskCapacity, type DiskPoint, type DiskReport, type DiskSpeed, type DiskVolume } from "../lib/api";
 import { bytes } from "../lib/format";
 
@@ -286,9 +286,9 @@ function FormatDialog({ v, size, onClose, onDone }: { v: DiskVolume; size: numbe
         </>
       }
     >
-      <p className="mb-3 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">
+      <Notice tone="warn" className="mb-3">
         Se borra todo lo que hay en {v.letter}: ({v.label || "sin nombre"}, {bytes(v.size - v.free)} ocupados). No se puede deshacer.
-      </p>
+      </Notice>
       <div className="space-y-2">
         {options.map((o) => (
           <label key={o.id} className={`flex items-start gap-2 rounded-lg border p-2 text-xs ${fs === o.id ? "border-neon/50 bg-neon/5" : "border-line"} ${o.id === "FAT32" && !canFat32 ? "opacity-50" : ""}`}>

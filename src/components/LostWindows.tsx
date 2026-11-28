@@ -1,8 +1,8 @@
-import { Check, TriangleAlert } from "lucide-react";
+import { Check } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { lostWinApi, type LostWin } from "../lib/api";
 import { useToast } from "./feedback";
-import { Button, Card } from "./ui";
+import { Button, Card, Notice } from "./ui";
 
 /** «Excel», «Excel y Word», «Excel, Word y 2 más»: los programas, sin repetir. */
 export function appsText(list: LostWin[]): string {
@@ -62,12 +62,9 @@ export function LostWindows() {
     return (
       <Card className="col-span-12 border-warn/40">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="flex min-w-0 items-center gap-2 text-sm text-warn">
-            <TriangleAlert size={15} className="shrink-0" />
-            <span className="min-w-0">
-              {list.length === 1 ? "1 ventana está fuera de la pantalla" : `${list.length} ventanas están fuera de la pantalla`}: {appsText(list)}
-            </span>
-          </p>
+          <Notice tone="warn" className="min-w-0">
+            {list.length === 1 ? "1 ventana está fuera de la pantalla" : `${list.length} ventanas están fuera de la pantalla`}: {appsText(list)}
+          </Notice>
           <Button onClick={bring}>Traer las ventanas perdidas</Button>
         </div>
       </Card>

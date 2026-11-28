@@ -831,6 +831,43 @@ const CATALOG: Builtin[] = [
     tags: ["bloq num", "numlock", "teclado numerico", "contraseña", "numeros"],
     actions: [{ step: 1, kind: "fix", id: "performance.numlock", label: "Bloq Num encendido al iniciar" }],
   },
+  {
+    id: "dll-falta",
+    title: "«Falta MSVCP140.dll» (u otra DLL) y el programa no abre",
+    problem: "Al abrir un programa sale «No se puede iniciar el programa porque falta xxx.dll en el equipo» o «no se encontró VCRUNTIME140.dll».",
+    solution: `1. No descargues la DLL de una web de «descargar DLL»: son de las fuentes de malware más habituales y una DLL suelta casi nunca arregla nada.
+2. Escribe el nombre de la DLL en Ctrl+K (por ejemplo «msvcp140»): AdminOps dice de qué paquete oficial es y lo instala (32 y 64 bits).
+   - msvcp140, vcruntime140, api-ms-win-crt-*: Visual C++ 2015–2022.
+   - msvcr120 / msvcp120: Visual C++ 2013; msvcr110: 2012; msvcr100: 2010; msvcr90: 2008.
+   - d3dx9_43, xinput1_3, xaudio2_7: DirectX.
+3. Vuelve a abrir el programa.
+4. Si la DLL no es de ninguno de estos (lleva el nombre del programa), es del propio programa: repáralo o reinstálalo.`,
+    tags: ["dll", "falta", "msvcp140", "vcruntime140", "visual c++", "directx", "no abre"],
+    actions: [{ step: 2, kind: "page", id: "apps", focus: "install", label: "Abrir Instalar (Visual C++ y DirectX)" }],
+  },
+  {
+    id: "sin-internet-falso",
+    title: "Windows dice «Sin Internet» pero las webs cargan",
+    problem: "El icono de red sale con el aviso amarillo o «Sin Internet» aunque se navega bien. Outlook y Teams se ponen «sin conexión».",
+    solution: `1. Comprueba que de verdad hay Internet: abre una web cualquiera.
+2. Si carga, la prueba de Windows no llega a su servidor (proxy o DNS de la empresa). Arregla el aviso desde AdminOps (necesita modo técnico).
+3. Desconecta y vuelve a conectar la red (o reinicia) para que Windows vuelva a mirar.`,
+    tags: ["sin internet", "aviso amarillo", "ncsi", "proxy", "teams sin conexion", "outlook desconectado"],
+    actions: [{ step: 2, kind: "fix", id: "repair.ncsi-false", label: "Arreglar el aviso de «sin Internet»" }],
+  },
+  {
+    id: "rdp-corta",
+    title: "El Escritorio remoto se corta o se queda en negro",
+    problem: "La conexión a un servidor o a otro equipo se corta cada poco, se congela o se queda la pantalla en negro.",
+    solution: `1. Quita el UDP de las conexiones de Escritorio remoto de este equipo (necesita modo técnico).
+2. Vacía la caché de imágenes del Escritorio remoto y vuelve a conectar.
+3. Si sigue, prueba con cable en lugar de Wi-Fi y revisa la velocidad (Red → Velocidad y diagnóstico).`,
+    tags: ["escritorio remoto", "rdp", "se corta", "pantalla negra", "mstsc", "desconecta"],
+    actions: [
+      { step: 1, kind: "fix", id: "repair.rdp-drops", label: "Arreglar cortes y pantalla negra" },
+      { step: 2, kind: "fix", id: "repair.rdp-cache", label: "Vaciar la caché de imágenes" },
+    ],
+  },
 ];
 
 /** Lo que AdminOps sabe hacer en cada solución, por su id. */

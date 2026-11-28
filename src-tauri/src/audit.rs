@@ -15,7 +15,7 @@ pub const MESSAGE: &str = "Modo auditoría activo: AdminOps no hace cambios en e
 /// Comandos que cambian el equipo (sistema, programas, usuarios, red, archivos).
 const BLOCKED: &[&str] = &[
     // barra: pantallas (Win+P), Wi-Fi y Bluetooth, reconectar la Wi-Fi y reiniciar
-    "bar_display_mode", "bar_set_radio", "bar_wifi_reconnect", "bar_restart", "usb_fix_letters", "update_uninstall",
+    "bar_display_mode", "bar_set_radio", "bar_wifi_reconnect", "bar_restart", "usb_fix_letters", "update_uninstall", "kbd_use",
     // connected: buscar driver, volver a detectar y habilitar cambian el equipo
     "connected_action",
     // pantallas: cambiar la resolución o la disposición, confirmar o deshacer, y reiniciar el driver gráfico
@@ -240,7 +240,7 @@ const SAFE: &[&str] = &[
     // drivers
     "backup_drivers",
     // elevation
-    "is_admin", "relaunch_as_admin", "relaunch_as_user",
+    "is_admin", "relaunch_as_admin", "relaunch_as_user", "tech_on_open", "set_tech_on_open",
     // family
     "dns_filter_status", "blocked_sites", "logon_hours",
     // connected (solo leen)
@@ -310,7 +310,7 @@ const SAFE: &[&str] = &[
     // escucharte (graba y reproduce, no cambia nada), la cámara (lectura) y la barra del cohete
     "audio_echo", "cam_view", "rocket_bar", "bar_fixes", "bar_open_comm",
     // abrir Asistencia rápida; la grabación al caso (datos de AdminOps), copiarla al portapapeles y abrirla
-    "bar_quick_assist", "bar_screen_clip", "bar_profile", "bar_set_user_tools", "usb_hidden", "bar_ticket_extras", "selfcheck_after_update", "bar_network", "bar_save_desktop", "bar_wireless", "bar_open_folder", "bar_lock", "bar_console", "notes_list", "notes_index", "notes_save", "notes_delete", "faultrec_attach_case", "faultrec_copy_file", "faultrec_open_file",
+    "bar_quick_assist", "bar_screen_clip", "bar_profile", "bar_set_user_tools", "usb_hidden", "bar_ticket_extras", "device_in_use", "selfcheck_after_update", "bar_network", "bar_save_desktop", "bar_wireless", "bar_open_folder", "bar_lock", "bar_console", "notes_list", "notes_index", "notes_save", "notes_delete", "ui_pref_get", "ui_pref_set", "faultrec_attach_case", "faultrec_copy_file", "faultrec_open_file",
     // ventanas fuera de la pantalla y avisos de webs (solo leer)
     "lost_windows", "web_notifications",
     // bandeja: lista de arreglos (lectura) y lo que queda en modo portable (lectura)

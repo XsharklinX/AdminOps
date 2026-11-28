@@ -4,6 +4,7 @@
 export const FIXTURES: Record<string, unknown> = {
   app_info: { version: "1.2.9", portable: true, dataDir: "D:\\AdminOps\\datos", reportsDir: "D:\\AdminOps\\informes", startPage: null },
   is_admin: true,
+  tech_on_open: { on: false, relaunch: false },
   lock_status: { enabled: false, kind: "", idleMinutes: 0, waitSecs: 0 },
   get_settings: {
     technician: "Técnico de prueba",

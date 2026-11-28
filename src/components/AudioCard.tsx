@@ -1,3 +1,4 @@
+import { InUseNotice } from "./InUseNotice";
 import { listen } from "@tauri-apps/api/event";
 import { Headphones, Mic, RefreshCw, ShieldCheck, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -131,6 +132,7 @@ export function AudioCard() {
         </button>
       }
     >
+      <InUseNotice kind="microphone" />
       {listening && !heardAny && <p className="mb-2 text-sm text-neon">Habla ahora (o que hable el usuario): AdminOps escucha todos los micrófonos a la vez.</p>}
       {problems.length > 0 && (
         <div className="mb-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-sm text-ink">

@@ -1,10 +1,10 @@
-import { Download, Loader2, PackageX, RefreshCw, Search, TriangleAlert } from "lucide-react";
+import { Download, Loader2, PackageX, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, systemApi, type Advice, type AppView } from "../lib/api";
 import { useOnJournalChange } from "../lib/journalEvents";
-import { ErrorState, Loading, smallBtn } from "../components/ui";
+import { ErrorState, Loading, Notice, smallBtn } from "../components/ui";
 import { NeedsAdmin } from "../components/AdminBanner";
 
 const ADVICE: Record<Advice, { title: string; hint: string; cls: string }> = {
@@ -92,9 +92,9 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
               punto de restauración.
             </p>
             {noUndo.length > 0 && (
-              <p className="mt-2 text-warn">
+              <Notice tone="warn" className="mt-2">
                 {noUndo.length} no se {noUndo.length === 1 ? "puede" : "pueden"} reinstalar automáticamente.
-              </p>
+              </Notice>
             )}
           </>
         ),
@@ -116,7 +116,11 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
         setRemoving(false);
         const go = await confirm({
           title: "No se pudo crear el punto de restauración",
-          body: <p className="font-mono text-xs break-words text-bad">{err.slice(RP_FAILED.length)}</p>,
+          body: (
+            <Notice tone="error" where="Bloatware" detail={err.slice(RP_FAILED.length)}>
+              <span className="font-mono break-words">{err.slice(RP_FAILED.length)}</span>
+            </Notice>
+          ),
           confirmLabel: "Quitar sin punto",
         });
         if (go) return remove(true);
@@ -165,9 +169,7 @@ export function Bloatware({ isAdmin }: { isAdmin: boolean }) {
         </div>
         {a.description && <p className="text-xs text-dim">{a.description}</p>}
         {a.note && (
-          <p className="mt-1 flex gap-1.5 text-xs text-warn/90">
-            <TriangleAlert size={12} className="mt-px shrink-0" /> {a.note}
-          </p>
+          <Notice tone="warn" className="mt-1">{a.note}</Notice>
         )}
         {!a.description && a.publisher && <p className="text-xs text-dim">{a.publisher}</p>}
       </div>

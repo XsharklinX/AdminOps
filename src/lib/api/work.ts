@@ -51,6 +51,7 @@ export interface Settings {
   rocketAuto?: boolean;
   /** Empezar el día ligero: optimiza una vez al día al poco de encender. */
   rocketMorning?: boolean;
+  /** En este equipo, abrir directamente en modo técnico. */
   /** Herramientas de la barra del cohete, en su orden (null: todas). */
   rocketTools?: string[] | null;
 }

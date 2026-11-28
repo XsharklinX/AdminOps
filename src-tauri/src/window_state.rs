@@ -124,6 +124,9 @@ pub fn ui_ready(app: tauri::AppHandle) {
     READY.store(true, std::sync::atomic::Ordering::SeqCst);
     BOOTING.store(true, std::sync::atomic::Ordering::SeqCst);
     reveal(&app);
+    // El instalador de una actualización espera esta marca para saber que la versión nueva abre.
+    let version = app.package_info().version.to_string();
+    std::thread::spawn(move || crate::appcare::mark_boot_ok(&version));
 }
 
 /// El código de la interfaz ha empezado a ejecutarse. Todavía no hay nada

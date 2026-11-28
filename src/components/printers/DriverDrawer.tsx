@@ -185,9 +185,9 @@ export function DriverDrawer({
               <p className="mt-1.5 text-xs leading-relaxed text-dim">{target.printer.state.reason}</p>
             </div>
           ) : (
-            <div className="rounded-lg border border-warn/30 bg-warn/5 px-3 py-2.5 text-xs text-warn">
+            <Notice tone="warn">
               Conectada y sin driver: Windows no sabe imprimir con ella. {target.device.model && <span className="text-dim">Modelo: {target.device.model}.</span>}
-            </div>
+            </Notice>
           )}
         </section>
 
@@ -308,9 +308,9 @@ export function DriverDrawer({
               </>
             )}
             {verdict === "ok" && (
-              <p className="text-xs text-ok">
+              <Notice tone="ok">
                 {target.kind === "printer" ? target.printer.name : name} con el driver {describeDriver(result.newDriver, result.newVersion)}. Queda anotado en el diario del equipo.
-              </p>
+              </Notice>
             )}
             {verdict === "undone" && <Notice tone="warn">Deshecho: vuelve a {describeDriver(result.previousDriver, result.previousVersion)}.</Notice>}
           </section>

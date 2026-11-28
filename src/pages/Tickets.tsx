@@ -624,9 +624,8 @@ function NetworkNotice({ portal, onReload }: { portal: Portal; onReload: () => v
   const online = useOnline();
   if (!online)
     return (
-      <div className="flex items-center gap-2 border-b border-warn/30 bg-warn/10 px-4 py-1.5 text-xs text-warn">
-        <WifiOff size={13} className="shrink-0" />
-        <span className="min-w-0 flex-1">Este equipo está sin conexión a Internet. {portal.name} se recargará solo en cuanto vuelva la conexión.</span>
+      <div className="border-b border-line px-4 py-1.5">
+        <Notice tone="warn">Este equipo está sin conexión a Internet. {portal.name} se recargará solo en cuanto vuelva la conexión.</Notice>
       </div>
     );
   if (!view.slow || view.error) return null;

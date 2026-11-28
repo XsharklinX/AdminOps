@@ -1,7 +1,7 @@
 import { CheckCircle2, CircleAlert, ExternalLink, FileCheck2, HardDriveDownload, Loader2, Printer, RefreshCw, Search, Star, Stethoscope, Trash2, Wrench, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { Button, ErrorState, IconButton, Loading, iconBtn } from "../components/ui";
+import { Button, ErrorState, IconButton, Loading, iconBtn, Notice } from "../components/ui";
 import { ViewCommand } from "../components/ActionCommand";
 import { DataTable, type Column } from "../components/DataTable";
 import { printersApi, tweaksApi, vendorApi, type FoundPrinter, type PrinterCheck, type PrinterInfo, type PrinterSupply, type VendorKey, type VendorPrinter, type VendorPrinterInventory } from "../lib/api";
@@ -255,12 +255,14 @@ export function Printers({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {invError && (
-        <p className="mb-3 flex flex-wrap items-center gap-2 text-xs text-warn">
-          <CircleAlert size={13} /> No se pudo leer la marca y el driver de las impresoras: {invError}
-          <button type="button" onClick={() => void loadInv()} className="text-neon hover:underline">
-            Reintentar
-          </button>
-        </p>
+        <div className="mb-3 space-y-1.5">
+          <Notice tone="warn">No se pudo leer la marca y el driver de las impresoras: {invError}</Notice>
+          <div>
+            <button type="button" onClick={() => void loadInv()} className="text-xs text-neon hover:underline">
+              Reintentar
+            </button>
+          </div>
+        </div>
       )}
       {inv && <NotInstalled devices={inv.notInstalled} isAdmin={isAdmin} onChanged={() => void load()} onOptions={(d) => setDrawer({ kind: "detected", device: d })} />}
       {batch && inv && (

@@ -2,7 +2,7 @@ import { usePolling } from "../hooks/usePolling";
 import { ArrowDown, ArrowUp, ChevronRight, Cpu, FolderOpen, HelpCircle, Layers, Lock, MemoryStick, Pause, Play, Search, ShieldAlert, Skull, TriangleAlert, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
-import { EmptyLine, ErrorState, Loading } from "../components/ui";
+import { EmptyLine, ErrorState, Loading, Notice } from "../components/ui";
 import { WhyNotResponding } from "../components/expert/WhyNotResponding";
 import { toolsApi, type ProcessView } from "../lib/api";
 import { bytes } from "../lib/format";
@@ -151,9 +151,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
             {tree && children > 0 && <> y sus {children} procesos hijos</>}. Se perderá lo que no esté guardado en ese programa.
           </p>
           {p.note && (
-            <p className="flex gap-1.5 text-warn">
-              <TriangleAlert size={14} className="mt-0.5 shrink-0" /> {p.note}
-            </p>
+            <Notice tone="warn">{p.note}</Notice>
           )}
         </>
       ),
@@ -423,7 +421,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
               </span>
             </div>
             <div className="truncate font-mono text-[11px] text-mute select-text">{selGroup.procs[0].exe ?? "Ruta no disponible"}</div>
-            {selGroup.protection === "critical" && <div className="text-xs text-bad">Es parte de Windows: finalizarlo puede colgar o reiniciar el equipo.</div>}
+            {selGroup.protection === "critical" && <Notice tone="warn" className="mt-1">Es parte de Windows: finalizarlo puede colgar o reiniciar el equipo.</Notice>}
           </div>
           <button
             onClick={() => toolsApi.openProcessLocation(selGroup.procs[0].pid).catch((e) => toast("error", String(e)))}
@@ -453,7 +451,7 @@ export function Processes({ isAdmin }: { isAdmin: boolean }) {
               {children > 0 && <span className="text-xs text-dim">{children} procesos hijos</span>}
             </div>
             <div className="truncate font-mono text-[11px] text-mute select-text">{sel.exe ?? "Ruta no disponible"}</div>
-            {sel.note && <div className={`text-xs ${sel.protection === "critical" ? "text-bad" : sel.protection === "self" ? "text-dim" : "text-warn"}`}>{sel.note}</div>}
+            {sel.note && <Notice tone={sel.protection === "self" ? "info" : "warn"} className="mt-1">{sel.note}</Notice>}
           </div>
           <button
             onClick={() => toolsApi.openProcessLocation(sel.pid).catch((e) => toast("error", String(e)))}

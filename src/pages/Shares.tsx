@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { NetworkDrives, OtherPcShares } from "../components/NetworkDrives";
 import { AccessEditor, ShareBackupDialog, shortAccount, when, WhyNoAccess } from "../components/ShareDialogs";
-import { Button, Card, EmptyLine, ErrorState, inputClass, Modal, Loading, iconBtn } from "../components/ui";
+import { Button, Card, EmptyLine, ErrorState, inputClass, Modal, Loading, iconBtn, Notice } from "../components/ui";
 import { logQuietly, officeApi, usersApi, vaultApi, type Share, type ShareBackup, type ShareRisk, type ShareSize, type SharingStatus } from "../lib/api";
 import { ago, bytes, friendlyPath } from "../lib/format";
 
@@ -182,17 +182,18 @@ export function Shares({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="mx-auto max-w-(--page-max) space-y-4 p-6">
       {blocked && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn/5 px-4 py-3">
-          <TriangleAlert size={16} className="shrink-0 text-warn" />
-          <p className="min-w-0 flex-1 text-sm text-ink">
+        <div className="space-y-2">
+          <Notice tone="warn">
             {status.category === "Public"
               ? "Windows trata esta red como pública: las carpetas compartidas no se ven desde otros equipos."
               : "Compartir archivos e impresoras está desactivado en el firewall."}
             <span className="block text-xs text-dim">Si es la red de casa o de la oficina, actívalo. En una Wi-Fi pública (cafetería, hotel) déjalo así.</span>
-          </p>
-          <Button onClick={() => void enable()} disabled={!isAdmin}>
-            Activar para esta red
-          </Button>
+          </Notice>
+          <div>
+            <Button onClick={() => void enable()} disabled={!isAdmin}>
+              Activar para esta red
+            </Button>
+          </div>
         </div>
       )}
 
@@ -268,27 +269,29 @@ export function Shares({ isAdmin }: { isAdmin: boolean }) {
                           )
                         ))}
                     </div>
-                    {s.missingPath && <p className="mt-1 text-[11px] text-bad">Quien intente entrar verá un error de Windows. Vuelve a crear la carpeta o deja de compartirla.</p>}
+                    {s.missingPath && <Notice tone="warn" className="mt-1">Quien intente entrar verá un error de Windows. Vuelve a crear la carpeta o deja de compartirla.</Notice>}
                     {s.ntfsBlocks && (
-                      <p className="mt-1 text-[11px] text-warn">
+                      <Notice tone="warn" className="mt-1">
                         Se comparte con «Todos», pero los permisos del disco no lo permiten y el acceso real es lo que dejen los dos a la vez: por eso la gente recibe «acceso
                         denegado» sin que se entienda por qué. Se arregla volviendo a dar el acceso en «Quién puede entrar».
-                      </p>
+                      </Notice>
                     )}
                     {s.risks.map((r) => (
-                      <p key={r} className="mt-1 text-[11px] text-warn">
-                        {RISK[r]?.why}{" "}
+                      <div key={r} className="mt-1">
+                        <Notice tone="warn">{RISK[r]?.why}</Notice>
                         {r === "everyone-full" && isAdmin && (
-                          <button onClick={() => void lowerEveryone(s)} className="text-neon hover:underline">
-                            Bajarlo a «Leer y modificar»
-                          </button>
+                          <div className="mt-1">
+                            <button onClick={() => void lowerEveryone(s)} className="text-[11px] text-neon hover:underline">
+                              Bajarlo a «Leer y modificar»
+                            </button>
+                          </div>
                         )}
-                      </p>
+                      </div>
                     ))}
                     {lowDisk(size) && size && (
-                      <p className="mt-1 flex items-center gap-1 text-[11px] text-warn">
-                        <TriangleAlert size={10} /> Quedan {bytes(size.diskFree)} libres en ese disco: cuando se llene, nadie podrá guardar en la carpeta.
-                      </p>
+                      <Notice tone="warn" className="mt-1">
+                        Quedan {bytes(size.diskFree)} libres en ese disco: cuando se llene, nadie podrá guardar en la carpeta.
+                      </Notice>
                     )}
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {s.access.map((a) => (

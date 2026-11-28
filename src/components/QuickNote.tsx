@@ -64,7 +64,7 @@ export function QuickNote() {
     setBusy("save");
     setError(null);
     try {
-      await notesApi.save({ id: "", title: title.trim(), text, created: 0, updated: 0, pinned: false, images: [] });
+      await notesApi.save({ id: "", title: title.trim(), text, created: 0, updated: 0, pinned: false, images: [], remindAt: null });
       await emit("notes-changed");
       await noteApi.close();
     } catch (e) {

@@ -12,6 +12,15 @@ fn main() {
     let conf: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&conf_path).unwrap()).unwrap();
     let version = conf["version"].as_str().unwrap().to_string();
     println!("cargo:rustc-env=APP_VERSION={version}");
+    // El formato de datos de esta versión (`DATA_FORMAT` de appcare.rs): se apunta con la copia del instalador para
+    // que «Volver a la versión anterior» sepa si la anterior lee los datos de ahora.
+    let appcare = root.join("src-tauri").join("src").join("appcare.rs");
+    println!("cargo:rerun-if-changed={}", appcare.display());
+    let data_format = std::fs::read_to_string(&appcare)
+        .ok()
+        .and_then(|t| t.lines().find_map(|l| l.trim().strip_prefix("pub const DATA_FORMAT: u32 = ").and_then(|r| r.trim_end_matches(';').trim().parse::<u32>().ok())))
+        .expect("no se encontró DATA_FORMAT en src-tauri/src/appcare.rs");
+    println!("cargo:rustc-env=APP_DATA_FORMAT={data_format}");
 
     let payload = root.join(format!("src-tauri/target/release/bundle/nsis/AdminOps_{version}_x64-setup.exe"));
     println!("cargo:rerun-if-changed={}", payload.display());

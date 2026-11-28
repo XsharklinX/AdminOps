@@ -340,7 +340,11 @@ export function Install({ isAdmin }: { isAdmin: boolean }) {
               Ocultar los {catalog.apps.filter((a) => isVisible(a, view) && isInstalled(a.id)).length} ya instalados
             </label>
           )}
-          {installedError && <span className="text-warn" title={installedError}>No se pudo comprobar qué está instalado</span>}
+          {installedError && (
+            <span title={installedError}>
+              <Notice tone="warn">No se pudo comprobar qué está instalado</Notice>
+            </span>
+          )}
           <button onClick={loadInstalled} className="rounded p-1 hover:text-ink" title="Volver a comprobar">
             <RefreshCw size={12} />
           </button>

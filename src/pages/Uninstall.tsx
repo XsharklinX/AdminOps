@@ -556,7 +556,11 @@ function BatchDialog({ programs, onClose }: { programs: InstalledProgram[]; onCl
             <span className="min-w-0 flex-1">
               <span className="text-sm text-ink">{p.name}</span>
               <span className="ml-2 text-[11px] text-mute">{p.silent ? `silencioso (${p.silentKind})` : "con asistente"}</span>
-              {status[p.id]?.msg && <span className={`block text-xs ${status[p.id].st === "error" ? "text-bad" : "text-dim"}`}>{status[p.id].msg}</span>}
+              {status[p.id]?.msg && (
+                <Notice tone={status[p.id].st === "error" ? "error" : "info"} where="Desinstalar" className="mt-1">
+                  {status[p.id].msg}
+                </Notice>
+              )}
             </span>
           </li>
         ))}

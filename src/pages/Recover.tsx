@@ -2,7 +2,7 @@ import { Download, FileSearch, Lightbulb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, inputClass, Loading } from "../components/ui";
+import { Button, Card, inputClass, Loading, Notice } from "../components/ui";
 import { CarveCard } from "../components/DiskRescue";
 import { UnsavedOffice } from "../components/UnsavedOffice";
 import { recoverApi, type RecoverDrive } from "../lib/api";
@@ -169,7 +169,7 @@ function Deleted({ isAdmin }: { isAdmin: boolean }) {
                 </select>
               </label>
             </div>
-            {source && source === dest && <p className="text-xs text-bad">Elige otra unidad para guardar lo recuperado.</p>}
+            {source && source === dest && <Notice tone="warn">Elige otra unidad para guardar lo recuperado.</Notice>}
 
             <div>
               <span className="mb-1.5 block text-xs text-dim">Qué buscar</span>

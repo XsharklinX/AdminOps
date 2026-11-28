@@ -15,7 +15,6 @@ import {
   Monitor,
   RefreshCw,
   Thermometer,
-  TriangleAlert,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -213,23 +212,24 @@ export function Hardware({ isAdmin, focus, onNavigate }: { isAdmin: boolean; foc
               </div>
             )}
             {sensors.cpuNeedsDriver && (
-              <div className="mt-3 flex items-center gap-3 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
-                <TriangleAlert size={14} className="shrink-0" />
-                <span className="flex-1">
+              <div className="mt-3 space-y-1.5">
+                <Notice tone="warn">
                   {!isAdmin
                     ? "La temperatura de la CPU y la placa requieren ejecutar AdminOps como administrador."
                     : !sensors.pawnioInstalled
                       ? "Para leer CPU y placa hace falta el driver PawnIO (libre y firmado)."
                       : "Esta CPU no expone su temperatura o requiere reiniciar AdminOps tras instalar PawnIO."}
-                </span>
+                </Notice>
                 {isAdmin && !sensors.pawnioInstalled && (
-                  <button
-                    onClick={installPawnio}
-                    disabled={installing}
-                    className="shrink-0 rounded-md border border-warn/50 px-3 py-1 text-warn hover:bg-warn/10 disabled:opacity-50"
-                  >
-                    Instalar PawnIO
-                  </button>
+                  <div>
+                    <button
+                      onClick={installPawnio}
+                      disabled={installing}
+                      className="shrink-0 rounded-md border border-warn/50 px-3 py-1 text-xs text-warn hover:bg-warn/10 disabled:opacity-50"
+                    >
+                      Instalar PawnIO
+                    </button>
+                  </div>
                 )}
               </div>
             )}

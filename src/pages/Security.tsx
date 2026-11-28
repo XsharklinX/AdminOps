@@ -321,9 +321,7 @@ function SuspiciousCard({ isAdmin }: { isAdmin: boolean }) {
           Programas sin firmar en carpetas temporales, PowerShell oculto, descargas por script y el archivo hosts redirigiendo antivirus o Windows Update. No sustituye a un antivirus.
         </Explain>
       ) : items.length === 0 ? (
-        <p className="flex items-center gap-2 text-sm text-ok">
-          <CircleCheck size={14} /> No se encontró nada sospechoso.
-        </p>
+        <Notice tone="ok">No se encontró nada sospechoso.</Notice>
       ) : (
         <div className="divide-y divide-line/60">
           {items.map((i, n) => (

@@ -169,7 +169,7 @@ fn save(c: &Config) -> Result<(), String> {
     if let Some(d) = p.parent() {
         std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
     }
-    let tmp = p.with_extension("json.tmp");
+    let tmp = crate::paths::tmp_for(&p);
     std::fs::write(&tmp, serde_json::to_string_pretty(c).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &p).map_err(|e| e.to_string())
 }
@@ -237,7 +237,7 @@ fn convert(dir: &Path, to_sealed: bool) -> Result<usize, String> {
         }
         let plain = read(bytes).ok_or_else(|| format!("{} está cifrado con otra clave.", p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()))?;
         let out = if to_sealed { seal(&key().ok_or(LOCKED_MSG)?, &plain)? } else { plain };
-        let tmp = p.with_extension("json.tmp");
+        let tmp = crate::paths::tmp_for(&p);
         std::fs::write(&tmp, out).map_err(|e| e.to_string())?;
         std::fs::rename(&tmp, &p).map_err(|e| e.to_string())?;
         n += 1;

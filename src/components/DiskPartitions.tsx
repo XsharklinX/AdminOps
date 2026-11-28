@@ -64,7 +64,7 @@ export function TypedConfirm({
           title: "Qué se va a hacer",
           body: (
             <div className="space-y-3">
-              <p className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs leading-relaxed text-bad">{body}</p>
+              <Notice tone="warn">{body}</Notice>
               {touches.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-ink">Se cambia</p>

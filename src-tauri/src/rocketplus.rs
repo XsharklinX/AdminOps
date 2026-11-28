@@ -625,7 +625,7 @@ pub fn mark_full_running() {
 }
 
 #[cfg(windows)]
-fn full_running() -> bool {
+pub fn full_running() -> bool {
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{OpenMutexW, SYNCHRONIZATION_SYNCHRONIZE};
     let name: Vec<u16> = MUTEX_FULL.encode_utf16().chain(Some(0)).collect();
@@ -642,7 +642,7 @@ fn full_running() -> bool {
 }
 
 #[cfg(not(windows))]
-fn full_running() -> bool {
+pub fn full_running() -> bool {
     false
 }
 
@@ -694,6 +694,9 @@ pub fn leave_rocket_behind(app: &tauri::AppHandle) {
     }
     let Ok(exe) = std::env::current_exe() else { return };
     std::thread::spawn(move || {
+        // Portable: el cohete no se queda corriendo desde la memoria USB (Windows no dejaría expulsarla y, al sacarla,
+        // se caería). Se copia a una carpeta de este equipo y corre desde ahí.
+        let exe = if crate::paths::is_portable() { local_copy(&exe).unwrap_or(exe) } else { exe };
         let exe = exe.to_string_lossy().into_owned();
         if crate::elevation::is_elevated() {
             if let Err(e) = crate::shellopen::run_as_user_visible(&exe, "--rocket") {
@@ -711,6 +714,42 @@ static LEFT_BEHIND: AtomicBool = AtomicBool::new(false);
 /// Esta salida no deja el cohete (se relanza AdminOps, o se sale sin dejar rastro).
 pub fn skip_rocket_behind() {
     SKIP_BEHIND.store(true, Ordering::SeqCst);
+}
+
+/// Copia el .exe portable a %LOCALAPPDATA%\AdminOps\cohete del usuario de la sesión (si no está ya igual) para que el
+/// cohete corra desde el equipo y no desde la memoria USB. Corriendo desde ahí ya no es «portable»: usa los ajustes de
+/// ese usuario. En modo técnico con la cuenta de otro, la carpeta es la del usuario de la sesión, no la del técnico:
+/// el cohete se abre como él y no podría leer el perfil del técnico.
+fn local_copy(exe: &std::path::Path) -> Option<std::path::PathBuf> {
+    let base = crate::target_user::user_dirs()?.local_app_data.join("AdminOps");
+    let dir = base.join("cohete");
+    std::fs::create_dir_all(&dir).ok()?;
+    // Elevada, AdminOps escribe en una carpeta del usuario: si alguna es un enlace (junction) a otro sitio, no se copia.
+    if [&base, &dir].iter().any(|d| is_reparse_point(d)) {
+        log::warn!("La carpeta del cohete es un enlace a otro sitio: no se copia ahí.");
+        return None;
+    }
+    let dst = dir.join("AdminOps.exe");
+    let same = std::fs::metadata(&dst).ok().zip(std::fs::metadata(exe).ok()).is_some_and(|(a, b)| a.len() == b.len() && a.modified().ok() >= b.modified().ok());
+    if !same {
+        // Si el de la vez anterior sigue abierto, no se puede pisar: se usa el que hay.
+        if std::fs::copy(exe, &dst).is_err() && !dst.exists() {
+            return None;
+        }
+    }
+    Some(dst)
+}
+
+/// ¿Es un enlace (junction o enlace simbólico) y no una carpeta de verdad?
+fn is_reparse_point(p: &std::path::Path) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // FILE_ATTRIBUTE_REPARSE_POINT
+        std::fs::symlink_metadata(p).is_ok_and(|m| m.file_attributes() & 0x400 != 0)
+    }
+    #[cfg(not(windows))]
+    std::fs::symlink_metadata(p).is_ok_and(|m| m.file_type().is_symlink())
 }
 
 /// Un solo «solo el cohete» por sesión: el del inicio de sesión, el que deja AdminOps al cerrarse y el de una tarea

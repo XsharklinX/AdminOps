@@ -7,7 +7,7 @@ import { useToast } from "../components/feedback";
 import { ScanToFolder } from "../components/ScanToFolder";
 import { ActionError, BrandBadge, DriverChip } from "../components/printers/Parts";
 import { describeDriver, installerFor, missingSoftware, VENDOR_NAME } from "../components/printers/logic";
-import { Button, EmptyState, ErrorState, iconBtn } from "../components/ui";
+import { Button, EmptyState, ErrorState, iconBtn, Notice } from "../components/ui";
 import { goToPage } from "../lib/navigate";
 import { vendorApi, type DriverLibrary, type VendorScanner, type VendorScannerInventory } from "../lib/api";
 
@@ -113,13 +113,17 @@ export function Scanners({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {failed && inv && lastOkAt && (
-        <p className="mb-3 flex flex-wrap items-center gap-2 text-xs text-warn">
-          <CircleAlert size={13} /> No se pudo actualizar: {failed}, se enseña la lectura de las{" "}
-          {new Date(lastOkAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
-          <button type="button" onClick={() => void load()} className="text-neon hover:underline">
-            Reintentar
-          </button>
-        </p>
+        <div className="mb-3 space-y-1.5">
+          <Notice tone="warn">
+            No se pudo actualizar: {failed}, se enseña la lectura de las{" "}
+            {new Date(lastOkAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
+          </Notice>
+          <div>
+            <button type="button" onClick={() => void load()} className="text-xs text-neon hover:underline">
+              Reintentar
+            </button>
+          </div>
+        </div>
       )}
       {inv.scanners.length > 0 && (
         <ul className="divide-y divide-line/60 overflow-hidden rounded-2xl border border-line/70 bg-panel shadow-elev-1">
@@ -148,9 +152,9 @@ export function Scanners({ isAdmin }: { isAdmin: boolean }) {
                 {errors[key] && <ActionError className="mt-2 ml-8" message={errors[key]} />}
                 {shots[s.name] && (
                   <div className="mt-3 ml-8">
-                    <p className="mb-1.5 flex items-center gap-1.5 text-xs text-ok">
-                      <CheckCircle2 size={13} /> Página recibida: el escáner funciona. Si no escanea desde un programa, el fallo está en el programa.
-                    </p>
+                    <Notice tone="ok" className="mb-1.5">
+                      Página recibida: el escáner funciona. Si no escanea desde un programa, el fallo está en el programa.
+                    </Notice>
                     <img src={shots[s.name].dataUrl} alt={`Escaneo de prueba de ${s.model || s.name}`} className="max-h-72 rounded-lg border border-line bg-white" />
                   </div>
                 )}

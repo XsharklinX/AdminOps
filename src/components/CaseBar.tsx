@@ -361,15 +361,15 @@ function CloseDialog({ current, onClose, onClosed }: { current: Case; onClose: (
       footer={
         <>
           {confirmDiscard ? (
-            <span className="mr-auto flex items-center gap-2 text-xs text-bad">
-              ¿Descartarlo sin guardar?
+            <div className="mr-auto flex items-center gap-2 text-xs text-bad">
+              <Notice tone="warn">¿Descartarlo sin guardar?</Notice>
               <button onClick={() => void discard()} className="font-medium underline" disabled={busy !== null}>
                 Sí, descartar
               </button>
               <button onClick={() => setConfirmDiscard(false)} className="text-mute hover:text-ink">
                 No
               </button>
-            </span>
+            </div>
           ) : (
             <button onClick={() => setConfirmDiscard(true)} className="mr-auto flex items-center gap-1 text-xs text-mute hover:text-bad" title="Para un caso abierto por error">
               <Trash2 size={12} /> Descartar

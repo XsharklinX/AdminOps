@@ -233,6 +233,8 @@ export const kbdApi = {
   state: () => invoke<KbdState>("kbd_state"),
   /** Deja solo el primer español y quita el atajo. `entryId`: la entrada del diario, para deshacer. */
   onlySpanish: () => invoke<{ message: string; entryId: number }>("kbd_only_spanish"),
+  /** Escribir con ese teclado ya (en lo abierto y en lo que se abra), sin quitar ninguno. */
+  use: (langId: number, klid: string) => invoke<string>("kbd_use", { langId, klid }),
 };
 
 // ---------- Herramientas, usuarios y Wi-Fi (v0.11) ----------

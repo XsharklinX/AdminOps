@@ -260,12 +260,90 @@ pub fn write_json<T: Serialize>(path: &std::path::Path, value: &T) -> Result<(),
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    let tmp = path.with_extension("json.tmp");
+    // Temporal único por proceso e hilo: la app y el cohete pueden escribir el mismo JSON a la vez.
+    static TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = path.with_extension(format!("json.{}-{seq}.tmp", std::process::id()));
     let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
     // Cifrado si toca; y con lo cifrado bloqueado, un error en lugar de pisarlo con lo vacío.
     let bytes = crate::datacrypt::for_write(path, json.into_bytes())?;
     std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e.to_string()
+    })
+}
+
+/// Bloqueo entre procesos (la app y el cohete) con un mutex con nombre de Windows, para las lecturas-modificaciones-
+/// escrituras de los JSON compartidos. Espera 5 s como mucho; si no lo consigue (o no puede crearlo), sigue sin él:
+/// el mutex en memoria de cada módulo protege los hilos del mismo proceso. Fuera de Windows no hace nada.
+pub struct CrossProcessLock {
+    #[cfg(windows)]
+    handle: windows_sys::Win32::Foundation::HANDLE,
+}
+
+impl CrossProcessLock {
+    /// `name` sin prefijo, p. ej. "AdminOpsNotas" (se crea como `Local\AdminOpsNotas`).
+    #[cfg(windows)]
+    pub fn acquire(name: &str) -> Self {
+        use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, LocalFree, ERROR_ACCESS_DENIED, WAIT_ABANDONED, WAIT_OBJECT_0};
+        use windows_sys::Win32::Security::Authorization::{ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1};
+        use windows_sys::Win32::Security::{PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES};
+        use windows_sys::Win32::System::Threading::{CreateMutexW, OpenMutexW, WaitForSingleObject, MUTEX_MODIFY_STATE};
+        const SYNCHRONIZE: u32 = 0x0010_0000;
+        let wide: Vec<u16> = format!("Local\\{name}").encode_utf16().chain(std::iter::once(0)).collect();
+        // El cohete (sin elevar) y la app en modo técnico (elevada) comparten el mutex. Con los permisos por defecto,
+        // el que crea uno elevado solo lo abren los administradores y el otro se quedaría sin bloqueo justo cuando hay
+        // competencia. Por eso: control total para SYSTEM y Administradores, esperar y soltar para cualquier usuario
+        // autenticado, y etiqueta de integridad media (sin ella el de un proceso elevado sería «alta» y no se podría
+        // soltar desde uno normal).
+        let sddl: Vec<u16> = "D:(A;;0x1F0001;;;SY)(A;;0x1F0001;;;BA)(A;;0x100001;;;AU)S:(ML;;NW;;;ME)".encode_utf16().chain(std::iter::once(0)).collect();
+        // SAFETY: `wide` y `sddl` terminan en 0 y viven durante las llamadas; `sd` se libera con LocalFree; el handle se
+        // cierra en Drop o aquí.
+        unsafe {
+            let mut sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+            let have_sd = ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), SDDL_REVISION_1, &mut sd, std::ptr::null_mut()) != 0;
+            let sa = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: sd, bInheritHandle: 0 };
+            let mut handle = CreateMutexW(if have_sd { &sa } else { std::ptr::null() }, 0, wide.as_ptr());
+            // Ya existe y lo creó otro con menos permisos para nosotros (CreateMutexW pide todos): se abre con lo justo.
+            if handle.is_null() && GetLastError() == ERROR_ACCESS_DENIED {
+                handle = OpenMutexW(SYNCHRONIZE | MUTEX_MODIFY_STATE, 0, wide.as_ptr());
+            }
+            if have_sd {
+                LocalFree(sd as _);
+            }
+            if handle.is_null() {
+                return Self { handle: std::ptr::null_mut() };
+            }
+            let r = WaitForSingleObject(handle, 5000);
+            if r == WAIT_OBJECT_0 || r == WAIT_ABANDONED {
+                Self { handle }
+            } else {
+                CloseHandle(handle);
+                Self { handle: std::ptr::null_mut() }
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    pub fn acquire(_name: &str) -> Self {
+        Self {}
+    }
+}
+
+#[cfg(windows)]
+impl Drop for CrossProcessLock {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            use windows_sys::Win32::Foundation::CloseHandle;
+            use windows_sys::Win32::System::Threading::ReleaseMutex;
+            // SAFETY: el handle es nuestro y el mutex lo tiene este mismo hilo (se adquiere y se suelta en él).
+            unsafe {
+                ReleaseMutex(self.handle);
+                CloseHandle(self.handle);
+            }
+        }
+    }
 }
 
 /// Informes PDF. En portable se juntan los de todos los equipos.
@@ -356,5 +434,31 @@ pub fn get_app_info(app: tauri::AppHandle) -> AppInfo {
         data_dir: machine_data_dir(&app).display().to_string(),
         reports_dir: reports_dir(&app).display().to_string(),
         start_page: std::env::var("ADMINOPS_START_PAGE").ok().filter(|p| p.len() < 200),
+    }
+}
+
+/// Nombre temporal único por proceso y escritura, para que el cohete y la app no se pisen al guardar el mismo archivo.
+pub fn tmp_for(path: &std::path::Path) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("dat");
+    path.with_extension(format!("{ext}.{}-{seq}.tmp", std::process::id()))
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::CrossProcessLock;
+
+    #[test]
+    fn el_mutex_entre_procesos_se_toma_y_se_suelta() {
+        let name = format!("AdminOpsPrueba{}", std::process::id());
+        let a = CrossProcessLock::acquire(&name);
+        // El descriptor (SDDL) es válido: si no, no habría mutex.
+        assert!(!a.handle.is_null());
+        drop(a);
+        // Otro hilo lo vuelve a tomar enseguida: se soltó bien.
+        let n = name.clone();
+        let ok = std::thread::spawn(move || !CrossProcessLock::acquire(&n).handle.is_null()).join().unwrap();
+        assert!(ok);
     }
 }

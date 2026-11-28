@@ -3,7 +3,7 @@ import { Copy, Eye, EyeOff, FolderLock, FolderOpen, HardDrive, KeyRound, Lock, L
 import { useCallback, useState } from "react";
 import { useConfirm, useToast } from "../components/feedback";
 import { TaskStatus } from "../components/TaskStatus";
-import { Button, Card, Explain, inputClass, Intro, Loading, Modal } from "../components/ui";
+import { Button, Card, Explain, inputClass, Intro, Loading, Modal, Notice } from "../components/ui";
 import { logQuietly, vaultApi, type VaultStatus, type VaultSupport } from "../lib/api";
 import { bytes, friendlyPath } from "../lib/format";
 import { useLiveEffect } from "../lib/useLiveEffect";
@@ -46,7 +46,7 @@ function NewPassword({ pw, setPw, pw2, setPw2 }: { pw: string; setPw: (v: string
         </div>
       )}
       <PasswordInput value={pw2} onChange={setPw2} placeholder="Repite la contraseña" />
-      {pw2 && pw !== pw2 && <p className="text-xs text-bad">Las contraseñas no coinciden.</p>}
+      {pw2 && pw !== pw2 && <Notice tone="warn">Las contraseñas no coinciden.</Notice>}
     </div>
   );
 }

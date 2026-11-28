@@ -140,7 +140,7 @@
     <div class="screen" id="s-done">
       <div class="check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <h2 id="d-title">AdminOps está listo</h2>
-      <p class="lead">Lo encontrarás en el menú Inicio. Todo lo que cambie en el equipo quedará en el Historial y se podrá deshacer.</p>
+      <p class="lead" id="d-lead">Lo encontrarás en el menú Inicio. Todo lo que cambie en el equipo quedará en el Historial y se podrá deshacer.</p>
       <div class="actions">
         <button class="btn primary" id="open">Abrir AdminOps</button>
         <button class="btn" id="finish">Cerrar</button>
@@ -258,7 +258,7 @@
 
   async function doInstall() {
     show("s-progress");
-    $("p-title").textContent = info && info.auto ? `Actualizando AdminOps a la ${info.version}…` : info && info.rollback ? `Volviendo a la ${info.version}…` : info && info.installedVersion && !info.downgrade ? "Actualizando AdminOps…" : "Instalando AdminOps…";
+    $("p-title").textContent = info && info.rollback ? `Volviendo a la ${info.version}…` : info && info.auto ? `Actualizando AdminOps a la ${info.version}…` : info && info.installedVersion && !info.downgrade ? "Actualizando AdminOps…" : "Instalando AdminOps…";
     nextTip();
     const tipTimer = setInterval(nextTip, 4500);
     try {
@@ -276,9 +276,40 @@
     }
   }
 
+  // Solo se comprueba una vez: «Abrir AdminOps» después de «sin-copia» abre sin esperar ni volver a avisar.
+  let verified = false;
+
   async function openApp() {
     try {
       await invoke("launch", { dir: installedDir });
+      // Actualización automática: se espera a que la versión nueva diga que abrió; si no, se vuelve a la anterior.
+      if (info && info.auto && !info.rollback && !verified) {
+        verified = true;
+        show("s-progress");
+        $("p-title").textContent = "Comprobando que abre…";
+        $("bar").style.width = "100%";
+        $("pct").textContent = "";
+        $("step").textContent = "Comprobando que abre…";
+        const r = await invoke("verify_launch");
+        if (r === "vuelta") {
+          $("p-title").textContent = "No abrió bien: volviendo a la versión anterior…";
+          $("step").textContent = "Volviendo a la versión anterior…";
+          setTimeout(() => invoke("quit"), 2500);
+          return;
+        }
+        if (r === "manual") {
+          $("p-title").textContent = "No abrió bien: se abrió el instalador de la versión anterior";
+          $("step").textContent = "Confírmalo en su ventana para volver a la versión anterior.";
+          setTimeout(() => invoke("quit"), 4000);
+          return;
+        }
+        if (r === "sin-copia") {
+          $("d-title").textContent = "AdminOps se actualizó, pero no confirmó que abriera";
+          $("d-lead").textContent = "No se pudo volver sola a la versión anterior (AdminOps te dirá por qué al abrirse). Si no abre, usa el instalador clásico.";
+          show("s-done");
+          return;
+        }
+      }
       invoke("quit");
     } catch (e) {
       $("err").textContent = String(e);

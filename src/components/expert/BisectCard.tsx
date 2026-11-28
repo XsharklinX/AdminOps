@@ -6,7 +6,7 @@ import { Loader2, Search, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useConfirm, useToast } from "../feedback";
 import { useKeepAlive } from "../../lib/alive";
-import { Card, EmptyLine, smallBtn, softBtn } from "../ui";
+import { Card, EmptyLine, Notice, smallBtn, softBtn } from "../ui";
 import { diagnoseApi, tweaksApi, type JournalEntry } from "../../lib/api";
 import { answer, candidates, culprit, maxQuestions, plan, startBisect, toUndo, type BisectState, type Candidate } from "../../lib/bisect";
 import { timeOfDay } from "../../lib/format";
@@ -244,8 +244,8 @@ export function BisectCard({ entries, onChanged }: { entries: JournalEntry[] | n
           )}
 
           {failed && (
-            <div className="mt-3 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3">
-              <p className="text-sm text-bad">Se interrumpió: {failed}</p>
+            <div className="mt-3">
+              <Notice tone="error" where="Encontrar el cambio que lo rompió">Se interrumpió: {failed}</Notice>
               <button onClick={() => void cancel()} className={`${smallBtn} mt-2`}>
                 <Undo2 size={12} /> Dejarlo todo como estaba
               </button>

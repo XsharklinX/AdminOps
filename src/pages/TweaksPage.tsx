@@ -6,7 +6,7 @@ import { RP_FAILED, tweaksApi, type OpResult, type TweakView } from "../lib/api"
 import { ScheduleCard } from "../components/Maintenance";
 import { PowerCard } from "../components/PowerCard";
 import { useOnJournalChange } from "../lib/journalEvents";
-import { ErrorState, Loading, EmptyLine } from "../components/ui";
+import { ErrorState, Loading, EmptyLine, Notice } from "../components/ui";
 
 const CANCELLED = "Cancelado por el usuario.";
 
@@ -115,7 +115,9 @@ export function TweaksPage({
           title: "No se pudo crear el punto de restauración",
           body: (
             <>
-              <p className="mb-2 font-mono text-xs break-words text-bad">{err.slice(RP_FAILED.length)}</p>
+              <Notice tone="error" where="Ajustes" detail={err.slice(RP_FAILED.length)} className="mb-2">
+                <span className="font-mono break-words">{err.slice(RP_FAILED.length)}</span>
+              </Notice>
               <p>
                 Puedes aplicar el ajuste igualmente: AdminOps guarda el estado anterior y podrás deshacerlo desde aquí o
                 desde el Historial.

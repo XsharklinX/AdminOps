@@ -1,9 +1,9 @@
-import { ChevronDown, Loader2, Play, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ChevronDown, Loader2, Lock, Play, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TaskStatus } from "./TaskStatus";
 import { ChangePreview } from "./ChangePreview";
 import { ViewCommand } from "./ActionCommand";
-import type { TweakStatus, TweakView } from "../lib/api";
+import { api, type TweakStatus, type TweakView } from "../lib/api";
 import { RISK } from "../lib/risk";
 
 const STATUS: Partial<Record<TweakStatus, { label: string; cls: string }>> = {
@@ -80,7 +80,9 @@ export function TweakCard({
   highlighted?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const blocked = (t.needsAdmin && !isAdmin) || !t.supported || t.status === "unavailable";
+  // Necesita administrador y AdminOps está en modo usuario: en vez del botón, un candado que lleva a modo técnico.
+  const needsTech = t.needsAdmin && !isAdmin;
+  const blocked = needsTech || !t.supported || t.status === "unavailable";
   // "Parcial" se muestra apagado: al pulsarlo se completa el ajuste.
   const on = t.status === "applied";
   const st = STATUS[t.status];
@@ -106,7 +108,7 @@ export function TweakCard({
               <span className="rounded border border-line-2 px-1.5 py-px text-[11px] text-dim">Requiere reinicio</span>
             )}
             {t.needsAdmin && !isAdmin && (
-              <span className="rounded border border-warn/30 px-1.5 py-px text-[11px] text-warn">Requiere admin</span>
+              <span className="flex items-center gap-1 rounded border border-warn/30 px-1.5 py-px text-[11px] text-warn"><Lock size={10} /> Pide modo técnico</span>
             )}
           </div>
           <p className="mt-1 text-sm text-dim">{t.description}</p>
@@ -141,7 +143,16 @@ export function TweakCard({
         </div>
 
         <div className="pt-0.5">
-          {t.kind === "action" ? (
+          {needsTech && t.supported && t.status !== "unavailable" ? (
+            <button
+              type="button"
+              onClick={() => void api.relaunchAsAdmin().catch(() => {})}
+              title="Esto cambia una parte del sistema: pide modo técnico (Windows pedirá la contraseña de un administrador)"
+              className="flex items-center gap-1.5 rounded-md border border-warn/40 px-3 py-1.5 text-xs font-medium text-warn transition-colors hover:bg-warn/10"
+            >
+              <Lock size={12} /> Modo técnico
+            </button>
+          ) : t.kind === "action" ? (
             <button
               onClick={onRun}
               disabled={busy || blocked}

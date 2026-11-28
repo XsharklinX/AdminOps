@@ -1,4 +1,4 @@
-import { Eye, EyeOff, KeyRound, Loader2, Pencil, RefreshCw, Search, ShieldAlert, ShieldCheck, ShieldOff, Trash2, TriangleAlert, UserCheck, UserPlus, UserRound, UserX } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, Pencil, RefreshCw, Search, ShieldAlert, ShieldCheck, ShieldOff, Trash2, UserCheck, UserPlus, UserRound, UserX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "../components/contacts/Avatar";
 import { useToast } from "../components/feedback";
@@ -530,7 +530,7 @@ function CreateUser({ onClose, onCreated }: { onClose: () => void; onCreated: (n
         <div>
           <span className="mb-1 block text-xs text-dim">Contraseña</span>
           <PasswordFields value={u.password} confirm={confirm} onChange={(password) => setU({ ...u, password })} onConfirm={setConfirm} />
-          {mismatch && confirm && <p className="mt-1 text-xs text-bad">Las contraseñas no coinciden.</p>}
+          {mismatch && confirm && <Notice tone="warn" className="mt-1">Las contraseñas no coinciden.</Notice>}
           {!u.password && <Notice tone="warn" className="mt-1">Sin contraseña, cualquiera con acceso al equipo podrá entrar en esta cuenta.</Notice>}
         </div>
 
@@ -602,7 +602,7 @@ function PasswordDialog({ user, onClose, onDone }: { user: LocalUser; onClose: (
     >
       <div className="space-y-3">
         <PasswordFields value={pw} confirm={confirm} onChange={setPw} onConfirm={setConfirm} />
-        {pw !== confirm && confirm && <p className="text-xs text-bad">Las contraseñas no coinciden.</p>}
+        {pw !== confirm && confirm && <Notice tone="warn">Las contraseñas no coinciden.</Notice>}
         {!pw && <Notice tone="warn">Déjala vacía para quitar la contraseña: la cuenta entrará sin pedirla.</Notice>}
         <Check checked={mustChange && !!pw} disabled={!pw} onChange={setMustChange}>
           Pedir que la cambie al iniciar sesión
@@ -683,10 +683,10 @@ function DeleteUser({ user, onClose, onDeleted }: { user: LocalUser; onClose: ()
             </Check>
             {!withProfile && <p className="text-xs text-mute">La carpeta quedará en el disco y podrás copiar sus archivos o borrarla más tarde.</p>}
             {withProfile && (
-              <label className="block">
-                <span className="mb-1 block text-xs text-bad">Sus archivos se borrarán para siempre. Escribe «{user.name}» para confirmar:</span>
-                <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} className={inputClass} />
-              </label>
+              <div className="space-y-1">
+                <Notice tone="warn">Sus archivos se borrarán para siempre. Escribe «{user.name}» para confirmar:</Notice>
+                <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} className={inputClass} aria-label={`Escribe ${user.name} para confirmar`} />
+              </div>
             )}
           </>
         ) : (
@@ -743,8 +743,8 @@ function RenameDialog({ user, onClose, onDone }: { user: LocalUser; onClose: () 
         <label className="block">
           <span className="mb-1 block text-xs text-dim">Nombre de la cuenta</span>
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20} className={inputClass} />
-          {problema && <span className="mt-1 block text-[11px] text-bad">{problema}</span>}
         </label>
+        {problema && <Notice tone="warn">{problema}</Notice>}
         <label className="block">
           <span className="mb-1 block text-xs text-dim">Nombre completo</span>
           <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={256} placeholder="María Pérez" className={inputClass} />
@@ -754,11 +754,10 @@ function RenameDialog({ user, onClose, onDone }: { user: LocalUser; onClose: () 
           <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={256} placeholder="Recepción · segunda planta" className={inputClass} />
         </label>
         {cambiaNombre && user.hasProfile && (
-          <p className="flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 p-2.5 text-[11px] text-warn">
-            <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+          <Notice tone="warn">
             Su carpeta personal seguirá llamándose «{user.name}»: Windows no la renombra al cambiar la cuenta. Todo funciona igual, y
             cambiarla a mano rompe el perfil.
-          </p>
+          </Notice>
         )}
       </div>
     </Modal>

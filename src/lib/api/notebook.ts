@@ -10,6 +10,38 @@ export interface Note {
   pinned: boolean;
   /** Imágenes pegadas (capturas), como data: URL. */
   images: string[];
+  /** Hora (ms desde 1970) a la que AdminOps avisa de la nota; vacía si no hay aviso. */
+  remindAt?: number | null;
+}
+
+const atHour = (d: Date, h: number) => {
+  const x = new Date(d);
+  x.setHours(h, 0, 0, 0);
+  return x;
+};
+
+/** Los avisos que se ofrecen en el editor, a partir de `now`. */
+export function remindOptions(now: Date = new Date()): { label: string; at: number }[] {
+  const today15 = atHour(now, 15);
+  const tomorrow = atHour(new Date(now.getTime() + 86_400_000), 9);
+  const monday = atHour(now, 9);
+  monday.setDate(monday.getDate() + (((8 - monday.getDay()) % 7) || 7));
+  return [
+    today15 > now ? { label: "Hoy 15:00", at: today15.getTime() } : { label: "En 1 hora", at: now.getTime() + 3_600_000 },
+    { label: "Mañana 9:00", at: tomorrow.getTime() },
+    { label: "El lunes 9:00", at: monday.getTime() },
+  ];
+}
+
+/** «hoy 15:00», «mañana 09:00» o «lun 3 nov 09:00». */
+export function fmtRemind(ms: number, now: Date = new Date()): string {
+  const d = new Date(ms);
+  const hm = d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(now)) / 86_400_000);
+  if (diff === 0) return `hoy ${hm}`;
+  if (diff === 1) return `mañana ${hm}`;
+  return `${d.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" })} ${hm}`;
 }
 
 /** «[ ] algo» / «[x] algo»: una casilla de la nota. */

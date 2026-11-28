@@ -1,9 +1,9 @@
 // Asistente de pocos pasos para lo delicado: qué quieres hacer, qué se va a
 // tocar y qué no, una comprobación de seguridad y la confirmación. En cada paso
 // se ve cómo salir sin cambiar nada.
-import { Check, ChevronLeft, ChevronRight, ShieldAlert } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Button, Modal } from "./ui";
+import { Button, Modal, Notice } from "./ui";
 
 export interface WizardStep {
   title: string;
@@ -64,9 +64,7 @@ export function Wizard({ title, steps, finishLabel, danger = true, onClose, onFi
 export function Checks({ items, value, onChange }: { items: string[]; value: boolean[]; onChange: (v: boolean[]) => void }) {
   return (
     <div className="space-y-2">
-      <p className="flex items-center gap-1.5 text-xs text-warn">
-        <ShieldAlert size={13} /> Antes de seguir, confirma que:
-      </p>
+      <Notice tone="warn">Antes de seguir, confirma que:</Notice>
       {items.map((it, k) => (
         <label key={it} className="flex cursor-pointer items-start gap-2 rounded-md border border-line px-3 py-2 text-[13px] text-ink hover:border-line-2">
           <input type="checkbox" checked={!!value[k]} onChange={(e) => onChange(items.map((_, j) => (j === k ? e.target.checked : !!value[j])))} className="mt-0.5 accent-[var(--color-neon)]" />

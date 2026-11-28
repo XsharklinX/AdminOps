@@ -337,6 +337,10 @@ pub struct TweakIndex {
     category: String,
     risk: model::Risk,
     note: Option<String>,
+    /// Cuánto tarda, qué cierra y si reinicia (los botones de «Resolver un problema» lo dicen antes de pulsar).
+    eta: String,
+    closes: Option<String>,
+    reboot: bool,
 }
 
 /// Nombre y categoría de todo el catálogo, sin detectar el estado (para la búsqueda global).
@@ -345,7 +349,17 @@ pub fn tweak_index(state: State<'_, TweakState>) -> Vec<TweakIndex> {
     state
         .catalog
         .iter()
-        .map(|t| TweakIndex { id: t.id.clone(), name: t.name.clone(), description: t.description.clone(), category: t.category.clone(), risk: t.risk, note: t.note.clone() })
+        .map(|t| TweakIndex {
+            id: t.id.clone(),
+            name: t.name.clone(),
+            description: t.description.clone(),
+            category: t.category.clone(),
+            risk: t.risk,
+            note: t.note.clone(),
+            eta: t.eta.clone().unwrap_or_else(|| if t.script.is_some() { "unos segundos".into() } else { "al momento".into() }),
+            closes: t.closes.clone(),
+            reboot: t.reboot,
+        })
         .collect()
 }
 

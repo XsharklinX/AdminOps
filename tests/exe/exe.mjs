@@ -15,6 +15,9 @@
 //      ratón de verdad (no simulado dentro de la página): si algo invisible
 //      tapa la ventana, el clic no llega y la prueba falla;
 //   5. grabar 5 s con «Grabar el fallo» y comprobar que el vídeo se guarda;
+//   5b. la barra del cohete (ventana «rocket»): cada herramienta con su botón, «El teclado» y
+//       «La impresora» (solo leen) abren su panel, caben en la ventana y Esc los cierra (se salta con aviso si el
+//       cohete no se puede encender o su ventana no aparece por CDP; --no-rocket lo omite);
 //   6. cerrar la ventana y comprobar que no quedan procesos (ni AdminOps ni WebView2).
 // Son los fallos que llegaron en la 1.1.6: la capa invisible, la ventana negra
 // del portable y el modo claro con el fondo negro.
@@ -77,7 +80,10 @@ mkdirSync(dataDir, { recursive: true });
 // datos de AdminOps instalado en este equipo (storage::migrate_if_needed), con
 // sus portales y ajustes como «Al cerrar, minimizar», y la prueba deja de ser limpia.
 // «onboarded»: sin él sale el asistente de inicio, que tapa la ventana y deja el portal escondido.
-writeFileSync(join(dataDir, "settings.json"), JSON.stringify({ onboarded: true, rocket: "off" }));
+// «rocketTools»: la barra de la prueba lleva el teclado y la impresora, cuyos paneles solo leen. «netOff»: sin
+// salir a Internet (velocidad e IP pública apagadas), así la prueba no depende de la red ni gasta datos.
+const ROCKET_TEST_TOOLS = ["rec", "clip", "speed", "note", "mon", "fix", "card", "help", "teams", "mail", "app", "keyboard", "printer"];
+writeFileSync(join(dataDir, "settings.json"), JSON.stringify({ onboarded: true, rocket: "off", rocketTools: ROCKET_TEST_TOOLS, netOff: ["speedtest", "publicip"] }));
 
 // ── 2. Portal de prueba: una página con sesión (cookie) y un contador ──────
 let visits = 0;
@@ -400,6 +406,102 @@ if ($o -eq ${pid}) { [C]::mouse_event(2,0,0,0,[IntPtr]::Zero); [C]::mouse_event(
 "$o|$($sb.ToString())"`;
   const [p, cls] = execFileSync("powershell", ["-NoProfile", "-Command", ps], { encoding: "utf8" }).trim().split("|");
   return { pid: Number(p), cls: cls ?? "" };
+}
+
+// ── 7b. La barra del cohete (ventana «rocket») ─────────────────────────────
+// El cohete es otra ventana de WebView2 (rocket.rs, etiqueta «rocket»). Comparte la carpeta de datos y los
+// argumentos del navegador con la principal, así que el mismo puerto de depuración la expone como una página más;
+// se reconoce por `window.__ADMINOPS_ROCKET__` (su script de inicio). La prueba lo enciende en modo escritorio
+// (la prueba arranca con `rocket: "off"`), y al terminar lo apaga. Si no se puede encender o su página no aparece
+// por CDP, se avisa y se salta: no rompe la build.
+await rocketBarCheck();
+
+async function rocketBarCheck() {
+  if (args.includes("--no-rocket")) return log("Cohete: omitido (--no-rocket).");
+  const invoke = (cmd, a) => page.evaluate(([c, x]) => window.__TAURI_INTERNALS__.invoke(c, x), [cmd, a]);
+  const skip = (why) => log(`⚠ Cohete: no se probó la barra (${why}).`);
+  try {
+    await invoke("rocket_set_mode", { mode: "desktop" });
+  } catch (e) {
+    return skip(`no se pudo encender el cohete: ${String(e?.message ?? e).split(/\r?\n/)[0]}`);
+  }
+  try {
+    let rk = null;
+    for (let i = 0; i < 60 && !rk; i++) {
+      for (const p of browser.contexts().flatMap((c) => c.pages())) {
+        if (await p.evaluate(() => window.__ADMINOPS_ROCKET__ === true).catch(() => false)) rk = p;
+      }
+      if (!rk) await sleep(250);
+    }
+    if (!rk) return skip("la ventana del cohete no aparece por el puerto de depuración (CDP) en 15 s");
+    await rk.waitForSelector("#root *", { timeout: 15000 }).catch(() => {});
+
+    // Saca la barra (si estaba escondida, el cohete la abre al tocarlo) y la mantiene abierta con el ratón encima.
+    const ensureOpen = async () => {
+      for (let i = 0; i < 4; i++) {
+        if (await rk.$(".rkb-col .rkb-tools")) return true;
+        const opener = await rk.$(".rkb-tab, .rkb-bubble, [aria-label='Sacar la barra de AdminOps']");
+        await opener?.click({ timeout: 3000 }).catch(() => {});
+        await rk.waitForSelector(".rkb-col .rkb-tools", { timeout: 2500 }).catch(() => {});
+      }
+      return !!(await rk.$(".rkb-col .rkb-tools"));
+    };
+    if (!(await ensureOpen())) {
+      fail("cohete", "la barra no se abre (ver cohete-cerrado.png)");
+      await rk.screenshot({ path: join(out, "cohete-cerrado.png") }).catch(() => {});
+      return;
+    }
+
+    // Cada herramienta que debe verse tiene su botón: las de fábrica de este equipo (con o sin administrador).
+    const src = readFileSync(join(root, "src", "lib", "api", "rocketbar.ts"), "utf8");
+    const labelOf = Object.fromEntries([...src.slice(src.indexOf("export const TOOL_LABEL")).matchAll(/^\s+([a-z]+): "([^"]+)"/gm)].map((m) => [m[1], m[2]]));
+    // Los ajustes de la prueba fijan la barra (rocketTools): esos son los botones esperados.
+    const expected = ROCKET_TEST_TOOLS.filter((t) => labelOf[t]);
+    const labels = await rk.$$eval(".rkb-tools .rkb-btn", (bs) => bs.map((b) => b.getAttribute("aria-label") ?? ""));
+    if (!labels.length) fail("cohete", "la barra no tiene ningún botón de herramienta");
+    for (const t of expected) if (!labels.includes(labelOf[t])) fail("cohete", `falta el botón de «${labelOf[t]}»`);
+    for (const l of labels) if (!l.trim()) fail("cohete", "hay un botón de la barra sin aria-label");
+    log(`Cohete: ${labels.length} botones (${expected.length} esperados).`);
+
+    // Cada panel: se abre, cabe dentro de la ventana y Esc lo cierra.
+    const fits = () =>
+      rk.evaluate(() => {
+        const el = document.querySelector(".rk-panel");
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        const w = document.documentElement.clientWidth;
+        const h = document.documentElement.clientHeight;
+        return { ok: r.width > 0 && r.height > 0 && r.left >= -0.5 && r.top >= -0.5 && r.right <= w + 0.5 && r.bottom <= h + 0.5, box: [r.left, r.top, r.right, r.bottom].map(Math.round).join(","), win: `${w}x${h}` };
+      });
+    for (const tool of ["keyboard", "printer"]) {
+      const label = labelOf[tool];
+      if (!labels.includes(label)) continue; // ya se dio por fallo arriba si debía estar
+      await ensureOpen();
+      await rk.click(`.rkb-tools [aria-label="${label}"]`, { timeout: 4000 }).catch((e) => fail("cohete", `no se pudo pulsar «${label}»: ${String(e.message).split("\n")[0]}`));
+      const opened = await rk.waitForSelector(".rk-panel", { timeout: 10000 }).then(() => true, () => false);
+      if (!opened) {
+        fail("cohete", `«${label}» no abrió su panel`);
+        await rk.screenshot({ path: join(out, `cohete-${tool}-sin-panel.png`) }).catch(() => {});
+        continue;
+      }
+      // La ventana crece a su ancho de panel de forma asíncrona: se espera a que quepa (hasta 3 s).
+      let f = await fits();
+      for (let i = 0; i < 12 && f && !f.ok; i++) {
+        await sleep(250);
+        f = await fits();
+      }
+      await rk.screenshot({ path: join(out, `cohete-${tool}.png`) }).catch(() => {});
+      if (!f?.ok) fail("cohete", `el panel de «${label}» no cabe en la ventana (panel ${f?.box}, ventana ${f?.win})`);
+      await rk.keyboard.press("Escape");
+      const closed = await rk.waitForSelector(".rk-panel", { state: "detached", timeout: 3000 }).then(() => true, () => false);
+      if (!closed) fail("cohete", `Esc no cerró el panel de «${label}»`);
+    }
+  } catch (e) {
+    fail("cohete", String(e?.message ?? e).split(/\r?\n/)[0]);
+  } finally {
+    await invoke("rocket_set_mode", { mode: "off" }).catch(() => {});
+    await sleep(800);
+  }
 }
 
 await finish();

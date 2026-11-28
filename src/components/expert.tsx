@@ -169,11 +169,13 @@ export function CrashCulprits({ isAdmin }: { isAdmin: boolean }) {
   return (
     <Card title="Pantallazos: del driver culpable a la solución" icon={<Bug size={14} />}>
       {r.verifier.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
-          <ShieldAlert size={14} /> Driver Verifier está vigilando: {r.verifier.join(", ")}.
-          <Button size="sm" kind="danger" onClick={() => expertApi.verifierOff().then((m) => (toast("ok", m), load()), (e) => toast("error", String(e)))} disabled={!isAdmin}>
-            Desactivar Driver Verifier
-          </Button>
+        <div className="mb-3 space-y-1.5">
+          <Notice tone="warn">Driver Verifier está vigilando: {r.verifier.join(", ")}.</Notice>
+          <div>
+            <Button size="sm" kind="danger" onClick={() => expertApi.verifierOff().then((m) => (toast("ok", m), load()), (e) => toast("error", String(e)))} disabled={!isAdmin}>
+              Desactivar Driver Verifier
+            </Button>
+          </div>
         </div>
       )}
       <div className="space-y-3">

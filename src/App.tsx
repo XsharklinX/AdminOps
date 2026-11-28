@@ -678,7 +678,22 @@ export default function App() {
   useTypeToFilter(() => locked !== false || paletteOpen || workshop || onboarding || aboutOpen || helpOpen || findOpen || alertsOpen || caseDialog || updateOpen);
 
   useEffect(() => {
-    trackBoot("permisos", api.isAdmin()).then(setIsAdmin).catch(() => setIsAdmin(false));
+    trackBoot("permisos", api.isAdmin())
+      .then((admin) => {
+        setIsAdmin(admin);
+        // «Abrir en modo técnico en este equipo»: una vez por arranque (si se dice que no al aviso, se queda en modo
+        // usuario). Viniendo de «Volver a modo usuario» no se pide (lo decide el backend con `--modo-usuario`).
+        if (admin) return;
+        let tried = false;
+        try {
+          tried = sessionStorage.getItem("adminops.techTried") === "1";
+          sessionStorage.setItem("adminops.techTried", "1");
+        } catch {
+          /* sin almacenamiento */
+        }
+        if (!tried) void api.techOnOpen().then((t) => { if (t.relaunch) void api.relaunchAsAdmin().catch(() => {}); }, () => {});
+      })
+      .catch(() => setIsAdmin(false));
     trackBoot("usuario del equipo", systemApi.targetUser()).then(setTargetUser).catch(logQuietly("App"));
     trackBoot("datos de AdminOps", appApi.info())
       .then((info) => {

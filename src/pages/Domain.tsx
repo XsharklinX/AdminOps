@@ -347,7 +347,7 @@ function JoinCard({ status, isAdmin, onJoined }: { status: DomainStatus; isAdmin
             <Button onClick={join} disabled={!isAdmin || !domain.trim() || !user.trim() || !password || joining || failed}>
               {joining ? <Loader2 size={14} className="animate-spin" /> : <Building2 size={14} />} Unir al dominio
             </Button>
-            {failed && <span className="text-xs text-bad">Corrige lo marcado en rojo antes de unir.</span>}
+            {failed && <Notice tone="warn">Corrige lo marcado en rojo antes de unir.</Notice>}
           </div>
           <p className="text-[11px] text-mute">
             La contraseña solo se usa para esta operación: no se guarda ni queda en el historial. Después hay que reiniciar el equipo e iniciar
@@ -426,10 +426,10 @@ function CredentialsDialog({
           </p>
         )}
         {kind === "leave" && (
-          <p className="text-warn">
+          <Notice tone="warn">
             Los usuarios del dominio dejarán de poder iniciar sesión en este equipo. Asegúrate de conocer la contraseña de un administrador local
             (AdminOps no deja continuar si no hay ninguno activo).
-          </p>
+          </Notice>
         )}
         {kind === "rename" && (
           <input

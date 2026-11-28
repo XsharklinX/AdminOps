@@ -4,7 +4,7 @@ import { useToast } from "./feedback";
 
 interface SelfCheckLine {
   text: string;
-  state: "ok" | "fixed" | "warn";
+  state: "ok" | "fixed" | "warn" | "failed";
 }
 
 /**
@@ -20,8 +20,14 @@ export function SelfCheck() {
       invoke<SelfCheckLine[]>("selfcheck_after_update")
         .then((lines) => {
           if (!alive || lines.length === 0) return;
-          const warn = lines.some((l) => l.state === "warn");
-          toast(warn ? "error" : "ok", `Comprobada la versión nueva: ${lines.map((l) => l.text).join(" ")}`);
+          // Una actualización que no abrió y se deshizo: aviso aparte, sin el «Comprobada la versión nueva».
+          const failed = lines.filter((l) => l.state === "failed");
+          const rest = lines.filter((l) => l.state !== "failed");
+          if (failed.length) toast("error", failed.map((l) => l.text).join(" "));
+          if (rest.length) {
+            const warn = rest.some((l) => l.state === "warn");
+            toast(warn ? "error" : "ok", `Comprobada la versión nueva: ${rest.map((l) => l.text).join(" ")}`);
+          }
         })
         .catch(() => {});
     }, 4000);

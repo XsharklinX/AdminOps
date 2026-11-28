@@ -1035,6 +1035,10 @@ fn watch_fullscreen(app: tauri::AppHandle) {
             std::thread::sleep(Duration::from_secs(2));
             tick += 1;
             let Some(w) = app.get_webview_window(LABEL) else { break };
+            // Con varios escritorios virtuales (Win+Tab), la barra va al que se está viendo.
+            if let Ok(h) = w.hwnd() {
+                crate::vdesk::follow(h.0 as isize);
+            }
             // ¿Se conectó o quitó la base o un monitor? (La primera vuelta solo apunta las de ahora.)
             let key = screens_key(&w);
             if !key.is_empty() && key != screens {

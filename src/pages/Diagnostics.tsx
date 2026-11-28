@@ -766,12 +766,14 @@ export function Diagnostics({
         <Progress timings={timings} running={running} quick={quickRun} />
         <ProblemsBoard refresh={d?.timestamp ?? 0} />
         {shown.quick && !running && (
-          <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
-            Análisis rápido: una primera mirada. No se guarda ni cuenta para el Panel o el informe.
-            <button onClick={() => void run(false)} className="underline">
-              Hacer el completo
-            </button>
-          </p>
+          <div className="mb-3 space-y-1.5">
+            <Notice tone="warn">Análisis rápido: una primera mirada. No se guarda ni cuenta para el Panel o el informe.</Notice>
+            <div>
+              <button onClick={() => void run(false)} className="text-xs text-warn underline">
+                Hacer el completo
+              </button>
+            </div>
+          </div>
         )}
         {shown.changes && <ChangesStrip c={shown.changes} />}
         {safeFixes.length > 0 && (
@@ -789,9 +791,9 @@ export function Diagnostics({
           <ul className="space-y-1">{main.map(row)}</ul>
         ) : (
           !running && (
-            <p className="flex items-center gap-2 py-2 text-sm text-ok">
-              <CircleCheck size={16} /> Nada urgente ni que convenga arreglar{suggestions.length > 0 ? ": solo sugerencias." : "."}
-            </p>
+            <Notice tone="ok" className="my-2">
+              Nada urgente ni que convenga arreglar{suggestions.length > 0 ? ": solo sugerencias." : "."}
+            </Notice>
           )
         )}
         {suggestions.length > 0 && (
@@ -1106,9 +1108,7 @@ export function Diagnostics({
             <Unavailable section={shown.drivers}>
               {(drivers) =>
                 drivers.length === 0 ? (
-                  <p className="flex items-center gap-2 text-sm text-ok">
-                    <CircleCheck size={15} /> Todos los dispositivos funcionan.
-                  </p>
+                  <Notice tone="ok">Todos los dispositivos funcionan.</Notice>
                 ) : (
                   <ul className="space-y-2">
                     {drivers.map((x) => (

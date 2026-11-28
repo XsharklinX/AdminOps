@@ -3,10 +3,10 @@
 // de si ya funciona. Si un paso lo arregla, se para ahí y se apunta (las
 // soluciones aprenden de lo que funcionó).
 import { ArrowRight, Check, ExternalLink, Loader2, RefreshCw, X, Zap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { celebrate } from "./Celebrate";
-import { Button, Modal } from "./ui";
-import { knowledgeApi, troubleshootApi, type Solution, type Symptom, type TroubleFinding } from "../lib/api";
+import { Button, Modal, Notice } from "./ui";
+import { knowledgeApi, troubleshootApi, tweaksApi, type Solution, type Symptom, type TroubleFinding } from "../lib/api";
 import type { SolutionAction } from "../lib/solutionsCatalog";
 import { checkFor, parseSteps } from "../lib/steps";
 import { openCase } from "../lib/currentCase";
@@ -15,6 +15,14 @@ export function GuidedSolution({ solution, actions, onRun, running, onClose }: {
   const steps = useMemo(() => parseSteps(solution.solution).filter((s) => s.n > 0), [solution.solution]);
   const check: Symptom | null = useMemo(() => checkFor(solution), [solution]);
   const [i, setI] = useState(0);
+  // Cuánto tarda cada arreglo del catálogo, qué cierra y si reinicia: se dice antes de pulsar.
+  const [fixInfo, setFixInfo] = useState<Record<string, string>>({});
+  useEffect(() => {
+    tweaksApi.index().then(
+      (list) => setFixInfo(Object.fromEntries(list.map((t) => [t.id, [t.eta, t.closes, t.reboot ? "reinicia" : null].filter(Boolean).join(" · ")]))),
+      () => {},
+    );
+  }, []);
   const [result, setResult] = useState<TroubleFinding[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [done, setDone] = useState<"fixed" | "notfixed" | null>(null);
@@ -51,9 +59,7 @@ export function GuidedSolution({ solution, actions, onRun, running, onClose }: {
         <p className="text-sm text-dim">Esta solución no tiene pasos numerados («1.», «2.»…). Edítala para poder seguirla paso a paso.</p>
       ) : done === "fixed" ? (
         <div className="space-y-3 text-sm">
-          <p className="flex items-center gap-2 text-ok">
-            <Check size={16} /> Arreglado en el paso {step.n}. Queda apuntado: la próxima vez esta solución sabrá qué suele funcionar.
-          </p>
+          <Notice tone="ok">Arreglado en el paso {step.n}. Queda apuntado: la próxima vez esta solución sabrá qué suele funcionar.</Notice>
           <Button onClick={onClose}>Cerrar</Button>
         </div>
       ) : done === "notfixed" ? (
@@ -84,6 +90,7 @@ export function GuidedSolution({ solution, actions, onRun, running, onClose }: {
                 <button key={`${a.kind}-${a.id}`} onClick={() => onRun(a)} disabled={running !== null} className="flex items-center gap-1 rounded-md border border-neon/40 px-2.5 py-1 text-xs text-neon hover:bg-neon/10 disabled:opacity-40">
                   {running === `${a.kind}-${a.id}` ? <Loader2 size={11} className="animate-spin" /> : a.kind === "fix" ? <Zap size={11} /> : a.kind === "tool" ? <ExternalLink size={11} /> : <ArrowRight size={11} />}
                   {a.kind === "fix" ? `${a.label} ahora` : a.label}
+                  {a.kind === "fix" && fixInfo[a.id] && <span className="ml-1 text-[10px] text-mute">· {fixInfo[a.id]}</span>}
                 </button>
               ))}
             </div>
@@ -94,9 +101,9 @@ export function GuidedSolution({ solution, actions, onRun, running, onClose }: {
                 {checking ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Comprobar si ya funciona
               </button>
               {result && (
-                <p className={`mt-1 ${bad.length ? "text-warn" : "text-ok"}`}>
+                <Notice tone={bad.length ? "warn" : "ok"} className="mt-1">
                   {bad.length ? `Sigue habiendo ${bad.length} problema(s): ${bad[0].title}.` : "La comprobación no encuentra problemas: parece arreglado."}
-                </p>
+                </Notice>
               )}
             </div>
           )}

@@ -306,16 +306,45 @@ fn office_xml(app: &tauri::AppHandle) -> Result<(String, usize), String> {
     Ok((xml, kinds))
 }
 
+/// ¿Es un enlace (junction o enlace simbólico)? Se mira sin seguirlo.
+fn is_link(p: &std::path::Path) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        std::fs::symlink_metadata(p).is_ok_and(|m| m.file_attributes() & 0x400 != 0)
+    }
+    #[cfg(not(windows))]
+    std::fs::symlink_metadata(p).is_ok_and(|m| m.file_type().is_symlink())
+}
+
+/// ¿Hay algún enlace dentro (en cualquier nivel)? Se recorre sin seguirlos.
+fn has_links_inside(dir: &std::path::Path) -> bool {
+    let Ok(list) = std::fs::read_dir(dir) else { return false };
+    list.flatten().any(|e| {
+        let p = e.path();
+        is_link(&p) || (p.is_dir() && has_links_inside(&p))
+    })
+}
+
 /// Escribe en la carpeta de AdminOps en ProgramData, que Windows lee con privilegios: la carpeta, solo de
 /// administradores y SYSTEM (lectura para el resto), aunque alguien la hubiera creado antes.
+///
+/// Los permisos se ponen solo en la carpeta (sin /T, Windows los hereda hacia dentro) y nunca si ella o algo de dentro
+/// es un enlace: un usuario puede crear cosas en ProgramData y un icacls como administrador que siguiera un enlace
+/// cambiaría los permisos de otra carpeta (System32). El archivo se crea de nuevo: uno que dejara otro sería suyo.
 fn write_protected(file: &std::path::Path, text: &str) -> Result<(), String> {
     if let Some(dir) = file.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        if is_link(dir) || has_links_inside(dir) {
+            return Err(format!("La carpeta {} tiene enlaces a otros sitios: no se toca. Bórralos y vuelve a probar.", dir.display()));
+        }
         let d = dir.to_string_lossy().into_owned();
-        crate::ps::exec("icacls", &[&d, "/setowner", "*S-1-5-32-544", "/T", "/C", "/Q"]).map_err(|e| format!("No se pudo proteger la carpeta: {e}"))?;
-        crate::ps::exec("icacls", &[&d, "/inheritance:r", "/grant:r", "*S-1-5-32-544:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-545:(OI)(CI)RX", "/T", "/C", "/Q"])
+        crate::ps::exec("icacls", &[&d, "/setowner", "*S-1-5-32-544", "/C", "/Q"]).map_err(|e| format!("No se pudo proteger la carpeta: {e}"))?;
+        crate::ps::exec("icacls", &[&d, "/inheritance:r", "/grant:r", "*S-1-5-32-544:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-545:(OI)(CI)RX", "/C", "/Q"])
             .map_err(|e| format!("No se pudo proteger la carpeta: {e}"))?;
     }
+    // remove_file quita el enlace si lo fuera, no lo que hay detrás; el nuevo es de los administradores.
+    let _ = std::fs::remove_file(file);
     std::fs::write(file, text).map_err(|e| format!("No se pudo escribir el archivo de asociaciones: {e}"))
 }
 

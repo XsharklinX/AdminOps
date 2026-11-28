@@ -18,6 +18,23 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.5.3",
+    title: "Actualizaciones que no fallan, la barra a tu medida y notas que avisan",
+    added: [
+      "Si una actualización no llega a abrir bien, AdminOps vuelve sola a la versión anterior y lo dice al abrirse.",
+      "La barra del cohete tiene su propia sección en Ajustes. Tocar dos veces una herramienta cierra su panel sin cortar lo que está haciendo, cada panel se abre a la altura de su botón y la barra sigue al escritorio virtual en el que estés.",
+      "El teclado de la barra deja elegir entre los idiomas del equipo y volver a como estaba.",
+      "Cámara y audio dicen qué programa está usando la cámara o el micrófono.",
+      "Una DLL que falta lleva al paquete que la trae: escribe su nombre en Ctrl+K.",
+      "Arreglos nuevos: «Sin internet» falso con internet y Escritorio remoto que se corta.",
+      "Notas con aviso a una hora («Hoy 15:00», «Mañana 9:00») y notas desde plantilla: equipo nuevo, alta de usuario, cambio de impresora o las tuyas.",
+      "«Abrir en modo técnico en este equipo», y los ajustes que piden modo técnico lo dicen con un botón para pasar a él.",
+    ],
+    fixed: [
+      "La actualización automática abría un cuadro negro y cerraba AdminOps.",
+    ],
+  },
+  {
     version: "1.5.2",
     title: "Para cualquier usuario: modo usuario y modo técnico, y la barra siempre a mano",
     added: [

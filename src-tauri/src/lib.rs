@@ -2,6 +2,8 @@ mod agenda;
 mod bootlog;
 mod comms;
 mod desktopicons;
+mod vdesk;
+mod inuse;
 mod context;
 mod perfhistory;
 mod problems;
@@ -118,6 +120,7 @@ mod usbpolicy;
 mod camfix;
 mod lostwin;
 mod notebook;
+mod uipref;
 mod rocketbar;
 mod bartools;
 mod webnotif;
@@ -334,6 +337,8 @@ pub fn run() {
                 rocketbar::start_hotkey(app.handle().clone());
                 rocketplus::start_brain(app.handle().clone());
                 rocketplus::watch_full(app.handle().clone());
+                // Avisos de las notas también con AdminOps cerrada (solo avisa si la entera no está abierta).
+                notebook::start(app.handle().clone());
                 return Ok(());
             }
             rocketplus::mark_full_running();
@@ -365,6 +370,8 @@ pub fn run() {
                 boottime::step("Vigilancia de la red", || officemap::start(app.handle().clone()));
                 // Agenda de mantenimientos: resumen del día y aviso antes de cada visita.
                 agenda::start(app.handle().clone());
+                // Avisos de las notas (Conocimiento → Notas).
+                notebook::start(app.handle().clone());
                 disks::start_watch(app.handle().clone());
             }
             uxio::watch_drops(app.handle());
@@ -434,7 +441,11 @@ pub fn run() {
             boottime::log_timing,
             elevation::relaunch_as_admin,
             elevation::relaunch_as_user,
+            elevation::tech_on_open,
+            elevation::set_tech_on_open,
             rocketbar::bar_profile,
+            kbdlang::kbd_use,
+            inuse::device_in_use,
             rocketbar::bar_ticket_extras,
             appcare::selfcheck_after_update,
             usbpolicy::usb_hidden,
@@ -550,6 +561,8 @@ pub fn run() {
             notebook::notes_index,
             notebook::notes_save,
             notebook::notes_delete,
+            uipref::ui_pref_get,
+            uipref::ui_pref_set,
             faultrec::faultrec_attach_case,
             faultrec::faultrec_copy_file,
             faultrec::faultrec_open_file,

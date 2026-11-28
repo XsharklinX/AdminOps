@@ -1,4 +1,6 @@
 import { notesApi, type Note } from "../lib/api/notebook";
+import { installQueueApi } from "../lib/api/install";
+import { DLL_PACKAGES } from "../lib/dlls";
 import { AppWindow, BookOpen, Bug, CheckCircle2, Circle, CornerDownLeft, FileText, Lightbulb, ListTree, Loader2, Pin, Search, Settings as SettingsIcon, SlidersHorizontal, Sparkles, UserRound, Wrench, X, XCircle, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV, allowedInMode, isPageId, navLabel, pageLabel, visibleAreas, type Area, type PageId } from "./Sidebar";
@@ -280,6 +282,22 @@ export function CommandPalette({
       out.push({ key: `solution:${s.id}`, kind: "solution", title: s.title, subtitle: s.problem, search: norm(`${s.title} ${s.problem} ${s.solution} ${s.tags.join(" ")}`), run: () => onNavigate("knowledge", `solution:${s.id}`) });
     for (const t of templates)
       out.push({ key: `template:${t.id}`, kind: "template", title: t.name, subtitle: t.category || "Plantilla de texto", search: norm(`${t.name} ${t.category} ${t.body}`), run: () => onNavigate("knowledge", `template:${t.id}`) });
+    // «msvcp140», «d3dx9_43.dll»…: la DLL que falta lleva a su paquete oficial (nunca a una web de descargas).
+    for (const p of DLL_PACKAGES)
+      out.push({
+        key: `dll:${p.name}`,
+        kind: "repair",
+        title: `Falta una DLL de ${p.name}`,
+        subtitle: `${p.dlls.slice(0, 4).map((d) => `${d}.dll`).join(", ")}… · ${p.apps.length ? "instala el paquete oficial (32 y 64 bits)" : (p.hint ?? "")}`,
+        search: norm(`dll falta no se encuentra ${p.name} ${p.dlls.join(" ")} ${p.dlls.map((d) => `${d}.dll`).join(" ")}`),
+        run: () => {
+          if (!p.apps.length) return;
+          void installQueueApi.enqueue(p.apps).then(
+            () => onNavigate("apps", "install"),
+            logQuietly("CommandPalette.dll"),
+          );
+        },
+      });
     for (const n of notes) {
       const first = n.text.split("\n").find((l) => l.trim()) ?? "";
       out.push({ key: `note:${n.id}`, kind: "note", title: n.title || first || "Nota", subtitle: (n.title ? first : "").slice(0, 90) || "Conocimiento › Notas", search: norm(`${n.title} ${n.text}`), run: () => onNavigate("knowledge", `notebook:${n.id}:${Date.now()}`) });

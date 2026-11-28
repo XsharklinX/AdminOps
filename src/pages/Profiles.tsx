@@ -31,7 +31,7 @@ import { ProfileEditor } from "../components/ProfileEditor";
 import { TaskStatus } from "../components/TaskStatus";
 import { RP_FAILED, profilesApi, workApi, type ProfileDef, type ProfileResult, type ProfileView } from "../lib/api";
 import { useOnJournalChange } from "../lib/journalEvents";
-import { ErrorState, Intro, Loading, Overlay, softBtn } from "../components/ui";
+import { ErrorState, Intro, Loading, Notice, Overlay, softBtn } from "../components/ui";
 import { NeedsAdmin } from "../components/AdminBanner";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -154,7 +154,11 @@ export function Profiles({ isAdmin }: { isAdmin: boolean }) {
         setBusy(null);
         const go = await confirm({
           title: "No se pudo crear el punto de restauración",
-          body: <p className="font-mono text-xs break-words text-bad">{err.slice(RP_FAILED.length)}</p>,
+          body: (
+            <Notice tone="error" where="Perfiles" detail={err.slice(RP_FAILED.length)}>
+              <span className="font-mono break-words">{err.slice(RP_FAILED.length)}</span>
+            </Notice>
+          ),
           confirmLabel: "Aplicar sin punto",
         });
         if (go) return apply(p, true);
